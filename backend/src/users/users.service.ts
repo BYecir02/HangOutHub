@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'; // On importe ton service BDD
-import { Prisma } from '@prisma/client'; // On importe les types automatiques de Prisma
+import { PrismaService } from '../prisma/prisma.service'; 
+import { Prisma } from '@prisma/client'; 
 
 @Injectable()
 export class UsersService {
