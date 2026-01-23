@@ -1,0 +1,433 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Booking {
+  id           String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String      @db.Uuid
+  eventId      String?     @db.Uuid
+  ticketTypeId String?     @db.Uuid
+  status       String?     @default("PENDING") @db.VarChar(20)
+  qrCode       String?     @db.VarChar(255)
+  Event        Event?      @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  TicketType   TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User         User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Payment      Payment[]
+}
+
+model Category {
+  id      Int     @id @default(autoincrement())
+  name    String  @db.VarChar(50)
+  iconUrl String? @db.VarChar(255)
+  Tag     Tag[]
+}
+
+model ChatMessage {
+  id       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  outingId String    @db.Uuid
+  senderId String    @db.Uuid
+  content  String
+  sentAt   DateTime? @default(now()) @db.Timestamp(6)
+  Outing   Outing    @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User      @relation(fields: [senderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model City {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique @db.VarChar(100)
+  slug             String             @unique @db.VarChar(100)
+  imageUrl         String?            @db.VarChar(255)
+  region           String?            @db.VarChar(100)
+  Place            Place[]
+  User             User[]
+  UserCityInterest UserCityInterest[]
+}
+
+model DeviceToken {
+  id       String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId   String  @db.Uuid
+  token    String  @unique @db.VarChar(255)
+  platform String? @db.VarChar(10)
+  User     User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Event {
+  id          String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId     String?      @db.Uuid
+  organizerId String       @db.Uuid
+  title       String       @db.VarChar(100)
+  description String?
+  startTime   DateTime     @db.Timestamp(6)
+  endTime     DateTime?    @db.Timestamp(6)
+  coverUrl    String?      @db.VarChar(255)
+  entryFee    Decimal?     @default(0) @db.Decimal(10, 2)
+  Booking     Booking[]
+  User        User         @relation(fields: [organizerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Place       Place?       @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  EventTag    EventTag[]
+  Promotion   Promotion[]
+  TicketType  TicketType[]
+}
+
+model EventTag {
+  eventId String @db.Uuid
+  tagId   Int
+  Event   Event  @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Tag     Tag    @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([eventId, tagId])
+}
+
+model Friendship {
+  id                                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  requesterId                       String    @db.Uuid
+  receiverId                        String    @db.Uuid
+  status                            String?   @default("PENDING") @db.VarChar(20)
+  createdAt                         DateTime? @default(now()) @db.Timestamp(6)
+  User_Friendship_receiverIdToUser  User      @relation("Friendship_receiverIdToUser", fields: [receiverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User_Friendship_requesterIdToUser User      @relation("Friendship_requesterIdToUser", fields: [requesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Notification {
+  id                              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId                          String    @db.Uuid
+  actorId                         String?   @db.Uuid
+  type                            String    @db.VarChar(50)
+  isRead                          Boolean?  @default(false)
+  createdAt                       DateTime? @default(now()) @db.Timestamp(6)
+  User_Notification_actorIdToUser User?     @relation("Notification_actorIdToUser", fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User_Notification_userIdToUser  User      @relation("Notification_userIdToUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Outing {
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  creatorId         String              @db.Uuid
+  placeId           String?             @db.Uuid
+  title             String              @db.VarChar(100)
+  scheduledDate     DateTime            @db.Timestamp(6)
+  status            String?             @default("DRAFT") @db.VarChar(20)
+  ChatMessage       ChatMessage[]
+  User              User                @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Place             Place?              @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  OutingMedia       OutingMedia[]
+  OutingParticipant OutingParticipant[]
+}
+
+model OutingMedia {
+  id                 String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  outingId           String               @db.Uuid
+  uploaderId         String               @db.Uuid
+  url                String               @db.VarChar(255)
+  type               String?              @db.VarChar(10)
+  createdAt          DateTime?            @default(now()) @db.Timestamp(6)
+  Outing             Outing               @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User               User                 @relation(fields: [uploaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  OutingMediaComment OutingMediaComment[]
+  OutingMediaLike    OutingMediaLike[]
+}
+
+model OutingMediaComment {
+  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String      @db.Uuid
+  mediaId     String      @db.Uuid
+  content     String
+  OutingMedia OutingMedia @relation(fields: [mediaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model OutingMediaLike {
+  userId      String      @db.Uuid
+  mediaId     String      @db.Uuid
+  OutingMedia OutingMedia @relation(fields: [mediaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, mediaId])
+}
+
+model OutingParticipant {
+  outingId String   @db.Uuid
+  userId   String   @db.Uuid
+  status   String?  @default("INVITED") @db.VarChar(20)
+  isAdmin  Boolean? @default(false)
+  Outing   Outing   @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([outingId, userId])
+}
+
+model Payment {
+  id        String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bookingId String  @db.Uuid
+  amount    Decimal @db.Decimal(10, 2)
+  provider  String  @db.VarChar(50)
+  status    String? @default("PENDING") @db.VarChar(20)
+  Booking   Booking @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Permission {
+  id             Int              @id @default(autoincrement())
+  slug           String           @unique @db.VarChar(50)
+  description    String?          @db.VarChar(255)
+  RolePermission RolePermission[]
+}
+
+model Place {
+  id           String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  cityId       Int
+  name         String         @db.VarChar(100)
+  description  String?
+  address      String?        @db.VarChar(255)
+  latitude     Float
+  longitude    Float
+  priceLevel   Int?           @default(1)
+  coverUrl     String?        @db.VarChar(255)
+  avgRating    Float?         @default(0)
+  viewCount    Int?           @default(0)
+  Event        Event[]
+  Outing       Outing[]
+  City         City           @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  PlaceClaim   PlaceClaim[]
+  PlaceTag     PlaceTag[]
+  Promotion    Promotion[]
+  Review       Review[]
+  SavedPlace   SavedPlace[]
+  Story        Story[]
+  Subscription Subscription[]
+}
+
+model PlaceClaim {
+  id          String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String  @db.Uuid
+  placeId     String  @db.Uuid
+  documentUrl String  @db.VarChar(255)
+  status      String? @default("PENDING") @db.VarChar(20)
+  Place       Place   @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model PlaceTag {
+  placeId String @db.Uuid
+  tagId   Int
+  Place   Place  @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Tag     Tag    @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([placeId, tagId])
+}
+
+model Promotion {
+  id      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId String?   @db.Uuid
+  eventId String?   @db.Uuid
+  budget  Decimal?  @db.Decimal(10, 2)
+  endDate DateTime? @db.Timestamp(6)
+  Event   Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Place   Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Report {
+  id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reporterId String  @db.Uuid
+  targetId   String  @db.Uuid
+  reason     String  @db.VarChar(255)
+  status     String? @default("PENDING") @db.VarChar(20)
+  User       User    @relation(fields: [reporterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Review {
+  id            String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId        String          @db.Uuid
+  placeId       String          @db.Uuid
+  rating        Int
+  comment       String?
+  photos        String?
+  createdAt     DateTime?       @default(now()) @db.Timestamp(6)
+  Place         Place           @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User          User            @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ReviewComment ReviewComment[]
+  ReviewLike    ReviewLike[]
+}
+
+model ReviewComment {
+  id       String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId   String @db.Uuid
+  reviewId String @db.Uuid
+  content  String
+  Review   Review @relation(fields: [reviewId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model ReviewLike {
+  userId   String @db.Uuid
+  reviewId String @db.Uuid
+  Review   Review @relation(fields: [reviewId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, reviewId])
+}
+
+model Role {
+  id             Int              @id @default(autoincrement())
+  name           String           @unique @db.VarChar(50)
+  description    String?          @db.VarChar(255)
+  RolePermission RolePermission[]
+  UserRole       UserRole[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  Permission   Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Role         Role       @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([roleId, permissionId])
+}
+
+model SavedPlace {
+  userId  String    @db.Uuid
+  placeId String    @db.Uuid
+  savedAt DateTime? @default(now()) @db.Timestamp(6)
+  Place   Place     @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User    User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, placeId])
+}
+
+model Story {
+  id        String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String      @db.Uuid
+  placeId   String?     @db.Uuid
+  mediaUrl  String      @db.VarChar(255)
+  expiresAt DateTime    @db.Timestamp(6)
+  Place     Place?      @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User      User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  StoryLike StoryLike[]
+  StoryView StoryView[]
+}
+
+model StoryLike {
+  userId  String @db.Uuid
+  storyId String @db.Uuid
+  Story   Story  @relation(fields: [storyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User    User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, storyId])
+}
+
+model StoryView {
+  userId  String    @db.Uuid
+  storyId String    @db.Uuid
+  seenAt  DateTime? @default(now()) @db.Timestamp(6)
+  Story   Story     @relation(fields: [storyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User    User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, storyId])
+}
+
+model Subscription {
+  id       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId  String    @db.Uuid
+  planName String?   @db.VarChar(50)
+  endDate  DateTime? @db.Timestamp(6)
+  Place    Place     @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Tag {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar(50)
+  categoryId      Int?
+  EventTag        EventTag[]
+  PlaceTag        PlaceTag[]
+  Category        Category?         @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  UserTagInterest UserTagInterest[]
+}
+
+model TicketType {
+  id       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  eventId  String    @db.Uuid
+  name     String    @db.VarChar(50)
+  price    Decimal   @db.Decimal(10, 2)
+  quantity Int
+  Booking  Booking[]
+  Event    Event     @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model User {
+  id                                      String               @id @db.Uuid
+  username                                String               @unique @db.VarChar(50)
+  phoneNumber                             String               @unique @db.VarChar(20)
+  email                                   String?              @unique @db.VarChar(255)
+  displayName                             String?              @db.VarChar(100)
+  passwordHash                            String?              @db.VarChar(255)
+  isVerified                              Boolean?             @default(false)
+  bio                                     String?
+  avatarUrl                               String?              @db.VarChar(255)
+  coverUrl                                String?              @db.VarChar(255)
+  birthDate                               DateTime?            @db.Date
+  gender                                  String?              @db.VarChar(20)
+  residenceCityId                         Int?
+  followersCount                          Int?                 @default(0)
+  followingCount                          Int?                 @default(0)
+  isActive                                Boolean?             @default(true)
+  lastLoginAt                             DateTime?            @db.Timestamp(6)
+  createdAt                               DateTime?            @default(now()) @db.Timestamp(6)
+  updatedAt                               DateTime?            @default(now()) @db.Timestamp(6)
+  Booking                                 Booking[]
+  ChatMessage                             ChatMessage[]
+  DeviceToken                             DeviceToken[]
+  Event                                   Event[]
+  Friendship_Friendship_receiverIdToUser  Friendship[]         @relation("Friendship_receiverIdToUser")
+  Friendship_Friendship_requesterIdToUser Friendship[]         @relation("Friendship_requesterIdToUser")
+  Notification_Notification_actorIdToUser Notification[]       @relation("Notification_actorIdToUser")
+  Notification_Notification_userIdToUser  Notification[]       @relation("Notification_userIdToUser")
+  Outing                                  Outing[]
+  OutingMedia                             OutingMedia[]
+  OutingMediaComment                      OutingMediaComment[]
+  OutingMediaLike                         OutingMediaLike[]
+  OutingParticipant                       OutingParticipant[]
+  PlaceClaim                              PlaceClaim[]
+  Report                                  Report[]
+  Review                                  Review[]
+  ReviewComment                           ReviewComment[]
+  ReviewLike                              ReviewLike[]
+  SavedPlace                              SavedPlace[]
+  Story                                   Story[]
+  StoryLike                               StoryLike[]
+  StoryView                               StoryView[]
+  City                                    City?                @relation(fields: [residenceCityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  UserCityInterest                        UserCityInterest[]
+  UserRole                                UserRole[]
+  UserTagInterest                         UserTagInterest[]
+}
+
+model UserCityInterest {
+  userId String @db.Uuid
+  cityId Int
+  City   City   @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, cityId])
+}
+
+model UserRole {
+  userId     String    @db.Uuid
+  roleId     Int
+  assignedAt DateTime? @default(now()) @db.Timestamp(6)
+  Role       Role      @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User       User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, roleId])
+}
+
+model UserTagInterest {
+  userId String @db.Uuid
+  tagId  Int
+  Tag    Tag    @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([userId, tagId])
+}
