@@ -93,7 +93,6 @@ export default function TabLayout() {
         name="register" 
         options={{ href: null, tabBarStyle: { display: 'none' } }} 
       />
-      {/* On cache aussi l'ancien explore si tu ne l'as pas supprimé */}
       <Tabs.Screen 
         name="explore" 
         options={{ href: null }} 
