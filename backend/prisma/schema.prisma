@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [uuidOssp(map: "uuid-ossp")]
 }
 
 model Booking {
@@ -357,7 +359,7 @@ model TicketType {
 }
 
 model User {
-  id                                      String               @id @db.Uuid
+  id                                      String               @id @default(uuid()) @db.Uuid
   username                                String               @unique @db.VarChar(50)
   phoneNumber                             String               @unique @db.VarChar(20)
   email                                   String?              @unique @db.VarChar(255)
@@ -375,7 +377,7 @@ model User {
   isActive                                Boolean?             @default(true)
   lastLoginAt                             DateTime?            @db.Timestamp(6)
   createdAt                               DateTime?            @default(now()) @db.Timestamp(6)
-  updatedAt                               DateTime?            @default(now()) @db.Timestamp(6)
+  updatedAt                               DateTime?            @updatedAt @db.Timestamp(6)
   Booking                                 Booking[]
   ChatMessage                             ChatMessage[]
   DeviceToken                             DeviceToken[]
