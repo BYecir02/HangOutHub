@@ -37,25 +37,22 @@ async function main() {
   console.log('✅ Rôles mis à jour');
 
   // --- 2. LES CATÉGORIES ---
+  await prisma.category.deleteMany({});
   const categories = [
-    { name: 'Restaurant', iconUrl: 'icon-resto' },
-    { name: 'Bar & Lounge', iconUrl: 'icon-bar' },
-    { name: 'Concert', iconUrl: 'icon-music' },
-    { name: 'Sport', iconUrl: 'icon-sport' },
-    { name: 'Plage', iconUrl: 'icon-beach' },
-    { name: 'Art & Culture', iconUrl: 'icon-art' },
-    { name: 'Festival', iconUrl: 'icon-festival' },
-    { name: 'Boîte de nuit', iconUrl: 'icon-club' },
+    { name: 'Restaurant', icon: 'restaurant-outline', color: '#FF9F43' },
+    { name: 'Bar & Lounge', icon: 'beer-outline', color: '#54a0ff' },
+    { name: 'Concert', icon: 'musical-notes-outline', color: '#5f27cd' },
+    { name: 'Sport', icon: 'football-outline', color: '#ee5253' },
+    { name: 'Plage', icon: 'sunny-outline', color: '#feca57' },
+    { name: 'Art & Culture', icon: 'color-palette-outline', color: '#ff9ff3' },
+    { name: 'Festival', icon: 'people-outline', color: '#00d2d3' },
+    { name: 'Boîte de nuit', icon: 'moon-outline', color: '#2e86de' },
   ];
 
   for (const category of categories) {
-    // On vérifie d'abord si la catégorie existe par son nom
-    const exists = await prisma.category.findFirst({ where: { name: category.name } });
-    if (!exists) {
-        await prisma.category.create({ data: category });
-    }
+    await prisma.category.create({ data: category });
   }
-  console.log('✅ Catégories mises à jour');
+  console.log('✅ Catégories mises à jour avec Icônes & Couleurs');
 
   // --- 3. LES VILLES DU BÉNIN (77 Communes) ---
   const beninData = {

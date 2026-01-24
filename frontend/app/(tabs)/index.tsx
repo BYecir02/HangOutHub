@@ -12,7 +12,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ NOUVEAU : On vérifie si l'utilisateur est déjà connecté au démarrage
+  // On vérifie si l'utilisateur est déjà connecté au démarrage
   useEffect(() => {
     const checkLogin = async () => {
       try {

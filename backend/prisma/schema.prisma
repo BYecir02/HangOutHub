@@ -25,7 +25,8 @@ model Booking {
 model Category {
   id      Int     @id @default(autoincrement())
   name    String  @db.VarChar(50)
-  iconUrl String? @db.VarChar(255)
+  icon    String  @default("help-outline")
+  color   String  @default("#4c669f")
   Tag     Tag[]
 }
 
