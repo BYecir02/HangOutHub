@@ -2,24 +2,24 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Petite fonction pour créer des slugs propres (ex: "Sèmè-Podji" -> "seme-podji")
+// Petite fonction pour créer des slugs propres
 function slugify(text: string) {
   return text
     .toString()
     .toLowerCase()
-    .normalize('NFD') // Sépare les accents des lettres
-    .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
-    .replace(/\s+/g, '-') // Remplace les espaces par des tirets
-    .replace(/[^\w\-]+/g, '') // Supprime les caractères spéciaux
-    .replace(/\-\-+/g, '-') // Remplace les tirets multiples par un seul
-    .replace(/^-+/, '') // Supprime les tirets au début
-    .replace(/-+$/, ''); // Supprime les tirets à la fin
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 }
 
 async function main() {
   console.log('🇧🇯 Début du seeding complet du Bénin...');
 
-  // --- 1. LES ROLES ---
+  // --- 1. LES ROLES (On touche pas) ---
   const roles = [
     { name: 'USER', description: 'Utilisateur standard' },
     { name: 'ADMIN', description: 'Administrateur du système' },
@@ -36,28 +36,82 @@ async function main() {
   }
   console.log('✅ Rôles mis à jour');
 
-  // --- 2. LES CATÉGORIES ---
+  // --- 2. LES CATÉGORIES & TAGS (C'est ici qu'on améliore !) ---
+  
+  // ⚠️ Important : On supprime d'abord les TAGS pour ne pas bloquer la suppression des catégories
+  await prisma.tag.deleteMany({}); 
   await prisma.category.deleteMany({});
+
   const categories = [
-    { name: 'Restaurant', icon: 'restaurant-outline', color: '#FF9F43' },
-    { name: 'Bar & Lounge', icon: 'beer-outline', color: '#54a0ff' },
-    { name: 'Concert', icon: 'musical-notes-outline', color: '#5f27cd' },
-    { name: 'Sport', icon: 'football-outline', color: '#ee5253' },
-    { name: 'Plage', icon: 'sunny-outline', color: '#feca57' },
-    { name: 'Art & Culture', icon: 'color-palette-outline', color: '#ff9ff3' },
-    { name: 'Festival', icon: 'people-outline', color: '#00d2d3' },
-    { name: 'Boîte de nuit', icon: 'moon-outline', color: '#2e86de' },
+    { 
+      name: 'Restaurant', 
+      icon: 'restaurant-outline', 
+      color: '#FF9F43',
+      tags: ['Maquis', 'Gastronomique', 'Fast-food', 'Brunch', 'Pizzeria', 'Fruits de mer'] 
+    },
+    { 
+      name: 'Bar & Lounge', 
+      icon: 'beer-outline', 
+      color: '#54a0ff',
+      tags: ['Rooftop', 'Chicha', 'VIP', 'Cocktails', 'Afterwork', 'Billard'] 
+    },
+    { 
+      name: 'Concert', 
+      icon: 'musical-notes-outline', 
+      color: '#5f27cd',
+      tags: ['Live Band', 'Rap/Hip-hop', 'Gospel', 'Acoustique', 'Traditionnel'] 
+    },
+    { 
+      name: 'Sport', 
+      icon: 'football-outline', 
+      color: '#ee5253',
+      tags: ['Football', 'Fitness', 'Yoga', 'Basketball', 'Marche', 'Salle de gym'] 
+    },
+    { 
+      name: 'Plage', 
+      icon: 'sunny-outline', 
+      color: '#feca57',
+      tags: ['Détente', 'Surf', 'Jet-ski', 'Pique-nique', 'Vue mer'] 
+    },
+    { 
+      name: 'Art & Culture', 
+      icon: 'color-palette-outline', 
+      color: '#ff9ff3',
+      tags: ['Vernissage', 'Expo', 'Théâtre', 'Stand-up', 'Musée', 'Cinéma'] 
+    },
+    { 
+      name: 'Festival', 
+      icon: 'people-outline', 
+      color: '#00d2d3',
+      tags: ['Musique', 'Gastronomie', 'Danse', 'Mode'] 
+    },
+    { 
+      name: 'Boîte de nuit', 
+      icon: 'moon-outline', 
+      color: '#2e86de',
+      tags: ['Afrobeats', 'DJ Set', 'Amapiano', 'Techno', 'Bouyon'] 
+    },
   ];
 
   for (const category of categories) {
-    await prisma.category.create({ data: category });
-  }
-  console.log('✅ Catégories mises à jour avec Icônes & Couleurs');
+    // On sépare les tags du reste des données
+    const { tags, ...catData } = category;
 
-  // --- 3. LES VILLES DU BÉNIN (77 Communes) ---
+    await prisma.category.create({
+      data: {
+        ...catData, // name, icon, color
+        Tag: {
+          create: tags.map(tagName => ({ name: tagName })) // Création magique des tags liés
+        }
+      }
+    });
+  }
+  console.log('✅ Catégories et Tags mis à jour');
+
+  // --- 3. LES VILLES DU BÉNIN (On touche pas) ---
   const beninData = {
     'Alibori': ['Kandi', 'Banikoara', 'Gogounou', 'Kérou', 'Malanville', 'Ségbana'],
-    'Atacora': ['Natitingou', 'Boukoumbé', 'Cobly', 'Kouandé', 'Matéri', 'Péhunco', 'Tanguiéta', 'Toucountouna'], // Note: Kerou est dans Alibori ou Atacora selon les sources, je l'ai laissé dans Alibori comme ta liste, j'ai retiré le doublon ici
+    'Atacora': ['Natitingou', 'Boukoumbé', 'Cobly', 'Kouandé', 'Matéri', 'Péhunco', 'Tanguiéta', 'Toucountouna'],
     'Atlantique': ['Ouidah', 'Abomey-Calavi', 'Allada', 'Kpomassè', 'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè'],
     'Borgou': ['Parakou', 'Bembèrèkè', 'Kalalé', 'N’Dali', 'Nikki', 'Pèrèrè', 'Sinendé', 'Tchaourou'],
     'Collines': ['Dassa-Zoumè', 'Bantè', 'Glazoué', 'Ouèssè', 'Savalou', 'Savè'],
@@ -77,15 +131,13 @@ async function main() {
       const slug = slugify(cityName);
       
       await prisma.city.upsert({
-        where: { slug: slug }, // On utilise le slug comme identifiant unique
-        update: {
-            region: department // Met à jour le département si ça a changé
-        },
+        where: { slug: slug },
+        update: { region: department },
         create: {
           name: cityName,
           slug: slug,
-          region: department, // Ici 'region' sert de Département
-          imageUrl: null // On pourra ajouter des images plus tard
+          region: department,
+          imageUrl: null 
         },
       });
     }

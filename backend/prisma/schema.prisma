@@ -68,7 +68,9 @@ model Event {
   startTime   DateTime     @db.Timestamp(6)
   endTime     DateTime?    @db.Timestamp(6)
   coverUrl    String?      @db.VarChar(255)
+  images      String[]     @default([])
   entryFee    Decimal?     @default(0) @db.Decimal(10, 2)
+  address     String?   @db.VarChar(255)
   Booking     Booking[]
   User        User         @relation(fields: [organizerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   Place       Place?       @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -189,6 +191,7 @@ model Place {
   longitude    Float
   priceLevel   Int?           @default(1)
   coverUrl     String?        @db.VarChar(255)
+  images       String[]       @default([])
   avgRating    Float?         @default(0)
   viewCount    Int?           @default(0)
   Event        Event[]

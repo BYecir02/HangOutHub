@@ -1,17 +1,21 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { View } from 'react-native';
+import { View, useColorScheme } from 'react-native';
 
 export default function TabLayout() {
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#4c669f', // Bleu principal
-        tabBarInactiveTintColor: 'gray',
+        tabBarInactiveTintColor: isDark ? '#9ca3af' : 'gray', // Gris plus clair en mode sombre
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: isDark ? '#111827' : '#fff', // Fond sombre (Gris très foncé) ou blanc
           borderTopWidth: 0,
           elevation: 10,
           shadowColor: '#000',
@@ -35,13 +39,13 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 2. DÉCOUVRIR (Anciennement Explore) */}
+      {/* 2. CARTE (Remplace Découvrir) */}
       <Tabs.Screen
-        name="discover"
+        name="map"
         options={{
-          title: 'Découvrir',
+          title: 'Carte',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
+            <Ionicons name={focused ? "map" : "map-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -60,6 +64,12 @@ export default function TabLayout() {
             </View>
           ),
         }}
+        listeners={() => ({
+          tabPress: (e) => {
+            e.preventDefault(); // Empêche l'ouverture de l'onglet vide
+            router.push('/create-modal'); // Ouvre le modal à la place
+          },
+        })}
       />
 
       {/* 4. SOCIAL */}
