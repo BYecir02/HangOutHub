@@ -26,6 +26,7 @@ export default function RootLayout() {
           <Stack.Screen name="event" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="outing" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="place" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="post" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           <Stack.Screen name="search" options={{ headerShown: false }} />
         </Stack>

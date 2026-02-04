@@ -71,7 +71,7 @@ export default function CreateModalScreen() {
             Que souhaitez-vous ajouter ?
           </Text>
 
-          <View className="flex-row justify-between px-2">
+          <View className="flex-row justify-between px-1">
             {/* OPTION 1 : SORTIE */}
             <MenuOption 
               label="Sortie" 
@@ -94,6 +94,14 @@ export default function CreateModalScreen() {
               icon="location" 
               color="#2ecc71" 
               onPress={() => navigateTo('/place')} 
+            />
+
+            {/* OPTION 4 : PUBLICATION */}
+            <MenuOption 
+              label="Post" 
+              icon="create" 
+              color="#f39c12" 
+              onPress={() => navigateTo('/post')} 
             />
           </View>
 
