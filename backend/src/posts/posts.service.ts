@@ -19,4 +19,22 @@ export class PostsService {
       },
     });
   }
+
+  // ✅ NOUVELLE MÉTHODE
+  async findAllByUser(userId: string) {
+    return this.prisma.post.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true
+          }
+        }
+      }
+    });
+  }
 }

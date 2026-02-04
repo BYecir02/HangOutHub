@@ -9,8 +9,11 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('sorties');
   const [user, setUser] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]); // Stocke les posts
   const [loading, setLoading] = useState(true);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  // États pour les Modals
+  const [previewImage, setPreviewImage] = useState<string | null>(null); // Pour l'avatar/cover
   
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -19,8 +22,16 @@ export default function ProfileScreen() {
     useCallback(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await api.get('/users/me');
-        setUser(response.data);
+        // 1. Récupérer le profil
+        const userRes = await api.get('/users/me');
+        setUser(userRes.data);
+
+        // 2. Récupérer les posts de l'utilisateur
+        if (userRes.data?.id) {
+            const postsRes = await api.get(`/posts/user/${userRes.data.id}`);
+            // On garde tous les posts (texte ou image)
+            setPosts(postsRes.data);
+        }
       } catch (error) {
         console.error("Erreur lors de la récupération du profil:", error);
       } finally {
@@ -34,9 +45,56 @@ export default function ProfileScreen() {
 
   const tabItems = [
     { id: 'sorties', label: 'Mes Sorties' },
-    { id: 'photos', label: 'Photos' },
+    { id: 'posts', label: 'Posts' },
     { id: 'avis', label: 'Avis' },
   ];
+
+  // Composant d'affichage d'un post (Style Feed)
+  const PostItem = ({ item }: { item: any }) => (
+    <View className="bg-white dark:bg-gray-900 mb-2 pb-4 border-b border-gray-100 dark:border-gray-800">
+        {/* Header du post */}
+        <View className="flex-row items-center p-4">
+            <Image 
+                source={{ uri: getImageUrl(item.User?.avatarUrl) || 'https://i.pravatar.cc/150' }} 
+                className="w-10 h-10 rounded-full mr-3" 
+            />
+            <View>
+                <Text className="font-bold text-gray-800 dark:text-white text-base">
+                    {item.User?.displayName || item.User?.username}
+                </Text>
+                <Text className="text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(item.createdAt).toLocaleDateString()}
+                </Text>
+            </View>
+        </View>
+
+        {/* Contenu Texte */}
+        {item.content && (
+            <Text className="px-4 pb-3 text-gray-800 dark:text-gray-200 text-base leading-6">
+                {item.content}
+            </Text>
+        )}
+
+        {/* Images (On affiche la première en grand pour l'instant) */}
+        {item.images && item.images.length > 0 && (
+            <Image 
+                source={{ uri: getImageUrl(item.images[0]) }} 
+                className="w-full h-96 bg-gray-200 dark:bg-gray-800"
+                resizeMode="cover"
+            />
+        )}
+
+        {/* Actions (Like/Comment) */}
+        <View className="flex-row px-4 pt-3">
+            <TouchableOpacity className="flex-row items-center mr-6">
+                <Ionicons name="heart-outline" size={24} color={isDark ? "#fff" : "#333"} />
+            </TouchableOpacity>
+            <TouchableOpacity className="flex-row items-center">
+                <Ionicons name="chatbubble-outline" size={24} color={isDark ? "#fff" : "#333"} />
+            </TouchableOpacity>
+        </View>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -124,8 +182,8 @@ export default function ProfileScreen() {
           <Text className="text-gray-400 dark:text-gray-500 text-xs">Abonnements</Text>
         </TouchableOpacity>
         <TouchableOpacity className="items-center">
-          <Text className="font-bold text-lg text-gray-900 dark:text-white">12</Text>
-          <Text className="text-gray-400 dark:text-gray-500 text-xs">Sorties</Text>
+          <Text className="font-bold text-lg text-gray-900 dark:text-white">{posts.length}</Text>
+          <Text className="text-gray-400 dark:text-gray-500 text-xs">Posts</Text>
         </TouchableOpacity>
       </View>
 
@@ -150,7 +208,7 @@ export default function ProfileScreen() {
         />
 
         {/* CONTENU DYNAMIQUE DES ONGLETS */}
-        <View className="p-5 min-h-[200px]">
+        <View className="min-h-[200px]">
           {activeTab === 'sorties' && (
             <View className="items-center justify-center py-10">
               <Ionicons name="calendar-outline" size={48} color={isDark ? "#333" : "#eee"} />
@@ -158,11 +216,18 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {activeTab === 'photos' && (
-            <View className="flex-row flex-wrap justify-between">
-              {[1, 2, 3].map((i) => (
-                <View key={i} className="w-[31%] aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg mb-2" />
-              ))}
+          {/* --- LISTE DES POSTS (FEED) --- */}
+          {activeTab === 'posts' && (
+            <View>
+              {posts.length > 0 ? (
+                posts.map((post) => (
+                  <PostItem key={post.id} item={post} />
+                ))
+              ) : (
+                <View className="w-full items-center py-10">
+                    <Text className="text-gray-400">Aucune publication pour le moment.</Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -174,7 +239,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* MODAL DE PRÉVISUALISATION D'IMAGE */}
+      {/* MODAL DE PRÉVISUALISATION D'IMAGE (Avatar/Cover) */}
       <Modal visible={!!previewImage} transparent={true} onRequestClose={() => setPreviewImage(null)} animationType="fade">
         <View className="flex-1 bg-black justify-center items-center">
           <TouchableOpacity 

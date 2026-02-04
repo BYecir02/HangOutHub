@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -24,5 +24,11 @@ export class PostsController {
   }))
   create(@Request() req, @Body() createPostDto: CreatePostDto, @UploadedFiles() files: Array<Express.Multer.File>) {
     return this.postsService.create(req.user.userId, createPostDto, files);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('user/:userId')
+  findAllByUser(@Param('userId') userId: string) {
+    return this.postsService.findAllByUser(userId);
   }
 }
