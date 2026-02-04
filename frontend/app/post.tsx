@@ -21,7 +21,7 @@ export default function CreatePostScreen() {
   // Gestion des images (Caméra ou Galerie)
   const pickImage = async (source: 'camera' | 'gallery') => {
     const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
