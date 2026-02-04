@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, useColorScheme, Image, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, useColorScheme, Image, ScrollView, Alert, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import api from '../services/api';
 
 export default function CreatePostScreen() {
   const router = useRouter();
@@ -15,11 +16,12 @@ export default function CreatePostScreen() {
   const [location, setLocation] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>('public');
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Gestion des images (Caméra ou Galerie)
   const pickImage = async (source: 'camera' | 'gallery') => {
     const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
@@ -44,6 +46,42 @@ export default function CreatePostScreen() {
     else setLocation("Le Code Bar, Cotonou"); // Mock pour l'instant
   };
 
+  // Envoi du post au backend
+  const handlePost = async () => {
+    if (!content.trim() && images.length === 0) {
+      Alert.alert("Oups", "Ajoute du texte ou une image !");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('visibility', visibility);
+
+      // Ajout des images
+      images.forEach((uri, index) => {
+        formData.append('images', {
+          uri: uri,
+          name: `image_${index}.jpg`,
+          type: 'image/jpeg',
+        } as any);
+      });
+
+      await api.post('/posts', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      Alert.alert("Succès", "Post publié !");
+      router.back();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erreur", "Impossible de publier le post.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-white dark:bg-black pt-14">
       {/* HEADER */}
@@ -53,12 +91,17 @@ export default function CreatePostScreen() {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          disabled={!content.trim()}
+          onPress={handlePost}
+          disabled={(!content.trim() && images.length === 0) || loading}
           className={`px-5 py-2 rounded-full ${content.trim() ? 'bg-[#f39c12]' : 'bg-gray-200 dark:bg-gray-800'}`}
         >
-          <Text className={`font-bold ${content.trim() ? 'text-white' : 'text-gray-400 dark:text-gray-500'}`}>
-            Publier
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={content.trim() ? "white" : "gray"} />
+          ) : (
+            <Text className={`font-bold ${content.trim() ? 'text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+              Publier
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 

@@ -235,6 +235,17 @@ model Promotion {
   Place   Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
+model Post {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId     String    @db.Uuid
+  content    String?
+  images     String[]  @default([])
+  visibility String?   @default("public") @db.VarChar(20)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime? @updatedAt @db.Timestamp(6)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Report {
   id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   reporterId String  @db.Uuid
@@ -392,6 +403,7 @@ model User {
   Notification_Notification_userIdToUser  Notification[]       @relation("Notification_userIdToUser")
   Outing                                  Outing[]
   OutingMedia                             OutingMedia[]
+  Post                                    Post[]
   OutingMediaComment                      OutingMediaComment[]
   OutingMediaLike                         OutingMediaLike[]
   OutingParticipant                       OutingParticipant[]
