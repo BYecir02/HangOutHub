@@ -51,12 +51,12 @@ export class UsersController {
     
     // Si un avatar a été uploadé, on construit son URL
     if (files.avatar && files.avatar[0]) {
-      updateData['avatarUrl'] = `${process.env.API_URL || 'http://192.168.1.26:3000'}/uploads/profiles/${files.avatar[0].filename}`;
+      updateData['avatarUrl'] = `/uploads/profiles/${files.avatar[0].filename}`;
     }
 
     // Si une couverture a été uploadée
     if (files.cover && files.cover[0]) {
-      updateData['coverUrl'] = `${process.env.API_URL || 'http://192.168.1.26:3000'}/uploads/profiles/${files.cover[0].filename}`;
+      updateData['coverUrl'] = `/uploads/profiles/${files.cover[0].filename}`;
     }
 
     return this.usersService.update(req.user.userId, updateData);

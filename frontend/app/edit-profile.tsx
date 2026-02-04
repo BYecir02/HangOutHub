@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, ActivityInd
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -124,8 +124,8 @@ export default function EditProfileScreen() {
   }
 
   // Logique d'affichage des images (Nouvelle image > Ancienne image > Placeholder)
-  const displayAvatar = newAvatar ? { uri: newAvatar.uri } : (form.avatarUrl ? { uri: form.avatarUrl } : { uri: 'https://i.pravatar.cc/150' });
-  const displayCover = newCover ? { uri: newCover.uri } : (form.coverUrl ? { uri: form.coverUrl } : { uri: 'https://images.unsplash.com/photo-1557683316-973673baf926' });
+  const displayAvatar = newAvatar ? { uri: newAvatar.uri } : (form.avatarUrl ? { uri: getImageUrl(form.avatarUrl) || '' } : { uri: 'https://i.pravatar.cc/150' });
+  const displayCover = newCover ? { uri: newCover.uri } : (form.coverUrl ? { uri: getImageUrl(form.coverUrl) || '' } : { uri: 'https://images.unsplash.com/photo-1557683316-973673baf926' });
 
   return (
     <View className="flex-1 bg-white">

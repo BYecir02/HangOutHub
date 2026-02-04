@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator, Mod
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Tabs from '../../components/ui/Tabs';
-import api from '../../services/api';
+import api, { getImageUrl } from '../../services/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -51,9 +51,9 @@ export default function ProfileScreen() {
       
       {/* 1. Couverture & Profil */}
       <View className="h-48 bg-gray-200 dark:bg-gray-800">
-        <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewImage(user?.coverUrl || 'https://images.unsplash.com/photo-1557683316-973673baf926')}>
+        <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewImage(getImageUrl(user?.coverUrl) || 'https://images.unsplash.com/photo-1557683316-973673baf926')}>
           <Image 
-            source={{ uri: user?.coverUrl || 'https://images.unsplash.com/photo-1557683316-973673baf926' }} 
+            source={{ uri: getImageUrl(user?.coverUrl) || 'https://images.unsplash.com/photo-1557683316-973673baf926' }} 
             className="w-full h-full"
           />
         </TouchableOpacity>
@@ -61,9 +61,9 @@ export default function ProfileScreen() {
         {/* Photo de profil avec badge caméra */}
         <View className="absolute -bottom-12 left-5">
           <View className="p-1 bg-white dark:bg-black rounded-full shadow-sm relative">
-            <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewImage(user?.avatarUrl || 'https://i.pravatar.cc/150')}>
+            <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewImage(getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150')}>
               <Image 
-                source={{ uri: user?.avatarUrl || 'https://i.pravatar.cc/150' }} 
+                source={{ uri: getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150' }} 
                 className="w-24 h-24 rounded-full"
               />
             </TouchableOpacity>
