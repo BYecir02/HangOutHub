@@ -8,7 +8,20 @@ describe('PostsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PostsController],
-      providers: [PostsService],
+      providers: [
+        {
+          provide: PostsService,
+          useValue: {
+            create: jest.fn(),
+            findAllByUser: jest.fn(),
+            remove: jest.fn(),
+            update: jest.fn(),
+            addComment: jest.fn(),
+            getComments: jest.fn(),
+            toggleLike: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<PostsController>(PostsController);
