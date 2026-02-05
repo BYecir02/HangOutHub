@@ -1,42 +1,59 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator, Modal, useColorScheme } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator, Modal, useColorScheme, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
 import Tabs from '../../components/ui/Tabs';
-import api, { getImageUrl } from '../../services/api';
+import PostItem from '../../components/social/PostItem';
+import ProfileHeader from '../../components/profile/ProfileHeader';
+import ProfileStats from '../../components/profile/ProfileStats';
+import { useUserProfile } from '../../hooks/useUserProfile';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('sorties');
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  // Utilisation du Hook personnalisé
+  const { user, posts, loading, deletePost } = useUserProfile();
+  
+  // États pour les Modals
+  const [previewImage, setPreviewImage] = useState<string | null>(null); // Pour l'avatar/cover
   
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  useFocusEffect(
-    useCallback(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const response = await api.get('/users/me');
-        setUser(response.data);
-      } catch (error) {
-        console.error("Erreur lors de la récupération du profil:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-    }, [])
-  );
-
   const tabItems = [
     { id: 'sorties', label: 'Mes Sorties' },
-    { id: 'photos', label: 'Photos' },
+    { id: 'posts', label: 'Posts' },
     { id: 'avis', label: 'Avis' },
   ];
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deletePost(postId);
+      Alert.alert("Succès", "Post supprimé.");
+    } catch (error) {
+      Alert.alert("Erreur", "Impossible de supprimer le post.");
+    }
+  };
+
+  const handleEditPost = (post: any) => {
+    // Navigation vers l'écran de création en mode édition
+    router.push({
+      pathname: '/post',
+      params: { 
+        postId: post.id, 
+        content: post.content,
+        visibility: post.visibility
+      }
+    });
+  };
+
+  const handleCommentPost = (post: any) => {
+    router.push({
+      pathname: '/comments',
+      params: { postId: post.id }
+    });
+  };
 
   if (loading) {
     return (
@@ -49,85 +66,11 @@ export default function ProfileScreen() {
   return (
     <ScrollView className="flex-1 bg-white dark:bg-black" showsVerticalScrollIndicator={false}>
       
-      {/* 1. Couverture & Profil */}
-      <View className="h-48 bg-gray-200 dark:bg-gray-800">
-        <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewImage(getImageUrl(user?.coverUrl) || 'https://images.unsplash.com/photo-1557683316-973673baf926')}>
-          <Image 
-            source={{ uri: getImageUrl(user?.coverUrl) || 'https://images.unsplash.com/photo-1557683316-973673baf926' }} 
-            className="w-full h-full"
-          />
-        </TouchableOpacity>
-        
-        {/* Photo de profil avec badge caméra */}
-        <View className="absolute -bottom-12 left-5">
-          <View className="p-1 bg-white dark:bg-black rounded-full shadow-sm relative">
-            <TouchableOpacity activeOpacity={0.9} onPress={() => setPreviewImage(getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150')}>
-              <Image 
-                source={{ uri: getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150' }} 
-                className="w-24 h-24 rounded-full"
-              />
-            </TouchableOpacity>
-            {/* Petit bouton pour changer la photo */}
-            <TouchableOpacity className="absolute bottom-0 right-0 bg-blue-500 p-1.5 rounded-full border-2 border-white dark:border-black">
-              <Ionicons name="camera" size={14} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      {/* 1. Header (Couverture, Avatar, Infos, Boutons) */}
+      <ProfileHeader user={user} onImagePress={setPreviewImage} />
 
-      {/* 2. Infos Utilisateur */}
-      <View className="mt-14 px-5">
-        <View className="flex-row justify-between items-start">
-          <View>
-            <Text className="text-2xl font-bold text-gray-900 dark:text-white">{user?.displayName || user?.username || 'Utilisateur'}</Text>
-            <Text className="text-gray-500 dark:text-gray-400 font-medium">@{user?.username || 'user'}</Text>
-          </View>
-          {/* Icône Paramètres (Settings) en haut à droite */}
-          <TouchableOpacity 
-            className="bg-gray-50 dark:bg-gray-800 p-2 rounded-full border border-gray-100 dark:border-gray-700"
-            onPress={() => router.push('/settings')}
-          >
-            <Ionicons name="settings-outline" size={24} color={isDark ? "#fff" : "#333"} />
-          </TouchableOpacity>
-        </View>
-        
-        <Text className="mt-3 text-gray-700 dark:text-gray-300 leading-5">
-          {user?.bio || "Aucune biographie pour le moment."}
-        </Text>
-
-        {/* --- BOUTONS ACTIONS --- */}
-        <View className="flex-row mt-4 gap-3">
-          <TouchableOpacity 
-            className="flex-1 bg-gray-100 dark:bg-gray-800 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 items-center active:bg-gray-200 dark:active:bg-gray-700"
-            onPress={() => router.push('/edit-profile')}
-          >
-            <Text className="text-gray-800 dark:text-white font-bold text-sm">Modifier le profil</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            className="flex-1 bg-gray-100 dark:bg-gray-800 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 items-center active:bg-gray-200 dark:active:bg-gray-700"
-            onPress={() => router.push('/preferences')}
-          >
-            <Text className="text-gray-800 dark:text-white font-bold text-sm">Modifier ses préférences</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 3. Statistiques */}
-      <View className="flex-row justify-around mt-6 py-4 border-y border-gray-100 dark:border-gray-800">
-        <TouchableOpacity className="items-center">
-          <Text className="font-bold text-lg text-gray-900 dark:text-white">124</Text>
-          <Text className="text-gray-400 dark:text-gray-500 text-xs">Abonnés</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="items-center border-x border-gray-100 dark:border-gray-800 px-10">
-          <Text className="font-bold text-lg text-gray-900 dark:text-white">89</Text>
-          <Text className="text-gray-400 dark:text-gray-500 text-xs">Abonnements</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="items-center">
-          <Text className="font-bold text-lg text-gray-900 dark:text-white">12</Text>
-          <Text className="text-gray-400 dark:text-gray-500 text-xs">Sorties</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 2. Statistiques */}
+      <ProfileStats postsCount={posts.length} />
 
       {/* 4. Actions rapides */}
       <View className="flex-row px-5 mt-6 justify-between">
@@ -150,7 +93,7 @@ export default function ProfileScreen() {
         />
 
         {/* CONTENU DYNAMIQUE DES ONGLETS */}
-        <View className="p-5 min-h-[200px]">
+        <View className="min-h-[200px]">
           {activeTab === 'sorties' && (
             <View className="items-center justify-center py-10">
               <Ionicons name="calendar-outline" size={48} color={isDark ? "#333" : "#eee"} />
@@ -158,11 +101,24 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {activeTab === 'photos' && (
-            <View className="flex-row flex-wrap justify-between">
-              {[1, 2, 3].map((i) => (
-                <View key={i} className="w-[31%] aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg mb-2" />
-              ))}
+          {/* --- LISTE DES POSTS (FEED) --- */}
+          {activeTab === 'posts' && (
+            <View>
+              {posts.length > 0 ? (
+                posts.map((post) => (
+                  <PostItem 
+                    key={post.id} 
+                    item={post} 
+                    onDelete={handleDeletePost}
+                    onEdit={handleEditPost}
+                    onComment={handleCommentPost}
+                  />
+                ))
+              ) : (
+                <View className="w-full items-center py-10">
+                    <Text className="text-gray-400">Aucune publication pour le moment.</Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -174,7 +130,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* MODAL DE PRÉVISUALISATION D'IMAGE */}
+      {/* MODAL DE PRÉVISUALISATION D'IMAGE (Avatar/Cover) */}
       <Modal visible={!!previewImage} transparent={true} onRequestClose={() => setPreviewImage(null)} animationType="fade">
         <View className="flex-1 bg-black justify-center items-center">
           <TouchableOpacity 
@@ -193,6 +149,7 @@ export default function ProfileScreen() {
           )}
         </View>
       </Modal>
+
     </ScrollView>
   );
 }

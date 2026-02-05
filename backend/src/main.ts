@@ -8,18 +8,24 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.enableCors();
-  // Rendre le dossier 'uploads' accessible publiquement
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
-    prefix: '/uploads/',
-  });
+  
+  // Note : Les fichiers statiques (uploads) sont gérés par ServeStaticModule dans app.module.ts
 
   //PRÉFIXE API (Tout passera par /api/v1/...)
   app.setGlobalPrefix('api/v1');
+
+  // Middleware de logging simple pour voir les requêtes entrantes
+  app.use((req: any, res: any, next: any) => {
+    console.log(`📞 Reçu : ${req.method} ${req.originalUrl}`);
+    next();
+  });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(`🚀 Le serveur tourne sur : http://localhost:${port}/api/v1`);
+  console.log(`📂 Routes disponibles (exemple) :`);
+  console.log(`   - GET http://localhost:${port}/api/v1/categories`);
 }
 bootstrap();

@@ -11,11 +11,12 @@ import { PlacesModule } from './places/places.module';
 import { PostsModule } from './posts/posts.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'), // Pointe vers le dossier 'uploads' à la racine du projet
+      rootPath: join(process.cwd(), 'uploads'), // Utilise process.cwd() pour être sûr de pointer sur la racine du projet
       serveRoot: '/uploads', // Rend les fichiers accessibles via http://ip:3000/uploads/...
     }),
     UsersModule,
@@ -24,9 +25,10 @@ import { join } from 'path';
     CategoriesModule,
     EventsModule,
     PlacesModule,
-    PostsModule
+    PostsModule,
+    CommentsModule
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [AppService],
 })
 export class AppModule {}

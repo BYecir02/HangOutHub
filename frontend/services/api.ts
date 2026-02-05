@@ -3,8 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 
 // On utilise la variable d'environnement EXPO_PUBLIC_API_URL
 // Si elle n'est pas définie, on utilise l'IP locale par défaut (utile pour le dev rapide)
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.74.2.126:3000';
-const API_URL = `${BASE_URL}/api/v1`; 
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = `${BASE_URL}/api/v1`;
 
 const api = axios.create({
   baseURL: API_URL,
