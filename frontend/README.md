@@ -37,7 +37,7 @@ Pour que l'application puisse communiquer avec le backend (NestJS), vous devez c
 Utilisez l'adresse IP locale de votre ordinateur.
 *(Astuce : tapez `ipconfig` sous Windows ou `ifconfig` sous Mac/Linux pour la trouver)*.
 ```dotenv
-EXPO_PUBLIC_API_URL=[http://192.168.1.](http://192.168.1.)XX:3000
+EXPO_PUBLIC_API_URL=http://192.168.1.XX:3000
 
 ```
 
