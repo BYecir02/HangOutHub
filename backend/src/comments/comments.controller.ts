@@ -30,7 +30,7 @@ export class CommentsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req) {
+  remove(@Param('id') id: string, @Request() req: { user: { userId: string } }) {
     return this.commentsService.remove(id, req.user.userId);
   }
 }

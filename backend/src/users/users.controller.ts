@@ -14,7 +14,7 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt')) 
   @Get('me') // Route: /users/me
-  async getProfile(@Request() req) {
+  async getProfile(@Request() req: { user: { userId: string } }) {
     const userId = req.user.userId;
     const user = await this.usersService.findOne(userId);
 
@@ -23,7 +23,7 @@ export class UsersController {
     }
     
     // On retire le mot de passe avant de renvoyer les infos
-    const { passwordHash, ...result } = user;
+    const { passwordHash: _passwordHash, ...result } = user;
     return result;
   }
   
@@ -43,9 +43,9 @@ export class UsersController {
     }),
   }))
   updateProfile(
-    @Request() req, 
+    @Request() req: { user: { userId: string } }, 
     @Body() updateUserDto: UpdateUserDto,
-    @UploadedFiles() files: { avatar?: any[], cover?: any[] }
+    @UploadedFiles() files: { avatar?: Express.Multer.File[], cover?: Express.Multer.File[] }
   ) {
     const updateData = { ...updateUserDto };
     

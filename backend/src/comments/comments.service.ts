@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CommentsService {
   constructor(private prisma: PrismaService) {}
 
-  create(createCommentDto: CreateCommentDto) {
+  create(_createCommentDto: CreateCommentDto) {
     return 'This action adds a new comment';
   }
 
@@ -19,7 +19,7 @@ export class CommentsService {
     return `This action returns a #${id} comment`;
   }
 
-  update(id: number, updateCommentDto: UpdateCommentDto) {
+  update(id: number, _updateCommentDto: UpdateCommentDto) {
     return `This action updates a #${id} comment`;
   }
 

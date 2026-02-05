@@ -24,7 +24,7 @@ export class EventsController {
       },
     }),
   }))
-  create(@Req() req, @Body() createEventDto: CreateEventDto, @UploadedFiles() files: { cover?: any[], gallery?: any[] }) {
+  create(@Req() req: { user: { userId: string } }, @Body() createEventDto: CreateEventDto, @UploadedFiles() files: { cover?: Express.Multer.File[], gallery?: Express.Multer.File[] }) {
     // req.user contient l'user extrait du Token JWT
     return this.eventsService.create(req.user.userId, createEventDto, files); 
   }

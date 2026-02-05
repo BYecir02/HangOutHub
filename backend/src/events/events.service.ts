@@ -6,7 +6,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 export class EventsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, createEventDto: CreateEventDto, files: { cover?: any[], gallery?: any[] }) {
+  async create(userId: string, createEventDto: CreateEventDto, files: { cover?: Express.Multer.File[], gallery?: Express.Multer.File[] }) {
     // 1. Gestion de l'image de couverture
     const coverFile = files.cover ? files.cover[0] : null;
     const coverUrl = coverFile ? `/uploads/${coverFile.filename}` : null;

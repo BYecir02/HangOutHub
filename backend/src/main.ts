@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -15,7 +14,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // Middleware de logging simple pour voir les requêtes entrantes
-  app.use((req: any, res: any, next: any) => {
+  app.use((req: { method: string; originalUrl: string }, res: any, next: () => void) => {
     console.log(`📞 Reçu : ${req.method} ${req.originalUrl}`);
     next();
   });
@@ -28,4 +27,4 @@ async function bootstrap() {
   console.log(`📂 Routes disponibles (exemple) :`);
   console.log(`   - GET http://localhost:${port}/api/v1/categories`);
 }
-bootstrap();
+void bootstrap();
