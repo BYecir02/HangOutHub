@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CommentsService {
   constructor(private prisma: PrismaService) {}
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   create(_createCommentDto: CreateCommentDto) {
     return 'This action adds a new comment';
   }
@@ -19,6 +20,7 @@ export class CommentsService {
     return `This action returns a #${id} comment`;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   update(id: number, _updateCommentDto: UpdateCommentDto) {
     return `This action updates a #${id} comment`;
   }
