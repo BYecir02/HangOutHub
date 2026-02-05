@@ -6,7 +6,7 @@ import { CreatePlaceDto } from './dto/create-place.dto';
 export class PlacesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createPlaceDto: CreatePlaceDto, files: { cover?: any[], gallery?: any[] }) {
+  async create(createPlaceDto: CreatePlaceDto, files: { cover?: Express.Multer.File[], gallery?: Express.Multer.File[] }) {
     const coverFile = files.cover ? files.cover[0] : null;
     const coverUrl = coverFile ? `/uploads/${coverFile.filename}` : null;
 

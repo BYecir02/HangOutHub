@@ -22,7 +22,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new ConflictException('Un utilisateur avec cet Email, Téléphone ou Pseudo existe déjà.');
+      throw new ConflictException('Un·utilisateur·avec·cet·Email,·Téléphone·ou·Pseudo·existe·déjà.');
     }
 
     // 2. Hachage
@@ -30,7 +30,7 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(createUserDto.password, salt);
 
     // 3. Préparation
-    const { password, ...userData } = createUserDto;
+    const { password: _password, ...userData } = createUserDto;
 
     // 3.5 Récupérer le rôle "USER"
     const userRole = await this.prisma.role.findUnique({
@@ -60,7 +60,7 @@ export class UsersService {
       }
     });
 
-    const { passwordHash: hidden, ...result } = newUser;
+    const { passwordHash: _hidden, ...result } = newUser;
     return result;
   }
 
@@ -98,13 +98,13 @@ export class UsersService {
   }
 
   // mise à jour du profil utilisateur
-  async update(id: string, updateUserDto: any) {
+  async update(id: string, updateUserDto: Prisma.UserUpdateInput) {
     const user = await this.prisma.user.update({
       where: { id },
       data: updateUserDto,
     });
 
-    const { passwordHash: hidden, ...result } = user;
+    const { passwordHash: _hidden, ...result } = user;
     return result;
   }
 }

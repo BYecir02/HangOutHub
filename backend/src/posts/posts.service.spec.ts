@@ -53,7 +53,7 @@ describe('PostsService', () => {
 
       // 3. ASSERT (Vérification)
       expect(result).toEqual(expectedResult); // Le résultat est-il celui attendu ?
-      expect(prisma.post.create).toHaveBeenCalledWith({ // La méthode create de Prisma a-t-elle été appelée avec les bons arguments ?
+      expect(prisma.post.create as jest.Mock).toHaveBeenCalledWith({ // La méthode create de Prisma a-t-elle été appelée avec les bons arguments ?
         data: {
           userId,
           content: 'Hello World',
