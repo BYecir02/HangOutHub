@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsString, IsOptional, IsDateString, IsUUID, IsNumber, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsUUID,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateEventDto {
@@ -27,7 +35,7 @@ export class CreateEventDto {
   @IsOptional()
   @IsUUID()
   placeId?: string; // Si l'événement se passe dans un lieu référencé (Bar, etc.)
-  
-  // Note : Dans ton schéma, l'Event n'est pas lié directement à Category, 
+
+  // Note : Dans ton schéma, l'Event n'est pas lié directement à Category,
   // mais via des Tags. On verra ça après, restons simple pour la création.
 }

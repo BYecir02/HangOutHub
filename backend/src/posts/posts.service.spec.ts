@@ -43,7 +43,12 @@ describe('PostsService', () => {
       const userId = 'user-123';
       const createPostDto = { content: 'Hello World', visibility: 'public' };
       const files = []; // Pas d'images pour ce test
-      const expectedResult = { id: 'post-1', ...createPostDto, userId, images: [] };
+      const expectedResult = {
+        id: 'post-1',
+        ...createPostDto,
+        userId,
+        images: [],
+      };
 
       // On configure le mock pour qu'il retourne une valeur précise quand on l'appelle
       (prisma.post.create as jest.Mock).mockResolvedValue(expectedResult);
@@ -54,7 +59,8 @@ describe('PostsService', () => {
       // 3. ASSERT (Vérification)
       expect(result).toEqual(expectedResult); // Le résultat est-il celui attendu ?
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.post.create).toHaveBeenCalledWith({ // La méthode create de Prisma a-t-elle été appelée avec les bons arguments ?
+      expect(prisma.post.create).toHaveBeenCalledWith({
+        // La méthode create de Prisma a-t-elle été appelée avec les bons arguments ?
         data: {
           userId,
           content: 'Hello World',

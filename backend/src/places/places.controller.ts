@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseInterceptors, UploadedFiles, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseInterceptors,
+  UploadedFiles,
+  UseGuards,
+} from '@nestjs/common';
 import { PlacesService } from './places.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -13,19 +22,30 @@ export class PlacesController {
   // POST /places
   @UseGuards(AuthGuard('jwt'))
   @Post()
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'cover', maxCount: 1 },
-    { name: 'gallery', maxCount: 10 }
-  ], {
-    storage: diskStorage({
-      destination: './uploads',
-      filename: (req, file, cb) => {
-        const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
-        cb(null, `${randomName}${extname(file.originalname)}`);
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'cover', maxCount: 1 },
+        { name: 'gallery', maxCount: 10 },
+      ],
+      {
+        storage: diskStorage({
+          destination: './uploads',
+          filename: (req, file, cb) => {
+            const randomName = Array(32)
+              .fill(null)
+              .map(() => Math.round(Math.random() * 16).toString(16))
+              .join('');
+            cb(null, `${randomName}${extname(file.originalname)}`);
+          },
+        }),
       },
-    }),
-  }))
-  create(@Body() createPlaceDto: CreatePlaceDto, @UploadedFiles() files: { cover?: any[], gallery?: any[] }) {
+    ),
+  )
+  create(
+    @Body() createPlaceDto: CreatePlaceDto,
+    @UploadedFiles() files: { cover?: any[]; gallery?: any[] },
+  ) {
     return this.placesService.create(createPlaceDto, files);
   }
 

@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
@@ -16,13 +20,15 @@ export class UsersService {
         OR: [
           { email: createUserDto.email },
           { phoneNumber: createUserDto.phoneNumber },
-          { username: createUserDto.username }
-        ]
-      }
+          { username: createUserDto.username },
+        ],
+      },
     });
 
     if (existingUser) {
-      throw new ConflictException('Un·utilisateur·avec·cet·Email,·Téléphone·ou·Pseudo·existe·déjà.');
+      throw new ConflictException(
+        'Un·utilisateur·avec·cet·Email,·Téléphone·ou·Pseudo·existe·déjà.',
+      );
     }
 
     // 2. Hachage
@@ -35,11 +41,13 @@ export class UsersService {
 
     // 3.5 Récupérer le rôle "USER"
     const userRole = await this.prisma.role.findUnique({
-      where: { name: 'USER' }
+      where: { name: 'USER' },
     });
 
     if (!userRole) {
-      throw new NotFoundException("Le rôle 'USER' est introuvable en base de données.");
+      throw new NotFoundException(
+        "Le rôle 'USER' est introuvable en base de données.",
+      );
     }
 
     // 4. Création
@@ -50,15 +58,15 @@ export class UsersService {
         isVerified: false,
         UserRole: {
           create: {
-            roleId: userRole.id
-          }
-        }
+            roleId: userRole.id,
+          },
+        },
       },
       include: {
         UserRole: {
-          include: { Role: true } 
-        }
-      }
+          include: { Role: true },
+        },
+      },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -85,10 +93,10 @@ export class UsersService {
       include: {
         UserRole: {
           include: {
-            Role: true 
-          }
-        }
-      }
+            Role: true,
+          },
+        },
+      },
     });
   }
 

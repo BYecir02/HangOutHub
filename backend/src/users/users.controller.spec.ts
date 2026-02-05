@@ -12,7 +12,11 @@ describe('UsersController', () => {
         {
           provide: UsersService,
           // On simule les méthodes du service utilisées par le contrôleur
-          useValue: { findAll: jest.fn(), findOne: jest.fn(), findMe: jest.fn() },
+          useValue: {
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            findMe: jest.fn(),
+          },
         },
       ],
     }).compile();

@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, NotFoundException, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  NotFoundException,
+  UseInterceptors,
+  UploadedFiles,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -12,7 +25,7 @@ import { extname } from 'path';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @UseGuards(AuthGuard('jwt')) 
+  @UseGuards(AuthGuard('jwt'))
   @Get('me') // Route: /users/me
   async getProfile(@Request() req: { user: { userId: string } }) {
     const userId = req.user.userId;
@@ -21,35 +34,42 @@ export class UsersController {
     if (!user) {
       throw new NotFoundException('Utilisateur introuvable');
     }
-    
+
     // On retire le mot de passe avant de renvoyer les infos
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...result } = user;
     return result;
   }
-  
-  @UseGuards(AuthGuard('jwt')) 
+
+  @UseGuards(AuthGuard('jwt'))
   @Patch('me')
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'avatar', maxCount: 1 },
-    { name: 'cover', maxCount: 1 },
-  ], {
-    storage: diskStorage({
-      destination: './uploads/profiles', // Assure-toi que ce dossier existe !
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = extname(file.originalname);
-        cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'avatar', maxCount: 1 },
+        { name: 'cover', maxCount: 1 },
+      ],
+      {
+        storage: diskStorage({
+          destination: './uploads/profiles', // Assure-toi que ce dossier existe !
+          filename: (req, file, cb) => {
+            const uniqueSuffix =
+              Date.now() + '-' + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+          },
+        }),
       },
-    }),
-  }))
+    ),
+  )
   updateProfile(
-    @Request() req: { user: { userId: string } }, 
+    @Request() req: { user: { userId: string } },
     @Body() updateUserDto: UpdateUserDto,
-    @UploadedFiles() files: { avatar?: Express.Multer.File[], cover?: Express.Multer.File[] }
+    @UploadedFiles()
+    files: { avatar?: Express.Multer.File[]; cover?: Express.Multer.File[] },
   ) {
     const updateData = { ...updateUserDto };
-    
+
     // Si un avatar a été uploadé, on construit son URL
     if (files.avatar && files.avatar[0]) {
       updateData['avatarUrl'] = `/uploads/profiles/${files.avatar[0].filename}`;
@@ -62,7 +82,7 @@ export class UsersController {
 
     return this.usersService.update(req.user.userId, updateData);
   }
-  
+
   @Post() // Inscription
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
