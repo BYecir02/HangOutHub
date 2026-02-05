@@ -23,8 +23,8 @@ export class UsersController {
     }
     
     // On retire le mot de passe avant de renvoyer les infos
-    const result = { ...user };
-    delete result.passwordHash;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash, ...result } = user;
     return result;
   }
   

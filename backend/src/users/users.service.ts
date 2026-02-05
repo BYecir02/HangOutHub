@@ -30,8 +30,8 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(createUserDto.password, salt);
 
     // 3. Préparation
-    const userData = { ...createUserDto };
-    delete userData.password;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userData } = createUserDto;
 
     // 3.5 Récupérer le rôle "USER"
     const userRole = await this.prisma.role.findUnique({
@@ -61,8 +61,8 @@ export class UsersService {
       }
     });
 
-    const result = { ...newUser };
-    delete result.passwordHash;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash: _hidden, ...result } = newUser;
     return result;
   }
 
@@ -106,8 +106,8 @@ export class UsersService {
       data: updateUserDto,
     });
 
-    const result = { ...user };
-    delete result.passwordHash;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash: _hidden, ...result } = user;
     return result;
   }
 }
