@@ -6,14 +6,18 @@ import { CreateEventDto } from './dto/create-event.dto';
 export class EventsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, createEventDto: CreateEventDto, files: { cover?: Express.Multer.File[], gallery?: Express.Multer.File[] }) {
+  async create(
+    userId: string,
+    createEventDto: CreateEventDto,
+    files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
+  ) {
     // 1. Gestion de l'image de couverture
     const coverFile = files.cover ? files.cover[0] : null;
     const coverUrl = coverFile ? `/uploads/${coverFile.filename}` : null;
 
     // 2. Gestion de la galerie
-    const galleryUrls = files.gallery 
-      ? files.gallery.map(file => `/uploads/${file.filename}`) 
+    const galleryUrls = files.gallery
+      ? files.gallery.map((file) => `/uploads/${file.filename}`)
       : [];
 
     // 2. Création dans la base via Prisma
@@ -22,7 +26,9 @@ export class EventsService {
         title: createEventDto.title,
         description: createEventDto.description,
         startTime: new Date(createEventDto.startTime), // Conversion String -> Date
-        endTime: createEventDto.endTime ? new Date(createEventDto.endTime) : null,
+        endTime: createEventDto.endTime
+          ? new Date(createEventDto.endTime)
+          : null,
         entryFee: createEventDto.entryFee || 0,
         coverUrl: coverUrl,
         images: galleryUrls,
@@ -38,7 +44,7 @@ export class EventsService {
         User: { select: { username: true, avatarUrl: true } }, // On récupère l'organisateur
         Place: true, // On récupère le lieu si il existe
       },
-      orderBy: { startTime: 'asc' }
+      orderBy: { startTime: 'asc' },
     });
   }
 }

@@ -7,11 +7,11 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  displayName?: string; 
+  displayName?: string;
 
   @IsOptional()
   @IsString()
-  bio?: string; 
+  bio?: string;
 
   @IsOptional()
   @IsString()
@@ -19,13 +19,13 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  gender?: string; 
+  gender?: string;
 
   @IsOptional()
   @IsDateString()
-  birthDate?: string; 
+  birthDate?: string;
 
   @IsOptional()
   @IsInt()
-  residenceCityId?: number; 
+  residenceCityId?: number;
 }

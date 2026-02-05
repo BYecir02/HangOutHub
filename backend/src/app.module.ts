@@ -25,7 +25,7 @@ import { CommentsModule } from './comments/comments.module';
     EventsModule,
     PlacesModule,
     PostsModule,
-    CommentsModule
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -9,7 +9,7 @@ import { CreateUserDto } from '../users/dto/create-user.dto'; // Import
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   // Fonction d'inscription
@@ -20,23 +20,26 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const user = await this.usersService.findOneByEmail(loginDto.email);
 
-    if (!user || !user.passwordHash) { 
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.passwordHash,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
-    const userRoles = user['UserRole'] || []; 
+    const userRoles = user['UserRole'] || [];
     const primaryRole = userRoles.length > 0 ? userRoles[0].Role.name : 'USER';
 
-    const payload = { 
-      sub: user.id, 
-      username: user.username, 
-      role: primaryRole 
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      role: primaryRole,
     };
 
     return {
@@ -46,8 +49,8 @@ export class AuthService {
         username: user.username,
         email: user.email,
         avatarUrl: user.avatarUrl,
-        role: primaryRole
-      }
+        role: primaryRole,
+      },
     };
   }
 }

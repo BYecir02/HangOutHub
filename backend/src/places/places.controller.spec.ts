@@ -12,7 +12,11 @@ describe('PlacesController', () => {
         {
           provide: PlacesService,
           // On simule les méthodes du service utilisées par le contrôleur
-          useValue: { create: jest.fn(), findAll: jest.fn(), findOne: jest.fn() },
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+          },
         },
       ],
     }).compile();

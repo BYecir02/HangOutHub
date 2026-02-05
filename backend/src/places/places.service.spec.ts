@@ -12,7 +12,11 @@ describe('PlacesService', () => {
         {
           provide: PrismaService,
           useValue: {
-            place: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn() },
+            place: {
+              findMany: jest.fn(),
+              create: jest.fn(),
+              findUnique: jest.fn(),
+            },
           },
         },
       ],

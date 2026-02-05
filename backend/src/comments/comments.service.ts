@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -35,7 +39,9 @@ export class CommentsService {
     }
 
     if (comment.userId !== userId) {
-      throw new ForbiddenException('You are not allowed to delete this comment');
+      throw new ForbiddenException(
+        'You are not allowed to delete this comment',
+      );
     }
 
     return this.prisma.postComment.delete({

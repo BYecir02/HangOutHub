@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -8,9 +12,15 @@ import { CreateCommentDto } from '../comments/dto/create-comment.dto';
 export class PostsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, createPostDto: CreatePostDto, files: Array<Express.Multer.File>) {
+  async create(
+    userId: string,
+    createPostDto: CreatePostDto,
+    files: Array<Express.Multer.File>,
+  ) {
     // Construction des URLs des images
-    const imageUrls = files ? files.map(file => `/uploads/posts/${file.filename}`) : [];
+    const imageUrls = files
+      ? files.map((file) => `/uploads/posts/${file.filename}`)
+      : [];
 
     return this.prisma.post.create({
       data: {
@@ -32,27 +42,27 @@ export class PostsService {
             id: true,
             username: true,
             displayName: true,
-            avatarUrl: true
-          }
+            avatarUrl: true,
+          },
         },
-        _count: { 
+        _count: {
           select: {
             likes: true,
             comments: true,
-          }
+          },
         },
         likes: {
           where: { userId: currentUserId },
-          select: { userId: true }
-        }
-      }
+          select: { userId: true },
+        },
+      },
     });
 
     // On transforme le résultat pour ajouter un champ booléen simple "isLiked"
-    return posts.map(post => ({
+    return posts.map((post) => ({
       ...post,
       isLiked: post.likes.length > 0,
-      likes: undefined // On nettoie le tableau likes qui ne sert plus
+      likes: undefined, // On nettoie le tableau likes qui ne sert plus
     }));
   }
 
@@ -70,7 +80,7 @@ export class PostsService {
     if (post.userId !== userId) {
       throw new ForbiddenException('You are not allowed to delete this post');
     }
-    
+
     return this.prisma.post.delete({
       where: { id },
     });
@@ -95,7 +105,11 @@ export class PostsService {
     });
   }
 
-  async addComment(userId: string, postId: string, createCommentDto: CreateCommentDto) {
+  async addComment(
+    userId: string,
+    postId: string,
+    createCommentDto: CreateCommentDto,
+  ) {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
     });
