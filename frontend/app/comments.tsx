@@ -19,6 +19,7 @@ export default function CommentsScreen() {
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<any | null>(null); // Commentaire auquel on répond
 
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -52,7 +53,8 @@ export default function CommentsScreen() {
         avatar: getImageUrl(c.User.avatarUrl) || 'https://i.pravatar.cc/150',
         content: c.content,
         time: new Date(c.createdAt).toLocaleDateString(),
-        userId: c.userId // Important pour savoir si c'est le mien
+        userId: c.userId,
+        parentId: c.parentId
       }));
       setComments(formattedComments);
     } catch (error) {
@@ -67,7 +69,10 @@ export default function CommentsScreen() {
     
     setIsSending(true);
     try {
-      const res = await api.post(`/posts/${postId}/comments`, { content: comment });
+      const res = await api.post(`/posts/${postId}/comments`, { 
+        content: comment,
+        parentId: replyingTo ? replyingTo.id : undefined
+      });
       
       // On ajoute le nouveau commentaire à la liste (formaté)
       const newComment = {
@@ -76,11 +81,13 @@ export default function CommentsScreen() {
         avatar: getImageUrl(res.data.User.avatarUrl) || 'https://i.pravatar.cc/150',
         content: res.data.content,
         time: 'À l\'instant',
-        userId: currentUserId
+        userId: currentUserId,
+        parentId: res.data.parentId
       };
       
       setComments(prev => [...prev, newComment]);
       setComment('');
+      setReplyingTo(null); // On réinitialise la réponse
       Keyboard.dismiss();
     } catch (error) {
       console.error("Erreur envoi commentaire:", error);
@@ -101,6 +108,10 @@ export default function CommentsScreen() {
 
   const handleReportComment = (commentId: string) => {
     Alert.alert("Signalé", "Merci, nous allons examiner ce commentaire.");
+  };
+
+  const handleReply = (comment: any) => {
+    setReplyingTo(comment);
   };
 
   return (
@@ -144,6 +155,7 @@ export default function CommentsScreen() {
                     item={{ ...item, isMine: item.userId === currentUserId }} 
                     onDelete={handleDeleteComment}
                     onReport={handleReportComment}
+                    onReply={handleReply}
                   />
                 )}
                 ListEmptyComponent={
@@ -154,14 +166,25 @@ export default function CommentsScreen() {
 
         {/* Zone de saisie (Input Bar) */}
         {/* On applique le padding dynamique (insets.bottom) ici */}
+        {replyingTo && (
+          <View className="px-4 py-2 bg-gray-50 dark:bg-gray-800 flex-row justify-between items-center border-t border-gray-200 dark:border-gray-700">
+            <Text className="text-gray-500 dark:text-gray-400 text-sm">
+              Réponse à <Text className="font-bold">{replyingTo.user}</Text>
+            </Text>
+            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+              <Ionicons name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View 
-            className={`flex-row items-end p-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 ${isKeyboardVisible ? '' : 'pb-5'}`}
+            className={`flex-row items-end p-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 ${isKeyboardVisible ? '' : 'pb-5'} ${replyingTo ? 'border-t-0' : ''}`}
         >
             <Image source={{ uri: 'https://i.pravatar.cc/150?u=me' }} className="w-8 h-8 rounded-full mr-3 mb-2" />
             <View className="flex-1 flex-row items-center bg-gray-100 dark:bg-gray-800 rounded-3xl px-4 py-2">
                 <TextInput
                     className="flex-1 text-gray-800 dark:text-white max-h-24 pt-2 pb-2"
-                    placeholder="Ajouter un commentaire..."
+                    placeholder={replyingTo ? `Répondre à ${replyingTo.user}...` : "Ajouter un commentaire..."}
                     placeholderTextColor="#999"
                     multiline
                     value={comment}

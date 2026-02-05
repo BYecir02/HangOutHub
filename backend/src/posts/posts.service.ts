@@ -109,6 +109,7 @@ export class PostsService {
         content: createCommentDto.content,
         userId,
         postId,
+        parentId: createCommentDto.parentId,
       },
       include: {
         User: {

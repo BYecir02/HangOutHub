@@ -381,8 +381,11 @@ model PostComment {
   userId    String    @db.Uuid
   content   String
   createdAt DateTime? @default(now()) @db.Timestamp(6)
+  parentId  String?   @db.Uuid
   Post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
   User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Parent    PostComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  Replies   PostComment[] @relation("CommentReplies")
 }
 
 model PostLike {
