@@ -23,7 +23,8 @@ export class UsersController {
     }
     
     // On retire le mot de passe avant de renvoyer les infos
-    const { passwordHash: _passwordHash, ...result } = user;
+    const result = { ...user };
+    delete result.passwordHash;
     return result;
   }
   

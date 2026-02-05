@@ -30,7 +30,8 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(createUserDto.password, salt);
 
     // 3. Préparation
-    const { password: _password, ...userData } = createUserDto;
+    const userData = { ...createUserDto };
+    delete userData.password;
 
     // 3.5 Récupérer le rôle "USER"
     const userRole = await this.prisma.role.findUnique({
@@ -60,7 +61,8 @@ export class UsersService {
       }
     });
 
-    const { passwordHash: _hidden, ...result } = newUser;
+    const result = { ...newUser };
+    delete result.passwordHash;
     return result;
   }
 
@@ -104,7 +106,8 @@ export class UsersService {
       data: updateUserDto,
     });
 
-    const { passwordHash: _hidden, ...result } = user;
+    const result = { ...user };
+    delete result.passwordHash;
     return result;
   }
 }
