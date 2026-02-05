@@ -244,6 +244,8 @@ model Post {
   createdAt  DateTime? @default(now()) @db.Timestamp(6)
   updatedAt  DateTime? @updatedAt @db.Timestamp(6)
   User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments   PostComment[]
+  likes      PostLike[]
 }
 
 model Report {
@@ -373,6 +375,25 @@ model TicketType {
   Event    Event     @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
+model PostComment {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  postId    String    @db.Uuid
+  userId    String    @db.Uuid
+  content   String
+  createdAt DateTime? @default(now()) @db.Timestamp(6)
+  Post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PostLike {
+  userId String @db.Uuid
+  postId String @db.Uuid
+  Post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+}
+
 model User {
   id                                      String               @id @default(uuid()) @db.Uuid
   username                                String               @unique @db.VarChar(50)
@@ -404,6 +425,8 @@ model User {
   Outing                                  Outing[]
   OutingMedia                             OutingMedia[]
   Post                                    Post[]
+  PostComment                             PostComment[]
+  PostLike                                PostLike[]
   OutingMediaComment                      OutingMediaComment[]
   OutingMediaLike                         OutingMediaLike[]
   OutingParticipant                       OutingParticipant[]

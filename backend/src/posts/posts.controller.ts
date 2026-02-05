@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, UseInterceptors, UploadedFiles, Delete, Patch } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { CreateCommentDto } from '../comments/dto/create-comment.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -28,7 +30,38 @@ export class PostsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('user/:userId')
-  findAllByUser(@Param('userId') userId: string) {
-    return this.postsService.findAllByUser(userId);
+  findAllByUser(@Param('userId') userId: string, @Request() req) {
+    return this.postsService.findAllByUser(userId, req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  remove(@Param('id') id: string, @Request() req) {
+    // On passe l'ID de l'utilisateur connecté pour la vérification
+    return this.postsService.remove(id, req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch(':id')
+  update(@Param('id') id: string, @Request() req, @Body() updatePostDto: UpdatePostDto) {
+    return this.postsService.update(id, req.user.userId, updatePostDto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/comments')
+  addComment(@Param('id') postId: string, @Request() req, @Body() createCommentDto: CreateCommentDto) {
+    return this.postsService.addComment(req.user.userId, postId, createCommentDto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/comments')
+  getComments(@Param('id') postId: string) {
+    return this.postsService.getComments(postId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/like')
+  toggleLike(@Param('id') postId: string, @Request() req) {
+    return this.postsService.toggleLike(postId, req.user.userId);
   }
 }

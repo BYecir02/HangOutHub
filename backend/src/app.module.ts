@@ -11,6 +11,7 @@ import { PlacesModule } from './places/places.module';
 import { PostsModule } from './posts/posts.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { join } from 'path';
     CategoriesModule,
     EventsModule,
     PlacesModule,
-    PostsModule
+    PostsModule,
+    CommentsModule
   ],
   controllers: [AppController],
   providers: [AppService],

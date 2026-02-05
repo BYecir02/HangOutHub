@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, useColorScheme, Image, ScrollView, Alert, Modal, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../services/api';
 
 export default function CreatePostScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams(); // Récupération des paramètres (si édition)
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
-  const [content, setContent] = useState('');
+  // Détection du mode édition
+  const isEditing = !!params.postId;
+
+  const [content, setContent] = useState(params.content ? String(params.content) : '');
   const [images, setImages] = useState<string[]>([]);
   const [showPoll, setShowPoll] = useState(false);
   const [location, setLocation] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>((params.visibility as any) || 'public');
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -55,24 +59,35 @@ export default function CreatePostScreen() {
 
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('content', content);
-      formData.append('visibility', visibility);
+      if (isEditing) {
+        // --- MODE ÉDITION (PATCH) ---
+        // Note: Le backend actuel ne gère pas encore la modif d'images, on envoie juste le texte/visibilité
+        await api.patch(`/posts/${params.postId}`, { 
+          content, 
+          visibility 
+        });
+        Alert.alert("Succès", "Post modifié !");
+      } else {
+        // --- MODE CRÉATION (POST) ---
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('visibility', visibility);
 
-      // Ajout des images
-      images.forEach((uri, index) => {
-        formData.append('images', {
-          uri: uri,
-          name: `image_${index}.jpg`,
-          type: 'image/jpeg',
-        } as any);
-      });
+        // Ajout des images
+        images.forEach((uri, index) => {
+          formData.append('images', {
+            uri: uri,
+            name: `image_${index}.jpg`,
+            type: 'image/jpeg',
+          } as any);
+        });
 
-      await api.post('/posts', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      Alert.alert("Succès", "Post publié !");
+        await api.post('/posts', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        Alert.alert("Succès", "Post publié !");
+      }
+      
       router.back();
     } catch (error) {
       console.error(error);
@@ -99,7 +114,7 @@ export default function CreatePostScreen() {
             <ActivityIndicator size="small" color={content.trim() ? "white" : "gray"} />
           ) : (
             <Text className={`font-bold ${content.trim() ? 'text-white' : 'text-gray-400 dark:text-gray-500'}`}>
-              Publier
+              {isEditing ? 'Enregistrer' : 'Publier'}
             </Text>
           )}
         </TouchableOpacity>
@@ -186,15 +201,20 @@ export default function CreatePostScreen() {
 
         {/* BARRE D'OUTILS */}
         <View className="flex-row items-center px-5 py-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-black mb-5">
-            {/* Galerie */}
-            <TouchableOpacity onPress={() => pickImage('gallery')} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
-                <Ionicons name="image" size={24} color="#4c669f" />
-            </TouchableOpacity>
-            
-            {/* Caméra */}
-            <TouchableOpacity onPress={() => pickImage('camera')} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
-                <Ionicons name="camera" size={24} color="#4c669f" />
-            </TouchableOpacity>
+            {/* On masque l'ajout d'images en mode édition pour l'instant (car backend non prêt) */}
+            {!isEditing && (
+              <>
+                {/* Galerie */}
+                <TouchableOpacity onPress={() => pickImage('gallery')} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
+                    <Ionicons name="image" size={24} color="#4c669f" />
+                </TouchableOpacity>
+                
+                {/* Caméra */}
+                <TouchableOpacity onPress={() => pickImage('camera')} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
+                    <Ionicons name="camera" size={24} color="#4c669f" />
+                </TouchableOpacity>
+              </>
+            )}
 
             {/* Sondage */}
             <TouchableOpacity onPress={() => setShowPoll(!showPoll)} className={`mr-4 p-2 rounded-full ${showPoll ? 'bg-blue-100' : 'bg-gray-50 dark:bg-gray-800'}`}>
