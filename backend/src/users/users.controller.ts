@@ -11,6 +11,7 @@ import {
   NotFoundException,
   UseInterceptors,
   UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -59,6 +60,12 @@ export class UsersController {
             cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
           },
         }),
+        fileFilter: (req, file, cb) => {
+          if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
+            return cb(new BadRequestException('Seules les images sont autorisées !'), false);
+          }
+          cb(null, true);
+        },
       },
     ),
   )

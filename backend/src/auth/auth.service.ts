@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto'; // Import
+import { RegisterOrganizerDto } from './dto/register-organizer.dto';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +17,25 @@ export class AuthService {
   async register(createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
+
+  // Nouvelle fonction pour l'inscription des organisateurs
+  async registerOrganizer(registerOrganizerDto: RegisterOrganizerDto) {
+    // On extrait les infos spécifiques à l'organisateur
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { accountType, companyName, ifuNumber, payoutInfo, jobTitle, ...userDto } = registerOrganizerDto;
+
+    // Détermination du rôle selon le type de compte
+    // PLACE -> PLACE_OWNER (Gérant de lieu)
+    // NOMAD -> ORGANIZER (Promoteur d'événements)
+    const roleName = accountType === 'PLACE' ? 'PLACE_OWNER' : 'ORGANIZER';
+
+    const organizerDetails = {
+      accountType, companyName, ifuNumber, payoutInfo, jobTitle
+    };
+
+    return this.usersService.create(userDto, roleName, organizerDetails);
+  }
+
   // Fonction de connexion
   async login(loginDto: LoginDto) {
     const user = await this.usersService.findOneByEmail(loginDto.email);

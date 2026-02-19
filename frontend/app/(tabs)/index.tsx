@@ -1,24 +1,26 @@
-import React, { useState, useEffect } from 'react'; // 👈 Ajout de useEffect
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { TextInput, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import api from '../../services/api';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/themed-text';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
-  // On vérifie si l'utilisateur est déjà connecté au démarrage
   useEffect(() => {
     const checkLogin = async () => {
       try {
         const token = await SecureStore.getItemAsync('userToken');
         if (token) {
-          // Si un token existe, on part direct à la maison ! 🏠
           console.log("Token trouvé, auto-login...");
           router.replace('/home');
         }
@@ -37,10 +39,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { access_token, user } = response.data;
-      
+      const { access_token } = response.data;
       await SecureStore.setItemAsync('userToken', access_token);
-      
       router.replace('/home'); 
     } catch (error: any) {
       const message = error.response?.data?.message || 'Erreur de connexion';
@@ -51,162 +51,98 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient colors={['#4c669f', '#3b5998', '#192f6a']} style={styles.background}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-        
-        <View style={styles.header}>
-          <Ionicons name="location" size={60} color="#fff" />
-          <Text style={styles.title}>Hangout Hub</Text>
-          <Text style={styles.subtitle}>Découvre. Sors. Profite.</Text>
-        </View>
+    <ThemedView className="flex-1">
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        className="flex-1"
+      >
+        <ScrollView 
+          contentContainerStyle={{ paddingHorizontal: 32, paddingTop: 80, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <ThemedView className="mt-8 mb-14">
+            <ThemedText type="title" className="text-[42px] font-bold mb-2 tracking-tight">
+              Connexion
+            </ThemedText>
+            <ThemedText className="text-lg font-normal">
+              Découvre. Sors. Profite.
+            </ThemedText>
+          </ThemedView>
 
-        <View style={styles.formCard}>
-          <Text style={styles.welcomeText}>Connexion</Text>
+          {/* Inputs - Style Typeform */}
+          <ThemedView className="mb-6">
+            <ThemedView className="mb-10">
+              <TextInput
+                className={`text-xl py-4 border-b-2 bg-transparent text-gray-900 dark:text-gray-100 ${
+                  focusedField === 'email' 
+                    ? 'border-[#4c669f]' 
+                    : 'border-gray-200 dark:border-gray-700'
+                }`}
+                placeholder="Email"
+                placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </ThemedView>
+            
+            <ThemedView className="mb-10">
+              <TextInput
+                className={`text-xl py-4 border-b-2 bg-transparent text-gray-900 dark:text-gray-100 ${
+                  focusedField === 'password' 
+                    ? 'border-[#4c669f]' 
+                    : 'border-gray-200 dark:border-gray-700'
+                }`}
+                placeholder="Mot de passe"
+                placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </ThemedView>
+          </ThemedView>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#666" style={styles.icon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
-          
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.icon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Mot de passe"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-          </View>
-
-          <TouchableOpacity>
-            <Text style={styles.forgotPassword}>Mot de passe oublié ?</Text>
+          {/* Mot de passe oublié */}
+          <TouchableOpacity className="items-end mb-8">
+            <ThemedText className="text-sm text-[#4c669f] font-medium">
+              Mot de passe oublié ?
+            </ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+          {/* Bouton de connexion */}
+          <TouchableOpacity 
+            className={`bg-[#4c669f] py-[18px] rounded-xl items-center mb-8 ${loading ? 'opacity-60' : ''}`}
+            onPress={handleLogin} 
+            disabled={loading}
+          >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>SE CONNECTER</Text>
+              <ThemedText className="text-white text-lg font-semibold tracking-wide">
+                Se connecter
+              </ThemedText>
             )}
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Pas encore de compte ? </Text>
+          {/* Footer */}
+          <ThemedView className="flex-row justify-center items-center">
+            <ThemedText className="text-base">Pas encore de compte ? </ThemedText>
             <TouchableOpacity onPress={() => router.push('/register')}>
-              <Text style={styles.linkText}>S'inscrire</Text>
+              <ThemedText className="text-base text-[#4c669f] font-semibold">
+                S'inscrire
+              </ThemedText>
             </TouchableOpacity>
-          </View>
-        </View>
+          </ThemedView>
+
+          <ThemedView className="h-10" />
+        </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 10,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#ddd',
-    marginTop: 5,
-    fontStyle: 'italic',
-  },
-  formCard: {
-    backgroundColor: 'white',
-    borderRadius: 25,
-    padding: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f3f5',
-    borderRadius: 12,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    height: 55,
-  },
-  icon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    color: '#333',
-    fontSize: 16,
-  },
-  forgotPassword: {
-    color: '#4c669f',
-    textAlign: 'right',
-    marginBottom: 20,
-    fontSize: 14,
-  },
-  button: {
-    backgroundColor: '#4c669f',
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#4c669f',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
-    letterSpacing: 1,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  footerText: {
-    color: '#666',
-  },
-  linkText: {
-    color: '#4c669f',
-    fontWeight: 'bold',
-  },
-});

@@ -13,7 +13,11 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   // --- CRÉATION (Inscription) ---
-  async create(createUserDto: CreateUserDto) {
+  async create(
+    createUserDto: CreateUserDto,
+    roleName: string = 'USER', // Par défaut c'est un USER classique
+    organizerDetails?: any, // Données optionnelles pour le profil pro
+  ) {
     // 1. Vérif existant
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -40,13 +44,13 @@ export class UsersService {
     const { password, ...userData } = createUserDto;
 
     // 3.5 Récupérer le rôle "USER"
-    const userRole = await this.prisma.role.findUnique({
-      where: { name: 'USER' },
+    const role = await this.prisma.role.findUnique({
+      where: { name: roleName },
     });
 
-    if (!userRole) {
+    if (!role) {
       throw new NotFoundException(
-        "Le rôle 'USER' est introuvable en base de données.",
+        `Le rôle '${roleName}' est introuvable en base de données.`,
       );
     }
 
@@ -58,14 +62,19 @@ export class UsersService {
         isVerified: false,
         UserRole: {
           create: {
-            roleId: userRole.id,
+            roleId: role.id,
           },
         },
+        // Si on a des détails organisateur, on crée le profil associé
+        OrganizerProfile: organizerDetails
+          ? { create: organizerDetails }
+          : undefined,
       },
       include: {
         UserRole: {
           include: { Role: true },
         },
+        OrganizerProfile: true,
       },
     });
 

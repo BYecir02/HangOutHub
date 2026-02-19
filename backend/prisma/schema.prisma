@@ -6,6 +6,7 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
   extensions = [uuid_ossp(map: "uuid-ossp")]
 }
 
@@ -397,6 +398,20 @@ model PostLike {
   @@id([userId, postId])
 }
 
+model OrganizerProfile {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String   @unique @db.Uuid
+  accountType String   @db.VarChar(20) // "PLACE" (Lieu physique) ou "NOMAD" (Promoteur)
+  companyName String   @db.VarChar(100)
+  ifuNumber   String   @db.VarChar(50) // Identifiant Fiscal Unique
+  payoutInfo  String   @db.VarChar(100) // Numéro Mobile Money ou IBAN
+  jobTitle    String   @db.VarChar(50) // Patron, Manager, Chargé de Com'
+  status      String   @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
   id                                      String               @id @default(uuid()) @db.Uuid
   username                                String               @unique @db.VarChar(50)
@@ -444,6 +459,7 @@ model User {
   StoryView                               StoryView[]
   City                                    City?                @relation(fields: [residenceCityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   UserCityInterest                        UserCityInterest[]
+  OrganizerProfile                        OrganizerProfile?
   UserRole                                UserRole[]
   UserTagInterest                         UserTagInterest[]
 }
