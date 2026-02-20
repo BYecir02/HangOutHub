@@ -1,9 +1,10 @@
 import { Tabs, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { View, useColorScheme } from 'react-native';
+import { View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export default function TabLayout() {
+export default function OrganizerLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -12,10 +13,10 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#4c669f', // Bleu principal
-        tabBarInactiveTintColor: isDark ? '#9ca3af' : 'gray', // Gris plus clair en mode sombre
+        tabBarInactiveTintColor: isDark ? '#9ca3af' : 'gray',
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? '#111827' : '#fff', // Fond sombre (Gris très foncé) ou blanc
+          backgroundColor: isDark ? '#111827' : '#fff',
           borderTopWidth: 0,
           elevation: 10,
           shadowColor: '#000',
@@ -26,39 +27,35 @@ export default function TabLayout() {
           paddingBottom: 25,
           paddingTop: 5,
         },
-      }}
-    >
-      {/* 1. ACCUEIL */}
+      }}>
       <Tabs.Screen
-        name="home"
+        name="dashboard"
         options={{
-          title: 'Accueil',
+          title: 'Dashboard',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <Ionicons size={24} name={focused ? "stats-chart" : "stats-chart-outline"} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="events"
+        options={{
+          title: 'Événements',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons size={24} name={focused ? "calendar" : "calendar-outline"} color={color} />
           ),
         }}
       />
 
-      {/* 2. CARTE (Remplace Découvrir) */}
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: 'Carte',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "map" : "map-outline"} size={24} color={color} />
-          ),
-        }}
-      />
-
-      {/* 3. BOUTON CENTRAL : AJOUTER */}
+      {/* 3. BOUTON CENTRAL : CRÉER */}
       <Tabs.Screen
         name="create"
         options={{
-          title: '', // On cache le texte pour laisser place au gros bouton
+          title: '',
           tabBarIcon: () => (
             <View 
               className="bg-[#ff4757] h-14 w-14 rounded-full justify-center items-center shadow-lg shadow-red-500"
-              style={{ marginBottom: 20 }} // Le fait ressortir de la barre
+              style={{ marginBottom: 20 }}
             >
               <Ionicons name="add" size={35} color="white" />
             </View>
@@ -66,37 +63,29 @@ export default function TabLayout() {
         }}
         listeners={() => ({
           tabPress: (e) => {
-            e.preventDefault(); // Empêche l'ouverture de l'onglet vide
-            router.push('/create-modal'); // Ouvre le modal à la place
+            e.preventDefault();
+            router.push('/create-event'); // Redirection vers la page à la racine
           },
         })}
       />
 
-      {/* 4. SOCIAL */}
       <Tabs.Screen
-        name="social"
+        name="scanner"
         options={{
-          title: 'Social',
+          title: 'Scanner',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "people" : "people-outline"} size={24} color={color} />
+            <Ionicons size={24} name={focused ? "qr-code" : "qr-code-outline"} color={color} />
           ),
         }}
       />
-
-      {/* 5. PROFIL (MOI) */}
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Moi',
+          title: 'Vitrine',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            <Ionicons size={24} name={focused ? "storefront" : "storefront-outline"} color={color} />
           ),
         }}
-      />
-
-      <Tabs.Screen 
-        name="explore" 
-        options={{ href: null }} 
       />
     </Tabs>
   );

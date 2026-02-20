@@ -110,6 +110,12 @@ export class UsersController {
     return this.usersService.update(id, data);
   }
 
+  // ✅ AJOUT : Route pour valider un compte pro
+  @Patch(':id/approve')
+  approve(@Param('id') id: string) {
+    return this.usersService.approveOrganizer(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);

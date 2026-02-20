@@ -412,6 +412,15 @@ model OrganizerProfile {
   User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique // On stocke le token (ou un hash) pour pouvoir le révoquer
+  device    String?  @db.VarChar(100) // Ex: "iPhone 13", "Android"
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
   id                                      String               @id @default(uuid()) @db.Uuid
   username                                String               @unique @db.VarChar(50)
@@ -460,6 +469,7 @@ model User {
   City                                    City?                @relation(fields: [residenceCityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   UserCityInterest                        UserCityInterest[]
   OrganizerProfile                        OrganizerProfile?
+  Session                                 Session[]
   UserRole                                UserRole[]
   UserTagInterest                         UserTagInterest[]
 }

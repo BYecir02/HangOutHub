@@ -1,7 +1,7 @@
 // frontend/app/(tabs)/register.tsx
 import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import api from '../../services/api'; 
+import api from '../services/api'; 
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '@/components/themed-view';

@@ -18,9 +18,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(organizer)" options={{ headerShown: false }} />
+          <Stack.Screen name="create-event" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-          <Stack.Screen name="preferences" options={{ headerShown: false }} />
+          <Stack.Screen name="preferences" options={{ headerShown: false }} />          
           <Stack.Screen name="settings" options={{ title: 'Paramètres', headerBackTitle: 'Retour' }} />
           <Stack.Screen name="create-modal" options={{ presentation: 'transparentModal', headerShown: false, animation: 'none' }} />
           <Stack.Screen name="event" options={{ headerShown: false, presentation: 'fullScreenModal' }} />

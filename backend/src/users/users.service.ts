@@ -92,6 +92,10 @@ export class UsersService {
   async findOne(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
+      include: {
+        OrganizerProfile: true, // ✅ On récupère les infos Pro (Statut, IFU...)
+        UserRole: { include: { Role: true } },
+      },
     });
   }
 
@@ -105,6 +109,7 @@ export class UsersService {
             Role: true,
           },
         },
+        OrganizerProfile: true, // ✅ Indispensable pour le login
       },
     });
   }
@@ -126,5 +131,13 @@ export class UsersService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _hidden, ...result } = user;
     return result;
+  }
+
+  // ✅ AJOUT : Valider un organisateur (Admin)
+  async approveOrganizer(userId: string) {
+    return this.prisma.organizerProfile.update({
+      where: { userId },
+      data: { status: 'APPROVED' },
+    });
   }
 }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TextInput, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import api from '../../services/api';
-import * as SecureStore from 'expo-secure-store';
+import api, { storage } from '@/services/api'; 
 import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
@@ -16,16 +15,26 @@ export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
+  // ✅ VÉRIFICATION INTELLIGENTE AU LANCEMENT
   useEffect(() => {
     const checkLogin = async () => {
       try {
-        const token = await SecureStore.getItemAsync('userToken');
-        if (token) {
-          console.log("Token trouvé, auto-login...");
-          router.replace('/home');
+        const token = await storage.getItem('userToken');
+        const userInfoStr = await storage.getItem('userInfo');
+
+        if (token && userInfoStr) {
+          const user = JSON.parse(userInfoStr);
+          const isPro = user.role === 'ORGANIZER' || user.role === 'PLACE_OWNER';
+          
+          // On redirige vers le bon espace
+          if (isPro) {
+             router.replace('/(organizer)');
+          } else {
+             router.replace('/(tabs)/home');
+          }
         }
       } catch (e) {
-        console.log("Pas de token trouvé");
+        console.log("Pas de session active");
       }
     };
     checkLogin();
@@ -39,12 +48,29 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { access_token } = response.data;
-      await SecureStore.setItemAsync('userToken', access_token);
-      router.replace('/home'); 
+      const { access_token, user } = response.data;
+      
+      // On stocke tout
+      await storage.setItem('userToken', access_token);
+      await storage.setItem('userInfo', JSON.stringify(user));
+
+      const isPro = user.role === 'ORGANIZER' || user.role === 'PLACE_OWNER';
+
+      if (isPro) {
+        if (user.organizerStatus === 'APPROVED') {
+          router.replace('/(organizer)/dashboard');
+        } else if (user.organizerStatus === 'PENDING') {
+          Alert.alert('Patience ⏳', 'Compte en attente de validation.');
+          await storage.removeItem('userToken');
+        } else {
+           router.replace('/(organizer)');
+        }
+      } else {
+        router.replace('/(tabs)/home'); 
+      }
     } catch (error: any) {
       const message = error.response?.data?.message || 'Erreur de connexion';
-      Alert.alert('Oups', message);
+      Alert.alert('Oups', Array.isArray(message) ? message[0] : message);
     } finally {
       setLoading(false);
     }
@@ -53,14 +79,13 @@ export default function LoginScreen() {
   return (
     <ThemedView className="flex-1">
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
         className="flex-1"
       >
         <ScrollView 
           contentContainerStyle={{ paddingHorizontal: 32, paddingTop: 80, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <ThemedView className="mt-8 mb-14">
             <ThemedText type="title" className="text-[42px] font-bold mb-2 tracking-tight">
               Connexion
@@ -70,15 +95,10 @@ export default function LoginScreen() {
             </ThemedText>
           </ThemedView>
 
-          {/* Inputs - Style Typeform */}
           <ThemedView className="mb-6">
             <ThemedView className="mb-10">
               <TextInput
-                className={`text-xl py-4 border-b-2 bg-transparent text-gray-900 dark:text-gray-100 ${
-                  focusedField === 'email' 
-                    ? 'border-[#4c669f]' 
-                    : 'border-gray-200 dark:border-gray-700'
-                }`}
+                className={`text-xl py-4 border-b-2 bg-transparent ${isDark ? 'text-gray-100 border-gray-700' : 'text-gray-900 border-gray-200'} ${focusedField === 'email' ? 'border-[#4c669f]' : ''}`}
                 placeholder="Email"
                 placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
                 value={email}
@@ -92,11 +112,7 @@ export default function LoginScreen() {
             
             <ThemedView className="mb-10">
               <TextInput
-                className={`text-xl py-4 border-b-2 bg-transparent text-gray-900 dark:text-gray-100 ${
-                  focusedField === 'password' 
-                    ? 'border-[#4c669f]' 
-                    : 'border-gray-200 dark:border-gray-700'
-                }`}
+                className={`text-xl py-4 border-b-2 bg-transparent ${isDark ? 'text-gray-100 border-gray-700' : 'text-gray-900 border-gray-200'} ${focusedField === 'password' ? 'border-[#4c669f]' : ''}`}
                 placeholder="Mot de passe"
                 placeholderTextColor={isDark ? '#9ca3af' : '#9ca3af'}
                 value={password}
@@ -108,14 +124,6 @@ export default function LoginScreen() {
             </ThemedView>
           </ThemedView>
 
-          {/* Mot de passe oublié */}
-          <TouchableOpacity className="items-end mb-8">
-            <ThemedText className="text-sm text-[#4c669f] font-medium">
-              Mot de passe oublié ?
-            </ThemedText>
-          </TouchableOpacity>
-
-          {/* Bouton de connexion */}
           <TouchableOpacity 
             className={`bg-[#4c669f] py-[18px] rounded-xl items-center mb-8 ${loading ? 'opacity-60' : ''}`}
             onPress={handleLogin} 
@@ -130,7 +138,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Footer */}
           <ThemedView className="flex-row justify-center items-center">
             <ThemedText className="text-base">Pas encore de compte ? </ThemedText>
             <TouchableOpacity onPress={() => router.push('/register')}>
@@ -139,8 +146,6 @@ export default function LoginScreen() {
               </ThemedText>
             </TouchableOpacity>
           </ThemedView>
-
-          <ThemedView className="h-10" />
         </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>

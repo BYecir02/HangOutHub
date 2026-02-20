@@ -5,12 +5,14 @@ import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto'; // Import
 import { RegisterOrganizerDto } from './dto/register-organizer.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private prisma: PrismaService, // ✅ Injection de Prisma
   ) {}
 
   // Fonction d'inscription
@@ -56,21 +58,42 @@ export class AuthService {
     const userRoles = user['UserRole'] || [];
     const primaryRole = userRoles.length > 0 ? userRoles[0].Role.name : 'USER';
 
+    // 1. Générer le token
     const payload = {
       sub: user.id,
       username: user.username,
       role: primaryRole,
     };
+    const token = this.jwtService.sign(payload);
+
+    // 2. ✅ Sauvegarder la session en BDD
+    await this.prisma.session.create({
+      data: {
+        userId: user.id,
+        token: token,
+        device: 'Mobile', // Tu pourras récupérer le vrai User-Agent plus tard
+      },
+    });
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: token,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
         avatarUrl: user.avatarUrl,
         role: primaryRole,
+        // ✅ Infos vitales pour le Dashboard Organisateur
+        organizerStatus: user.OrganizerProfile?.status, 
+        companyName: user.OrganizerProfile?.companyName,
       },
     };
+  }
+
+  // ✅ Fonction de déconnexion (Supprime la session)
+  async logout(token: string) {
+    // On supprime la session qui correspond à ce token
+    // Le .deleteMany évite une erreur si le token n'existe pas déjà
+    await this.prisma.session.deleteMany({ where: { token } });
   }
 }

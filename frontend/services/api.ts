@@ -1,5 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import { router } from 'expo-router';
 
 // On utilise la variable d'environnement EXPO_PUBLIC_API_URL
 // Si elle n'est pas définie, on utilise l'IP locale par défaut (utile pour le dev rapide)
@@ -13,16 +15,58 @@ const api = axios.create({
   },
 });
 
+// --- Helper pour le stockage compatible Web/Mobile ---
+export const storage = {
+  setItem: async (key: string, value: string) => {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  getItem: async (key: string) => {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      return await SecureStore.getItemAsync(key);
+    }
+  },
+  removeItem: async (key: string) => {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      await SecureStore.deleteItemAsync(key);
+    }
+  }
+};
+
 // Intercepteur pour ajouter le token JWT à chaque requête
 api.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('userToken');
+    const token = await storage.getItem('userToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Intercepteur pour gérer les erreurs (ex: Token expiré)
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    // Si le backend renvoie 401 (Non autorisé), c'est que le token est invalide ou expiré
+    if (error.response && error.response.status === 401) {
+      // On nettoie le stockage
+      await storage.removeItem('userToken');
+      await storage.removeItem('userInfo');
+      
+      // ✅ On force la redirection vers l'écran de connexion
+      router.replace('/');
+    }
     return Promise.reject(error);
   }
 );

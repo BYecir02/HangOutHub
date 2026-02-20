@@ -1,8 +1,9 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, HttpCode } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto'; // N'oublie pas l'import !
 import { RegisterOrganizerDto } from './dto/register-organizer.dto';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('auth')
 export class AuthController {
@@ -24,5 +25,15 @@ export class AuthController {
   @Post('login')
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  // ✅ Route de déconnexion
+  @UseGuards(AuthGuard('jwt'))
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Request() req: any) {
+    // On récupère le token depuis le header Authorization
+    const token = req.headers.authorization?.split(' ')[1];
+    return this.authService.logout(token);
   }
 }
