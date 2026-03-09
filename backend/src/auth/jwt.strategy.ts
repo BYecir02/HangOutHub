@@ -15,7 +15,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(req: Request, payload: { sub: string; username: string; role: string }) {
+  async validate(
+    req: Request,
+    payload: { sub: string; username: string; role: string },
+  ) {
     // Récupérer le token brut depuis le header (Bearer eyJ...)
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
 

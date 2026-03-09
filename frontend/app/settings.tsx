@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import api, { storage } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SettingsScreen() {
@@ -22,13 +22,42 @@ export default function SettingsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // 1. Supprimer le token
-              await SecureStore.deleteItemAsync('userToken');
-              // 2. Rediriger vers la page de connexion (index)
+              // 1. Logout backend (invalider la session)
+              await api.post('/auth/logout').catch(() => {});
+              // 2. Supprimer le token et les infos locales
+              await storage.removeItem('userToken');
+              await storage.removeItem('userInfo');
+              // 3. Rediriger vers la page de connexion (index)
               router.replace('/');
             } catch (error) {
               console.error("Erreur lors de la déconnexion:", error);
               Alert.alert("Erreur", "Impossible de se déconnecter.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Supprimer mon compte",
+      "Cette action est irréversible. Toutes vos données seront effacées.",
+      [
+        { text: "Annuler", style: "cancel" },
+        { 
+          text: "Supprimer définitivement", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              await api.delete('/users/me');
+              await storage.removeItem('userToken');
+              await storage.removeItem('userInfo');
+              router.replace('/');
+              Alert.alert("Compte supprimé", "Votre compte a été supprimé avec succès.");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Erreur", "Impossible de supprimer le compte.");
             }
           }
         }
@@ -67,10 +96,19 @@ export default function SettingsScreen() {
         </View>
 
         {/* Bouton Déconnexion */}
-        <TouchableOpacity onPress={handleLogout} className="flex-row items-center justify-center bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/50 mt-4">
-          <Ionicons name="log-out-outline" size={22} color="#ff4757" />
-          <Text className="ml-2 text-red-600 font-bold text-base">Se déconnecter</Text>
+        <TouchableOpacity onPress={handleLogout} className="flex-row items-center justify-center bg-gray-200 dark:bg-gray-800 p-4 rounded-xl border border-gray-300 dark:border-gray-700 mt-4">
+          <Ionicons name="log-out-outline" size={22} color={isDark ? "#fff" : "#333"} />
+          <Text className="ml-2 text-gray-800 dark:text-white font-bold text-base">Se déconnecter</Text>
         </TouchableOpacity>
+
+        {/* Zone Danger */}
+        <View className="mt-8">
+             <Text className="text-red-500 font-bold mb-2 uppercase text-xs tracking-wider">Zone Danger</Text>
+             <TouchableOpacity onPress={handleDeleteAccount} className="flex-row items-center justify-center bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/50">
+                <Ionicons name="trash-outline" size={22} color="#ff4757" />
+                <Text className="ml-2 text-red-600 font-bold text-base">Supprimer mon compte</Text>
+             </TouchableOpacity>
+        </View>
         
         <Text className="text-center text-gray-400 mt-8 text-xs">Hangout Hub v1.0.0</Text>
       </View>

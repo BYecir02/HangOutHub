@@ -1,11 +1,10 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Platform } from 'react-native';
 
-// On utilise la variable d'environnement EXPO_PUBLIC_API_URL
-// Si elle n'est pas définie, on utilise l'IP locale par défaut (utile pour le dev rapide)
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+export const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const API_URL = `${BASE_URL}/api/v1`;
 
 const api = axios.create({
@@ -15,7 +14,6 @@ const api = axios.create({
   },
 });
 
-// --- Helper pour le stockage compatible Web/Mobile ---
 export const storage = {
   setItem: async (key: string, value: string) => {
     if (Platform.OS === 'web') {
@@ -27,9 +25,8 @@ export const storage = {
   getItem: async (key: string) => {
     if (Platform.OS === 'web') {
       return localStorage.getItem(key);
-    } else {
-      return await SecureStore.getItemAsync(key);
     }
+    return SecureStore.getItemAsync(key);
   },
   removeItem: async (key: string) => {
     if (Platform.OS === 'web') {
@@ -37,10 +34,9 @@ export const storage = {
     } else {
       await SecureStore.deleteItemAsync(key);
     }
-  }
+  },
 };
 
-// Intercepteur pour ajouter le token JWT à chaque requête
 api.interceptors.request.use(
   async (config) => {
     const token = await storage.getItem('userToken');
@@ -49,40 +45,41 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
-// Intercepteur pour gérer les erreurs (ex: Token expiré)
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Si le backend renvoie 401 (Non autorisé), c'est que le token est invalide ou expiré
-    if (error.response && error.response.status === 401) {
-      // On nettoie le stockage
+    const method = error.config?.method?.toUpperCase() || 'GET';
+    const url = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
+    const status = error.response?.status;
+    const data = error.response?.data;
+
+    if (status) {
+      console.error(`[API ${status}] ${method} ${url}`, data);
+    }
+
+    if (status === 401) {
       await storage.removeItem('userToken');
       await storage.removeItem('userInfo');
-      
-      // ✅ On force la redirection vers l'écran de connexion
       router.replace('/');
     }
+
     return Promise.reject(error);
-  }
+  },
 );
 
-// Helper pour corriger les URLs des images (remplace localhost par l'IP)
 export const getImageUrl = (url: string | null | undefined) => {
-  if (!url) return null;
-  
-  // Si l'URL contient '/uploads/', c'est une image de notre serveur
-  // On force l'utilisation de l'URL de base actuelle pour éviter les problèmes d'IP
+  if (!url) {
+    return null;
+  }
+
   if (url.includes('/uploads/')) {
     const path = url.substring(url.indexOf('/uploads/'));
     return `${BASE_URL}${path}`;
   }
-  
-  // Sinon (ex: https://images.unsplash.com...), on retourne tel quel
+
   return url;
 };
 

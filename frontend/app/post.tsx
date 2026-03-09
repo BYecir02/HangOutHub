@@ -1,37 +1,90 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, useColorScheme, Image, ScrollView, Alert, Modal, ActivityIndicator } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+
 import api from '../services/api';
+
+type PostVisibility = 'public' | 'friends' | 'private';
+
+const VISIBILITY_OPTIONS: {
+  id: PostVisibility;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  description: string;
+}[] = [
+  {
+    id: 'public',
+    label: 'Tout le monde',
+    icon: 'globe-outline',
+    description: 'Visible par tous les utilisateurs de l application.',
+  },
+  {
+    id: 'friends',
+    label: 'Amis uniquement',
+    icon: 'people-outline',
+    description: 'Reserve aux personnes proches de ton reseau.',
+  },
+  {
+    id: 'private',
+    label: 'Moi uniquement',
+    icon: 'lock-closed-outline',
+    description: 'Le post reste visible uniquement dans ton espace.',
+  },
+];
 
 export default function CreatePostScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams(); // Récupération des paramètres (si édition)
+  const params = useLocalSearchParams<{
+    postId?: string;
+    content?: string;
+    visibility?: PostVisibility;
+  }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
-  // Détection du mode édition
   const isEditing = !!params.postId;
 
   const [content, setContent] = useState(params.content ? String(params.content) : '');
   const [images, setImages] = useState<string[]>([]);
-  const [showPoll, setShowPoll] = useState(false);
-  const [location, setLocation] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>((params.visibility as any) || 'public');
+  const [visibility, setVisibility] = useState<PostVisibility>(
+    params.visibility || 'public',
+  );
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Gestion des images (Caméra ou Galerie)
+  const canSubmit = content.trim().length > 0 || images.length > 0;
+  const visibilityLabel =
+    VISIBILITY_OPTIONS.find((option) => option.id === visibility)?.label ||
+    'Tout le monde';
+
+  const headerTitle = useMemo(() => {
+    return isEditing ? 'Modifier le post' : 'Nouvelle publication';
+  }, [isEditing]);
+
   const pickImage = async (source: 'camera' | 'gallery') => {
     const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
     };
 
-    let result;
+    let result: ImagePicker.ImagePickerResult;
+
     if (source === 'camera') {
       await ImagePicker.requestCameraPermissionsAsync();
       result = await ImagePicker.launchCameraAsync(options);
@@ -40,97 +93,104 @@ export default function CreatePostScreen() {
     }
 
     if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+      setImages((currentImages) => [...currentImages, result.assets[0].uri]);
     }
   };
 
-  // Simulation d'ajout de localisation
-  const toggleLocation = () => {
-    if (location) setLocation(null);
-    else setLocation("Le Code Bar, Cotonou"); // Mock pour l'instant
-  };
-
-  // Envoi du post au backend
   const handlePost = async () => {
-    if (!content.trim() && images.length === 0) {
-      Alert.alert("Oups", "Ajoute du texte ou une image !");
+    if (!canSubmit) {
+      Alert.alert('Oups', 'Ajoute du texte ou une image avant de publier.');
       return;
     }
 
     setLoading(true);
+
     try {
       if (isEditing) {
-        // --- MODE ÉDITION (PATCH) ---
-        // Note: Le backend actuel ne gère pas encore la modif d'images, on envoie juste le texte/visibilité
-        await api.patch(`/posts/${params.postId}`, { 
-          content, 
-          visibility 
+        await api.patch(`/posts/${params.postId}`, {
+          content,
+          visibility,
         });
-        Alert.alert("Succès", "Post modifié !");
+        Alert.alert('Succes', 'Post modifie.');
       } else {
-        // --- MODE CRÉATION (POST) ---
         const formData = new FormData();
         formData.append('content', content);
         formData.append('visibility', visibility);
 
-        // Ajout des images
         images.forEach((uri, index) => {
           formData.append('images', {
-            uri: uri,
+            uri,
             name: `image_${index}.jpg`,
             type: 'image/jpeg',
-          } as any);
+          } as never);
         });
 
         await api.post('/posts', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        Alert.alert("Succès", "Post publié !");
+
+        Alert.alert('Succes', 'Post publie.');
       }
-      
+
       router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert("Erreur", "Impossible de publier le post.");
+      Alert.alert('Erreur', 'Impossible de publier le post.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View className="flex-1 bg-white dark:bg-black pt-14">
-      {/* HEADER */}
-      <View className="flex-row items-center justify-between px-5 pb-4 border-b border-gray-100 dark:border-gray-800">
+    <View className="flex-1 bg-white pt-14 dark:bg-black">
+      <View className="flex-row items-center justify-between border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <Ionicons name="close" size={28} color={isDark ? "#fff" : "#333"} />
+          <Ionicons name="close" size={28} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <View className="items-center">
+          <Text className="text-lg font-semibold text-gray-900 dark:text-white">
+            {headerTitle}
+          </Text>
+          <Text className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+            {visibilityLabel}
+          </Text>
+        </View>
+
+        <TouchableOpacity
           onPress={handlePost}
-          disabled={(!content.trim() && images.length === 0) || loading}
-          className={`px-5 py-2 rounded-full ${content.trim() ? 'bg-[#f39c12]' : 'bg-gray-200 dark:bg-gray-800'}`}
+          disabled={!canSubmit || loading}
+          className={`rounded-full px-5 py-2 ${
+            canSubmit ? 'bg-[#f39c12]' : 'bg-gray-200 dark:bg-gray-800'
+          }`}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={content.trim() ? "white" : "gray"} />
+            <ActivityIndicator size="small" color={canSubmit ? 'white' : 'gray'} />
           ) : (
-            <Text className={`font-bold ${content.trim() ? 'text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+            <Text
+              className={`font-bold ${
+                canSubmit ? 'text-white' : 'text-gray-400 dark:text-gray-500'
+              }`}
+            >
               {isEditing ? 'Enregistrer' : 'Publier'}
             </Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* ZONE DE TEXTE + TOOLBAR */}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1 pb-20"
       >
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
-          {/* Champ de texte */}
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ paddingBottom: 20 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <TextInput
-            className="p-5 text-xl text-gray-800 dark:text-white leading-7 min-h-[150px]"
-            placeholder="Quoi de neuf ?"
-            placeholderTextColor={isDark ? "#666" : "#999"}
+            className="min-h-[170px] px-5 pt-5 text-xl leading-7 text-gray-800 dark:text-white"
+            placeholder="Partage une ambiance, une bonne adresse ou un plan pour ce soir..."
+            placeholderTextColor={isDark ? '#666' : '#999'}
             multiline
             textAlignVertical="top"
             autoFocus
@@ -138,151 +198,153 @@ export default function CreatePostScreen() {
             onChangeText={setContent}
           />
 
-          {/* Badge Localisation */}
-          {location && (
-            <View className="px-5 mb-4">
-              <View className="bg-blue-50 dark:bg-blue-900/30 self-start flex-row items-center px-3 py-1.5 rounded-full">
-                <Ionicons name="location" size={16} color="#4c669f" />
-                <Text className="text-[#4c669f] font-bold ml-1">{location}</Text>
-                <TouchableOpacity onPress={() => setLocation(null)} className="ml-2">
-                  <Ionicons name="close-circle" size={16} color="#4c669f" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Zone Sondage */}
-          {showPoll && (
-            <View className="mx-5 p-4 border border-gray-200 dark:border-gray-800 rounded-xl mb-4">
-              <View className="flex-row justify-between mb-2">
-                <Text className="font-bold text-gray-500">Sondage</Text>
-                <TouchableOpacity onPress={() => setShowPoll(false)}>
-                  <Ionicons name="close" size={20} color="gray" />
-                </TouchableOpacity>
-              </View>
-              <TextInput placeholder="Choix 1" className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg mb-2 text-gray-800 dark:text-white" />
-              <TextInput placeholder="Choix 2" className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-gray-800 dark:text-white" />
-              <TouchableOpacity className="mt-2">
-                <Text className="text-[#4c669f] font-bold text-sm">+ Ajouter une option</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Prévisualisation des images */}
-          {images.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-5 mb-4">
+          {images.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="px-5"
+            >
               {images.map((uri, index) => (
-                <View key={index} className="mr-3 relative">
-                  <Image source={{ uri }} className="w-40 h-40 rounded-xl bg-gray-100" resizeMode="cover" />
-                  <TouchableOpacity 
-                    onPress={() => setImages(images.filter((_, i) => i !== index))}
-                    className="absolute top-2 right-2 bg-black/50 rounded-full p-1"
+                <View key={index} className="relative mr-3">
+                  <Image
+                    source={{ uri }}
+                    className="h-40 w-40 rounded-2xl bg-gray-100"
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    onPress={() =>
+                      setImages((currentImages) =>
+                        currentImages.filter((_, currentIndex) => currentIndex !== index),
+                      )
+                    }
+                    className="absolute right-2 top-2 rounded-full bg-black/50 p-1"
                   >
                     <Ionicons name="close" size={16} color="white" />
                   </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
-          )}
+          ) : null}
+
+          <View className="mx-5 mt-5 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                Visibilite
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowVisibilityModal(true)}
+                className="flex-row items-center rounded-full bg-white px-3 py-2 dark:bg-gray-800"
+              >
+                <Text className="mr-1 text-sm font-semibold text-[#4c669f]">
+                  {visibilityLabel}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color="#4c669f" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
+              {isEditing
+                ? 'Tu modifies ici le texte et la visibilite. Les images deja publiees restent inchangées.'
+                : 'Ajoute une ou plusieurs images et choisis qui peut voir ta publication.'}
+            </Text>
+          </View>
         </ScrollView>
 
-        {/* SÉLECTEUR DE VISIBILITÉ */}
-        <View className="px-5 py-2 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-black">
-             <TouchableOpacity 
-               onPress={() => setShowVisibilityModal(true)}
-               className="flex-row items-center self-start"
-             >
-               <Text className="text-[#4c669f] font-bold text-sm mr-1">
-                 {visibility === 'public' ? 'Tout le monde' : visibility === 'friends' ? 'Amis uniquement' : 'Moi uniquement'}
-               </Text>
-               <Ionicons name="chevron-down" size={14} color="#4c669f" />
-             </TouchableOpacity>
-        </View>
+        <View className="mb-5 flex-row items-center border-t border-gray-100 bg-white px-5 py-3 dark:border-gray-800 dark:bg-black">
+          {!isEditing ? (
+            <>
+              <TouchableOpacity
+                onPress={() => void pickImage('gallery')}
+                className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+              >
+                <Ionicons name="image" size={24} color="#4c669f" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => void pickImage('camera')}
+                className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+              >
+                <Ionicons name="camera" size={24} color="#4c669f" />
+              </TouchableOpacity>
+            </>
+          ) : null}
 
-        {/* BARRE D'OUTILS */}
-        <View className="flex-row items-center px-5 py-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-black mb-5">
-            {/* On masque l'ajout d'images en mode édition pour l'instant (car backend non prêt) */}
-            {!isEditing && (
-              <>
-                {/* Galerie */}
-                <TouchableOpacity onPress={() => pickImage('gallery')} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
-                    <Ionicons name="image" size={24} color="#4c669f" />
-                </TouchableOpacity>
-                
-                {/* Caméra */}
-                <TouchableOpacity onPress={() => pickImage('camera')} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
-                    <Ionicons name="camera" size={24} color="#4c669f" />
-                </TouchableOpacity>
-              </>
-            )}
+          <View className="flex-1" />
 
-            {/* Sondage */}
-            <TouchableOpacity onPress={() => setShowPoll(!showPoll)} className={`mr-4 p-2 rounded-full ${showPoll ? 'bg-blue-100' : 'bg-gray-50 dark:bg-gray-800'}`}>
-                <Ionicons name="stats-chart" size={24} color="#4c669f" />
-            </TouchableOpacity>
-
-            {/* Localisation */}
-            <TouchableOpacity onPress={toggleLocation} className={`mr-4 p-2 rounded-full ${location ? 'bg-blue-100' : 'bg-gray-50 dark:bg-gray-800'}`}>
-                <Ionicons name="location" size={24} color="#4c669f" />
-            </TouchableOpacity>
-            
-            <View className="flex-1" />
-            
-            {/* Compteur de caractères discret */}
-            <Text className="text-gray-300 dark:text-gray-600 text-xs font-medium">
-              {content.length}/500
-            </Text>
+          <Text className="text-xs font-medium text-gray-300 dark:text-gray-600">
+            {content.length}/500
+          </Text>
         </View>
       </KeyboardAvoidingView>
 
-      {/* MODAL DE SÉLECTION DE VISIBILITÉ */}
       <Modal
         visible={showVisibilityModal}
-        transparent={true}
+        transparent
         animationType="slide"
         onRequestClose={() => setShowVisibilityModal(false)}
       >
-        <TouchableOpacity 
-            activeOpacity={1} 
-            onPress={() => setShowVisibilityModal(false)}
-            className="flex-1 justify-end bg-black/50"
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShowVisibilityModal(false)}
+          className="flex-1 justify-end bg-black/50"
         >
-            <TouchableOpacity activeOpacity={1} className="bg-white dark:bg-gray-900 rounded-t-3xl p-5 pb-10">
-                <View className="items-center mb-4">
-                    <View className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
+          <TouchableOpacity
+            activeOpacity={1}
+            className="rounded-t-3xl bg-white p-5 pb-10 dark:bg-gray-900"
+          >
+            <View className="mb-4 items-center">
+              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+            </View>
+
+            <Text className="mb-6 text-center text-lg font-bold text-gray-800 dark:text-white">
+              Qui peut voir ce post ?
+            </Text>
+
+            {VISIBILITY_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                onPress={() => {
+                  setVisibility(option.id);
+                  setShowVisibilityModal(false);
+                }}
+                className="flex-row items-center border-b border-gray-100 p-4 dark:border-gray-800"
+              >
+                <View
+                  className={`mr-4 rounded-full p-3 ${
+                    visibility === option.id
+                      ? 'bg-blue-50 dark:bg-blue-900/30'
+                      : 'bg-gray-100 dark:bg-gray-800'
+                  }`}
+                >
+                  <Ionicons
+                    name={option.icon}
+                    size={24}
+                    color={visibility === option.id ? '#4c669f' : 'gray'}
+                  />
                 </View>
-                <Text className="text-center text-lg font-bold text-gray-800 dark:text-white mb-6">Qui peut voir ce post ?</Text>
-                
-                {[
-                    { id: 'public', label: 'Tout le monde', icon: 'globe-outline', desc: 'Visible par tous les utilisateurs' },
-                    { id: 'friends', label: 'Amis uniquement', icon: 'people-outline', desc: 'Seuls vos abonnés peuvent voir' },
-                    { id: 'private', label: 'Moi uniquement', icon: 'lock-closed-outline', desc: 'Visible uniquement par vous' },
-                ].map((option) => (
-                    <TouchableOpacity 
-                        key={option.id}
-                        onPress={() => {
-                            setVisibility(option.id as any);
-                            setShowVisibilityModal(false);
-                        }}
-                        className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
-                    >
-                        <View className={`p-3 rounded-full mr-4 ${visibility === option.id ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                            <Ionicons name={option.icon as any} size={24} color={visibility === option.id ? "#4c669f" : "gray"} />
-                        </View>
-                        <View className="flex-1">
-                            <Text className={`font-bold text-base ${visibility === option.id ? 'text-[#4c669f]' : 'text-gray-800 dark:text-white'}`}>
-                                {option.label}
-                            </Text>
-                            <Text className="text-gray-500 text-xs mt-0.5">{option.desc}</Text>
-                        </View>
-                        {visibility === option.id && (
-                            <Ionicons name="checkmark-circle" size={24} color="#4c669f" />
-                        )}
-                    </TouchableOpacity>
-                ))}
-                
-                <View className="h-4" />
-            </TouchableOpacity>
+                <View className="flex-1">
+                  <Text
+                    className={`text-base font-bold ${
+                      visibility === option.id
+                        ? 'text-[#4c669f]'
+                        : 'text-gray-800 dark:text-white'
+                    }`}
+                  >
+                    {option.label}
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-gray-500">
+                    {option.description}
+                  </Text>
+                </View>
+                {visibility === option.id ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color="#4c669f"
+                  />
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>

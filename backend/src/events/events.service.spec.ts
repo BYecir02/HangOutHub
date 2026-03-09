@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventsService } from './events.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('EventsService', () => {
   let service: EventsService;
@@ -12,7 +13,18 @@ describe('EventsService', () => {
         {
           provide: PrismaService,
           useValue: {
-            event: { create: jest.fn(), findMany: jest.fn() },
+            event: {
+              create: jest.fn(),
+              findMany: jest.fn(),
+              findUnique: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: StorageService,
+          useValue: {
+            uploadFile: jest.fn(),
+            uploadFiles: jest.fn(),
           },
         },
       ],

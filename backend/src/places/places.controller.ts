@@ -1,25 +1,34 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
-  Post,
-  Body,
   Param,
-  UseInterceptors,
+  Patch,
+  Post,
+  Request,
   UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { PlacesService } from './places.service';
-import { CreatePlaceDto } from './dto/create-place.dto';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { AuthGuard } from '@nestjs/passport';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+
+import { CreatePlaceDto } from './dto/create-place.dto';
+import { UpdatePlaceDto } from './dto/update-place.dto';
+import { PlacesService } from './places.service';
+
+interface AuthenticatedRequest {
+  user: {
+    userId: string;
+  };
+}
 
 @Controller('places')
 export class PlacesController {
   constructor(private readonly placesService: PlacesService) {}
 
-  // POST /places
   @UseGuards(AuthGuard('jwt'))
   @Post()
   @UseInterceptors(
@@ -29,33 +38,82 @@ export class PlacesController {
         { name: 'gallery', maxCount: 10 },
       ],
       {
-        storage: diskStorage({
-          destination: './uploads',
-          filename: (req, file, cb) => {
-            const randomName = Array(32)
-              .fill(null)
-              .map(() => Math.round(Math.random() * 16).toString(16))
-              .join('');
-            cb(null, `${randomName}${extname(file.originalname)}`);
-          },
-        }),
+        storage: memoryStorage(),
+        fileFilter: (_req, file, cb) => {
+          if (!file.mimetype.startsWith('image/')) {
+            return cb(
+              new BadRequestException('Seules les images sont autorisees.'),
+              false,
+            );
+          }
+          cb(null, true);
+        },
       },
     ),
   )
   create(
+    @Request() req: AuthenticatedRequest,
     @Body() createPlaceDto: CreatePlaceDto,
-    @UploadedFiles() files: { cover?: any[]; gallery?: any[] },
+    @UploadedFiles()
+    files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
   ) {
-    return this.placesService.create(createPlaceDto, files);
+    return this.placesService.create(createPlaceDto, files, req.user.userId);
   }
 
-  // GET /places
+  @UseGuards(AuthGuard('jwt'))
+  @Patch(':id')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'cover', maxCount: 1 },
+        { name: 'gallery', maxCount: 10 },
+      ],
+      {
+        storage: memoryStorage(),
+        fileFilter: (_req, file, cb) => {
+          if (!file.mimetype.startsWith('image/')) {
+            return cb(
+              new BadRequestException('Seules les images sont autorisees.'),
+              false,
+            );
+          }
+          cb(null, true);
+        },
+      },
+    ),
+  )
+  update(
+    @Param('id') id: string,
+    @Body() updatePlaceDto: UpdatePlaceDto,
+    @Request() req: AuthenticatedRequest,
+    @UploadedFiles()
+    files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
+  ) {
+    return this.placesService.update(
+      id,
+      updatePlaceDto,
+      files,
+      req.user.userId,
+    );
+  }
+
   @Get()
   findAll() {
     return this.placesService.findAll();
   }
 
-  // GET /places/:id
+  @UseGuards(AuthGuard('jwt'))
+  @Get('saved/mine')
+  findSaved(@Request() req: AuthenticatedRequest) {
+    return this.placesService.findSavedByUser(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/save')
+  toggleSave(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.placesService.toggleSave(id, req.user.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.placesService.findOne(id);

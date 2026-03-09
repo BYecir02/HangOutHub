@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from './posts.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('PostsService', () => {
   let service: PostsService;
@@ -16,6 +17,19 @@ describe('PostsService', () => {
       delete: jest.fn(),
       update: jest.fn(),
     },
+    postLike: {
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+      create: jest.fn(),
+    },
+    postComment: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+  const mockStorageService = {
+    uploadFile: jest.fn(),
+    uploadFiles: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,6 +39,10 @@ describe('PostsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService, // On injecte notre mock ici
+        },
+        {
+          provide: StorageService,
+          useValue: mockStorageService,
         },
       ],
     }).compile();

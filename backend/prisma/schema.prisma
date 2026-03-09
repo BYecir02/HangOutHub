@@ -19,7 +19,7 @@ model Booking {
   qrCode       String?     @db.VarChar(255)
   Event        Event?      @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   TicketType   TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User         User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User         User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Payment      Payment[]
 }
 
@@ -38,7 +38,7 @@ model ChatMessage {
   content  String
   sentAt   DateTime? @default(now()) @db.Timestamp(6)
   Outing   Outing    @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User      @relation(fields: [senderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User      @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model City {
@@ -57,7 +57,7 @@ model DeviceToken {
   userId   String  @db.Uuid
   token    String  @unique @db.VarChar(255)
   platform String? @db.VarChar(10)
-  User     User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model Event {
@@ -73,7 +73,7 @@ model Event {
   images      String[]     @default([])
   address     String?      @db.VarChar(255)
   Booking     Booking[]
-  User        User         @relation(fields: [organizerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User         @relation(fields: [organizerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Place       Place?       @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   EventTag    EventTag[]
   Promotion   Promotion[]
@@ -95,8 +95,8 @@ model Friendship {
   receiverId                        String    @db.Uuid
   status                            String?   @default("PENDING") @db.VarChar(20)
   createdAt                         DateTime? @default(now()) @db.Timestamp(6)
-  User_Friendship_receiverIdToUser  User      @relation("Friendship_receiverIdToUser", fields: [receiverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User_Friendship_requesterIdToUser User      @relation("Friendship_requesterIdToUser", fields: [requesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User_Friendship_receiverIdToUser  User      @relation("Friendship_receiverIdToUser", fields: [receiverId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User_Friendship_requesterIdToUser User      @relation("Friendship_requesterIdToUser", fields: [requesterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model Notification {
@@ -107,7 +107,7 @@ model Notification {
   isRead                          Boolean?  @default(false)
   createdAt                       DateTime? @default(now()) @db.Timestamp(6)
   User_Notification_actorIdToUser User?     @relation("Notification_actorIdToUser", fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User_Notification_userIdToUser  User      @relation("Notification_userIdToUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User_Notification_userIdToUser  User      @relation("Notification_userIdToUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model Outing {
@@ -118,7 +118,7 @@ model Outing {
   scheduledDate     DateTime            @db.Timestamp(6)
   status            String?             @default("DRAFT") @db.VarChar(20)
   ChatMessage       ChatMessage[]
-  User              User                @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User              User                @relation(fields: [creatorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Place             Place?              @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   OutingMedia       OutingMedia[]
   OutingParticipant OutingParticipant[]
@@ -132,7 +132,7 @@ model OutingMedia {
   type               String?              @db.VarChar(10)
   createdAt          DateTime?            @default(now()) @db.Timestamp(6)
   Outing             Outing               @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User               User                 @relation(fields: [uploaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User               User                 @relation(fields: [uploaderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   OutingMediaComment OutingMediaComment[]
   OutingMediaLike    OutingMediaLike[]
 }
@@ -143,14 +143,14 @@ model OutingMediaComment {
   mediaId     String      @db.Uuid
   content     String
   OutingMedia OutingMedia @relation(fields: [mediaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model OutingMediaLike {
   userId      String      @db.Uuid
   mediaId     String      @db.Uuid
   OutingMedia OutingMedia @relation(fields: [mediaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, mediaId])
 }
@@ -161,7 +161,7 @@ model OutingParticipant {
   status   String?  @default("INVITED") @db.VarChar(20)
   isAdmin  Boolean? @default(false)
   Outing   Outing   @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([outingId, userId])
 }
@@ -185,6 +185,7 @@ model Permission {
 model Place {
   id           String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   cityId       Int
+  ownerId      String?        @db.Uuid // ✅ Le propriétaire du lieu
   name         String         @db.VarChar(100)
   description  String?
   address      String?        @db.VarChar(255)
@@ -198,6 +199,7 @@ model Place {
   Event        Event[]
   Outing       Outing[]
   City         City           @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Owner        User?          @relation("PlaceOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   PlaceClaim   PlaceClaim[]
   PlaceTag     PlaceTag[]
   Promotion    Promotion[]
@@ -214,7 +216,7 @@ model PlaceClaim {
   documentUrl String  @db.VarChar(255)
   status      String? @default("PENDING") @db.VarChar(20)
   Place       Place   @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User        User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model PlaceTag {
@@ -255,7 +257,7 @@ model Report {
   targetId   String  @db.Uuid
   reason     String  @db.VarChar(255)
   status     String? @default("PENDING") @db.VarChar(20)
-  User       User    @relation(fields: [reporterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User       User    @relation(fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model Review {
@@ -267,7 +269,7 @@ model Review {
   photos        String?
   createdAt     DateTime?       @default(now()) @db.Timestamp(6)
   Place         Place           @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User          User            @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User          User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   ReviewComment ReviewComment[]
   ReviewLike    ReviewLike[]
 }
@@ -277,15 +279,15 @@ model ReviewComment {
   userId   String @db.Uuid
   reviewId String @db.Uuid
   content  String
-  Review   Review @relation(fields: [reviewId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User     User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model ReviewLike {
   userId   String @db.Uuid
   reviewId String @db.Uuid
-  Review   Review @relation(fields: [reviewId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User     User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, reviewId])
 }
@@ -312,7 +314,7 @@ model SavedPlace {
   placeId String    @db.Uuid
   savedAt DateTime? @default(now()) @db.Timestamp(6)
   Place   Place     @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User    User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User    User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, placeId])
 }
@@ -324,7 +326,7 @@ model Story {
   mediaUrl  String      @db.VarChar(255)
   expiresAt DateTime    @db.Timestamp(6)
   Place     Place?      @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User      User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   StoryLike StoryLike[]
   StoryView StoryView[]
 }
@@ -332,8 +334,8 @@ model Story {
 model StoryLike {
   userId  String @db.Uuid
   storyId String @db.Uuid
-  Story   Story  @relation(fields: [storyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User    User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User    User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, storyId])
 }
@@ -342,8 +344,8 @@ model StoryView {
   userId  String    @db.Uuid
   storyId String    @db.Uuid
   seenAt  DateTime? @default(now()) @db.Timestamp(6)
-  Story   Story     @relation(fields: [storyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User    User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Story   Story     @relation(fields: [storyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User    User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, storyId])
 }
@@ -451,6 +453,7 @@ model User {
   Notification_Notification_userIdToUser  Notification[]       @relation("Notification_userIdToUser")
   Outing                                  Outing[]
   OutingMedia                             OutingMedia[]
+  OwnedPlaces                             Place[]              @relation("PlaceOwner") // ✅ Liste des lieux possédés
   Post                                    Post[]
   PostComment                             PostComment[]
   PostLike                                PostLike[]
@@ -478,7 +481,7 @@ model UserCityInterest {
   userId String @db.Uuid
   cityId Int
   City   City   @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, cityId])
 }
@@ -488,7 +491,7 @@ model UserRole {
   roleId     Int
   assignedAt DateTime? @default(now()) @db.Timestamp(6)
   Role       Role      @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User       User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, roleId])
 }
@@ -497,7 +500,7 @@ model UserTagInterest {
   userId String @db.Uuid
   tagId  Int
   Tag    Tag    @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, tagId])
 }

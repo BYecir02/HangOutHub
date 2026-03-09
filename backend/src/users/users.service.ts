@@ -1,24 +1,50 @@
 import {
-  Injectable,
   ConflictException,
+  Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import * as bcrypt from 'bcrypt';
-import { Prisma } from '@prisma/client';
+
+interface OrganizerDetailsInput {
+  accountType: string;
+  companyName: string;
+  ifuNumber: string;
+  payoutInfo: string;
+  jobTitle: string;
+}
+
+type SanitizedUser<T extends { passwordHash?: string | null }> = Omit<
+  T,
+  'passwordHash'
+>;
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // --- CRÉATION (Inscription) ---
+  private sanitizeUser<T extends { passwordHash?: string | null }>(
+    user: T,
+  ): SanitizedUser<T> {
+    const result = { ...user } as T & { passwordHash?: string | null };
+    delete result.passwordHash;
+    return result;
+  }
+
+  private sanitizeUsers<T extends { passwordHash?: string | null }>(
+    users: T[],
+  ) {
+    return users.map((user) => this.sanitizeUser(user));
+  }
+
   async create(
     createUserDto: CreateUserDto,
-    roleName: string = 'USER', // Par défaut c'est un USER classique
-    organizerDetails?: any, // Données optionnelles pour le profil pro
+    roleName = 'USER',
+    organizerDetails?: OrganizerDetailsInput,
   ) {
-    // 1. Vérif existant
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [
@@ -31,30 +57,30 @@ export class UsersService {
 
     if (existingUser) {
       throw new ConflictException(
-        'Un·utilisateur·avec·cet·Email,·Téléphone·ou·Pseudo·existe·déjà.',
+        'Un utilisateur avec cet email, telephone ou pseudo existe deja.',
       );
     }
 
-    // 2. Hachage
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(createUserDto.password, salt);
 
-    // 3. Préparation
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userData } = createUserDto;
+    const userData: Omit<CreateUserDto, 'password'> = {
+      username: createUserDto.username,
+      email: createUserDto.email,
+      phoneNumber: createUserDto.phoneNumber,
+      residenceCityId: createUserDto.residenceCityId,
+    };
 
-    // 3.5 Récupérer le rôle "USER"
     const role = await this.prisma.role.findUnique({
       where: { name: roleName },
     });
 
     if (!role) {
       throw new NotFoundException(
-        `Le rôle '${roleName}' est introuvable en base de données.`,
+        `Le role '${roleName}' est introuvable en base de donnees.`,
       );
     }
 
-    // 4. Création
     const newUser = await this.prisma.user.create({
       data: {
         ...userData,
@@ -65,7 +91,6 @@ export class UsersService {
             roleId: role.id,
           },
         },
-        // Si on a des détails organisateur, on crée le profil associé
         OrganizerProfile: organizerDetails
           ? { create: organizerDetails }
           : undefined,
@@ -78,28 +103,41 @@ export class UsersService {
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash: _hidden, ...result } = newUser;
-    return result;
+    return this.sanitizeUser(newUser);
   }
 
-  // --- LECTURE (Tous les users) ---
   async findAll() {
-    return this.prisma.user.findMany();
+    const users = await this.prisma.user.findMany();
+    return this.sanitizeUsers(users);
   }
 
-  // --- LECTURE (Un seul user par ID) ---
   async findOne(id: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
-        OrganizerProfile: true, // ✅ On récupère les infos Pro (Statut, IFU...)
+        OrganizerProfile: true,
         UserRole: { include: { Role: true } },
+        OwnedPlaces: {
+          select: {
+            id: true,
+            name: true,
+            coverUrl: true,
+            address: true,
+            avgRating: true,
+            City: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
+
+    return user ? this.sanitizeUser(user) : null;
   }
 
-  // --- LECTURE (Un user par Email - Pour le Login) ---
   async findOneByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
@@ -109,31 +147,29 @@ export class UsersService {
             Role: true,
           },
         },
-        OrganizerProfile: true, // ✅ Indispensable pour le login
+        OrganizerProfile: true,
+        OwnedPlaces: { select: { id: true } },
       },
     });
   }
 
-  // --- SUPPRESSION ---
   async remove(id: string) {
-    return this.prisma.user.delete({
+    await this.prisma.user.delete({
       where: { id },
     });
+
+    return { success: true };
   }
 
-  // mise à jour du profil utilisateur
   async update(id: string, updateUserDto: Prisma.UserUpdateInput) {
     const user = await this.prisma.user.update({
       where: { id },
       data: updateUserDto,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash: _hidden, ...result } = user;
-    return result;
+    return this.sanitizeUser(user);
   }
 
-  // ✅ AJOUT : Valider un organisateur (Admin)
   async approveOrganizer(userId: string) {
     return this.prisma.organizerProfile.update({
       where: { userId },

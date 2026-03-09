@@ -16,6 +16,8 @@ describe('PlacesController', () => {
             create: jest.fn(),
             findAll: jest.fn(),
             findOne: jest.fn(),
+            findSavedByUser: jest.fn(),
+            toggleSave: jest.fn(),
           },
         },
       ],

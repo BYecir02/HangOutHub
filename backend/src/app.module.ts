@@ -11,6 +11,8 @@ import { PostsModule } from './posts/posts.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { CommentsModule } from './comments/comments.module';
+import { StorageModule } from './storage/storage.module';
+import { OutingsModule } from './outings/outings.module';
 
 @Module({
   imports: [
@@ -20,12 +22,14 @@ import { CommentsModule } from './comments/comments.module';
     }),
     UsersModule,
     PrismaModule,
+    StorageModule,
     AuthModule,
     CategoriesModule,
     EventsModule,
     PlacesModule,
     PostsModule,
     CommentsModule,
+    OutingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

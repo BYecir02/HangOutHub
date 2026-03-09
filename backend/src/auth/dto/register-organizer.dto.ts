@@ -5,7 +5,9 @@ import { CreateUserDto } from '../../users/dto/create-user.dto';
 export class RegisterOrganizerDto extends CreateUserDto {
   @IsString()
   @IsNotEmpty()
-  @IsIn(['PLACE', 'NOMAD'], { message: 'Le type de compte doit être PLACE ou NOMAD' })
+  @IsIn(['PLACE', 'NOMAD'], {
+    message: 'Le type de compte doit être PLACE ou NOMAD',
+  })
   accountType: string; // "PLACE" (Lieu physique) ou "NOMAD" (Promoteur)
 
   @IsString()

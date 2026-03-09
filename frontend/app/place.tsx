@@ -1,233 +1,281 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import api from '../services/api';
+
+import api, { storage } from '../services/api';
 
 export default function CreatePlaceScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
-  // --- ÉTATS DU FORMULAIRE ---
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
-  
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
-  const [coords, setCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
-  const [priceLevel, setPriceLevel] = useState(1); 
+  const [priceLevel, setPriceLevel] = useState(1);
 
-  // 1. CHOISIR UNE IMAGE
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsMultipleSelection: true,
       selectionLimit: 10,
-      aspect: [16, 9], // Format paysage pour un lieu
+      aspect: [16, 9],
       quality: 0.7,
     });
 
     if (!result.canceled) {
-      // On ajoute les nouvelles images à la suite
-      setImages([...images, ...result.assets]);
+      setImages((current) => [...current, ...result.assets]);
     }
   };
 
-  // 2. OBTENIR LA POSITION GPS ACTUELLE
   const getCurrentLocation = async () => {
     setLocationLoading(true);
     try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'Nous avons besoin de la localisation pour placer le lieu sur la carte.');
+        Alert.alert(
+          'Permission refusee',
+          'La localisation est necessaire pour placer le lieu correctement.',
+        );
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({});
       setCoords({
         lat: location.coords.latitude,
-        lng: location.coords.longitude
+        lng: location.coords.longitude,
       });
-      
-      // Petit bonus : On essaie de deviner l'adresse texte (Reverse Geocoding)
+
       const reverseGeocode = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
-        longitude: location.coords.longitude
+        longitude: location.coords.longitude,
       });
-      
-      if (reverseGeocode.length > 0) {
-        const addr = reverseGeocode[0];
-        const formattedAddress = `${addr.street || ''} ${addr.name || ''}, ${addr.city}`;
-        if (!address) setAddress(formattedAddress); // On remplit seulement si vide
-      }
 
-    } catch (error) {
-      Alert.alert('Erreur', 'Impossible de récupérer la position GPS.');
+      if (reverseGeocode.length > 0 && !address.trim()) {
+        const addr = reverseGeocode[0];
+        const formattedAddress = `${addr.street || ''} ${addr.name || ''}, ${
+          addr.city || ''
+        }`.trim();
+        setAddress(formattedAddress);
+      }
+    } catch {
+      Alert.alert('Erreur', 'Impossible de recuperer la position GPS.');
     } finally {
       setLocationLoading(false);
     }
   };
 
-  // 3. ENVOYER AU BACKEND
   const handleSubmit = async () => {
-    if (!name || !address || !coords) {
-      Alert.alert("Oups", "Le nom, l'adresse et la localisation GPS sont obligatoires.");
+    if (!name.trim() || !address.trim() || !coords) {
+      Alert.alert(
+        'Oups',
+        "Le nom, l'adresse et la localisation GPS sont obligatoires.",
+      );
       return;
     }
 
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append('name', name);
-      formData.append('description', description);
-      formData.append('address', address);
+      formData.append('name', name.trim());
+      formData.append('description', description.trim());
+      formData.append('address', address.trim());
       formData.append('latitude', String(coords.lat));
       formData.append('longitude', String(coords.lng));
       formData.append('priceLevel', String(priceLevel));
-      formData.append('cityId', '1'); // Valeur par défaut (Cotonou)
+      formData.append('cityId', '1');
 
       if (images.length > 0) {
-        // 1. Image de couverture
         const coverImage = images[coverIndex];
         formData.append('cover', {
           uri: coverImage.uri,
-          name: 'place_cover.jpg',
-          type: 'image/jpeg',
+          name: coverImage.fileName || 'place-cover.jpg',
+          type: coverImage.mimeType || 'image/jpeg',
         } as any);
 
-        // 2. Galerie (les autres images)
         images.forEach((img, index) => {
           if (index !== coverIndex) {
             formData.append('gallery', {
               uri: img.uri,
-              name: `gallery_${index}.jpg`,
-              type: 'image/jpeg',
+              name: img.fileName || `gallery-${index}.jpg`,
+              type: img.mimeType || 'image/jpeg',
             } as any);
           }
         });
       }
 
-      // Envoi vers POST /places
-      await api.post('/places', formData, {
+      const response = await api.post('/places', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert("Succès ! 📍", "Le lieu a été ajouté.");
-      router.back(); // Retour au menu
+      const userInfo = await storage.getItem('userInfo');
+      if (userInfo) {
+        const parsed = JSON.parse(userInfo) as Record<string, unknown>;
+        parsed.hasPlace = true;
+        await storage.setItem('userInfo', JSON.stringify(parsed));
+      }
+
+      Alert.alert('Succes', 'Le lieu a ete ajoute.');
+      router.replace({
+        pathname: '/place/[id]',
+        params: { id: response.data.id },
+      });
     } catch (error) {
       console.error(error);
-      Alert.alert("Erreur", "Impossible de créer le lieu.");
+      Alert.alert('Erreur', 'Impossible de creer le lieu.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View className="flex-1 bg-white dark:bg-black pt-14">
-      {/* HEADER */}
-      <View className="flex-row items-center px-5 pb-4 border-b border-gray-100 dark:border-gray-800 z-10 bg-white dark:bg-black">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-full">
-          <Ionicons name="close" size={24} color={isDark ? "#fff" : "#333"} />
+    <View className="flex-1 bg-white pt-14 dark:bg-black">
+      <View className="z-10 flex-row items-center border-b border-gray-100 bg-white px-5 pb-4 dark:border-gray-800 dark:bg-black">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+        >
+          <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-800 flex-1">Ajouter un Lieu</Text>
-        
-        {/* Bouton Publier en haut à droite */}
+        <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
+          Ajouter un lieu
+        </Text>
         <TouchableOpacity onPress={handleSubmit} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="#2ecc71" />
           ) : (
-            <Text className="text-[#2ecc71] font-bold text-lg">Publier</Text>
+            <Text className="text-lg font-bold text-[#2ecc71]">Publier</Text>
           )}
         </TouchableOpacity>
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        
-        {/* 1. SECTION IMAGE */}
         <View className="mb-6">
-          <TouchableOpacity onPress={pickImage} className="w-full h-56 bg-gray-100 dark:bg-gray-900 justify-center items-center relative">
+          <TouchableOpacity
+            onPress={pickImage}
+            className="relative h-56 w-full items-center justify-center bg-gray-100 dark:bg-gray-900"
+          >
             {images.length > 0 ? (
               <>
-                <Image source={{ uri: images[coverIndex].uri }} className="w-full h-full" resizeMode="cover" />
-                <View className="absolute bottom-2 right-2 bg-black/60 px-3 py-1 rounded-full">
-                  <Text className="text-white text-xs font-bold">Couverture</Text>
+                <Image
+                  source={{ uri: images[coverIndex].uri }}
+                  className="h-full w-full"
+                  resizeMode="cover"
+                />
+                <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1">
+                  <Text className="text-xs font-bold text-white">Couverture</Text>
                 </View>
               </>
             ) : (
               <View className="items-center">
-                <View className="bg-gray-200 p-4 rounded-full mb-2">
+                <View className="mb-2 rounded-full bg-gray-200 p-4">
                   <Ionicons name="images" size={32} color="#999" />
                 </View>
-                <Text className="text-gray-400 font-medium">Ajouter des photos</Text>
+                <Text className="font-medium text-gray-400">
+                  Ajouter des photos
+                </Text>
               </View>
             )}
           </TouchableOpacity>
 
-          {/* Liste des miniatures (Galerie) */}
-          {images.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3 px-5">
+          {images.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-3 px-5"
+            >
               {images.map((img, index) => (
-                <TouchableOpacity key={index} onPress={() => setCoverIndex(index)} className={`mr-3 rounded-lg overflow-hidden border-2 w-16 h-16 ${index === coverIndex ? 'border-[#2ecc71]' : 'border-transparent dark:border-transparent'}`}>
-                  <Image source={{ uri: img.uri }} className="w-full h-full" />
+                <TouchableOpacity
+                  key={`${img.uri}-${index}`}
+                  onPress={() => setCoverIndex(index)}
+                  className={`mr-3 h-16 w-16 overflow-hidden rounded-lg border-2 ${
+                    index === coverIndex
+                      ? 'border-[#2ecc71]'
+                      : 'border-transparent'
+                  }`}
+                >
+                  <Image source={{ uri: img.uri }} className="h-full w-full" />
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity onPress={pickImage} className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-lg justify-center items-center border border-gray-200 dark:border-gray-700">
+              <TouchableOpacity
+                onPress={pickImage}
+                className="h-16 w-16 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+              >
                 <Ionicons name="add" size={24} color="#999" />
               </TouchableOpacity>
             </ScrollView>
-          )}
+          ) : null}
         </View>
 
-        <View className="px-5 space-y-5 pb-10">
-          
-          {/* 2. NOM DU LIEU */}
+        <View className="space-y-5 px-5 pb-10">
           <View>
-            <Text className="text-gray-500 dark:text-gray-400 font-medium mb-2 ml-1">Nom du lieu <Text className="text-red-500">*</Text></Text>
+            <Text className="mb-2 ml-1 font-medium text-gray-500 dark:text-gray-400">
+              Nom du lieu <Text className="text-red-500">*</Text>
+            </Text>
             <TextInput
               value={name}
               onChangeText={setName}
               placeholder="Ex: Le Code Bar"
-              placeholderTextColor={isDark ? "#666" : "#999"}
-              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-gray-800 dark:text-white font-bold text-lg border border-gray-200 dark:border-gray-700"
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-lg font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </View>
 
-          {/* 3. DESCRIPTION */}
-          <View className='pt-3'>
-            <Text className="text-gray-500 dark:text-gray-400 font-medium mb-2 ml-1">Description</Text>
+          <View className="pt-3">
+            <Text className="mb-2 ml-1 font-medium text-gray-500 dark:text-gray-400">
+              Description
+            </Text>
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Ambiance, spécialités, horaires..."
-              placeholderTextColor={isDark ? "#666" : "#999"}
+              placeholder="Ambiance, specialites, horaires..."
+              placeholderTextColor={isDark ? '#666' : '#999'}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
-              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-gray-800 dark:text-white border border-gray-200 dark:border-gray-700 h-32"
+              className="h-32 rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </View>
 
-          {/* 4. NIVEAU DE PRIX */}
-          <View className='pt-3'>
-            <Text className="text-gray-500 dark:text-gray-400 font-medium mb-3 ml-1">Niveau de prix</Text>
+          <View className="pt-3">
+            <Text className="mb-3 ml-1 font-medium text-gray-500 dark:text-gray-400">
+              Niveau de prix
+            </Text>
             <View className="flex-row gap-3">
               {[1, 2, 3, 4].map((level) => (
                 <TouchableOpacity
                   key={level}
                   onPress={() => setPriceLevel(level)}
-                  className={`flex-1 py-3 rounded-xl items-center border ${
-                    priceLevel === level 
-                      ? 'bg-[#2ecc71] border-[#2ecc71]' 
-                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  className={`flex-1 items-center rounded-xl border py-3 ${
+                    priceLevel === level
+                      ? 'border-[#2ecc71] bg-[#2ecc71]'
+                      : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
                   }`}
                 >
-                  <Text className={`font-bold text-lg ${priceLevel === level ? 'text-white' : 'text-gray-400'}`}>
+                  <Text
+                    className={`text-lg font-bold ${
+                      priceLevel === level ? 'text-white' : 'text-gray-400'
+                    }`}
+                  >
                     {Array(level).fill('$').join('')}
                   </Text>
                 </TouchableOpacity>
@@ -235,46 +283,57 @@ export default function CreatePlaceScreen() {
             </View>
           </View>
 
-          <View className="h-[1px] bg-gray-100 dark:bg-gray-800 my-2" />
+          <View className="my-2 h-[1px] bg-gray-100 dark:bg-gray-800" />
 
-          {/* 5. LOCALISATION (GPS + ADRESSE) */}
-          <View className='pt-3'>
-            <Text className="text-gray-500 dark:text-gray-400 font-medium mb-3 ml-1">Localisation <Text className="text-red-500">*</Text></Text>
-            
-            {/* Bouton GPS */}
-            <TouchableOpacity 
+          <View className="pt-3">
+            <Text className="mb-3 ml-1 font-medium text-gray-500 dark:text-gray-400">
+              Localisation <Text className="text-red-500">*</Text>
+            </Text>
+
+            <TouchableOpacity
               onPress={getCurrentLocation}
-              className={`flex-row items-center justify-center p-4 rounded-xl border border-dashed mb-4 ${coords ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}
+              className={`mb-4 flex-row items-center justify-center rounded-xl border border-dashed p-4 ${
+                coords
+                  ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                  : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+              }`}
             >
               {locationLoading ? (
                 <ActivityIndicator color="#4c669f" />
               ) : (
                 <>
-                  <Ionicons name={coords ? "checkmark-circle" : "navigate"} size={20} color={coords ? "#2ecc71" : "#4c669f"} />
-                  <Text className={`font-bold ml-2 ${coords ? 'text-green-700' : 'text-blue-700'}`}>
-                    {coords ? "Position GPS détectée" : "Utiliser ma position actuelle"}
+                  <Ionicons
+                    name={coords ? 'checkmark-circle' : 'navigate'}
+                    size={20}
+                    color={coords ? '#2ecc71' : '#4c669f'}
+                  />
+                  <Text
+                    className={`ml-2 font-bold ${
+                      coords ? 'text-green-700' : 'text-blue-700'
+                    }`}
+                  >
+                    {coords
+                      ? 'Position GPS detectee'
+                      : 'Utiliser ma position actuelle'}
                   </Text>
                 </>
               )}
             </TouchableOpacity>
 
-            {/* Champ Adresse Texte */}
             <TextInput
               value={address}
               onChangeText={setAddress}
               placeholder="Adresse (ex: Haie Vive, Rue 120)"
-              placeholderTextColor={isDark ? "#666" : "#999"}
-              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-gray-800 dark:text-white border border-gray-200 dark:border-gray-700"
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
-            
-            {/* Affichage discret des coordonnées pour debug */}
-            {coords && (
-              <Text className="text-xs text-gray-400 mt-2 text-center">
+
+            {coords ? (
+              <Text className="mt-2 text-center text-xs text-gray-400">
                 Lat: {coords.lat.toFixed(5)} | Lng: {coords.lng.toFixed(5)}
               </Text>
-            )}
+            ) : null}
           </View>
-
         </View>
       </ScrollView>
     </View>

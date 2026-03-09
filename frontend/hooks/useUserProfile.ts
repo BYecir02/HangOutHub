@@ -1,81 +1,198 @@
-// c:\Users\Lenovo\Desktop\Git\HangOutHub\HangOutHub\frontend\hooks\useUserProfile.ts
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+
 import api from '../services/api';
 
-interface User {
-  id: number;
+export interface OwnedPlace {
+  id: string;
+  name: string;
+  coverUrl?: string | null;
+  address?: string | null;
+  avgRating?: number | null;
+  City?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
+export interface OrganizerEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime?: string | null;
+  coverUrl?: string | null;
+  entryFee?: number | string | null;
+  Place?: {
+    id: string;
+    name?: string | null;
+    address?: string | null;
+  } | null;
+}
+
+export interface SavedPlace {
+  id: string;
+  name: string;
+  coverUrl?: string | null;
+  address?: string | null;
+  avgRating?: number | null;
+  City?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
+export interface UserProfile {
+  id: string;
   username: string;
-  displayName: string;
+  displayName: string | null;
   avatarUrl: string | null;
   coverUrl: string | null;
   bio: string | null;
-  // ... other user properties
+  role?: string;
+  followersCount?: number | null;
+  followingCount?: number | null;
+  OrganizerProfile?: {
+    companyName: string;
+    jobTitle: string;
+    accountType?: string;
+    status?: string;
+  } | null;
+  OwnedPlaces?: OwnedPlace[];
+  hasPlace?: boolean;
 }
 
-interface Post {
+export interface UserPost {
   id: string;
   content: string;
   images: string[];
   isLiked: boolean;
+  visibility?: 'public' | 'friends' | 'private';
+  createdAt?: string;
+  User?: {
+    username?: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+  };
   _count?: {
     likes: number;
     comments: number;
   };
-  // ... other post properties
 }
+
+export interface UserOuting {
+  id: string;
+  title: string;
+  scheduledDate: string;
+  status?: string | null;
+  Place?: {
+    id: string;
+    name?: string | null;
+    address?: string | null;
+    coverUrl?: string | null;
+    City?: {
+      id: number;
+      name: string;
+    } | null;
+  } | null;
+  _count?: {
+    OutingParticipant?: number;
+  };
+}
+
 export function useUserProfile() {
-  const [user, setUser] = useState<User | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [posts, setPosts] = useState<UserPost[]>([]);
+  const [outings, setOutings] = useState<UserOuting[]>([]);
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [organizerEvents, setOrganizerEvents] = useState<OrganizerEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async () => {
-    try{
-      // 1. Récupérer le profil
-      const userRes = await api.get('/users/me');
-      setUser(userRes.data);
+  const fetchUserProfile = useCallback(async () => {
+    setLoading(true);
 
-      // 2. Récupérer les posts de l'utilisateur
-      if (userRes.data?.id) {
-          const postsRes = await api.get(`/posts/user/${userRes.data.id}`);
-          setPosts(postsRes.data);
+    try {
+      const userRes = await api.get<UserProfile>('/users/me');
+      const currentUser = userRes.data;
+      const isOrganizer =
+        currentUser.role === 'ORGANIZER' || currentUser.role === 'PLACE_OWNER';
+
+      setUser(currentUser);
+
+      if (currentUser.id) {
+        const postsRes = await api.get<UserPost[]>(
+          `/posts/user/${currentUser.id}`,
+        );
+        setPosts(postsRes.data);
+
+        const outingsRes = await api.get<UserOuting[]>('/outings/mine');
+        setOutings(outingsRes.data);
+
+        const savedPlacesRes = await api.get<SavedPlace[]>('/places/saved/mine');
+        setSavedPlaces(savedPlacesRes.data);
+      } else {
+        setPosts([]);
+        setOutings([]);
+        setSavedPlaces([]);
+      }
+
+      if (isOrganizer) {
+        const eventsRes = await api.get<OrganizerEvent[]>('/events/mine');
+        setOrganizerEvents(eventsRes.data);
+      } else {
+        setOrganizerEvents([]);
       }
     } catch (error) {
-      console.error("Erreur lors de la récupération du profil:",error);
-      //optionally display an error message to the user here.
+      console.error('Erreur lors de la recuperation du profil:', error);
+      setUser(null);
+      setPosts([]);
+      setOutings([]);
+      setSavedPlaces([]);
+      setOrganizerEvents([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const deletePost = async (postId: string) => {
     try {
       await api.delete(`/posts/${postId}`);
-      // Mise à jour optimiste : on retire le post de la liste locale immédiatement
       setPosts((currentPosts) => currentPosts.filter((p) => p.id !== postId));
     } catch (error) {
-      console.error("Erreur suppression post:", error);
-      throw error; // On renvoie l'erreur pour que le composant puisse afficher une alerte
+      console.error('Erreur suppression post:', error);
+      throw error;
     }
   };
 
   const updatePost = async (postId: string, content: string) => {
     try {
       await api.patch(`/posts/${postId}`, { content });
-      // Mise à jour optimiste
-      setPosts((currentPosts) => currentPosts.map(p => p.id === postId ? { ...p, content } : p));
+      setPosts((currentPosts) =>
+        currentPosts.map((post) =>
+          post.id === postId ? { ...post, content } : post,
+        ),
+      );
     } catch (error) {
-      console.error("Erreur modification post:", error);
+      console.error('Erreur modification post:', error);
       throw error;
     }
   };
 
-  // Recharge les données à chaque fois qu'on revient sur l'écran
   useFocusEffect(
     useCallback(() => {
-      fetchUserProfile();
-    }, [])
+      void fetchUserProfile();
+    }, [fetchUserProfile]),
   );
 
-  return { user, posts, loading, refetch: fetchUserProfile, deletePost, updatePost };
+  return {
+    user,
+    posts,
+    outings,
+    savedPlaces,
+    organizerEvents,
+    ownedPlaces: user?.OwnedPlaces || [],
+    loading,
+    refetch: fetchUserProfile,
+    deletePost,
+    updatePost,
+  };
 }

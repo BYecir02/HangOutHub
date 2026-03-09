@@ -13,6 +13,7 @@ describe('CategoriesController', () => {
           provide: CategoriesService,
           useValue: {
             findAll: jest.fn(),
+            discover: jest.fn(),
           },
         },
       ],

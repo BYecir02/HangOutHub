@@ -42,7 +42,9 @@ export default function SearchScreen() {
           </View>
         ) : (
           <View className="items-center mt-10">
-             <Text className="text-gray-500 dark:text-gray-400">Recherche de "{query}"...</Text>
+             <Text className="text-gray-500 dark:text-gray-400">
+               {`Recherche de "${query}"...`}
+             </Text>
           </View>
         )}
       </ScrollView>

@@ -1,60 +1,105 @@
-// c:\Users\Lenovo\Desktop\Git\HangOutHub\HangOutHub\frontend\components\social\PostItem.tsx
-import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, useColorScheme, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
 import api, { getImageUrl } from '../../services/api';
 
-interface PostItemProps {
-  item: any;
-  onDelete?: (id: string) => void;
-  onEdit?: (post: any) => void;
-  onComment?: (post: any) => void;
+interface PostAuthor {
+  username?: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
 }
 
-export default function PostItem({ item, onDelete, onEdit, onComment }: PostItemProps) {
+interface PostItemData {
+  id: string;
+  userId?: string;
+  content?: string | null;
+  images?: string[];
+  isLiked?: boolean;
+  isOwner?: boolean;
+  visibility?: 'public' | 'friends' | 'private';
+  createdAt?: string;
+  User?: PostAuthor;
+  _count?: {
+    likes?: number;
+    comments?: number;
+  };
+}
+
+interface PostItemProps {
+  item: PostItemData;
+  onDelete?: (id: string) => void;
+  onEdit?: (post: PostItemData) => void;
+  onComment?: (post: PostItemData) => void;
+}
+
+export default function PostItem({
+  item,
+  onDelete,
+  onEdit,
+  onComment,
+}: PostItemProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const avatarUri =
+    getImageUrl(item.User?.avatarUrl) || 'https://i.pravatar.cc/150';
+  const postImageUri = getImageUrl(item.images?.[0]);
 
-  // État local pour l'UI optimiste (réaction immédiate)
-  const [isLiked, setIsLiked] = useState(item.isLiked);
+  const [isLiked, setIsLiked] = useState(Boolean(item.isLiked));
   const [likesCount, setLikesCount] = useState(item._count?.likes || 0);
+  const [commentsCount, setCommentsCount] = useState(item._count?.comments || 0);
+
+  useEffect(() => {
+    setIsLiked(Boolean(item.isLiked));
+    setLikesCount(item._count?.likes || 0);
+    setCommentsCount(item._count?.comments || 0);
+  }, [item._count?.comments, item._count?.likes, item.isLiked]);
 
   const handleLike = async () => {
     const previousState = isLiked;
-    // Mise à jour immédiate
     setIsLiked(!isLiked);
-    setLikesCount((prev: number) => isLiked ? prev - 1 : prev + 1);
+    setLikesCount((prev) => (isLiked ? prev - 1 : prev + 1));
 
     try {
       await api.post(`/posts/${item.id}/like`);
-    } catch (error) {
-      // En cas d'erreur, on revient en arrière
+    } catch {
       setIsLiked(previousState);
-      setLikesCount((prev: number) => isLiked ? prev + 1 : prev - 1);
+      setLikesCount((prev) => (isLiked ? prev + 1 : prev - 1));
     }
   };
 
   const handleOptions = () => {
-    const buttons: any[] = [];
-    
+    const buttons: {
+      text: string;
+      style?: 'default' | 'cancel' | 'destructive';
+      onPress?: () => void;
+    }[] = [];
+
     if (onEdit) {
       buttons.push({ text: 'Modifier', onPress: () => onEdit(item) });
     }
-    
+
     if (onDelete) {
-      buttons.push({ 
-        text: 'Supprimer', 
-        style: 'destructive', 
+      buttons.push({
+        text: 'Supprimer',
+        style: 'destructive',
         onPress: () => {
-          Alert.alert(
-            "Confirmer", 
-            "Supprimer ce post ?", 
-            [
-              { text: "Annuler", style: "cancel" },
-              { text: "Supprimer", style: "destructive", onPress: () => onDelete(item.id) }
-            ]
-          );
-        }
+          Alert.alert('Confirmer', 'Supprimer ce post ?', [
+            { text: 'Annuler', style: 'cancel' },
+            {
+              text: 'Supprimer',
+              style: 'destructive',
+              onPress: () => onDelete(item.id),
+            },
+          ]);
+        },
       });
     }
 
@@ -67,57 +112,81 @@ export default function PostItem({ item, onDelete, onEdit, onComment }: PostItem
 
   return (
     <View className="bg-white dark:bg-gray-900 mb-2 pb-4 border-b border-gray-100 dark:border-gray-800">
-        {/* Header du post */}
-        <View className="flex-row items-center p-4 justify-between">
-            <View className="flex-row items-center flex-1">
-                <Image 
-                    source={{ uri: getImageUrl(item.User?.avatarUrl) || 'https://i.pravatar.cc/150' }} 
-                    className="w-10 h-10 rounded-full mr-3" 
-                />
-                <View>
-                <Text className="font-bold text-gray-800 dark:text-white text-base">
-                    {item.User?.displayName || item.User?.username}
-                </Text>
-                <Text className="text-xs text-gray-500 dark:text-gray-400">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                </Text>
-                </View>
-            </View>
-
-            {(onDelete || onEdit) && (
-              <TouchableOpacity onPress={handleOptions} className="p-2">
-                <Ionicons name="ellipsis-horizontal" size={20} color={isDark ? "#fff" : "#333"} />
-              </TouchableOpacity>
-            )}
-        </View>
-
-        {/* Contenu Texte */}
-        {item.content && (
-            <Text className="px-4 pb-3 text-gray-800 dark:text-gray-200 text-base leading-6">
-                {item.content}
+      <View className="flex-row items-center p-4 justify-between">
+        <View className="flex-row items-center flex-1">
+          <Image
+            source={{ uri: avatarUri }}
+            className="w-10 h-10 rounded-full mr-3"
+          />
+          <View>
+            <Text className="font-bold text-gray-800 dark:text-white text-base">
+              {item.User?.displayName || item.User?.username || 'Utilisateur'}
             </Text>
-        )}
-
-        {/* Images (On affiche la première en grand pour l'instant) */}
-        {item.images && item.images.length > 0 && (
-            <Image 
-                source={{ uri: getImageUrl(item.images[0]) }} 
-                className="w-full h-96 bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
-            />
-        )}
-
-        {/* Actions (Like/Comment) */}
-        <View className="flex-row px-4 pt-3">
-            <TouchableOpacity className="flex-row items-center mr-6" onPress={handleLike}>
-                <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? "#ff4757" : (isDark ? "#aaa" : "#666")} />
-                <Text className={`ml-1.5 font-medium ${isLiked ? 'text-[#ff4757]' : 'text-gray-500 dark:text-gray-400'}`}>{likesCount}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity className="flex-row items-center" onPress={() => onComment && onComment(item)}>
-                <Ionicons name="chatbubble-outline" size={22} color={isDark ? "#aaa" : "#666"} />
-                <Text className="ml-1.5 text-gray-500 dark:text-gray-400 font-medium">{item._count?.comments || 0}</Text>
-            </TouchableOpacity>
+            <Text className="text-xs text-gray-500 dark:text-gray-400">
+              {item.createdAt
+                ? new Date(item.createdAt).toLocaleDateString()
+                : 'A l instant'}
+            </Text>
+          </View>
         </View>
+
+        {(onDelete || onEdit) && (
+          <TouchableOpacity onPress={handleOptions} className="p-2">
+            <Ionicons
+              name="ellipsis-horizontal"
+              size={20}
+              color={isDark ? '#fff' : '#333'}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {item.content && (
+        <Text className="px-4 pb-3 text-gray-800 dark:text-gray-200 text-base leading-6">
+          {item.content}
+        </Text>
+      )}
+
+      {item.images && item.images.length > 0 && postImageUri && (
+        <Image
+          source={{ uri: postImageUri }}
+          className="w-full h-96 bg-gray-200 dark:bg-gray-800"
+          resizeMode="cover"
+        />
+      )}
+
+      <View className="flex-row px-4 pt-3">
+        <TouchableOpacity
+          className="flex-row items-center mr-6"
+          onPress={handleLike}
+        >
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={24}
+            color={isLiked ? '#ff4757' : isDark ? '#aaa' : '#666'}
+          />
+          <Text
+            className={`ml-1.5 font-medium ${
+              isLiked ? 'text-[#ff4757]' : 'text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            {likesCount}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="flex-row items-center"
+          onPress={() => onComment?.(item)}
+        >
+          <Ionicons
+            name="chatbubble-outline"
+            size={22}
+            color={isDark ? '#aaa' : '#666'}
+          />
+          <Text className="ml-1.5 text-gray-500 dark:text-gray-400 font-medium">
+            {commentsCount}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

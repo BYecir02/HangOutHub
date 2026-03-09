@@ -23,8 +23,15 @@ export class AuthService {
   // Nouvelle fonction pour l'inscription des organisateurs
   async registerOrganizer(registerOrganizerDto: RegisterOrganizerDto) {
     // On extrait les infos spécifiques à l'organisateur
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { accountType, companyName, ifuNumber, payoutInfo, jobTitle, ...userDto } = registerOrganizerDto;
+
+    const {
+      accountType,
+      companyName,
+      ifuNumber,
+      payoutInfo,
+      jobTitle,
+      ...userDto
+    } = registerOrganizerDto;
 
     // Détermination du rôle selon le type de compte
     // PLACE -> PLACE_OWNER (Gérant de lieu)
@@ -32,7 +39,11 @@ export class AuthService {
     const roleName = accountType === 'PLACE' ? 'PLACE_OWNER' : 'ORGANIZER';
 
     const organizerDetails = {
-      accountType, companyName, ifuNumber, payoutInfo, jobTitle
+      accountType,
+      companyName,
+      ifuNumber,
+      payoutInfo,
+      jobTitle,
     };
 
     return this.usersService.create(userDto, roleName, organizerDetails);
@@ -84,8 +95,9 @@ export class AuthService {
         avatarUrl: user.avatarUrl,
         role: primaryRole,
         // ✅ Infos vitales pour le Dashboard Organisateur
-        organizerStatus: user.OrganizerProfile?.status, 
+        organizerStatus: user.OrganizerProfile?.status,
         companyName: user.OrganizerProfile?.companyName,
+        hasPlace: user.OwnedPlaces && user.OwnedPlaces.length > 0, // ✅ Indique si le lieu est déjà créé
       },
     };
   }

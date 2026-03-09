@@ -1,16 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+
 import api, { getImageUrl } from '../services/api';
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // État du formulaire
   const [form, setForm] = useState({
     username: '',
     displayName: '',
@@ -18,170 +26,189 @@ export default function EditProfileScreen() {
     avatarUrl: '',
     coverUrl: '',
   });
+  const [newAvatar, setNewAvatar] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [newCover, setNewCover] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
 
-  // Gestion des nouvelles images (pour l'upload)
-  const [newAvatar, setNewAvatar] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [newCover, setNewCover] = useState<ImagePicker.ImagePickerAsset | null>(null);
-
-  // 1. Charger les infos actuelles
-  useEffect(() => {
-    fetchCurrentProfile();
-  }, []);
-
-  const fetchCurrentProfile = async () => {
+  const fetchCurrentProfile = useCallback(async () => {
     try {
       const response = await api.get('/users/me');
       const { username, displayName, bio, avatarUrl, coverUrl } = response.data;
-      setForm({ 
-        username: username || '', 
+      setForm({
+        username: username || '',
         displayName: displayName || '',
-        bio: bio || '', 
-        avatarUrl, 
-        coverUrl 
+        bio: bio || '',
+        avatarUrl,
+        coverUrl,
       });
-    } catch (error) {
-      Alert.alert("Erreur", "Impossible de charger les infos.");
+    } catch {
+      Alert.alert('Erreur', 'Impossible de charger les infos.');
       router.back();
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  // 2. Fonction pour choisir une image
+  useEffect(() => {
+    void fetchCurrentProfile();
+  }, [fetchCurrentProfile]);
+
   const pickImage = async (type: 'avatar' | 'cover') => {
-    // Demander la permission (automatique sur les versions récentes d'Expo)
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
-      aspect: type === 'avatar' ? [1, 1] : [16, 9], // Carré pour avatar, Rectangle pour cover
+      aspect: type === 'avatar' ? [1, 1] : [16, 9],
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      if (type === 'avatar') {
-        setNewAvatar(result.assets[0]);
-      } else {
-        setNewCover(result.assets[0]);
-      }
+    if (result.canceled) {
+      return;
+    }
+
+    if (type === 'avatar') {
+      setNewAvatar(result.assets[0]);
+    } else {
+      setNewCover(result.assets[0]);
     }
   };
 
-  // 3. Sauvegarder les modifications
   const handleSave = async () => {
     if (!form.username.trim()) {
-      Alert.alert("Erreur", "Le nom d'utilisateur est obligatoire.");
+      Alert.alert('Erreur', "Le nom d'utilisateur est obligatoire.");
       return;
     }
 
     setSaving(true);
     try {
-      // On utilise FormData pour envoyer des fichiers ET du texte
       const formData = new FormData();
-      
-      // Ajout des champs texte
       formData.append('username', form.username);
       formData.append('displayName', form.displayName);
       formData.append('bio', form.bio);
 
-      // Ajout de l'avatar s'il y en a un nouveau
       if (newAvatar) {
-        formData.append('avatar', {
-          uri: newAvatar.uri,
-          name: 'avatar.jpg',
-          type: 'image/jpeg', // Adapte selon le type réel si besoin
-        } as any);
+        formData.append(
+          'avatar',
+          {
+            uri: newAvatar.uri,
+            name: 'avatar.jpg',
+            type: 'image/jpeg',
+          } as any,
+        );
       }
 
-      // Ajout de la couverture s'il y en a une nouvelle
       if (newCover) {
-        formData.append('cover', {
-          uri: newCover.uri,
-          name: 'cover.jpg',
-          type: 'image/jpeg',
-        } as any);
+        formData.append(
+          'cover',
+          {
+            uri: newCover.uri,
+            name: 'cover.jpg',
+            type: 'image/jpeg',
+          } as any,
+        );
       }
 
-      // Envoi de la requête avec le header spécifique pour l'upload
       await api.patch('/users/me', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      
-      Alert.alert("Succès", "Profil mis à jour !");
-      router.back(); // Retour au profil
+      Alert.alert('Succes', 'Profil mis a jour !');
+      router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert("Erreur", "La mise à jour a échoué.");
+      Alert.alert('Erreur', 'La mise a jour a echoue.');
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <View className="flex-1 justify-center items-center"><ActivityIndicator size="large" color="#4c669f" /></View>;
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#4c669f" />
+      </View>
+    );
   }
 
-  // Logique d'affichage des images (Nouvelle image > Ancienne image > Placeholder)
-  const displayAvatar = newAvatar ? { uri: newAvatar.uri } : (form.avatarUrl ? { uri: getImageUrl(form.avatarUrl) || '' } : { uri: 'https://i.pravatar.cc/150' });
-  const displayCover = newCover ? { uri: newCover.uri } : (form.coverUrl ? { uri: getImageUrl(form.coverUrl) || '' } : { uri: 'https://images.unsplash.com/photo-1557683316-973673baf926' });
+  const displayAvatar = newAvatar
+    ? { uri: newAvatar.uri }
+    : form.avatarUrl
+      ? { uri: getImageUrl(form.avatarUrl) || '' }
+      : { uri: 'https://i.pravatar.cc/150' };
+
+  const displayCover = newCover
+    ? { uri: newCover.uri }
+    : form.coverUrl
+      ? { uri: getImageUrl(form.coverUrl) || '' }
+      : {
+          uri: 'https://images.unsplash.com/photo-1557683316-973673baf926',
+        };
 
   return (
     <View className="flex-1 bg-white">
-      {/* HEADER */}
       <View className="flex-row justify-between items-center px-5 pt-16 pb-4 border-b border-gray-100 bg-white z-10">
         <TouchableOpacity onPress={() => router.back()}>
           <Text className="text-gray-500 text-lg">Annuler</Text>
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-800">Modifier le profil</Text>
+        <Text className="text-lg font-bold text-gray-800">
+          Modifier le profil
+        </Text>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
             <ActivityIndicator size="small" color="#4c669f" />
           ) : (
-            <Text className="text-[#4c669f] font-bold text-lg">Enregistrer</Text>
+            <Text className="text-[#4c669f] font-bold text-lg">
+              Enregistrer
+            </Text>
           )}
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        
-        {/* IMAGES SECTION */}
         <View className="items-center mb-6">
-          {/* Cover Image */}
-          <TouchableOpacity onPress={() => pickImage('cover')} className="w-full h-40 bg-gray-200 relative">
+          <TouchableOpacity
+            onPress={() => pickImage('cover')}
+            className="w-full h-40 bg-gray-200 relative"
+          >
             <Image source={displayCover} className="w-full h-full opacity-80" />
             <View className="absolute inset-0 justify-center items-center bg-black/20">
               <Ionicons name="camera-outline" size={30} color="white" />
             </View>
           </TouchableOpacity>
 
-          {/* Avatar Image */}
-          <TouchableOpacity onPress={() => pickImage('avatar')} className="-mt-12 relative">
-            <Image source={displayAvatar} className="w-24 h-24 rounded-full border-4 border-white" />
+          <TouchableOpacity
+            onPress={() => pickImage('avatar')}
+            className="-mt-12 relative"
+          >
+            <Image
+              source={displayAvatar}
+              className="w-24 h-24 rounded-full border-4 border-white"
+            />
             <View className="absolute bottom-0 right-0 bg-gray-800 p-1.5 rounded-full border-2 border-white">
               <Ionicons name="camera" size={14} color="white" />
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* FORMULAIRE */}
         <View className="px-5 space-y-6">
-          
-          {/* Champ Nom complet (Display Name) */}
           <View>
-            <Text className="text-gray-500 font-medium mb-2 ml-1">Nom complet</Text>
+            <Text className="text-gray-500 font-medium mb-2 ml-1">
+              Nom complet
+            </Text>
             <TextInput
               value={form.displayName}
               onChangeText={(text) => setForm({ ...form, displayName: text })}
               className="bg-gray-50 p-4 rounded-xl text-gray-800 font-medium border border-gray-200"
-              placeholder="Ton nom affiché (ex: Jean Dupont)"
+              placeholder="Ton nom affiche (ex: Jean Dupont)"
             />
           </View>
 
-          {/* Champ Username */}
           <View>
-            <Text className="text-gray-500 font-medium mb-2 ml-1 mt-3">Nom d'utilisateur</Text>
+            <Text className="text-gray-500 font-medium mb-2 ml-1 mt-3">
+              {"Nom d'utilisateur"}
+            </Text>
             <TextInput
               value={form.username}
               onChangeText={(text) => setForm({ ...form, username: text })}
@@ -190,9 +217,10 @@ export default function EditProfileScreen() {
             />
           </View>
 
-          {/* Champ Bio */}
           <View>
-            <Text className="text-gray-500 font-medium mb-2 ml-1 mt-3">Bio</Text>
+            <Text className="text-gray-500 font-medium mb-2 ml-1 mt-3">
+              Bio
+            </Text>
             <TextInput
               value={form.bio}
               onChangeText={(text) => setForm({ ...form, bio: text })}
@@ -206,7 +234,6 @@ export default function EditProfileScreen() {
               {form.bio.length}/150
             </Text>
           </View>
-
         </View>
       </ScrollView>
     </View>
