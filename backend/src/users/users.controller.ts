@@ -67,6 +67,17 @@ export class UsersController {
     return { ...user, role };
   }
 
+  @Get('public/:id')
+  async getPublicProfile(@Param('id') id: string) {
+    const user = await this.usersService.findPublicProfile(id);
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    return user;
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Patch('me')
   @UseInterceptors(

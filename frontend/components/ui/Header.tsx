@@ -7,20 +7,24 @@ interface HeaderProps {
   onNotificationPress?: () => void;
   onLocationPress?: () => void;
   onSearchPress?: () => void;
+  notificationCount?: number;
 }
 
 export default function Header({ 
-  location = "Cotonou, Bénin",
+  location = "Cotonou, Benin",
   onNotificationPress,
   onLocationPress,
-  onSearchPress
+  onSearchPress,
+  notificationCount = 0,
 }: HeaderProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const safeCount = Number.isFinite(notificationCount) ? notificationCount : 0;
+  const badgeLabel = safeCount > 99 ? '99+' : String(safeCount);
 
   return (
     <View className="bg-white dark:bg-black px-5 pt-14 pb-4 shadow-sm flex-row justify-between items-center border-b border-gray-100 dark:border-gray-800">
-      {/* Espace vide pour équilibrer le header et garder le titre centré */}
+      {/* Espace vide pour ÃƒÂ©quilibrer le header et garder le titre centrÃƒÂ© */}
       <View className="w-20" />
 
       {/* Localisation Centrale */}
@@ -36,7 +40,7 @@ export default function Header({
         </View>
       </TouchableOpacity>
 
-      {/* Actions à droite */}
+      {/* Actions ÃƒÂ  droite */}
       <View className="flex-row items-center">
         <TouchableOpacity 
           onPress={onSearchPress}
@@ -50,8 +54,13 @@ export default function Header({
           className="h-10 w-10 justify-center items-center"
         >
           <Ionicons name="notifications-outline" size={24} color={isDark ? "#fff" : "#333"} />
-          {/* Petit point rouge pour indiquer une nouvelle notification */}
-          <View className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-black" />
+          {safeCount > 0 ? (
+            <View className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 items-center justify-center border-2 border-white dark:border-black">
+              <Text className="text-[10px] font-bold text-white">
+                {badgeLabel}
+              </Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
       </View>
     </View>

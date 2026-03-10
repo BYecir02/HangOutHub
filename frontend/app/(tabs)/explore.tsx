@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
+  RefreshControl,
   Text,
   TouchableOpacity,
   View,
@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import EventCard from '@/components/ui/EventCard';
 import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
+import { getCache, setCache } from '@/services/dataCache';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 interface EventItem {
   id: string;
@@ -36,35 +38,37 @@ function formatEventDate(value: string) {
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedEvents = getCache<EventItem[]>('events');
+  const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
+  const [loading, setLoading] = useState(!cachedEvents);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchEvents = useCallback(async (forceRefresh = false) => {
+    const isRefresh = forceRefresh || getCache('events') !== null;
+
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const response = await api.get<EventItem[]>('/events');
+      setEvents(response.data);
+      setCache('events', response.data);
+    } catch {
+      if (!getCache('events')) {
+        setEvents([]);
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchEvents = async () => {
-      try {
-        const response = await api.get('/events');
-        if (isMounted) {
-          setEvents(response.data);
-        }
-      } catch {
-        if (isMounted) {
-          setEvents([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     void fetchEvents();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [fetchEvents]);
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black pt-16">
@@ -84,10 +88,24 @@ export default function ExploreScreen() {
 
       <SearchBar placeholder="Rechercher un evenement..." />
 
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#4c669f" />
-        </View>
+      {loading && events.length === 0 ? (
+        <FlatList
+          data={[0, 1, 2]}
+          keyExtractor={(item) => `skeleton-${item}`}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ListEmptyComponent={null}
+          renderItem={() => (
+            <View className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+              <SkeletonBlock className="h-52 w-full" />
+              <View className="p-5">
+                <SkeletonBlock className="h-5 w-40 rounded-lg" />
+                <SkeletonBlock className="mt-2 h-4 w-24 rounded-lg" />
+                <SkeletonBlock className="mt-3 h-4 w-32 rounded-lg" />
+              </View>
+            </View>
+          )}
+        />
       ) : (
         <FlatList
           data={events}
@@ -103,6 +121,15 @@ export default function ExploreScreen() {
                 Ajoute un premier evenement ou reviens plus tard.
               </Text>
             </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                void fetchEvents(true);
+              }}
+              tintColor="#4c669f"
+            />
           }
           renderItem={({ item }) => (
             <EventCard

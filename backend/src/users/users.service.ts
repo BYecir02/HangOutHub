@@ -138,6 +138,63 @@ export class UsersService {
     return user ? this.sanitizeUser(user) : null;
   }
 
+  async findPublicProfile(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        coverUrl: true,
+        bio: true,
+        OrganizerProfile: {
+          select: {
+            companyName: true,
+            jobTitle: true,
+            accountType: true,
+            status: true,
+          },
+        },
+        OwnedPlaces: {
+          select: {
+            id: true,
+            name: true,
+            coverUrl: true,
+            City: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        UserRole: {
+          include: {
+            Role: true,
+          },
+        },
+        _count: {
+          select: {
+            Post: true,
+            Outing: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    const role = user.UserRole[0]?.Role?.name || 'USER';
+
+    return {
+      ...user,
+      role,
+    };
+  }
+
   async findOneByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },

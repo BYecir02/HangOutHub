@@ -105,10 +105,19 @@ export function useUserProfile() {
   const [outings, setOutings] = useState<UserOuting[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [organizerEvents, setOrganizerEvents] = useState<OrganizerEvent[]>([]);
+  const [connectionsCount, setConnectionsCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const fetchUserProfile = useCallback(async () => {
-    setLoading(true);
+    const isRefresh = hasLoaded;
+
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
     try {
       const userRes = await api.get<UserProfile>('/users/me');
@@ -119,20 +128,27 @@ export function useUserProfile() {
       setUser(currentUser);
 
       if (currentUser.id) {
-        const postsRes = await api.get<UserPost[]>(
-          `/posts/user/${currentUser.id}`,
-        );
+        const [postsRes, outingsRes, savedPlacesRes, friendshipsRes] =
+          await Promise.all([
+            api.get<UserPost[]>(`/posts/user/${currentUser.id}`),
+            api.get<UserOuting[]>('/outings/mine'),
+            api.get<SavedPlace[]>('/places/saved/mine'),
+            api.get<{
+              counts?: {
+                connections?: number;
+              };
+            }>('/friendships/mine'),
+          ]);
+
         setPosts(postsRes.data);
-
-        const outingsRes = await api.get<UserOuting[]>('/outings/mine');
         setOutings(outingsRes.data);
-
-        const savedPlacesRes = await api.get<SavedPlace[]>('/places/saved/mine');
         setSavedPlaces(savedPlacesRes.data);
+        setConnectionsCount(friendshipsRes.data.counts?.connections || 0);
       } else {
         setPosts([]);
         setOutings([]);
         setSavedPlaces([]);
+        setConnectionsCount(0);
       }
 
       if (isOrganizer) {
@@ -143,15 +159,20 @@ export function useUserProfile() {
       }
     } catch (error) {
       console.error('Erreur lors de la recuperation du profil:', error);
-      setUser(null);
-      setPosts([]);
-      setOutings([]);
-      setSavedPlaces([]);
-      setOrganizerEvents([]);
+      if (!isRefresh) {
+        setUser(null);
+        setPosts([]);
+        setOutings([]);
+        setSavedPlaces([]);
+        setOrganizerEvents([]);
+        setConnectionsCount(0);
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      setHasLoaded(true);
     }
-  }, []);
+  }, [hasLoaded]);
 
   const deletePost = async (postId: string) => {
     try {
@@ -190,7 +211,9 @@ export function useUserProfile() {
     savedPlaces,
     organizerEvents,
     ownedPlaces: user?.OwnedPlaces || [],
+    connectionsCount,
     loading,
+    refreshing,
     refetch: fetchUserProfile,
     deletePost,
     updatePost,

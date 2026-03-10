@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
+  Image,
+  RefreshControl,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -9,108 +11,275 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import PlaceCard from '@/components/ui/PlaceCard';
 import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
+import { getCache, setCache } from '@/services/dataCache';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 interface PlaceItem {
   id: string;
   name: string;
   coverUrl: string | null;
   avgRating?: number | null;
+  priceLevel?: number | null;
   City?: {
     name?: string | null;
   } | null;
   address?: string | null;
 }
 
+type PlaceFilter = 'all' | 'top' | 'budget';
+
+const PLACE_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
+
+const FILTERS: { id: PlaceFilter; label: string }[] = [
+  { id: 'all', label: 'Tout' },
+  { id: 'top', label: 'Bien notes' },
+  { id: 'budget', label: 'Petit budget' },
+];
+
 export default function PlacesScreen() {
   const router = useRouter();
-  const [places, setPlaces] = useState<PlaceItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedPlaces = getCache<PlaceItem[]>('places');
+  const [places, setPlaces] = useState<PlaceItem[]>(cachedPlaces ?? []);
+  const [loading, setLoading] = useState(!cachedPlaces);
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<PlaceFilter>('all');
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchPlaces = useCallback(async (forceRefresh = false) => {
+    const isRefresh = forceRefresh || getCache('places') !== null;
 
-    const fetchPlaces = async () => {
-      try {
-        const response = await api.get('/places');
-        if (isMounted) {
-          setPlaces(response.data);
-        }
-      } catch {
-        if (isMounted) {
-          setPlaces([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const response = await api.get<PlaceItem[]>('/places');
+      setPlaces(response.data);
+      setCache('places', response.data);
+    } catch {
+      if (!getCache('places')) {
+        setPlaces([]);
       }
-    };
-
-    void fetchPlaces();
-
-    return () => {
-      isMounted = false;
-    };
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void fetchPlaces();
+  }, [fetchPlaces]);
+
+  const filteredPlaces = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return places
+      .filter((place) => {
+        if (activeFilter === 'top' && (place.avgRating || 0) < 4) {
+          return false;
+        }
+
+        if (activeFilter === 'budget' && (place.priceLevel || 1) > 2) {
+          return false;
+        }
+
+        if (!normalizedQuery) {
+          return true;
+        }
+
+        const searchableText = [place.name, place.City?.name, place.address]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        return searchableText.includes(normalizedQuery);
+      })
+      .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0));
+  }, [activeFilter, places, query]);
+
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black pt-16">
-      <View className="flex-row items-center px-5 pb-4">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons name="arrow-back" size={24} color="#2ecc71" />
-        </TouchableOpacity>
-        <View>
-          <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest">
-            Decouvrir
-          </Text>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-            Tous les lieux
-          </Text>
+    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
+      <View className="px-5 pb-4">
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="mr-4 rounded-full bg-white p-3 dark:bg-gray-900"
+          >
+            <Ionicons name="arrow-back" size={22} color="#2ecc71" />
+          </TouchableOpacity>
+          <View className="flex-1">
+            <Text className="text-xs uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
+              Lieux populaires
+            </Text>
+            <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+              Tous les lieux
+            </Text>
+            <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Retrouve tous les lieux en un seul endroit et affine selon l&apos;ambiance
+              que tu cherches.
+            </Text>
+          </View>
         </View>
       </View>
 
-      <SearchBar placeholder="Rechercher un lieu..." />
+      <SearchBar
+        placeholder="Rechercher un lieu, une ville, une adresse..."
+        value={query}
+        onChangeText={setQuery}
+      />
 
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#2ecc71" />
-        </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 18,
+          paddingBottom: 10,
+        }}
+        style={{ flexGrow: 0 }}
+      >
+        {FILTERS.map((filter) => {
+          const active = activeFilter === filter.id;
+
+          return (
+            <TouchableOpacity
+              key={filter.id}
+              onPress={() => setActiveFilter(filter.id)}
+              className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
+              style={active ? { backgroundColor: '#2ecc71' } : undefined}
+            >
+              <Text
+                className={`text-sm font-semibold ${
+                  active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                }`}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {loading && places.length === 0 ? (
+        <FlatList
+          data={[0, 1, 2]}
+          keyExtractor={(item) => `skeleton-${item}`}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ListHeaderComponent={
+            <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
+              Chargement des lieux...
+            </Text>
+          }
+          renderItem={() => (
+            <View className="flex-row overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+              <SkeletonBlock className="h-28 w-28 rounded-2xl" />
+              <View className="ml-4 flex-1 justify-between py-1">
+                <View>
+                  <SkeletonBlock className="h-6 w-24 rounded-full" />
+                  <SkeletonBlock className="mt-3 h-5 w-3/4 rounded-lg" />
+                  <SkeletonBlock className="mt-2 h-4 w-2/3 rounded-lg" />
+                </View>
+                <View className="mt-3 flex-row items-center justify-between">
+                  <SkeletonBlock className="h-4 w-16 rounded-lg" />
+                  <SkeletonBlock className="h-6 w-6 rounded-full" />
+                </View>
+              </View>
+            </View>
+          )}
+        />
       ) : (
         <FlatList
-          data={places}
-          numColumns={2}
+          data={filteredPlaces}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 24, paddingBottom: 120 }}
-          columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 12 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ListHeaderComponent={
+            <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
+              {filteredPlaces.length} resultat(s)
+            </Text>
+          }
           ListEmptyComponent={
-            <View className="w-full items-center py-16">
-              <Text className="text-lg font-semibold text-gray-800 dark:text-white">
-                Aucun lieu publie
+            <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
+              <Text className="text-lg font-semibold text-gray-900 dark:text-white">
+                Aucun lieu ne correspond
               </Text>
               <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-                Les lieux crees apparaitront ici.
+                Essaie une autre recherche ou reviens au filtre complet.
               </Text>
             </View>
           }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                void fetchPlaces(true);
+              }}
+              tintColor="#2ecc71"
+            />
+          }
           renderItem={({ item }) => (
-            <PlaceCard
-              name={item.name}
-              location={item.City?.name || item.address || 'Adresse a confirmer'}
-              imageUrl={
-                getImageUrl(item.coverUrl) ||
-                'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200'
-              }
-              rating={item.avgRating ?? undefined}
+            <TouchableOpacity
               onPress={() =>
                 router.push({
                   pathname: '/place/[id]',
                   params: { id: item.id },
                 })
               }
-            />
+              className="flex-row overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
+            >
+              <Image
+                source={{
+                  uri: getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER,
+                }}
+                className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                resizeMode="cover"
+              />
+
+              <View className="ml-4 flex-1 justify-between py-1">
+                <View>
+                  <View className="self-start rounded-full bg-green-100 px-3 py-1.5 dark:bg-green-900/30">
+                    <Text className="text-xs font-semibold text-green-700 dark:text-green-300">
+                      {item.City?.name || 'Lieu a decouvrir'}
+                    </Text>
+                  </View>
+
+                  <Text
+                    className="mt-3 text-lg font-bold text-gray-900 dark:text-white"
+                    numberOfLines={2}
+                  >
+                    {item.name}
+                  </Text>
+                  <Text
+                    className="mt-1 text-sm text-gray-500 dark:text-gray-400"
+                    numberOfLines={2}
+                  >
+                    {item.address || item.City?.name || 'Adresse a confirmer'}
+                  </Text>
+                </View>
+
+                <View className="mt-3 flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="star" size={14} color="#f59e0b" />
+                    <Text className="ml-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+                      {typeof item.avgRating === 'number' && item.avgRating > 0
+                        ? item.avgRating.toFixed(1)
+                        : 'Nouveau'}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="arrow-forward-circle"
+                    size={24}
+                    color="#2ecc71"
+                  />
+                </View>
+              </View>
+            </TouchableOpacity>
           )}
         />
       )}

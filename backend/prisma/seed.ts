@@ -389,6 +389,13 @@ async function main() {
   });
   const seededOutingIds = seededOutings.map((outing) => outing.id);
 
+  await prisma.friendship.deleteMany({
+    where: {
+      requesterId: { in: seededUserIds },
+      receiverId: { in: seededUserIds },
+    },
+  });
+
   if (seededOutingIds.length > 0) {
     await prisma.outingParticipant.deleteMany({
       where: { outingId: { in: seededOutingIds } },
@@ -405,6 +412,37 @@ async function main() {
   }
 
   await prisma.session.deleteMany({ where: { userId: { in: seededUserIds } } });
+
+  await prisma.friendship.createMany({
+    data: [
+      {
+        requesterId: user.id,
+        receiverId: organizer.id,
+        status: 'ACCEPTED',
+      },
+      {
+        requesterId: organizer.id,
+        receiverId: owner.id,
+        status: 'ACCEPTED',
+      },
+      {
+        requesterId: owner.id,
+        receiverId: user.id,
+        status: 'PENDING',
+      },
+    ],
+  });
+
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: user.id,
+        actorId: owner.id,
+        type: 'FRIEND_REQUEST',
+        isRead: false,
+      },
+    ],
+  });
 
   const placeOne = await prisma.place.create({
     data: {
@@ -551,6 +589,23 @@ async function main() {
         ],
       },
     },
+  });
+
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: organizer.id,
+        actorId: user.id,
+        type: 'OUTING_INVITE',
+        isRead: false,
+      },
+      {
+        userId: owner.id,
+        actorId: user.id,
+        type: 'OUTING_INVITE',
+        isRead: false,
+      },
+    ],
   });
 
   const tagIds = await getTagsByNames([

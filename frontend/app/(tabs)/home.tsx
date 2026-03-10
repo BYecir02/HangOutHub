@@ -15,6 +15,7 @@ import Header from '@/components/ui/Header';
 import PlaceCard from '@/components/ui/PlaceCard';
 import SuggestionCard from '@/components/ui/SuggestionCard';
 import api, { getImageUrl } from '@/services/api';
+import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { Category } from '@/types';
 
 interface HomeEvent {
@@ -38,6 +39,10 @@ interface HomePlace {
     name?: string | null;
   } | null;
   address?: string | null;
+}
+
+interface NotificationCountResponse {
+  unreadCount: number;
 }
 
 const EVENT_PLACEHOLDER =
@@ -72,30 +77,48 @@ function SectionPlaceholder({ message }: { message: string }) {
 export default function HomeScreen() {
   const router = useRouter();
   const placesRoute = '/places' as Href;
-  const exploreRoute = '/explore' as Href;
+  const eventsRoute = '/events' as Href;
+  const discoverRoute = '/discover' as Href;
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<HomeEvent[]>([]);
   const [places, setPlaces] = useState<HomePlace[]>([]);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
+
+    const isUnauthorized = (error: unknown) => {
+      if (!error || typeof error !== 'object') {
+        return false;
+      }
+
+      const response = (error as { response?: { status?: number } }).response;
+      return response?.status === 401;
+    };
 
     const loadHomeData = async () => {
       const results = await Promise.allSettled([
         api.get<Category[]>('/categories'),
         api.get<HomeEvent[]>('/events'),
         api.get<HomePlace[]>('/places'),
+        api.get<NotificationCountResponse>('/notifications/unread-count'),
       ]);
 
       if (!isMounted) {
         return;
       }
 
-      const [categoriesResult, eventsResult, placesResult] = results;
+      const [
+        categoriesResult,
+        eventsResult,
+        placesResult,
+        notificationsResult,
+      ] = results;
 
       if (categoriesResult.status === 'fulfilled') {
         setCategories(categoriesResult.value.data);
+        setCache('categories', categoriesResult.value.data);
       } else {
         console.error('Erreur chargement categories:', categoriesResult.reason);
         setCategories([]);
@@ -103,6 +126,7 @@ export default function HomeScreen() {
 
       if (eventsResult.status === 'fulfilled') {
         setEvents(eventsResult.value.data);
+        setCache('events', eventsResult.value.data);
       } else {
         console.error('Erreur chargement evenements:', eventsResult.reason);
         setEvents([]);
@@ -110,11 +134,34 @@ export default function HomeScreen() {
 
       if (placesResult.status === 'fulfilled') {
         setPlaces(placesResult.value.data);
+        setCache('places', placesResult.value.data);
       } else {
         console.error('Erreur chargement lieux:', placesResult.reason);
         setPlaces([]);
       }
 
+      if (
+        eventsResult.status === 'fulfilled' &&
+        placesResult.status === 'fulfilled'
+      ) {
+        setCache('discover', {
+          events: eventsResult.value.data,
+          places: placesResult.value.data,
+        });
+      }
+
+      let nextNotificationCount = 0;
+
+      if (notificationsResult.status === 'fulfilled') {
+        nextNotificationCount += notificationsResult.value.data.unreadCount;
+      } else if (!isUnauthorized(notificationsResult.reason)) {
+        console.error(
+          'Erreur chargement notifications:',
+          notificationsResult.reason,
+        );
+      }
+
+      setNotificationCount(nextNotificationCount);
       setLoading(false);
     };
 
@@ -145,13 +192,32 @@ export default function HomeScreen() {
     [featuredEvents],
   );
 
+  const handleCategoryPress = (categoryId: number) => {
+    const id = String(categoryId);
+
+    if (!getCategoryCache(id)) {
+      void api
+        .get(`/categories/${id}/discover`)
+        .then((response) => {
+          setCategoryCache(id, response.data);
+        })
+        .catch(() => {});
+    }
+
+    router.push({
+      pathname: '/category/[id]',
+      params: { id },
+    });
+  };
+
   return (
     <ScrollView
       className="flex-1 bg-gray-50 dark:bg-black"
       showsVerticalScrollIndicator={false}
     >
       <Header
-        onNotificationPress={() => {}}
+        notificationCount={notificationCount}
+        onNotificationPress={() => router.push('/notifications')}
         onSearchPress={() => router.push('/search')}
       />
 
@@ -167,12 +233,7 @@ export default function HomeScreen() {
             renderItem={({ item }) => (
               <CategoryCard
                 category={item}
-                onPress={() =>
-                  router.push({
-                    pathname: '/category/[id]',
-                    params: { id: String(item.id) },
-                  })
-                }
+                onPress={() => handleCategoryPress(item.id)}
               />
             )}
             keyExtractor={(item) => item.id.toString()}
@@ -190,7 +251,7 @@ export default function HomeScreen() {
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
             A la une
           </Text>
-          <TouchableOpacity onPress={() => router.push(exploreRoute)}>
+          <TouchableOpacity onPress={() => router.push(eventsRoute)}>
             <Text className="text-xs font-medium text-[#4c669f]">Voir tout</Text>
           </TouchableOpacity>
         </View>
@@ -270,7 +331,7 @@ export default function HomeScreen() {
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
             Recommande pour toi
           </Text>
-          <TouchableOpacity onPress={() => router.push(exploreRoute)}>
+          <TouchableOpacity onPress={() => router.push(discoverRoute)}>
             <Text className="text-xs font-medium text-[#4c669f]">Voir tout</Text>
           </TouchableOpacity>
         </View>

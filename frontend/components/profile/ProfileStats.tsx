@@ -4,51 +4,97 @@ import { Text, TouchableOpacity, View } from 'react-native';
 interface ProfileStatsProps {
   postsCount: number;
   outingsCount?: number;
-  followersCount?: number;
-  followingCount?: number;
+  connectionsCount?: number;
+  savedCount?: number;
   isOrganizer?: boolean;
   placesCount?: number;
   eventsCount?: number;
+  onConnectionsPress?: () => void;
 }
 
-function StatItem({ label, value }: { label: string; value: number }) {
-  return (
-    <TouchableOpacity className="items-center">
-      <Text className="text-lg font-bold text-gray-900 dark:text-white">
+function StatItem({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  onPress?: () => void;
+}) {
+  const content = (
+    <View className="items-center">
+      <Text className="text-base font-bold text-gray-900 dark:text-white">
         {value}
       </Text>
-      <Text className="text-xs text-gray-400 dark:text-gray-500">{label}</Text>
-    </TouchableOpacity>
+      <Text className="mt-1 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        {label}
+      </Text>
+    </View>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} className="items-center">
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 }
 
 export default function ProfileStats({
   postsCount,
   outingsCount = 0,
-  followersCount = 0,
+  connectionsCount = 0,
+  savedCount = 0,
   isOrganizer = false,
   placesCount = 0,
   eventsCount = 0,
+  onConnectionsPress,
 }: ProfileStatsProps) {
   if (isOrganizer) {
     return (
-      <View className="mt-6 flex-row justify-around border-y border-gray-100 py-4 dark:border-gray-800">
-        <StatItem label="Abonnes" value={followersCount} />
-        <View className="border-x border-gray-100 px-10 dark:border-gray-800">
-          <StatItem label="Lieux" value={placesCount} />
+      <View className="mt-5 px-5">
+        <View className="flex-row rounded-2xl border border-gray-100 bg-gray-50 px-2 py-3 dark:border-gray-800 dark:bg-gray-900">
+          <View className="flex-1">
+            <StatItem
+              label="Connexions"
+              value={connectionsCount}
+              onPress={onConnectionsPress}
+            />
+          </View>
+          <View className="flex-1 border-x border-gray-100 dark:border-gray-800">
+            <StatItem label="Lieux" value={placesCount} />
+          </View>
+          <View className="flex-1">
+            <StatItem label="Evenements" value={eventsCount} />
+          </View>
         </View>
-        <StatItem label="Evenements" value={eventsCount} />
       </View>
     );
   }
 
   return (
-    <View className="mt-6 flex-row justify-around border-y border-gray-100 py-4 dark:border-gray-800">
-      <StatItem label="Abonnes" value={followersCount} />
-      <View className="border-x border-gray-100 px-10 dark:border-gray-800">
-        <StatItem label="Sorties" value={outingsCount} />
+    <View className="mt-5 px-5">
+      <View className="flex-row rounded-2xl border border-gray-100 bg-gray-50 px-1 py-3 dark:border-gray-800 dark:bg-gray-900">
+        <View className="flex-1">
+          <StatItem
+            label="Connexions"
+            value={connectionsCount}
+            onPress={onConnectionsPress}
+          />
+        </View>
+        <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
+          <StatItem label="Envies" value={savedCount} />
+        </View>
+        <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
+          <StatItem label="Sorties" value={outingsCount} />
+        </View>
+        <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
+          <StatItem label="Posts" value={postsCount} />
+        </View>
       </View>
-      <StatItem label="Posts" value={postsCount} />
     </View>
   );
 }

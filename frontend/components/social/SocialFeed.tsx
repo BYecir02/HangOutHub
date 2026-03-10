@@ -1,9 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   RefreshControl,
   Text,
   TouchableOpacity,
@@ -13,7 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import PostItem from './PostItem';
-import api, { getImageUrl } from '../../services/api';
+import { SkeletonBlock } from '../ui/Skeleton';
+import api from '../../services/api';
 
 interface FeedAuthor {
   id: string;
@@ -38,9 +37,7 @@ interface FeedPost {
   };
 }
 
-const AVATAR_PLACEHOLDER = 'https://i.pravatar.cc/150';
-
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState() {
   return (
     <View className="items-center px-6 py-16">
       <View className="h-16 w-16 items-center justify-center rounded-full bg-[#4c669f]/10">
@@ -50,14 +47,32 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         Lance le feed
       </Text>
       <Text className="mt-3 text-center text-base leading-7 text-gray-500 dark:text-gray-400">
-        Cree ton premier post pour donner du rythme a la communaute.
+        Les publications apparaitront ici. Pour poster, passe par le bouton +
+        central.
       </Text>
-      <TouchableOpacity
-        onPress={onCreate}
-        className="mt-6 rounded-full bg-[#f39c12] px-5 py-3"
-      >
-        <Text className="font-semibold text-white">Publier maintenant</Text>
-      </TouchableOpacity>
+    </View>
+  );
+}
+
+function SkeletonPost() {
+  return (
+    <View className="mx-5 mb-4 rounded-3xl bg-white p-4 shadow-sm dark:bg-gray-900">
+      <View className="flex-row items-center">
+        <SkeletonBlock className="h-12 w-12 rounded-full" />
+        <View className="ml-3 flex-1">
+          <SkeletonBlock className="h-4 w-36 rounded-lg" />
+          <SkeletonBlock className="mt-2 h-3 w-20 rounded-lg" />
+        </View>
+      </View>
+      <SkeletonBlock className="mt-4 h-4 w-full rounded-lg" />
+      <SkeletonBlock className="mt-2 h-4 w-5/6 rounded-lg" />
+      <SkeletonBlock className="mt-2 h-4 w-2/3 rounded-lg" />
+      <SkeletonBlock className="mt-4 h-44 w-full rounded-2xl" />
+      <View className="mt-4 flex-row justify-between">
+        <SkeletonBlock className="h-4 w-16 rounded-lg" />
+        <SkeletonBlock className="h-4 w-16 rounded-lg" />
+        <SkeletonBlock className="h-4 w-16 rounded-lg" />
+      </View>
     </View>
   );
 }
@@ -67,9 +82,12 @@ export default function SocialFeed() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const fetchFeed = useCallback(async (isRefreshing = false) => {
-    if (isRefreshing) {
+    const isRefresh = isRefreshing || hasLoaded;
+
+    if (isRefresh) {
       setRefreshing(true);
     } else {
       setLoading(true);
@@ -80,32 +98,21 @@ export default function SocialFeed() {
       setPosts(response.data);
     } catch (error) {
       console.error('Erreur chargement feed social:', error);
-      if (!isRefreshing) {
+      if (!isRefresh) {
         setPosts([]);
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setHasLoaded(true);
     }
-  }, []);
+  }, [hasLoaded]);
 
   useFocusEffect(
     useCallback(() => {
       void fetchFeed();
     }, [fetchFeed]),
   );
-
-  const spotlightUsers = useMemo(() => {
-    const seen = new Set<string>();
-
-    return posts
-      .filter((post) => post.User?.id && !seen.has(post.User.id))
-      .map((post) => {
-        seen.add(post.User!.id);
-        return post.User!;
-      })
-      .slice(0, 8);
-  }, [posts]);
 
   const handleDeletePost = async (postId: string) => {
     try {
@@ -139,6 +146,13 @@ export default function SocialFeed() {
     });
   };
 
+  const handleMessagesPlaceholder = () => {
+    Alert.alert(
+      'Messagerie bientot disponible',
+      'Les conversations privees et de groupe arriveront dans une prochaine version.',
+    );
+  };
+
   const renderHeader = () => (
     <View className="border-b border-gray-100 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-black">
       <View className="flex-row items-start justify-between">
@@ -155,44 +169,41 @@ export default function SocialFeed() {
         </View>
 
         <TouchableOpacity
-          onPress={() => router.push('/post')}
-          className="h-12 w-12 items-center justify-center rounded-2xl bg-[#f39c12]"
+          onPress={handleMessagesPlaceholder}
+          className="h-12 w-12 items-center justify-center rounded-2xl bg-[#4c669f]"
         >
-          <Ionicons name="create-outline" size={22} color="#ffffff" />
+          <Ionicons name="chatbubble-ellipses-outline" size={22} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
-      {spotlightUsers.length > 0 ? (
-        <FlatList
-          data={spotlightUsers}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mt-6"
-          renderItem={({ item }) => (
-            <View className="mr-4 items-center">
-              <Image
-                source={{ uri: getImageUrl(item.avatarUrl) || AVATAR_PLACEHOLDER }}
-                className="h-14 w-14 rounded-full border-2 border-[#4c669f]"
-              />
-              <Text
-                className="mt-2 max-w-[72px] text-center text-xs font-medium text-gray-600 dark:text-gray-300"
-                numberOfLines={1}
-              >
-                {item.displayName || item.username || 'Utilisateur'}
-              </Text>
-            </View>
-          )}
-        />
-      ) : null}
+      <View className="mt-6 flex-row items-start rounded-3xl bg-[#4c669f]/10 p-4">
+        <View className="mr-3 mt-0.5 h-10 w-10 items-center justify-center rounded-2xl bg-[#4c669f]">
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+            Conversations plus tard
+          </Text>
+          <Text className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+            La messagerie privee et les groupes ne font pas encore partie du
+            parcours MVP principal.
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
-  if (loading) {
+  if (loading && posts.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-      </View>
+      <FlatList
+        data={[0, 1, 2]}
+        keyExtractor={(item) => `skeleton-${item}`}
+        renderItem={() => <SkeletonPost />}
+        ListHeaderComponent={renderHeader}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        className="flex-1 bg-gray-50 dark:bg-black"
+      />
     );
   }
 
@@ -209,7 +220,7 @@ export default function SocialFeed() {
         />
       )}
       ListHeaderComponent={renderHeader}
-      ListEmptyComponent={<EmptyState onCreate={() => router.push('/post')} />}
+      ListEmptyComponent={<EmptyState />}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

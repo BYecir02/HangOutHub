@@ -248,6 +248,13 @@ Mise a jour : 9 mars 2026
 - `fait` : detail lieu -> enregistrer dans les envies
 - `fait` : detail lieu / detail evenement -> organiser une sortie pre-remplie
 - `fait` : profil USER -> onglet envies avec lieux enregistres
+- `fait` : systeme de connexions de base via recherche (demande, acceptation, retrait)
+- `fait` : creation de sortie avec invitations de connexions acceptees
+- `fait` : recherche allegee pour ne garder que la decouverte de profils
+- `fait` : demandes recues et invitations de sorties deplacees dans notifications
+- `fait` : page connexions dediee pour connexions et demandes envoyees
+- `fait` : detail de sortie avec participants et invitations
+- `fait` : profil public (vue d un autre utilisateur)
 
 Lecture du statut :
 - `fait` = parcours branche et accessible dans l'application
@@ -271,6 +278,19 @@ A faire :
 
 Livrable attendu :
 une application propre visuellement et credible en demo.
+
+#### Suivi d'avancement Phase 3
+Mise a jour : 9 mars 2026
+
+- `fait` : les boutons voir tout du home ouvrent de vraies pages dediees
+- `fait` : page Tous les evenements avec recherche et filtres simples
+- `fait` : page Tous les lieux avec recherche et filtres simples
+- `fait` : page Decouvrir pour prolonger les recommandations
+- `fait` : profil user renforce avec synthese, stats et tabs plus utiles
+- `fait` : profil user recentre sur connexions / envies / sorties / posts
+- `fait` : notifications restructurees avec cartes resume + pages detaillees
+- `fait` : activite recente alimentee par les lieux enregistres
+- `partiel` : harmonisation visuelle globale restante
 
 ### Phase 4 - QA et durcissement
 Periode : du 6 mai 2026 au 20 mai 2026

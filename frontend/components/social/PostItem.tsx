@@ -111,7 +111,7 @@ export default function PostItem({
   };
 
   return (
-    <View className="bg-white dark:bg-gray-900 mb-2 pb-4 border-b border-gray-100 dark:border-gray-800">
+    <View className="bg-white dark:bg-gray-900 pb-4 border-b border-gray-100 dark:border-gray-800">
       <View className="flex-row items-center p-4 justify-between">
         <View className="flex-row items-center flex-1">
           <Image

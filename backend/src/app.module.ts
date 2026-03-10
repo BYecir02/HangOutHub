@@ -13,6 +13,8 @@ import { join } from 'path';
 import { CommentsModule } from './comments/comments.module';
 import { StorageModule } from './storage/storage.module';
 import { OutingsModule } from './outings/outings.module';
+import { FriendshipsModule } from './friendships/friendships.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { OutingsModule } from './outings/outings.module';
     PostsModule,
     CommentsModule,
     OutingsModule,
+    FriendshipsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

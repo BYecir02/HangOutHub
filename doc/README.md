@@ -50,6 +50,7 @@ Le seed cree notamment :
 - un compte `ORGANIZER`
 - un compte `PLACE_OWNER`
 - des lieux, des evenements, des posts, des likes et des commentaires
+- des connexions de demo et une demande en attente
 
 ### Comptes de demo
 
@@ -58,6 +59,11 @@ Le seed cree notamment :
 - `PLACE_OWNER` : `district@hangouthub.dev` / `Demo12345!`
 
 Ces comptes sont recrees ou remis a jour a chaque execution du seed.
+
+Relations de demo creees par le seed :
+- `amina` <-> `novaevents` : connexion acceptee
+- `novaevents` <-> `codedistrict` : connexion acceptee
+- `codedistrict` -> `amina` : demande en attente
 
 ## Docs utiles
 

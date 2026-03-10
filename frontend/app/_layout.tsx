@@ -18,7 +18,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -26,7 +26,11 @@ export default function RootLayout() {
           <Stack.Screen name="preferences" options={{ headerShown: false }} />
           <Stack.Screen
             name="settings"
-            options={{ title: 'Parametres', headerBackTitle: 'Retour' }}
+            options={{
+              headerShown: true,
+              title: 'Parametres',
+              headerBackTitle: 'Retour',
+            }}
           />
           <Stack.Screen
             name="create-modal"
@@ -45,13 +49,16 @@ export default function RootLayout() {
             name="outing"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
           />
+          <Stack.Screen name="outing/[id]" options={{ headerShown: false }} />
           <Stack.Screen
             name="place"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
           />
           <Stack.Screen name="place/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="events" options={{ headerShown: false }} />
           <Stack.Screen name="places" options={{ headerShown: false }} />
+          <Stack.Screen name="discover" options={{ headerShown: false }} />
           <Stack.Screen
             name="post"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
@@ -69,6 +76,14 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen name="search" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="friend-requests" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="outing-invitations"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="connections" options={{ headerShown: false }} />
+          <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
