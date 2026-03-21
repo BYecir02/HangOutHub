@@ -33,6 +33,12 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="help-support"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="create-modal"
             options={{
               presentation: 'transparentModal',

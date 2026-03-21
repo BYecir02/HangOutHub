@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import api from '../services/api';
+import { getMySettings } from '@/services/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private';
 
@@ -65,6 +66,32 @@ export default function CreatePostScreen() {
   );
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isEditing || params.visibility) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const applyDefaultVisibility = async () => {
+      try {
+        const settings = await getMySettings();
+
+        if (isMounted) {
+          setVisibility(settings.defaultPostVisibility);
+        }
+      } catch {
+        // Fallback garde la valeur locale par defaut.
+      }
+    };
+
+    void applyDefaultVisibility();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isEditing, params.visibility]);
 
   const canSubmit = content.trim().length > 0 || images.length > 0;
   const visibilityLabel =

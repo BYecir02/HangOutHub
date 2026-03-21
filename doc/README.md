@@ -69,3 +69,4 @@ Relations de demo creees par le seed :
 
 - `doc/mvp-roadmap-mai-2026.md`
 - `doc/supabase-storage-setup.md`
+- `doc/identifiants-demo.md`

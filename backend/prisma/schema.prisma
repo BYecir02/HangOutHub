@@ -428,6 +428,24 @@ model Session {
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model UserSettings {
+  id                               String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId                           String   @unique @db.Uuid
+  notificationMessages             Boolean  @default(true)
+  notificationOutingInvites        Boolean  @default(true)
+  notificationFriendRequests       Boolean  @default(true)
+  notificationSavedPlacesActivity  Boolean  @default(true)
+  profilePublic                    Boolean  @default(true)
+  defaultPostVisibility            String   @default("public") @db.VarChar(20)
+  allowOutingInvitesFrom           String   @default("connections") @db.VarChar(20)
+  theme                            String   @default("system") @db.VarChar(20)
+  language                         String   @default("fr") @db.VarChar(10)
+  dataSaver                        Boolean  @default(false)
+  createdAt                        DateTime @default(now()) @db.Timestamp(6)
+  updatedAt                        DateTime @updatedAt @db.Timestamp(6)
+  User                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
   id                                      String               @id @default(uuid()) @db.Uuid
   username                                String               @unique @db.VarChar(50)
@@ -478,6 +496,7 @@ model User {
   UserCityInterest                        UserCityInterest[]
   OrganizerProfile                        OrganizerProfile?
   Session                                 Session[]
+  UserSettings                            UserSettings?
   UserRole                                UserRole[]
   UserTagInterest                         UserTagInterest[]
 }

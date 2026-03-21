@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 
 interface OrganizerDetailsInput {
   accountType: string;
@@ -40,9 +41,72 @@ export interface UserTagPreferencesResponse {
   selectedTagIds: number[];
 }
 
+export interface UserSettingsResponse {
+  notificationMessages: boolean;
+  notificationOutingInvites: boolean;
+  notificationFriendRequests: boolean;
+  notificationSavedPlacesActivity: boolean;
+  profilePublic: boolean;
+  defaultPostVisibility: 'public' | 'friends' | 'private';
+  allowOutingInvitesFrom: 'everyone' | 'connections' | 'nobody';
+  theme: 'light' | 'dark' | 'system';
+  language: 'fr' | 'en';
+  dataSaver: boolean;
+}
+
+type StoredUserSettings = {
+  notificationMessages: boolean;
+  notificationOutingInvites: boolean;
+  notificationFriendRequests: boolean;
+  notificationSavedPlacesActivity: boolean;
+  profilePublic: boolean;
+  defaultPostVisibility: string;
+  allowOutingInvitesFrom: string;
+  theme: string;
+  language: string;
+  dataSaver: boolean;
+};
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private mapSettings(settings: StoredUserSettings): UserSettingsResponse {
+    return {
+      notificationMessages: settings.notificationMessages,
+      notificationOutingInvites: settings.notificationOutingInvites,
+      notificationFriendRequests: settings.notificationFriendRequests,
+      notificationSavedPlacesActivity: settings.notificationSavedPlacesActivity,
+      profilePublic: settings.profilePublic,
+      defaultPostVisibility: settings.defaultPostVisibility as
+        | 'public'
+        | 'friends'
+        | 'private',
+      allowOutingInvitesFrom: settings.allowOutingInvitesFrom as
+        | 'everyone'
+        | 'connections'
+        | 'nobody',
+      theme: settings.theme as 'light' | 'dark' | 'system',
+      language: settings.language as 'fr' | 'en',
+      dataSaver: settings.dataSaver,
+    };
+  }
+
+  private async getOrCreateSettings(userId: string) {
+    const existingSettings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+    });
+
+    if (existingSettings) {
+      return existingSettings;
+    }
+
+    return this.prisma.userSettings.create({
+      data: {
+        userId,
+      },
+    });
+  }
 
   private sanitizeUser<T extends { passwordHash?: string | null }>(
     user: T,
@@ -323,5 +387,24 @@ export class UsersService {
     ]);
 
     return this.getTagPreferences(userId);
+  }
+
+  async getSettings(userId: string): Promise<UserSettingsResponse> {
+    const settings = await this.getOrCreateSettings(userId);
+    return this.mapSettings(settings);
+  }
+
+  async updateSettings(
+    userId: string,
+    updateUserSettingsDto: UpdateUserSettingsDto,
+  ): Promise<UserSettingsResponse> {
+    await this.getOrCreateSettings(userId);
+
+    const settings = await this.prisma.userSettings.update({
+      where: { userId },
+      data: updateUserSettingsDto,
+    });
+
+    return this.mapSettings(settings);
   }
 }

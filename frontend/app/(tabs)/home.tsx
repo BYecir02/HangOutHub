@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import CategoryCard from '@/components/ui/CategoryCard';
 import EventCard from '@/components/ui/EventCard';
@@ -84,99 +85,117 @@ export default function HomeScreen() {
   const [places, setPlaces] = useState<HomePlace[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const isUnauthorized = useCallback((error: unknown) => {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const response = (error as { response?: { status?: number } }).response;
+    return response?.status === 401;
+  }, []);
+
+  const loadNotificationCount = useCallback(async () => {
+    const token = await storage.getItem('userToken');
+
+    if (!token) {
+      setNotificationCount(0);
+      return;
+    }
+
+    try {
+      const response = await api.get<NotificationCountResponse>(
+        '/notifications/unread-count',
+      );
+      setNotificationCount(Number(response.data.unreadCount || 0));
+    } catch (error) {
+      if (!isUnauthorized(error)) {
+        console.error('Erreur chargement notifications:', error);
+      }
+    }
+  }, [isUnauthorized]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadNotificationCount();
+    }, [loadNotificationCount]),
+  );
+
+  const loadHomeData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.get<Category[]>('/categories'),
+      api.get<HomeEvent[]>('/events'),
+      api.get<HomePlace[]>('/places'),
+    ]);
+
+    const [categoriesResult, eventsResult, placesResult] = results;
+
+    if (categoriesResult.status === 'fulfilled') {
+      setCategories(categoriesResult.value.data);
+      setCache('categories', categoriesResult.value.data);
+    } else {
+      console.error('Erreur chargement categories:', categoriesResult.reason);
+      setCategories([]);
+    }
+
+    if (eventsResult.status === 'fulfilled') {
+      setEvents(eventsResult.value.data);
+      setCache('events', eventsResult.value.data);
+    } else {
+      console.error('Erreur chargement evenements:', eventsResult.reason);
+      setEvents([]);
+    }
+
+    if (placesResult.status === 'fulfilled') {
+      setPlaces(placesResult.value.data);
+      setCache('places', placesResult.value.data);
+    } else {
+      console.error('Erreur chargement lieux:', placesResult.reason);
+      setPlaces([]);
+    }
+
+    if (
+      eventsResult.status === 'fulfilled' &&
+      placesResult.status === 'fulfilled'
+    ) {
+      setCache('discover', {
+        events: eventsResult.value.data,
+        places: placesResult.value.data,
+      });
+    }
+
+    await loadNotificationCount();
+  }, [loadNotificationCount]);
 
   useEffect(() => {
     let isMounted = true;
 
-    const isUnauthorized = (error: unknown) => {
-      if (!error || typeof error !== 'object') {
-        return false;
-      }
+    const initialLoad = async () => {
+      setLoading(true);
+      await loadHomeData();
 
-      const response = (error as { response?: { status?: number } }).response;
-      return response?.status === 401;
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
-    const loadHomeData = async () => {
-      const token = await storage.getItem('userToken');
-      const notificationsRequest: Promise<{ data: NotificationCountResponse }> =
-        token
-          ? api.get<NotificationCountResponse>('/notifications/unread-count')
-          : Promise.resolve({ data: { unreadCount: 0 } });
-
-      const results = await Promise.allSettled([
-        api.get<Category[]>('/categories'),
-        api.get<HomeEvent[]>('/events'),
-        api.get<HomePlace[]>('/places'),
-        notificationsRequest,
-      ]);
-
-      if (!isMounted) {
-        return;
-      }
-
-      const [
-        categoriesResult,
-        eventsResult,
-        placesResult,
-        notificationsResult,
-      ] = results;
-
-      if (categoriesResult.status === 'fulfilled') {
-        setCategories(categoriesResult.value.data);
-        setCache('categories', categoriesResult.value.data);
-      } else {
-        console.error('Erreur chargement categories:', categoriesResult.reason);
-        setCategories([]);
-      }
-
-      if (eventsResult.status === 'fulfilled') {
-        setEvents(eventsResult.value.data);
-        setCache('events', eventsResult.value.data);
-      } else {
-        console.error('Erreur chargement evenements:', eventsResult.reason);
-        setEvents([]);
-      }
-
-      if (placesResult.status === 'fulfilled') {
-        setPlaces(placesResult.value.data);
-        setCache('places', placesResult.value.data);
-      } else {
-        console.error('Erreur chargement lieux:', placesResult.reason);
-        setPlaces([]);
-      }
-
-      if (
-        eventsResult.status === 'fulfilled' &&
-        placesResult.status === 'fulfilled'
-      ) {
-        setCache('discover', {
-          events: eventsResult.value.data,
-          places: placesResult.value.data,
-        });
-      }
-
-      let nextNotificationCount = 0;
-
-      if (notificationsResult.status === 'fulfilled') {
-        nextNotificationCount += notificationsResult.value.data.unreadCount;
-      } else if (!isUnauthorized(notificationsResult.reason)) {
-        console.error(
-          'Erreur chargement notifications:',
-          notificationsResult.reason,
-        );
-      }
-
-      setNotificationCount(nextNotificationCount);
-      setLoading(false);
-    };
-
-    void loadHomeData();
+    void initialLoad();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadHomeData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await loadHomeData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadHomeData]);
 
   const featuredEvents = useMemo(() => events.slice(0, 5), [events]);
   const popularPlaces = useMemo(() => places.slice(0, 6), [places]);
@@ -220,6 +239,15 @@ export default function HomeScreen() {
     <ScrollView
       className="flex-1 bg-gray-50 dark:bg-black"
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            void onRefresh();
+          }}
+          tintColor="#4c669f"
+        />
+      }
     >
       <Header
         notificationCount={notificationCount}

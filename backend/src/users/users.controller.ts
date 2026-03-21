@@ -22,6 +22,7 @@ import { memoryStorage } from 'multer';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UpdateUserTagPreferencesDto } from './dto/update-user-tag-preferences.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserTagPreferencesResponse } from './users.service';
@@ -75,6 +76,24 @@ export class UsersController {
     @Request() req: AuthenticatedRequest,
   ): Promise<UserTagPreferencesResponse> {
     return this.usersService.getTagPreferences(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/settings')
+  getSettings(@Request() req: AuthenticatedRequest) {
+    return this.usersService.getSettings(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('me/settings')
+  updateSettings(
+    @Request() req: AuthenticatedRequest,
+    @Body() updateUserSettingsDto: UpdateUserSettingsDto,
+  ) {
+    return this.usersService.updateSettings(
+      req.user.userId,
+      updateUserSettingsDto,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -41,6 +42,7 @@ export default function NotificationsScreen() {
   const [activityItems, setActivityItems] = useState<
     NotificationActivityItem[]
   >([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const formatEventDate = (value: string) =>
     new Date(value).toLocaleString('fr-FR', {
@@ -68,7 +70,7 @@ export default function NotificationsScreen() {
       setInvitations(invitationsResponse.data);
       setActivityItems(activityResponse.data || []);
 
-      void api.post('/notifications/mark-read');
+      await api.post('/notifications/mark-read');
     } catch (error) {
       console.error('Erreur chargement notifications:', error);
       setFriendships(EMPTY_FRIENDSHIPS);
@@ -84,6 +86,16 @@ export default function NotificationsScreen() {
       void loadNotifications();
     }, [loadNotifications]),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await loadNotifications();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadNotifications]);
 
   return (
     <View className="flex-1 bg-white pt-16 dark:bg-black">
@@ -103,6 +115,15 @@ export default function NotificationsScreen() {
       <ScrollView
         className="flex-1 px-5 pb-10 pt-2"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void onRefresh();
+            }}
+            tintColor="#4c669f"
+          />
+        }
       >
         <View className="rounded-[28px] bg-[#4c669f]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
