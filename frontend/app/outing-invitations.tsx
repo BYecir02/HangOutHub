@@ -5,7 +5,6 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -14,11 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import PersonActionButton from '../components/social/PersonActionButton';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api from '../services/api';
 import { OutingInvitation } from '../types/social';
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -30,6 +31,7 @@ export default function OutingInvitationsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [invitations, setInvitations] = useState<OutingInvitation[]>([]);
 
@@ -62,7 +64,7 @@ export default function OutingInvitationsScreen() {
       await loadInvitations();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible de repondre a cette invitation.");
+      Alert.alert(t('commonErrorTitle'), t('outingInvitationsRespondFailed'));
     }
   };
 
@@ -77,7 +79,7 @@ export default function OutingInvitationsScreen() {
           />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Invitations de sorties
+          {t('outingInvitationsTitle')}
         </Text>
       </View>
 
@@ -87,16 +89,16 @@ export default function OutingInvitationsScreen() {
       >
         <View className="rounded-[28px] bg-[#4c669f]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            Sorties
+            {t('outingInvitationsLabel')}
           </Text>
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            Reponds aux sorties ou propose un autre plan.
+            {t('outingInvitationsHero')}
           </Text>
         </View>
 
         <View className="mt-5">
           <SocialCountChip
-            label="Invites"
+            label={t('outingInvitationsCountLabel')}
             value={invitations.length}
             color="#4c669f"
           />
@@ -117,33 +119,35 @@ export default function OutingInvitationsScreen() {
                   {invitation.title}
                 </Text>
                 <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Proposee par{' '}
-                  {invitation.User?.displayName ||
-                    invitation.User?.username ||
-                    'un ami'}
+                  {t('outingInvitationsProposedBy', {
+                    name:
+                      invitation.User?.displayName ||
+                      invitation.User?.username ||
+                      t('outingInvitationsUserFallback'),
+                  })}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {formatEventDate(invitation.scheduledDate)}
+                  {formatEventDate(invitation.scheduledDate, locale)}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {invitation.Place?.name ||
                     invitation.Place?.City?.name ||
                     invitation.Place?.address ||
-                    'Lieu libre'}
+                    t('profileFeaturedOutingLocationFallback')}
                 </Text>
 
                 <View className="mt-4 flex-row flex-wrap gap-2">
                   <PersonActionButton
-                    label="J y vais"
+                    label={t('outingInvitationsActionGoing')}
                     onPress={() => handleRespondToInvitation(invitation.id, 'GOING')}
                   />
                   <PersonActionButton
-                    label="Peut etre"
+                    label={t('outingInvitationsActionMaybe')}
                     variant="neutral"
                     onPress={() => handleRespondToInvitation(invitation.id, 'MAYBE')}
                   />
                   <PersonActionButton
-                    label="Decliner"
+                    label={t('outingInvitationsActionDecline')}
                     variant="neutral"
                     onPress={() =>
                       handleRespondToInvitation(invitation.id, 'DECLINED')
@@ -155,8 +159,8 @@ export default function OutingInvitationsScreen() {
           ) : (
             <SocialEmptyState
               icon="calendar-outline"
-              title="Aucune invitation en attente"
-              description="Tes prochaines invitations a une sortie apparaitront ici."
+              title={t('outingInvitationsEmptyTitle')}
+              description={t('outingInvitationsEmptyDescription')}
             />
           )}
         </View>

@@ -5,14 +5,14 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import { useAppLanguage } from '@/hooks/use-app-language';
 import api from '../services/api';
 import { getFriendshipOverview } from '../services/friendships';
 import {
@@ -36,8 +36,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const appLanguage = useAppLanguage();
-  const locale = appLanguage === 'en' ? 'en-US' : 'fr-FR';
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [friendships, setFriendships] =
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
@@ -111,7 +110,7 @@ export default function NotificationsScreen() {
           />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Notifications
+          {t('notificationsTitle')}
         </Text>
       </View>
 
@@ -130,10 +129,10 @@ export default function NotificationsScreen() {
       >
         <View className="rounded-[28px] bg-[#4c669f]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            Centre d activite
+            {t('notificationsActivityCenterLabel')}
           </Text>
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            Suis les demandes, invitations et activites autour de tes envies.
+            {t('notificationsActivityCenterSubtitle')}
           </Text>
         </View>
 
@@ -141,7 +140,7 @@ export default function NotificationsScreen() {
           <View className="rounded-[24px] border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <View className="flex-row items-center justify-between">
               <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                Demandes recues
+                {t('notificationsIncomingRequests')}
               </Text>
               <View className="min-w-[28px] items-center justify-center rounded-full bg-[#f39c12] px-2 py-1">
                 <Text className="text-xs font-bold text-white">
@@ -150,20 +149,20 @@ export default function NotificationsScreen() {
               </View>
             </View>
             <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              Consulte toutes tes demandes de connexion et reponds rapidement.
+              {t('notificationsIncomingRequestsDescription')}
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/friend-requests')}
               className="mt-4 self-start rounded-full bg-[#f39c12] px-4 py-2"
             >
-              <Text className="font-semibold text-white">Voir les demandes</Text>
+              <Text className="font-semibold text-white">{t('notificationsIncomingRequestsCta')}</Text>
             </TouchableOpacity>
           </View>
 
           <View className="rounded-[24px] border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <View className="flex-row items-center justify-between">
               <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                Invitations de sorties
+                {t('notificationsOutingInvites')}
               </Text>
               <View className="min-w-[28px] items-center justify-center rounded-full bg-[#4c669f] px-2 py-1">
                 <Text className="text-xs font-bold text-white">
@@ -172,14 +171,14 @@ export default function NotificationsScreen() {
               </View>
             </View>
             <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              Decouvre toutes les sorties auxquelles tu es invite et reponds.
+              {t('notificationsOutingInvitesDescription')}
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/outing-invitations')}
               className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2"
             >
               <Text className="font-semibold text-white">
-                Voir les invitations
+                {t('notificationsOutingInvitesCta')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -187,7 +186,7 @@ export default function NotificationsScreen() {
 
         <View className="mt-8">
           <Text className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-            Activite recente
+            {t('notificationsRecentActivity')}
           </Text>
 
           {loading ? (
@@ -213,8 +212,8 @@ export default function NotificationsScreen() {
                 </Text>
                 <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {item.place?.name
-                    ? `Nouveau dans ${item.place.name}`
-                    : 'Nouveau dans un lieu enregistre'}
+                    ? t('notificationsPlaceUpdateWithName', { place: item.place.name })
+                    : t('notificationsPlaceUpdateGeneric')}
                 </Text>
                 <Text className="mt-2 text-xs text-gray-400 dark:text-gray-500">
                   {formatEventDate(item.date)}
@@ -224,8 +223,8 @@ export default function NotificationsScreen() {
           ) : (
             <SocialEmptyState
               icon="notifications-outline"
-              title="Aucune activite pour le moment"
-              description="Enregistre un lieu pour recevoir des alertes d'activite."
+              title={t('notificationsEmptyTitle')}
+              description={t('notificationsEmptyDescription')}
             />
           )}
         </View>

@@ -4,10 +4,12 @@ import {
   Image,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 
 import api, { getImageUrl } from '../../services/api';
 
@@ -48,6 +50,7 @@ export default function PostItem({
 }: PostItemProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { locale, t } = useI18n();
   const avatarUri =
     getImageUrl(item.User?.avatarUrl) || 'https://i.pravatar.cc/150';
   const postImageUri = getImageUrl(item.images?.[0]);
@@ -83,18 +86,18 @@ export default function PostItem({
     }[] = [];
 
     if (onEdit) {
-      buttons.push({ text: 'Modifier', onPress: () => onEdit(item) });
+      buttons.push({ text: t('postItemEdit'), onPress: () => onEdit(item) });
     }
 
     if (onDelete) {
       buttons.push({
-        text: 'Supprimer',
+        text: t('postItemDelete'),
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Confirmer', 'Supprimer ce post ?', [
-            { text: 'Annuler', style: 'cancel' },
+          Alert.alert(t('postItemDeleteConfirmTitle'), t('postItemDeleteConfirmMessage'), [
+            { text: t('postItemCancel'), style: 'cancel' },
             {
-              text: 'Supprimer',
+              text: t('postItemDelete'),
               style: 'destructive',
               onPress: () => onDelete(item.id),
             },
@@ -103,10 +106,10 @@ export default function PostItem({
       });
     }
 
-    buttons.push({ text: 'Annuler', style: 'cancel' });
+    buttons.push({ text: t('postItemCancel'), style: 'cancel' });
 
     if (buttons.length > 1) {
-      Alert.alert('Options', undefined, buttons);
+      Alert.alert(t('postItemOptionsTitle'), undefined, buttons);
     }
   };
 
@@ -120,12 +123,12 @@ export default function PostItem({
           />
           <View>
             <Text className="font-bold text-gray-800 dark:text-white text-base">
-              {item.User?.displayName || item.User?.username || 'Utilisateur'}
+              {item.User?.displayName || item.User?.username || t('postItemUserFallback')}
             </Text>
             <Text className="text-xs text-gray-500 dark:text-gray-400">
               {item.createdAt
-                ? new Date(item.createdAt).toLocaleDateString()
-                : 'A l instant'}
+                ? new Date(item.createdAt).toLocaleDateString(locale)
+                : t('postItemJustNow')}
             </Text>
           </View>
         </View>

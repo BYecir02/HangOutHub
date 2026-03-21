@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
@@ -36,8 +37,8 @@ type EventFilter = 'all' | 'upcoming' | 'free' | 'week';
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -46,9 +47,13 @@ function formatEventDate(value: string) {
   });
 }
 
-function formatPrice(value: number | string | null) {
+function formatPrice(
+  value: number | string | null,
+  locale: string,
+  freeLabel: string,
+) {
   const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString('fr-FR')} FCFA` : 'Gratuit';
+  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
 }
 
 function isWithinNextWeek(value: string) {
@@ -59,15 +64,11 @@ function isWithinNextWeek(value: string) {
   return eventDate >= now && eventDate <= oneWeekLater;
 }
 
-const FILTERS: { id: EventFilter; label: string }[] = [
-  { id: 'all', label: 'Tout' },
-  { id: 'upcoming', label: 'A venir' },
-  { id: 'free', label: 'Gratuits' },
-  { id: 'week', label: 'Cette semaine' },
-];
+const FILTERS: EventFilter[] = ['all', 'upcoming', 'free', 'week'];
 
 export default function EventsScreen() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const cachedEvents = getCache<EventItem[]>('events');
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
   const [loading, setLoading] = useState(!cachedEvents);
@@ -101,6 +102,13 @@ export default function EventsScreen() {
   useEffect(() => {
     void fetchEvents();
   }, [fetchEvents]);
+
+  const filterLabels: Record<EventFilter, string> = {
+    all: t('eventsFilterAll'),
+    upcoming: t('eventsFilterUpcoming'),
+    free: t('eventsFilterFree'),
+    week: t('eventsFilterWeek'),
+  };
 
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -157,21 +165,20 @@ export default function EventsScreen() {
 
           <View className="flex-1">
             <Text className="text-xs uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-              A la une
+              {t('eventsLabel')}
             </Text>
             <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              Tous les evenements
+              {t('eventsTitle')}
             </Text>
             <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Parcours tous les evenements a venir et affine rapidement selon ton
-              envie du moment.
+              {t('eventsSubtitle')}
             </Text>
           </View>
         </View>
       </View>
 
       <SearchBar
-        placeholder="Rechercher un evenement, un lieu, une ville..."
+        placeholder={t('eventsSearchPlaceholder')}
         value={query}
         onChangeText={setQuery}
       />
@@ -179,7 +186,7 @@ export default function EventsScreen() {
       <FlatList
         horizontal
         data={FILTERS}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -187,11 +194,11 @@ export default function EventsScreen() {
           paddingBottom: 10,
         }}
         renderItem={({ item }) => {
-          const active = activeFilter === item.id;
+          const active = activeFilter === item;
 
           return (
             <TouchableOpacity
-              onPress={() => setActiveFilter(item.id)}
+              onPress={() => setActiveFilter(item)}
               className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
               style={active ? { backgroundColor: '#4c669f' } : undefined}
             >
@@ -202,7 +209,7 @@ export default function EventsScreen() {
                     : 'text-gray-700 dark:text-gray-200'
                 }`}
               >
-                {item.label}
+                {filterLabels[item]}
               </Text>
             </TouchableOpacity>
           );
@@ -218,7 +225,7 @@ export default function EventsScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              Chargement des evenements...
+              {t('eventsLoading')}
             </Text>
           }
           renderItem={() => (
@@ -250,16 +257,16 @@ export default function EventsScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              {filteredEvents.length} resultat(s)
+              {t('eventsResultsCount', { count: filteredEvents.length })}
             </Text>
           }
           ListEmptyComponent={
             <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
               <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-                Aucun evenement ne correspond
+                {t('eventsEmptyTitle')}
               </Text>
               <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-                Essaie une autre recherche ou reviens au filtre complet.
+                {t('eventsEmptyDescription')}
               </Text>
             </View>
           }
@@ -294,12 +301,12 @@ export default function EventsScreen() {
                 <View className="flex-row flex-wrap items-center gap-2">
                   <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
                     <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-                      {formatPrice(item.entryFee)}
+                      {formatPrice(item.entryFee, locale, t('homePriceFree'))}
                     </Text>
                   </View>
                   <View className="rounded-full bg-gray-100 px-3 py-2 dark:bg-gray-800">
                     <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                      {item.Place?.City?.name || 'Ville a confirmer'}
+                      {item.Place?.City?.name || t('eventsCityToConfirm')}
                     </Text>
                   </View>
                 </View>
@@ -311,7 +318,7 @@ export default function EventsScreen() {
                 <View className="mt-3 flex-row items-center">
                   <Ionicons name="time-outline" size={16} color="#ff4757" />
                   <Text className="ml-2 text-sm text-gray-600 dark:text-gray-300">
-                    {formatEventDate(item.startTime)}
+                    {formatEventDate(item.startTime, locale)}
                   </Text>
                 </View>
 
@@ -321,7 +328,7 @@ export default function EventsScreen() {
                     className="ml-2 flex-1 text-sm text-gray-500 dark:text-gray-400"
                     numberOfLines={1}
                   >
-                    {item.Place?.name || item.address || 'Lieu a confirmer'}
+                    {item.Place?.name || item.address || t('homeLocationToConfirm')}
                   </Text>
                 </View>
               </View>

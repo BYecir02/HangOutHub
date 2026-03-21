@@ -5,12 +5,13 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
 import SocialCountChip from '../components/social/SocialCountChip';
@@ -36,6 +37,7 @@ const EMPTY_FRIENDSHIPS: FriendshipOverview = {
 export default function FriendRequestsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
   const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(true);
   const [friendships, setFriendships] =
@@ -67,7 +69,7 @@ export default function FriendRequestsScreen() {
       await loadRequests();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible d'accepter cette demande.");
+      Alert.alert(t('commonErrorTitle'), t('searchRequestAcceptError'));
     }
   };
 
@@ -77,7 +79,7 @@ export default function FriendRequestsScreen() {
       await loadRequests();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible de refuser cette demande.");
+      Alert.alert(t('commonErrorTitle'), t('searchRequestRejectError'));
     }
   };
 
@@ -92,7 +94,7 @@ export default function FriendRequestsScreen() {
           />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Demandes recues
+          {t('friendRequestsTitle')}
         </Text>
       </View>
 
@@ -102,16 +104,16 @@ export default function FriendRequestsScreen() {
       >
         <View className="rounded-[28px] bg-[#f39c12]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f39c12]">
-            Connexions
+            {t('friendRequestsLabel')}
           </Text>
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            Accepte ou refuse les demandes en attente.
+            {t('friendRequestsSubtitle')}
           </Text>
         </View>
 
         <View className="mt-5">
           <SocialCountChip
-            label="Demandes"
+            label={t('friendRequestsCountLabel')}
             value={friendships.counts.incomingRequests}
             color="#f39c12"
           />
@@ -127,7 +129,7 @@ export default function FriendRequestsScreen() {
               <PersonRow
                 key={item.friendshipId}
                 user={item.user}
-                subtitle={item.user.bio?.trim() || 'Souhaite se connecter'}
+                subtitle={item.user.bio?.trim() || t('friendRequestsPendingSubtitle')}
                 onPress={() =>
                   router.push({
                     pathname: '/user/[id]',
@@ -136,13 +138,13 @@ export default function FriendRequestsScreen() {
                 }
                 primaryAction={
                   <PersonActionButton
-                    label="Accepter"
+                    label={t('searchActionAccept')}
                     onPress={() => handleAcceptRequest(item.friendshipId)}
                   />
                 }
                 secondaryAction={
                   <PersonActionButton
-                    label="Refuser"
+                    label={t('searchActionReject')}
                     variant="neutral"
                     onPress={() => handleRejectRequest(item.friendshipId)}
                   />
@@ -152,8 +154,8 @@ export default function FriendRequestsScreen() {
           ) : (
             <SocialEmptyState
               icon="mail-open-outline"
-              title="Aucune demande en attente"
-              description="Les futures demandes de connexion apparaitront ici."
+              title={t('friendRequestsEmptyTitle')}
+              description={t('friendRequestsEmptyDescription')}
             />
           )}
         </View>

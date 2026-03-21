@@ -6,12 +6,13 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '../../services/api';
 import { FriendshipOverview } from '../../types/social';
 
@@ -52,8 +53,8 @@ interface OutingDetail {
   OutingParticipant: OutingParticipant[];
 }
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -61,17 +62,24 @@ function formatEventDate(value: string) {
   });
 }
 
-function formatStatus(status?: string | null) {
+function formatStatus(
+  status: string | null | undefined,
+  t: (key:
+    | 'outingDetailStatusGoing'
+    | 'outingDetailStatusMaybe'
+    | 'outingDetailStatusDeclined'
+    | 'outingDetailStatusInvited') => string,
+) {
   if (status === 'GOING') {
-    return { label: 'Confirme', color: '#2ecc71' };
+    return { label: t('outingDetailStatusGoing'), color: '#2ecc71' };
   }
   if (status === 'MAYBE') {
-    return { label: 'Peut-etre', color: '#f39c12' };
+    return { label: t('outingDetailStatusMaybe'), color: '#f39c12' };
   }
   if (status === 'DECLINED') {
-    return { label: 'Decline', color: '#ef4444' };
+    return { label: t('outingDetailStatusDeclined'), color: '#ef4444' };
   }
-  return { label: 'Invite', color: '#4c669f' };
+  return { label: t('outingDetailStatusInvited'), color: '#4c669f' };
 }
 
 export default function OutingDetailScreen() {
@@ -79,6 +87,7 @@ export default function OutingDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [outing, setOuting] = useState<OutingDetail | null>(null);
   const [connections, setConnections] = useState<
@@ -179,7 +188,7 @@ export default function OutingDetailScreen() {
       setSelectedParticipantIds([]);
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible d'inviter ces personnes.");
+      Alert.alert(t('commonErrorTitle'), t('outingDetailInviteFailed'));
     } finally {
       setInviting(false);
     }
@@ -208,13 +217,13 @@ export default function OutingDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-5 dark:bg-black">
         <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-          Sortie introuvable
+          {t('outingDetailNotFound')}
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
           className="mt-4 rounded-full bg-[#4c669f] px-5 py-3"
         >
-          <Text className="font-semibold text-white">Retour</Text>
+          <Text className="font-semibold text-white">{t('publicProfileBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -230,43 +239,43 @@ export default function OutingDetailScreen() {
           <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          Sortie
+          {t('outingDetailTitle')}
         </Text>
       </View>
 
       <ScrollView className="flex-1 px-5 py-5" showsVerticalScrollIndicator={false}>
         <View className="rounded-[28px] bg-[#4c669f]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            Sortie
+            {t('outingCreateLabel')}
           </Text>
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
             {outing.title}
           </Text>
           <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {formatEventDate(outing.scheduledDate)}
+            {formatEventDate(outing.scheduledDate, locale)}
           </Text>
           <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {outing.Place?.name ||
               outing.Place?.City?.name ||
               outing.Place?.address ||
-              'Lieu libre'}
+              t('profileFeaturedOutingLocationFallback')}
           </Text>
 
           <TouchableOpacity
             onPress={handleOpenDiscussion}
             className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2"
           >
-            <Text className="font-semibold text-white">Ouvrir la discussion</Text>
+            <Text className="font-semibold text-white">{t('outingDetailOpenDiscussion')}</Text>
           </TouchableOpacity>
         </View>
 
         <View className="mt-6 rounded-3xl bg-gray-50 p-4 dark:bg-gray-900">
           <Text className="text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Participants
+            {t('outingDetailParticipantsLabel')}
           </Text>
           <View className="mt-4 gap-3">
             {outing.OutingParticipant.map((participant) => {
-              const status = formatStatus(participant.status);
+              const status = formatStatus(participant.status, t);
               return (
                 <View
                   key={participant.userId}
@@ -285,10 +294,10 @@ export default function OutingDetailScreen() {
                     <Text className="text-base font-semibold text-gray-900 dark:text-white">
                       {participant.User.displayName ||
                         participant.User.username ||
-                        'Participant'}
+                        t('outingDetailParticipantFallback')}
                     </Text>
                     <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      @{participant.User.username || 'utilisateur'}
+                      @{participant.User.username || t('outingDetailUsernameFallback')}
                     </Text>
                   </View>
                   <View
@@ -311,7 +320,7 @@ export default function OutingDetailScreen() {
         {canInvite ? (
           <View className="mt-6 rounded-3xl bg-gray-50 p-4 dark:bg-gray-900">
             <Text className="text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-              Inviter des connexions
+              {t('outingDetailInviteConnectionsLabel')}
             </Text>
 
             {availableConnections.length > 0 ? (
@@ -373,15 +382,20 @@ export default function OutingDetailScreen() {
                     <ActivityIndicator color="white" />
                   ) : (
                     <Text className="font-semibold text-white">
-                      Inviter {selectedParticipantIds.length || ''}{' '}
-                      {selectedParticipantIds.length > 1 ? 'personnes' : 'personne'}
+                      {selectedParticipantIds.length > 1
+                        ? t('outingDetailInviteMany', {
+                            count: selectedParticipantIds.length,
+                          })
+                        : t('outingDetailInviteOne', {
+                            count: selectedParticipantIds.length,
+                          })}
                     </Text>
                   )}
                 </TouchableOpacity>
               </View>
             ) : (
               <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                Toutes tes connexions sont deja invitees.
+                {t('outingDetailAllConnectionsInvited')}
               </Text>
             )}
           </View>

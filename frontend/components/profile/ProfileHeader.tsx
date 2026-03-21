@@ -3,11 +3,13 @@ import {
   Image,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 
 import { getImageUrl } from '../../services/api';
 
@@ -17,12 +19,15 @@ interface ProfileHeaderProps {
   onImagePress: (url: string) => void;
 }
 
-function getStatusColors(status?: string) {
+function getStatusColors(
+  status: string | undefined,
+  t: (key: 'profileStatusVerified' | 'profileStatusPending' | 'profileStatusInProgress') => string,
+) {
   if (status === 'APPROVED') {
     return {
       bg: 'bg-green-100 dark:bg-green-900/30',
       text: 'text-green-700 dark:text-green-300',
-      label: 'Profil verifie',
+      label: t('profileStatusVerified'),
     };
   }
 
@@ -30,14 +35,14 @@ function getStatusColors(status?: string) {
     return {
       bg: 'bg-amber-100 dark:bg-amber-900/30',
       text: 'text-amber-700 dark:text-amber-300',
-      label: 'Validation en attente',
+      label: t('profileStatusPending'),
     };
   }
 
   return {
     bg: 'bg-gray-100 dark:bg-gray-800',
     text: 'text-gray-600 dark:text-gray-300',
-    label: 'Profil en cours',
+    label: t('profileStatusInProgress'),
   };
 }
 
@@ -49,12 +54,13 @@ export default function ProfileHeader({
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t } = useI18n();
 
   const coverUrl =
     getImageUrl(user?.coverUrl) ||
     'https://images.unsplash.com/photo-1557683316-973673baf926';
   const avatarUrl = getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150';
-  const statusConfig = getStatusColors(user?.OrganizerProfile?.status);
+  const statusConfig = getStatusColors(user?.OrganizerProfile?.status, t);
 
   return (
     <View>
@@ -83,7 +89,7 @@ export default function ProfileHeader({
         <View className="flex-row items-start justify-between">
           <View className="flex-1 pr-4">
             <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-              {user?.displayName || user?.username || 'Utilisateur'}
+              {user?.displayName || user?.username || t('profileUserFallback')}
             </Text>
             <Text className="font-medium text-gray-500 dark:text-gray-400">
               @{user?.username || 'user'}
@@ -110,29 +116,31 @@ export default function ProfileHeader({
         ) : null}
 
         <Text className="mt-3 leading-5 text-gray-700 dark:text-gray-300">
-          {user?.bio || 'Aucune biographie pour le moment.'}
+          {user?.bio || t('profileNoBioYet')}
         </Text>
 
         <View className="mt-4 flex-row gap-3">
           <TouchableOpacity
-            className="flex-1 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
+            className={`items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700 ${
+              isOrganizer ? 'flex-1' : 'w-full'
+            }`}
             onPress={() => router.push('/edit-profile')}
           >
             <Text className="text-sm font-bold text-gray-800 dark:text-white">
-              Modifier le profil
+              {t('profileEditProfile')}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            className="flex-1 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
-            onPress={() =>
-              router.push(isOrganizer ? '/organizer/events' : '/preferences')
-            }
-          >
-            <Text className="text-sm font-bold text-gray-800 dark:text-white">
-              {isOrganizer ? 'Mes evenements' : 'Mes preferences'}
-            </Text>
-          </TouchableOpacity>
+          {isOrganizer ? (
+            <TouchableOpacity
+              className="flex-1 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
+              onPress={() => router.push('/organizer/dashboard')}
+            >
+              <Text className="text-sm font-bold text-gray-800 dark:text-white">
+                {t('profileOrganizerPanel')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </View>

@@ -11,40 +11,47 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useColorScheme,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import api from '../services/api';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import { getMySettings } from '@/services/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private';
 
 const VISIBILITY_OPTIONS: {
   id: PostVisibility;
-  label: string;
+  labelKey:
+    | 'postVisibilityPublicLabel'
+    | 'postVisibilityFriendsLabel'
+    | 'postVisibilityPrivateLabel';
   icon: keyof typeof Ionicons.glyphMap;
-  description: string;
+  descriptionKey:
+    | 'postVisibilityPublicDescription'
+    | 'postVisibilityFriendsDescription'
+    | 'postVisibilityPrivateDescription';
 }[] = [
   {
     id: 'public',
-    label: 'Tout le monde',
+    labelKey: 'postVisibilityPublicLabel',
     icon: 'globe-outline',
-    description: 'Visible par tous les utilisateurs de l application.',
+    descriptionKey: 'postVisibilityPublicDescription',
   },
   {
     id: 'friends',
-    label: 'Amis uniquement',
+    labelKey: 'postVisibilityFriendsLabel',
     icon: 'people-outline',
-    description: 'Reserve aux personnes proches de ton reseau.',
+    descriptionKey: 'postVisibilityFriendsDescription',
   },
   {
     id: 'private',
-    label: 'Moi uniquement',
+    labelKey: 'postVisibilityPrivateLabel',
     icon: 'lock-closed-outline',
-    description: 'Le post reste visible uniquement dans ton espace.',
+    descriptionKey: 'postVisibilityPrivateDescription',
   },
 ];
 
@@ -57,6 +64,7 @@ export default function CreatePostScreen() {
   }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t } = useI18n();
   const isEditing = !!params.postId;
 
   const [content, setContent] = useState(params.content ? String(params.content) : '');
@@ -66,6 +74,16 @@ export default function CreatePostScreen() {
   );
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const visibilityOptions = useMemo(
+    () =>
+      VISIBILITY_OPTIONS.map((option) => ({
+        ...option,
+        label: t(option.labelKey),
+        description: t(option.descriptionKey),
+      })),
+    [t],
+  );
 
   useEffect(() => {
     if (isEditing || params.visibility) {
@@ -95,12 +113,12 @@ export default function CreatePostScreen() {
 
   const canSubmit = content.trim().length > 0 || images.length > 0;
   const visibilityLabel =
-    VISIBILITY_OPTIONS.find((option) => option.id === visibility)?.label ||
-    'Tout le monde';
+    visibilityOptions.find((option) => option.id === visibility)?.label ||
+    t('postVisibilityPublicLabel');
 
   const headerTitle = useMemo(() => {
-    return isEditing ? 'Modifier le post' : 'Nouvelle publication';
-  }, [isEditing]);
+    return isEditing ? t('postHeaderEditTitle') : t('postHeaderCreateTitle');
+  }, [isEditing, t]);
 
   const pickImage = async (source: 'camera' | 'gallery') => {
     const options: ImagePicker.ImagePickerOptions = {
@@ -126,7 +144,7 @@ export default function CreatePostScreen() {
 
   const handlePost = async () => {
     if (!canSubmit) {
-      Alert.alert('Oups', 'Ajoute du texte ou une image avant de publier.');
+      Alert.alert(t('postEmptyAlertTitle'), t('postEmptyAlertMessage'));
       return;
     }
 
@@ -138,7 +156,7 @@ export default function CreatePostScreen() {
           content,
           visibility,
         });
-        Alert.alert('Succes', 'Post modifie.');
+        Alert.alert(t('outingCreateSuccessTitle'), t('postEditSuccessMessage'));
       } else {
         const formData = new FormData();
         formData.append('content', content);
@@ -156,13 +174,13 @@ export default function CreatePostScreen() {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
-        Alert.alert('Succes', 'Post publie.');
+        Alert.alert(t('outingCreateSuccessTitle'), t('postCreateSuccessMessage'));
       }
 
       router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', 'Impossible de publier le post.');
+      Alert.alert(t('commonErrorTitle'), t('postPublishFailedMessage'));
     } finally {
       setLoading(false);
     }
@@ -199,7 +217,7 @@ export default function CreatePostScreen() {
                 canSubmit ? 'text-white' : 'text-gray-400 dark:text-gray-500'
               }`}
             >
-              {isEditing ? 'Enregistrer' : 'Publier'}
+              {isEditing ? t('postSubmitEdit') : t('postSubmitCreate')}
             </Text>
           )}
         </TouchableOpacity>
@@ -216,7 +234,7 @@ export default function CreatePostScreen() {
         >
           <TextInput
             className="min-h-[170px] px-5 pt-5 text-xl leading-7 text-gray-800 dark:text-white"
-            placeholder="Partage une ambiance, une bonne adresse ou un plan pour ce soir..."
+            placeholder={t('postContentPlaceholder')}
             placeholderTextColor={isDark ? '#666' : '#999'}
             multiline
             textAlignVertical="top"
@@ -256,7 +274,7 @@ export default function CreatePostScreen() {
           <View className="mx-5 mt-5 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
             <View className="flex-row items-center justify-between">
               <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                Visibilite
+                {t('postVisibilitySection')}
               </Text>
               <TouchableOpacity
                 onPress={() => setShowVisibilityModal(true)}
@@ -271,8 +289,8 @@ export default function CreatePostScreen() {
 
             <Text className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
               {isEditing
-                ? 'Tu modifies ici le texte et la visibilite. Les images deja publiees restent inchangées.'
-                : 'Ajoute une ou plusieurs images et choisis qui peut voir ta publication.'}
+                ? t('postEditHint')
+                : t('postCreateHint')}
             </Text>
           </View>
         </ScrollView>
@@ -323,10 +341,10 @@ export default function CreatePostScreen() {
             </View>
 
             <Text className="mb-6 text-center text-lg font-bold text-gray-800 dark:text-white">
-              Qui peut voir ce post ?
+              {t('postVisibilityModalTitle')}
             </Text>
 
-            {VISIBILITY_OPTIONS.map((option) => (
+            {visibilityOptions.map((option) => (
               <TouchableOpacity
                 key={option.id}
                 onPress={() => {

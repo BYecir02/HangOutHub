@@ -18,14 +18,15 @@ import { SkeletonBlock } from '../../components/ui/Skeleton';
 import Tabs from '../../components/ui/Tabs';
 import { getImageUrl } from '../../services/api';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { useI18n } from '@/hooks/use-i18n';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -77,6 +78,7 @@ function EmptyPanel({
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const {
     user,
@@ -110,14 +112,14 @@ export default function ProfileScreen() {
         username:
           user.displayName || user.username
             ? `${user.displayName || user.username} · ${
-                user.OrganizerProfile.jobTitle || 'Gerant'
+                user.OrganizerProfile.jobTitle || t('profileOrganizerRoleFallback')
               }`
             : user.username,
       };
     }
 
     return user;
-  }, [isOrganizer, user]);
+  }, [isOrganizer, t, user]);
 
   const sortedOutings = useMemo(
     () =>
@@ -131,22 +133,22 @@ export default function ProfileScreen() {
   const featuredOuting = sortedOutings[0] ?? null;
   const tabItems = isOrganizer
     ? [
-        { id: 'overview', label: 'Vue d ensemble' },
-        { id: 'places', label: 'Lieux' },
-        { id: 'events', label: 'Evenements' },
+        { id: 'overview', label: t('profileTabOverview') },
+        { id: 'places', label: t('profileTabPlaces') },
+        { id: 'events', label: t('profileTabEvents') },
       ]
     : [
-        { id: 'outings', label: 'Sorties' },
-        { id: 'saved', label: 'Envies' },
-        { id: 'posts', label: 'Posts' },
+        { id: 'outings', label: t('profileTabOutings') },
+        { id: 'saved', label: t('profileTabSaved') },
+        { id: 'posts', label: t('profileTabPosts') },
       ];
 
   const handleDeletePost = async (postId: string) => {
     try {
       await deletePost(postId);
-      Alert.alert('Succes', 'Post supprime.');
+      Alert.alert(t('profileDeletePostSuccessTitle'), t('profileDeletePostSuccessMessage'));
     } catch {
-      Alert.alert('Erreur', 'Impossible de supprimer le post.');
+      Alert.alert(t('commonErrorTitle'), t('profileDeletePostErrorMessage'));
     }
   };
 
@@ -235,20 +237,20 @@ export default function ProfileScreen() {
                   className="rounded-[28px] bg-[#4c669f]/10 p-5"
                 >
                   <Text className="text-xs uppercase tracking-widest text-[#4c669f]">
-                    A ne pas oublier
+                    {t('profileFeaturedOutingLabel')}
                   </Text>
                   <Text className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
                     {featuredOuting.title}
                   </Text>
                   <View className="mt-4 rounded-3xl bg-white p-4 dark:bg-gray-900">
                     <Text className="text-sm text-gray-700 dark:text-gray-200">
-                      {formatEventDate(featuredOuting.scheduledDate)}
+                      {formatEventDate(featuredOuting.scheduledDate, locale)}
                     </Text>
                     <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       {featuredOuting.Place?.name ||
                         featuredOuting.Place?.City?.name ||
                         featuredOuting.Place?.address ||
-                        'Lieu libre'}
+                        t('profileFeaturedOutingLocationFallback')}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -257,16 +259,16 @@ export default function ProfileScreen() {
                   onPress={() => router.push('/outing')}
                   className="mt-4 items-center rounded-full bg-[#4c669f] px-5 py-3"
                 >
-                  <Text className="font-semibold text-white">Nouvelle sortie</Text>
+                  <Text className="font-semibold text-white">{t('profileCreateOutingCta')}</Text>
                 </TouchableOpacity>
                 </>
               ) : (
                 <EmptyPanel
                   icon="calendar-outline"
                   color="#4c669f"
-                  title="Aucune sortie planifiee"
-                  description="Quand un lieu ou un evenement te tente, transforme-le en sortie."
-                  actionLabel="Organiser une sortie"
+                  title={t('profileEmptyOutingsTitle')}
+                  description={t('profileEmptyOutingsDescription')}
+                  actionLabel={t('profileOrganizeOutingCta')}
                   onPress={() => router.push('/outing')}
                 />
               )}
@@ -279,10 +281,10 @@ export default function ProfileScreen() {
                 <>
                 <View className="mb-5 rounded-[28px] bg-[#2ecc71]/10 p-5">
                   <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-[#2ecc71]">
-                    Tes envies
+                    {t('profileSavedIntroLabel')}
                   </Text>
                   <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-                    Garde les meilleurs spots sous la main
+                    {t('profileSavedIntroTitle')}
                   </Text>
                 </View>
                 {savedPlaces.map((place) => (
@@ -308,7 +310,7 @@ export default function ProfileScreen() {
                         {place.name}
                       </Text>
                       <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {place.City?.name || place.address || 'Adresse a confirmer'}
+                        {place.City?.name || place.address || t('homeAddressToConfirm')}
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -319,9 +321,9 @@ export default function ProfileScreen() {
                 <EmptyPanel
                   icon="heart-outline"
                   color="#2ecc71"
-                  title="Aucune envie enregistree"
-                  description="Enregistre un lieu depuis sa fiche pour le retrouver ici."
-                  actionLabel="Explorer les lieux"
+                  title={t('profileEmptySavedTitle')}
+                  description={t('profileEmptySavedDescription')}
+                  actionLabel={t('profileExplorePlacesCta')}
                   onPress={() => router.push('/(tabs)/home')}
                 />
               )}
@@ -343,8 +345,8 @@ export default function ProfileScreen() {
               <EmptyPanel
                 icon="create-outline"
                 color="#f39c12"
-                title="Aucun post pour le moment"
-                description="Quand tu voudras publier, passe simplement par le bouton + central."
+                title={t('profileEmptyPostsTitle')}
+                description={t('profileEmptyPostsDescription')}
               />
             )
           ) : null}
@@ -353,13 +355,13 @@ export default function ProfileScreen() {
             <View className="px-5">
               <View className="rounded-3xl bg-gray-50 p-5 dark:bg-gray-900">
                 <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                  Structure
+                  {t('profileStructureLabel')}
                 </Text>
                 <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-                  {user?.OrganizerProfile?.companyName || 'Organisation'}
+                  {user?.OrganizerProfile?.companyName || t('profileOrganizationFallback')}
                 </Text>
                 <Text className="mt-2 text-base text-gray-600 dark:text-gray-300">
-                  {user?.bio || 'Ajoute une courte description pour rendre le profil plus credible.'}
+                  {user?.bio || t('profileOrganizerBioFallback')}
                 </Text>
               </View>
             </View>
@@ -389,7 +391,7 @@ export default function ProfileScreen() {
                         {place.name}
                       </Text>
                       <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {place.City?.name || place.address || 'Adresse a confirmer'}
+                        {place.City?.name || place.address || t('homeAddressToConfirm')}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -422,7 +424,7 @@ export default function ProfileScreen() {
                         {event.title}
                       </Text>
                       <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {formatEventDate(event.startTime)}
+                        {formatEventDate(event.startTime, locale)}
                       </Text>
                     </View>
                   </TouchableOpacity>

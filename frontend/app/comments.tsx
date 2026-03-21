@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import CommentItem from '../components/social/CommentItem';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '../services/api';
 
 interface CommentAuthor {
@@ -54,6 +55,7 @@ export default function CommentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ postId?: string }>();
   const postId = params.postId;
+  const { locale, t } = useI18n();
 
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<CommentListItem[]>([]);
@@ -66,15 +68,15 @@ export default function CommentsScreen() {
   const mapComment = useCallback((item: ApiComment): CommentListItem => {
     return {
       id: item.id,
-      user: item.User.displayName || item.User.username || 'Utilisateur',
+      user: item.User.displayName || item.User.username || t('commentsUserFallback'),
       avatar:
         getImageUrl(item.User.avatarUrl) || 'https://i.pravatar.cc/150',
       content: item.content,
-      time: new Date(item.createdAt).toLocaleDateString(),
+      time: new Date(item.createdAt).toLocaleDateString(locale),
       userId: item.userId,
       parentId: item.parentId,
     };
-  }, []);
+  }, [locale, t]);
 
   const fetchComments = useCallback(async () => {
     if (!postId) {
@@ -169,16 +171,16 @@ export default function CommentsScreen() {
 
         return prev.filter((current) => !idsToRemove.has(current.id));
       });
-      Alert.alert('Succes', 'Commentaire supprime');
+      Alert.alert(t('commentsDeleteSuccessTitle'), t('commentsDeleteSuccessMessage'));
     } catch {
-      Alert.alert('Erreur', 'Impossible de supprimer');
+      Alert.alert(t('commonErrorTitle'), t('commentsDeleteErrorMessage'));
     }
   };
 
   const handleReportComment = () => {
     Alert.alert(
-      'Signale',
-      'Merci, nous allons examiner ce commentaire.',
+      t('commentsReportTitle'),
+      t('commentsReportMessage'),
     );
   };
 
@@ -200,7 +202,7 @@ export default function CommentsScreen() {
             <View className="items-center">
               <View className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mb-2" />
               <Text className="font-bold text-lg text-gray-800 dark:text-white">
-                Commentaires
+                {t('commentsTitle')}
               </Text>
             </View>
             <TouchableOpacity onPress={() => router.back()} className="p-1">
@@ -225,7 +227,7 @@ export default function CommentsScreen() {
               )}
               ListEmptyComponent={
                 <Text className="text-center text-gray-400 mt-10">
-                  Soyez le premier a commenter !
+                  {t('commentsFirstComment')}
                 </Text>
               }
             />
@@ -234,7 +236,7 @@ export default function CommentsScreen() {
           {replyingTo && (
             <View className="px-4 py-2 bg-gray-50 dark:bg-gray-800 flex-row justify-between items-center border-t border-gray-200 dark:border-gray-700">
               <Text className="text-gray-500 dark:text-gray-400 text-sm">
-                Reponse a <Text className="font-bold">{replyingTo.user}</Text>
+                {t('commentsReplyToUser', { user: replyingTo.user })}
               </Text>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>
                 <Ionicons name="close-circle" size={20} color="#666" />
@@ -260,8 +262,8 @@ export default function CommentsScreen() {
                 className="flex-1 text-gray-800 dark:text-white max-h-24 pt-2 pb-2"
                 placeholder={
                   replyingTo
-                    ? `Repondre a ${replyingTo.user}...`
-                    : 'Ajouter un commentaire...'
+                    ? t('commentsReplyPlaceholder', { user: replyingTo.user })
+                    : t('commentsInputPlaceholder')
                 }
                 placeholderTextColor="#999"
                 multiline
@@ -281,7 +283,7 @@ export default function CommentsScreen() {
                       comment.trim() ? 'text-[#4c669f]' : 'text-gray-400'
                     }`}
                   >
-                    Publier
+                    {t('commentsPublish')}
                   </Text>
                 )}
               </TouchableOpacity>

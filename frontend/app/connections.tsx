@@ -5,7 +5,6 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -15,6 +14,8 @@ import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import {
   getFriendshipOverview,
   removeFriendship,
@@ -35,6 +36,7 @@ const EMPTY_FRIENDSHIPS: FriendshipOverview = {
 export default function ConnectionsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
   const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(true);
   const [friendships, setFriendships] =
@@ -66,7 +68,7 @@ export default function ConnectionsScreen() {
       await loadConnections();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', 'Impossible de modifier cette relation.');
+      Alert.alert(t('commonErrorTitle'), t('searchRelationshipUpdateError'));
     }
   };
 
@@ -81,7 +83,7 @@ export default function ConnectionsScreen() {
           />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Connexions
+          {t('connectionsTitle')}
         </Text>
       </View>
 
@@ -91,30 +93,30 @@ export default function ConnectionsScreen() {
       >
         <View className="rounded-[28px] bg-[#4c669f]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            Reseau
+            {t('connectionsNetworkLabel')}
           </Text>
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            Gere tes connexions et tes demandes envoyees.
+            {t('connectionsHeroSubtitle')}
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/search')}
             className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2"
           >
-            <Text className="font-semibold text-white">Chercher des personnes</Text>
+            <Text className="font-semibold text-white">{t('connectionsSearchPeople')}</Text>
           </TouchableOpacity>
         </View>
 
         <View className="mt-5 flex-row gap-3">
           <View className="flex-1">
             <SocialCountChip
-              label="Connexions"
+              label={t('connectionsCountConnections')}
               value={friendships.counts.connections}
               color="#4c669f"
             />
           </View>
           <View className="flex-1">
             <SocialCountChip
-              label="Envoyees"
+              label={t('connectionsCountSent')}
               value={friendships.counts.outgoingRequests}
               color="#2ecc71"
             />
@@ -123,7 +125,7 @@ export default function ConnectionsScreen() {
 
         <View className="mt-8">
           <Text className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-            Tes connexions
+            {t('connectionsSectionConnections')}
           </Text>
 
           {loading ? (
@@ -135,17 +137,17 @@ export default function ConnectionsScreen() {
               <PersonRow
                 key={item.friendshipId}
                 user={item.user}
-                subtitle={item.user.bio?.trim() || 'Connexion acceptee'}
+                subtitle={item.user.bio?.trim() || t('connectionsAcceptedSubtitle')}
                 onPress={() =>
                   router.push({
                     pathname: '/user/[id]',
                     params: { id: item.user.id },
                   })
                 }
-                primaryAction={<PersonActionButton label="Connecte" disabled />}
+                primaryAction={<PersonActionButton label={t('searchActionConnected')} disabled />}
                 secondaryAction={
                   <PersonActionButton
-                    label="Retirer"
+                    label={t('searchActionRemove')}
                     variant="neutral"
                     onPress={() => handleRemoveRelation(item.friendshipId)}
                   />
@@ -155,15 +157,15 @@ export default function ConnectionsScreen() {
           ) : (
             <SocialEmptyState
               icon="people-outline"
-              title="Aucune connexion pour le moment"
-              description="Ajoute des personnes pour commencer a organiser des sorties ensemble."
+              title={t('connectionsEmptyTitle')}
+              description={t('connectionsEmptyDescription')}
             />
           )}
         </View>
 
         <View className="mt-8">
           <Text className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-            Demandes envoyees
+            {t('connectionsSectionOutgoing')}
           </Text>
 
           {loading ? (
@@ -175,17 +177,17 @@ export default function ConnectionsScreen() {
               <PersonRow
                 key={item.friendshipId}
                 user={item.user}
-                subtitle={item.user.bio?.trim() || 'En attente de reponse'}
+                subtitle={item.user.bio?.trim() || t('connectionsPendingSubtitle')}
                 onPress={() =>
                   router.push({
                     pathname: '/user/[id]',
                     params: { id: item.user.id },
                   })
                 }
-                primaryAction={<PersonActionButton label="Envoyee" disabled />}
+                primaryAction={<PersonActionButton label={t('searchActionSent')} disabled />}
                 secondaryAction={
                   <PersonActionButton
-                    label="Annuler"
+                    label={t('genericCancel')}
                     variant="neutral"
                     onPress={() => handleRemoveRelation(item.friendshipId)}
                   />
@@ -195,8 +197,8 @@ export default function ConnectionsScreen() {
           ) : (
             <SocialEmptyState
               icon="paper-plane-outline"
-              title="Aucune demande envoyee"
-              description="Quand tu ajouteras de nouvelles personnes, elles apparaitront ici."
+              title={t('connectionsOutgoingEmptyTitle')}
+              description={t('connectionsOutgoingEmptyDescription')}
             />
           )}
         </View>

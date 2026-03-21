@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
@@ -70,14 +71,10 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-const FILTERS: { id: DiscoverFilter; label: string }[] = [
-  { id: 'all', label: 'Tout' },
-  { id: 'events', label: 'Evenements' },
-  { id: 'places', label: 'Lieux' },
-];
+const FILTERS: DiscoverFilter[] = ['all', 'events', 'places'];
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -87,6 +84,7 @@ function formatEventDate(value: string) {
 
 export default function DiscoverScreen() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const cachedDiscover = getCache<{
     events: DiscoverEvent[];
     places: DiscoverPlace[];
@@ -133,16 +131,24 @@ export default function DiscoverScreen() {
     void fetchDiscoverData();
   }, [fetchDiscoverData]);
 
+  const filterLabels: Record<DiscoverFilter, string> = {
+    all: t('discoverFilterAll'),
+    events: t('discoverFilterEvents'),
+    places: t('discoverFilterPlaces'),
+  };
+
   const discoverItems = useMemo<DiscoverItem[]>(() => {
     const topEvents = events.slice(0, 6).map((event) => ({
       id: `event-${event.id}`,
       type: 'event' as const,
       title: event.title,
-      subtitle: event.Place?.name || event.address || 'Lieu a confirmer',
-      meta: formatEventDate(event.startTime),
+      subtitle: event.Place?.name || event.address || t('homeLocationToConfirm'),
+      meta: formatEventDate(event.startTime, locale),
       image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
       badge:
-        Number(event.entryFee || 0) > 0 ? 'Selection evenement' : 'Bon plan gratuit',
+        Number(event.entryFee || 0) > 0
+          ? t('discoverEventBadge')
+          : t('discoverEventBadgeFree'),
       actionColor: '#ff4757',
       targetId: event.id,
     }));
@@ -154,19 +160,19 @@ export default function DiscoverScreen() {
         id: `place-${place.id}`,
         type: 'place' as const,
         title: place.name,
-        subtitle: place.City?.name || place.address || 'Adresse a confirmer',
+        subtitle: place.City?.name || place.address || t('homeAddressToConfirm'),
         meta:
           typeof place.avgRating === 'number' && place.avgRating > 0
-            ? `Note ${place.avgRating.toFixed(1)}`
-            : 'A decouvrir',
+            ? t('discoverPlaceMetaRated', { rating: place.avgRating.toFixed(1) })
+            : t('discoverPlaceMetaDiscover'),
         image: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER,
-        badge: 'Lieu tendance',
+        badge: t('discoverPlaceBadge'),
         actionColor: '#2ecc71',
         targetId: place.id,
       }));
 
     return [...topEvents, ...topPlaces];
-  }, [events, places]);
+  }, [events, locale, places, t]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -199,21 +205,20 @@ export default function DiscoverScreen() {
 
           <View className="flex-1">
             <Text className="text-xs uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-              Selection
+              {t('discoverLabel')}
             </Text>
             <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              Decouvrir
+              {t('discoverTitle')}
             </Text>
             <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Une page mixte pour prolonger les suggestions du home sans faire
-              semblant d&apos;avoir un algo complexe.
+              {t('discoverSubtitle')}
             </Text>
           </View>
         </View>
       </View>
 
       <SearchBar
-        placeholder="Rechercher un lieu ou un evenement..."
+        placeholder={t('discoverSearchPlaceholder')}
         value={query}
         onChangeText={setQuery}
       />
@@ -221,7 +226,7 @@ export default function DiscoverScreen() {
       <FlatList
         horizontal
         data={FILTERS}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -229,11 +234,11 @@ export default function DiscoverScreen() {
           paddingBottom: 10,
         }}
         renderItem={({ item }) => {
-          const active = activeFilter === item.id;
+          const active = activeFilter === item;
 
           return (
             <TouchableOpacity
-              onPress={() => setActiveFilter(item.id)}
+              onPress={() => setActiveFilter(item)}
               className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
               style={active ? { backgroundColor: '#f39c12' } : undefined}
             >
@@ -244,7 +249,7 @@ export default function DiscoverScreen() {
                     : 'text-gray-700 dark:text-gray-200'
                 }`}
               >
-                {item.label}
+                {filterLabels[item]}
               </Text>
             </TouchableOpacity>
           );
@@ -260,7 +265,7 @@ export default function DiscoverScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              Chargement de la selection...
+              {t('discoverLoading')}
             </Text>
           }
           renderItem={() => (
@@ -288,16 +293,16 @@ export default function DiscoverScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              {filteredItems.length} suggestion(s) disponibles
+              {t('discoverSuggestionsCount', { count: filteredItems.length })}
             </Text>
           }
           ListEmptyComponent={
             <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
               <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-                Rien a afficher ici
+                {t('discoverEmptyTitle')}
               </Text>
               <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-                Essaie une recherche plus large ou reviens au mode tout.
+                {t('discoverEmptyDescription')}
               </Text>
             </View>
           }

@@ -9,13 +9,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '../services/api';
 
 interface PlaceOption {
@@ -61,6 +62,7 @@ export default function CreateOutingScreen() {
   }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [placesLoading, setPlacesLoading] = useState(true);
   const [connectionsLoading, setConnectionsLoading] = useState(true);
@@ -175,7 +177,7 @@ export default function CreateOutingScreen() {
 
   const handleCreateOuting = async () => {
     if (!title.trim()) {
-      Alert.alert('Erreur', 'Le titre de la sortie est obligatoire.');
+      Alert.alert(t('commonErrorTitle'), t('outingCreateRequiredTitle'));
       return;
     }
 
@@ -189,11 +191,11 @@ export default function CreateOutingScreen() {
         participantIds: selectedParticipantIds,
       });
 
-      Alert.alert('Succes', 'Sortie creee.');
+      Alert.alert(t('outingCreateSuccessTitle'), t('outingCreateSuccessMessage'));
       router.replace('/(tabs)/profile');
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', 'Impossible de creer la sortie.');
+      Alert.alert(t('commonErrorTitle'), t('outingCreateFailedMessage'));
     } finally {
       setLoading(false);
     }
@@ -209,31 +211,31 @@ export default function CreateOutingScreen() {
           <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          Organiser une sortie
+          {t('outingCreateTitle')}
         </Text>
       </View>
 
       <ScrollView className="flex-1 px-5 py-5" showsVerticalScrollIndicator={false}>
         <View className="rounded-3xl bg-[#4c669f]/10 p-5">
           <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-[#4c669f]">
-            Sortie
+            {t('outingCreateLabel')}
           </Text>
           {typeof params.sourceLabel === 'string' && params.sourceLabel ? (
             <Text className="mt-3 text-sm font-semibold text-[#4c669f]">
-              Depuis {params.sourceLabel}
+              {t('outingCreateFromSource', { source: params.sourceLabel })}
             </Text>
           ) : null}
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            Planifie un rendez-vous simple et rapide
+            {t('outingCreateHeroTitle')}
           </Text>
           <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
-            Choisis un lieu, fixe une date et invite tes connexions en quelques secondes.
+            {t('outingCreateHeroSubtitle')}
           </Text>
         </View>
 
         <View className="mt-6 gap-4">
           <TextInput
-            placeholder="Titre de la sortie"
+            placeholder={t('outingCreateInputTitlePlaceholder')}
             placeholderTextColor={isDark ? '#666' : '#999'}
             className="rounded-2xl bg-gray-50 p-4 text-lg font-semibold text-gray-800 dark:bg-gray-800 dark:text-white"
             value={title}
@@ -242,7 +244,7 @@ export default function CreateOutingScreen() {
 
           <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
             <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-              Date et heure
+              {t('outingCreateDateTimeLabel')}
             </Text>
 
             <View className="flex-row gap-3">
@@ -254,7 +256,7 @@ export default function CreateOutingScreen() {
                 className="flex-1 items-center rounded-xl bg-white p-3 dark:bg-gray-800"
               >
                 <Text className="text-gray-800 dark:text-white">
-                  {scheduledDate.toLocaleDateString()}
+                  {scheduledDate.toLocaleDateString(locale)}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -265,7 +267,7 @@ export default function CreateOutingScreen() {
                 className="flex-1 items-center rounded-xl bg-white p-3 dark:bg-gray-800"
               >
                 <Text className="text-gray-800 dark:text-white">
-                  {scheduledDate.toLocaleTimeString([], {
+                  {scheduledDate.toLocaleTimeString(locale, {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
@@ -276,7 +278,7 @@ export default function CreateOutingScreen() {
 
           <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
             <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-              Lieu conseille
+              {t('outingCreateSuggestedPlaceLabel')}
             </Text>
 
             {placesLoading ? (
@@ -296,13 +298,13 @@ export default function CreateOutingScreen() {
                     {place.name}
                   </Text>
                   <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {place.City?.name || place.address || 'Adresse a confirmer'}
+                    {place.City?.name || place.address || t('homeAddressToConfirm')}
                   </Text>
                 </TouchableOpacity>
               ))
             ) : (
               <Text className="text-sm text-gray-500 dark:text-gray-400">
-                Aucun lieu disponible. Tu peux tout de meme creer une sortie libre sans lieu rattache.
+                {t('outingCreateNoPlace')}
               </Text>
             )}
 
@@ -321,7 +323,7 @@ export default function CreateOutingScreen() {
                     : 'text-gray-700 dark:text-gray-200'
                 }`}
               >
-                Sortie libre
+                {t('outingCreateFreeMode')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -329,12 +331,18 @@ export default function CreateOutingScreen() {
           <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
             <View className="mb-3 flex-row items-center justify-between">
               <Text className="text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Connexions a inviter
+                {t('outingCreateInviteConnectionsLabel')}
               </Text>
               {selectedParticipantIds.length > 0 ? (
                 <View className="rounded-full bg-[#4c669f]/10 px-3 py-1">
                   <Text className="text-xs font-semibold text-[#4c669f]">
-                    {selectedParticipantIds.length} selection{selectedParticipantIds.length > 1 ? 's' : ''}
+                    {selectedParticipantIds.length > 1
+                      ? t('outingCreateSelectionMany', {
+                          count: selectedParticipantIds.length,
+                        })
+                      : t('outingCreateSelectionOne', {
+                          count: selectedParticipantIds.length,
+                        })}
                   </Text>
                 </View>
               ) : null}
@@ -396,21 +404,21 @@ export default function CreateOutingScreen() {
                   className="mt-1 self-start rounded-full bg-white px-4 py-2 dark:bg-gray-800"
                 >
                   <Text className="font-semibold text-[#4c669f]">
-                    Ajouter d&apos;autres connexions
+                    {t('outingCreateAddMoreConnections')}
                   </Text>
                 </TouchableOpacity>
               </>
             ) : (
               <View className="rounded-2xl bg-white p-4 dark:bg-gray-800">
                 <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  Tu n&apos;as pas encore de connexions. Passe par la recherche pour ajouter des personnes avant de les inviter.
+                  {t('outingCreateNoConnections')}
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push('/search')}
                   className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2"
                 >
                   <Text className="font-semibold text-white">
-                    Ouvrir la recherche
+                    {t('outingCreateOpenSearch')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -427,7 +435,7 @@ export default function CreateOutingScreen() {
             <ActivityIndicator color="white" />
           ) : (
             <Text className="text-lg font-bold text-white">
-              Creer ma sortie
+              {t('outingCreateSubmit')}
             </Text>
           )}
         </TouchableOpacity>
@@ -440,13 +448,15 @@ export default function CreateOutingScreen() {
               <View className="overflow-hidden rounded-t-3xl bg-white pb-8 dark:bg-gray-900">
                 <View className="flex-row items-center justify-between border-b border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800">
                   <TouchableOpacity onPress={() => setShowPicker(false)}>
-                    <Text className="font-medium text-gray-500">Annuler</Text>
+                    <Text className="font-medium text-gray-500">{t('genericCancel')}</Text>
                   </TouchableOpacity>
                   <Text className="text-lg font-bold text-gray-800 dark:text-white">
-                    {pickerMode === 'date' ? 'Choisir une date' : 'Choisir une heure'}
+                    {pickerMode === 'date'
+                      ? t('createEventPickerDateTitle')
+                      : t('createEventPickerTimeTitle')}
                   </Text>
                   <TouchableOpacity onPress={() => setShowPicker(false)}>
-                    <Text className="text-lg font-bold text-[#4c669f]">OK</Text>
+                    <Text className="text-lg font-bold text-[#4c669f]">{t('createEventPickerConfirm')}</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker

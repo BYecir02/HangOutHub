@@ -10,14 +10,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import OrganizerPanelNav from '@/components/organizer/OrganizerPanelNav';
+import { useI18n } from '@/hooks/use-i18n';
+import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { getImageUrl } from '@/services/api';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -27,9 +30,48 @@ function formatEventDate(value: string) {
 
 export default function OrganizerEventsScreen() {
   const router = useRouter();
-  const { organizerEvents, loading } = useUserProfile();
+  const { locale, t } = useI18n();
+  const {
+    organizerEvents,
+    loading,
+    user,
+    error,
+    refetch,
+  } = useUserProfile();
+  const isAllowed = useOrganizerGuard({
+    user,
+    loading,
+    suspend: Boolean(error),
+  });
 
   if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
+        <ActivityIndicator size="large" color="#ff4757" />
+      </View>
+    );
+  }
+
+  if (error && !user) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 px-6 dark:bg-black">
+        <Text className="text-center text-xl font-bold text-gray-900 dark:text-white">
+          {t('organizerDataLoadErrorTitle')}
+        </Text>
+        <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+          {t('organizerDataLoadErrorMessage')}
+        </Text>
+        <TouchableOpacity
+          onPress={() => void refetch()}
+          className="mt-5 rounded-2xl bg-[#ff4757] px-5 py-3"
+        >
+          <Text className="font-semibold text-white">{t('organizerDataRetry')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!user || !isAllowed) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
         <ActivityIndicator size="large" color="#ff4757" />
@@ -42,10 +84,10 @@ export default function OrganizerEventsScreen() {
       <View className="flex-row items-center justify-between">
         <View>
           <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Organisateur
+            {t('organizerEventsLabel')}
           </Text>
           <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-            Mes evenements
+            {t('organizerEventsTitle')}
           </Text>
         </View>
         <TouchableOpacity
@@ -57,8 +99,29 @@ export default function OrganizerEventsScreen() {
       </View>
 
       <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-        Gere les evenements publies et verifie leur rendu public.
+        {t('organizerEventsSubtitle')}
       </Text>
+
+      {error ? (
+        <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
+          <Text className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+            {t('organizerDataLoadErrorMessage')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void refetch()}
+            className="mt-3 self-start rounded-full bg-amber-600 px-4 py-2"
+          >
+            <Text className="text-xs font-semibold text-white">
+              {t('organizerDataRetry')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <OrganizerPanelNav
+        current="events"
+        showCreatePlace={user.role === 'PLACE_OWNER'}
+      />
 
       <View className="mt-6 pb-24">
         {organizerEvents.length > 0 ? (
@@ -88,10 +151,10 @@ export default function OrganizerEventsScreen() {
                   {event.title}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {formatEventDate(event.startTime)}
+                  {formatEventDate(event.startTime, locale)}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-400 dark:text-gray-500">
-                  {event.Place?.name || 'Lieu a confirmer'}
+                  {event.Place?.name || t('homeLocationToConfirm')}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -100,17 +163,17 @@ export default function OrganizerEventsScreen() {
         ) : (
           <View className="items-center rounded-3xl bg-white px-6 py-10 dark:bg-gray-900">
             <Text className="text-center text-lg font-semibold text-gray-900 dark:text-white">
-              Aucun evenement publie
+              {t('organizerEventsEmptyTitle')}
             </Text>
             <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-              Cree ton premier evenement pour rendre ton profil plus credible.
+              {t('organizerEventsEmptyDescription')}
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/event')}
               className="mt-5 rounded-xl bg-[#ff4757] px-5 py-3"
             >
               <Text className="font-semibold text-white">
-                Creer un evenement
+                {t('organizerEventsCreate')}
               </Text>
             </TouchableOpacity>
           </View>

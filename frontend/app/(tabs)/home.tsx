@@ -15,7 +15,7 @@ import EventCard from '@/components/ui/EventCard';
 import Header from '@/components/ui/Header';
 import PlaceCard from '@/components/ui/PlaceCard';
 import SuggestionCard from '@/components/ui/SuggestionCard';
-import { useAppLanguage } from '@/hooks/use-app-language';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { Category } from '@/types';
@@ -64,9 +64,10 @@ function formatEventDate(value: string, locale: 'fr-FR' | 'en-US') {
 function formatEventPrice(
   value: number | string | null,
   locale: 'fr-FR' | 'en-US',
+  freeLabel: string,
 ) {
   const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : 'Gratuit';
+  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
 }
 
 function SectionPlaceholder({ message }: { message: string }) {
@@ -84,8 +85,7 @@ export default function HomeScreen() {
   const placesRoute = '/places' as Href;
   const eventsRoute = '/events' as Href;
   const discoverRoute = '/discover' as Href;
-  const appLanguage = useAppLanguage();
-  const locale = appLanguage === 'en' ? 'en-US' : 'fr-FR';
+  const { locale, t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<HomeEvent[]>([]);
   const [places, setPlaces] = useState<HomePlace[]>([]);
@@ -210,17 +210,17 @@ export default function HomeScreen() {
       featuredEvents.slice(0, 3).map((event, index) => ({
         id: event.id,
         title: event.title,
-        category: event.Place?.name || event.address || 'Lieu a confirmer',
+        category: event.Place?.name || event.address || t('homeLocationToConfirm'),
         date: formatEventDate(event.startTime, locale),
         image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
         reason:
           index === 0
-            ? 'Tendance du moment'
+            ? t('homeReasonTrending')
             : index === 1
-              ? 'A ne pas manquer'
-              : 'Selection locale',
+              ? t('homeReasonMustSee')
+              : t('homeReasonLocalSelection'),
       })),
-    [featuredEvents, locale],
+    [featuredEvents, locale, t],
   );
 
   const handleCategoryPress = (categoryId: number) => {
@@ -263,7 +263,7 @@ export default function HomeScreen() {
 
       <View className="mt-6">
         <Text className="ml-5 mb-4 text-lg font-bold text-gray-800 dark:text-white">
-          Categories
+          {t('homeCategories')}
         </Text>
         {loading ? (
           <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
@@ -282,17 +282,17 @@ export default function HomeScreen() {
             contentContainerStyle={{ paddingHorizontal: 20 }}
           />
         ) : (
-          <SectionPlaceholder message="Aucune categorie disponible pour le moment." />
+          <SectionPlaceholder message={t('homeNoCategories')} />
         )}
       </View>
 
       <View className="mt-8">
         <View className="mb-4 flex-row items-end justify-between px-5">
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
-            A la une
+            {t('homeFeatured')}
           </Text>
           <TouchableOpacity onPress={() => router.push(eventsRoute)}>
-            <Text className="text-xs font-medium text-[#4c669f]">Voir tout</Text>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -309,9 +309,9 @@ export default function HomeScreen() {
               <EventCard
                 title={item.title}
                 date={formatEventDate(item.startTime, locale)}
-                location={item.Place?.name || item.address || 'Lieu a confirmer'}
+                location={item.Place?.name || item.address || t('homeLocationToConfirm')}
                 imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                price={formatEventPrice(item.entryFee, locale)}
+                price={formatEventPrice(item.entryFee, locale, t('homePriceFree'))}
                 onPress={() =>
                   router.push({
                     pathname: '/event/[id]',
@@ -322,17 +322,17 @@ export default function HomeScreen() {
             )}
           />
         ) : (
-          <SectionPlaceholder message="Aucun evenement publie pour le moment." />
+          <SectionPlaceholder message={t('homeNoEvents')} />
         )}
       </View>
 
       <View className="mt-8">
         <View className="mb-4 flex-row items-end justify-between px-5">
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
-            Lieux populaires
+            {t('homePopularPlaces')}
           </Text>
           <TouchableOpacity onPress={() => router.push(placesRoute)}>
-            <Text className="text-xs font-medium text-[#4c669f]">Voir tout</Text>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -349,7 +349,7 @@ export default function HomeScreen() {
             renderItem={({ item }) => (
               <PlaceCard
                 name={item.name}
-                location={item.City?.name || item.address || 'Adresse a confirmer'}
+                location={item.City?.name || item.address || t('homeAddressToConfirm')}
                 imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
                 rating={item.avgRating ?? undefined}
                 onPress={() =>
@@ -362,17 +362,17 @@ export default function HomeScreen() {
             )}
           />
         ) : (
-          <SectionPlaceholder message="Aucun lieu publie pour le moment." />
+          <SectionPlaceholder message={t('homeNoPlaces')} />
         )}
       </View>
 
       <View className="mt-8 px-5 pb-24">
         <View className="mb-4 flex-row items-end justify-between">
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
-            Recommande pour toi
+            {t('homeRecommended')}
           </Text>
           <TouchableOpacity onPress={() => router.push(discoverRoute)}>
-            <Text className="text-xs font-medium text-[#4c669f]">Voir tout</Text>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -396,7 +396,7 @@ export default function HomeScreen() {
             />
           ))
         ) : (
-          <SectionPlaceholder message="Les suggestions apparaitront ici des que des evenements seront publies." />
+          <SectionPlaceholder message={t('homeNoSuggestions')} />
         )}
       </View>
     </ScrollView>

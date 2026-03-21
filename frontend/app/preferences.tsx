@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import api from '@/services/api';
 
 interface PreferenceTag {
@@ -31,6 +32,7 @@ interface PreferencesResponse {
 
 export default function PreferencesScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const [categories, setCategories] = useState<PreferenceCategory[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,8 +71,8 @@ export default function PreferencesScreen() {
   const handleSave = async () => {
     if (selectedTags.length < 3) {
       Alert.alert(
-        'Hop hop !',
-        "Selectionne au moins 3 tags pour qu'on puisse te proposer du bon contenu.",
+        t('preferencesMinTagTitle'),
+        t('preferencesMinTagMessage'),
       );
       return;
     }
@@ -83,12 +85,12 @@ export default function PreferencesScreen() {
       });
 
       setSelectedTags(response.data.selectedTagIds || selectedTags);
-      Alert.alert("C'est note !", 'Ton flux sera ajuste selon tes gouts.', [
-        { text: 'Super', onPress: () => router.back() },
+      Alert.alert(t('preferencesSavedTitle'), t('preferencesSavedMessage'), [
+        { text: t('preferencesSavedConfirm'), onPress: () => router.back() },
       ]);
     } catch (error) {
       console.error('Erreur sauvegarde preferences:', error);
-      Alert.alert('Erreur', "Impossible d'enregistrer tes preferences.");
+      Alert.alert(t('commonErrorTitle'), t('preferencesSaveError'));
     } finally {
       setSaving(false);
     }
@@ -107,9 +109,9 @@ export default function PreferencesScreen() {
       <View className="bg-white dark:bg-black shadow-sm z-10">
         <View className="flex-row justify-between items-center px-5 pt-16 pb-4 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-black z-10">
           <TouchableOpacity onPress={() => router.back()}>
-            <Text className="text-gray-500 text-lg">Annuler</Text>
+            <Text className="text-gray-500 text-lg">{t('preferencesCancel')}</Text>
           </TouchableOpacity>
-          <Text className="text-lg font-bold text-gray-800 dark:text-white">Tes gouts</Text>
+          <Text className="text-lg font-bold text-gray-800 dark:text-white">{t('preferencesTitle')}</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving}>
             {saving ? (
               <ActivityIndicator size="small" color="#4c669f" />
@@ -119,7 +121,7 @@ export default function PreferencesScreen() {
                   selectedTags.length >= 3 ? 'text-[#4c669f]' : 'text-gray-300'
                 }`}
               >
-                Enregistrer
+                {t('preferencesSave')}
               </Text>
             )}
           </TouchableOpacity>
@@ -130,7 +132,7 @@ export default function PreferencesScreen() {
         {categories.length === 0 ? (
           <View className="rounded-2xl bg-white p-5 dark:bg-gray-900">
             <Text className="text-base text-gray-500 dark:text-gray-400">
-              Aucune categorie disponible pour le moment.
+              {t('preferencesNoCategory')}
             </Text>
           </View>
         ) : null}

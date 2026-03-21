@@ -16,18 +16,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AuthTextField from '@/components/auth/AuthTextField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, storage } from '@/services/api';
-
-interface StoredUser {
-  role?: string;
-  hasPlace?: boolean;
-  organizerStatus?: string;
-}
+import {
+  canAccessOrganizerPanel,
+  getOrganizerAccessDenialReason,
+  getOrganizerEntryPath,
+  isOrganizerUser,
+} from '@/services/organizer-access';
+import {
+  clearStoredUserSession,
+  resolveStoredUserSession,
+  setStoredUserSession,
+  type StoredUserSession,
+} from '@/services/user-session';
 
 const LOGIN_HIGHLIGHTS = [
-  { icon: 'musical-notes-outline', label: 'Events live' },
-  { icon: 'wine-outline', label: 'Rooftops' },
-  { icon: 'location-outline', label: 'Cotonou spots' },
+  { icon: 'musical-notes-outline', labelKey: 'loginHighlightEventsLive' },
+  { icon: 'wine-outline', labelKey: 'loginHighlightRooftops' },
+  { icon: 'location-outline', labelKey: 'loginHighlightCotonouSpots' },
 ] as const;
 
 export default function LoginScreen() {
@@ -35,30 +42,57 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const organizerCreatePlaceRoute = '/organizer/create-place' as Href;
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t } = useI18n();
+
+  const clearSession = async () => {
+    await storage.removeItem('userToken');
+    await storage.removeItem('refreshToken');
+    await clearStoredUserSession();
+  };
+
+  const showOrganizerDeniedAlert = (user: StoredUserSession) => {
+    const reason = getOrganizerAccessDenialReason(user);
+
+    if (reason === 'PENDING') {
+      Alert.alert(t('loginPendingValidationTitle'), t('loginPendingValidationMessage'));
+      return;
+    }
+
+    if (reason === 'REJECTED') {
+      Alert.alert(t('loginOrganizerRejectedTitle'), t('loginOrganizerRejectedMessage'));
+      return;
+    }
+
+    if (reason === 'SUSPENDED') {
+      Alert.alert(t('loginOrganizerSuspendedTitle'), t('loginOrganizerSuspendedMessage'));
+    }
+  };
 
   useEffect(() => {
     const checkLogin = async () => {
       try {
         const token = await storage.getItem('userToken');
-        const userInfoStr = await storage.getItem('userInfo');
 
-        if (!token || !userInfoStr) {
+        if (!token) {
           return;
         }
 
-        const user: StoredUser = JSON.parse(userInfoStr);
-        const isPro =
-          user.role === 'ORGANIZER' || user.role === 'PLACE_OWNER';
+        const user = await resolveStoredUserSession();
 
-        if (isPro) {
-          if (user.role === 'PLACE_OWNER' && !user.hasPlace) {
-            router.replace(organizerCreatePlaceRoute);
-          } else {
-            router.replace('/(tabs)/profile');
+        if (!user) {
+          await clearSession();
+          return;
+        }
+
+        if (isOrganizerUser(user)) {
+          if (!canAccessOrganizerPanel(user)) {
+            await clearSession();
+            return;
           }
+
+          router.replace(getOrganizerEntryPath(user) as Href);
           return;
         }
 
@@ -69,11 +103,11 @@ export default function LoginScreen() {
     };
 
     void checkLogin();
-  }, [organizerCreatePlaceRoute, router]);
+  }, [router]);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+      Alert.alert(t('commonErrorTitle'), t('loginMissingFields'));
       return;
     }
 
@@ -83,40 +117,31 @@ export default function LoginScreen() {
       const { access_token, refresh_token, user } = response.data as {
         access_token: string;
         refresh_token: string;
-        user: StoredUser;
+        user: StoredUserSession;
       };
 
       await storage.setItem('userToken', access_token);
       await storage.setItem('refreshToken', refresh_token);
-      await storage.setItem('userInfo', JSON.stringify(user));
+      const persistedUser = await setStoredUserSession(user);
 
-      const isPro =
-        user.role === 'ORGANIZER' || user.role === 'PLACE_OWNER';
-
-      if (!isPro) {
+      if (!isOrganizerUser(persistedUser)) {
         router.replace('/(tabs)/home');
         return;
       }
 
-      if (user.organizerStatus === 'PENDING') {
-        Alert.alert('Validation en cours', 'Compte pro en attente de validation.');
-        await storage.removeItem('userToken');
-        await storage.removeItem('refreshToken');
-        await storage.removeItem('userInfo');
+      if (!canAccessOrganizerPanel(persistedUser)) {
+        showOrganizerDeniedAlert(persistedUser);
+        await clearSession();
         return;
       }
 
-      if (user.role === 'PLACE_OWNER' && !user.hasPlace) {
-        router.replace(organizerCreatePlaceRoute);
-      } else {
-        router.replace('/(tabs)/profile');
-      }
+      router.replace(getOrganizerEntryPath(persistedUser) as Href);
     } catch (error) {
       Alert.alert(
         'Oups',
         getApiErrorMessage(
           error,
-          'Connexion impossible pour le moment. Reessaie dans un instant.',
+          t('loginUnavailableFallback'),
         ),
       );
     } finally {
@@ -168,7 +193,7 @@ export default function LoginScreen() {
                   isDark ? 'text-white' : 'text-slate-950'
                 }`}
               >
-                Entre dans la scene locale.
+                {t('loginHeroTitle')}
               </Text>
 
               <Text
@@ -176,14 +201,13 @@ export default function LoginScreen() {
                   isDark ? 'text-slate-300' : 'text-slate-600'
                 }`}
               >
-                Decouvre les lieux qui comptent, les sorties du moment et les
-                experiences qui donnent envie de sortir ce soir.
+                {t('loginHeroSubtitle')}
               </Text>
 
               <View className="mt-6 flex-row flex-wrap">
                 {LOGIN_HIGHLIGHTS.map((item) => (
                   <View
-                    key={item.label}
+                    key={item.labelKey}
                     className={`mb-3 mr-3 flex-row items-center rounded-full px-4 py-2 ${
                       isDark ? 'bg-white/10' : 'bg-white/80'
                     }`}
@@ -198,7 +222,7 @@ export default function LoginScreen() {
                         isDark ? 'text-white' : 'text-slate-800'
                       }`}
                     >
-                      {item.label}
+                      {t(item.labelKey)}
                     </Text>
                   </View>
                 ))}
@@ -219,36 +243,36 @@ export default function LoginScreen() {
                       isDark ? 'text-slate-400' : 'text-slate-500'
                     }`}
                   >
-                    Connexion
+                    {t('loginCardEyebrow')}
                   </Text>
                   <Text
                     className={`mt-2 text-2xl font-bold ${
                       isDark ? 'text-white' : 'text-slate-950'
                     }`}
                   >
-                    Reprends ta place dans la vibe
+                    {t('loginCardTitle')}
                   </Text>
                 </View>
               </View>
 
               <AuthTextField
-                label="Email"
+                label={t('loginEmailLabel')}
                 isDark={isDark}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
-                placeholder="ton@email.com"
+                placeholder={t('loginEmailPlaceholder')}
               />
 
               <AuthTextField
-                label="Mot de passe"
+                label={t('loginPasswordLabel')}
                 isDark={isDark}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                placeholder="Entre ton mot de passe"
-                hint="Utilise les comptes demo si tu veux tester rapidement le MVP."
+                placeholder={t('loginPasswordPlaceholder')}
+                hint={t('loginPasswordHint')}
               />
 
               <TouchableOpacity
@@ -269,7 +293,7 @@ export default function LoginScreen() {
                     <ActivityIndicator color="#ffffff" />
                   ) : (
                     <Text className="text-base font-semibold text-white p-5">
-                      Se connecter
+                      {t('loginSubmit')}
                     </Text>
                   )}
                 </LinearGradient>
@@ -285,7 +309,7 @@ export default function LoginScreen() {
                     isDark ? 'text-slate-300' : 'text-slate-600'
                   }`}
                 >
-                  Utilisateur, organisateur ou gerant de lieu: tout commence ici.
+                  {t('loginUserTypeHint')}
                 </Text>
               </View>
             </View>
@@ -296,11 +320,11 @@ export default function LoginScreen() {
                   isDark ? 'text-slate-300' : 'text-slate-600'
                 }`}
               >
-                Pas encore de compte ?
+                {t('loginNoAccount')}
               </Text>
               <TouchableOpacity onPress={() => router.push('/register')}>
                 <Text className="ml-2 text-sm font-semibold text-[#4c669f]">
-                  Creer mon acces
+                  {t('loginCreateAccess')}
                 </Text>
               </TouchableOpacity>
             </View>

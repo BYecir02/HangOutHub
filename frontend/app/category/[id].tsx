@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import EventCard from '@/components/ui/EventCard';
 import PlaceCard from '@/components/ui/PlaceCard';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -64,8 +65,8 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -73,9 +74,13 @@ function formatEventDate(value: string) {
   });
 }
 
-function formatEventPrice(value: number | string | null) {
+function formatEventPrice(
+  value: number | string | null,
+  locale: string,
+  freeLabel: string,
+) {
   const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString('fr-FR')} FCFA` : 'Gratuit';
+  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
 }
 
 function EmptyBlock({
@@ -98,6 +103,7 @@ function EmptyBlock({
 export default function CategoryDiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
+  const { locale, t } = useI18n();
   const [data, setData] = useState<CategoryResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -156,13 +162,13 @@ export default function CategoryDiscoverScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 px-8 dark:bg-black">
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Categorie introuvable
+          {t('categoryNotFound')}
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
           className="mt-4 rounded-xl bg-[#4c669f] px-5 py-3"
         >
-          <Text className="font-semibold text-white">Retour</Text>
+          <Text className="font-semibold text-white">{t('publicProfileBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -269,14 +275,16 @@ export default function CategoryDiscoverScreen() {
             </TouchableOpacity>
 
             <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
-              Decouvrir
+              {t('categoryHeaderLabel')}
             </Text>
             <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
               {data.category.name}
             </Text>
             <Text className="mt-3 max-w-[90%] text-base text-gray-600 dark:text-gray-300">
-              {data.places.length} lieu(x) et {data.events.length} evenement(s)
-              trouves pour cette categorie.
+              {t('categorySummary', {
+                places: data.places.length,
+                events: data.events.length,
+              })}
             </Text>
 
             {data.category.Tag.length > 0 ? (
@@ -300,7 +308,7 @@ export default function CategoryDiscoverScreen() {
           <View className="px-5 pb-24 pt-6">
             <View className="mb-4 flex-row items-center justify-between">
               <Text className="text-xl font-bold text-gray-900 dark:text-white">
-                Evenements
+                {t('categoryEventsTitle')}
               </Text>
               <Text className="text-sm text-gray-500 dark:text-gray-400">
                 {data.events.length}
@@ -317,15 +325,15 @@ export default function CategoryDiscoverScreen() {
                 renderItem={({ item }) => (
                   <EventCard
                     title={item.title}
-                    date={formatEventDate(item.startTime)}
+                    date={formatEventDate(item.startTime, locale)}
                     location={
                       item.Place?.name ||
                       item.Place?.City?.name ||
                       item.address ||
-                      'Lieu a confirmer'
+                      t('homeLocationToConfirm')
                     }
                     imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                    price={formatEventPrice(item.entryFee)}
+                    price={formatEventPrice(item.entryFee, locale, t('homePriceFree'))}
                     onPress={() =>
                       router.push({
                         pathname: '/event/[id]',
@@ -337,14 +345,14 @@ export default function CategoryDiscoverScreen() {
               />
             ) : (
               <EmptyBlock
-                title="Aucun evenement"
-                message="Cette categorie n'a pas encore d'evenement associe."
+                title={t('categoryEmptyEventsTitle')}
+                message={t('categoryEmptyEventsDescription')}
               />
             )}
 
             <View className="mb-4 mt-8 flex-row items-center justify-between">
               <Text className="text-xl font-bold text-gray-900 dark:text-white">
-                Lieux
+                {t('categoryPlacesTitle')}
               </Text>
               <Text className="text-sm text-gray-500 dark:text-gray-400">
                 {data.places.length}
@@ -362,7 +370,7 @@ export default function CategoryDiscoverScreen() {
                   <PlaceCard
                     name={item.name}
                     location={
-                      item.City?.name || item.address || 'Adresse a confirmer'
+                      item.City?.name || item.address || t('homeAddressToConfirm')
                     }
                     imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
                     rating={item.avgRating ?? undefined}
@@ -377,8 +385,8 @@ export default function CategoryDiscoverScreen() {
               />
             ) : (
               <EmptyBlock
-                title="Aucun lieu"
-                message="Cette categorie n'a pas encore de lieu associe."
+                title={t('categoryEmptyPlacesTitle')}
+                message={t('categoryEmptyPlacesDescription')}
               />
             )}
           </View>

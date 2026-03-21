@@ -8,6 +8,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import OrganizerPanelNav from '@/components/organizer/OrganizerPanelNav';
+import { useI18n } from '@/hooks/use-i18n';
+import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 function DashboardCard({
@@ -31,9 +34,49 @@ function DashboardCard({
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, organizerEvents, ownedPlaces, loading } = useUserProfile();
+  const { t } = useI18n();
+  const {
+    user,
+    organizerEvents,
+    ownedPlaces,
+    loading,
+    error,
+    refetch,
+  } = useUserProfile();
+  const isAllowed = useOrganizerGuard({
+    user,
+    loading,
+    suspend: Boolean(error),
+  });
 
   if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
+        <ActivityIndicator size="large" color="#4c669f" />
+      </View>
+    );
+  }
+
+  if (error && !user) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 px-6 dark:bg-black">
+        <Text className="text-center text-xl font-bold text-gray-900 dark:text-white">
+          {t('organizerDataLoadErrorTitle')}
+        </Text>
+        <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+          {t('organizerDataLoadErrorMessage')}
+        </Text>
+        <TouchableOpacity
+          onPress={() => void refetch()}
+          className="mt-5 rounded-2xl bg-[#4c669f] px-5 py-3"
+        >
+          <Text className="font-semibold text-white">{t('organizerDataRetry')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!user || !isAllowed) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
         <ActivityIndicator size="large" color="#4c669f" />
@@ -44,23 +87,44 @@ export default function DashboardScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
       <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-        Dashboard
+        {t('organizerDashboardLabel')}
       </Text>
       <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-        {user?.OrganizerProfile?.companyName || 'Organisation'}
+        {user?.OrganizerProfile?.companyName || t('organizerDashboardOrgFallback')}
       </Text>
       <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-        Vue rapide des contenus publies pour la demo.
+        {t('organizerDashboardSubtitle')}
       </Text>
+
+      {error ? (
+        <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
+          <Text className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+            {t('organizerDataLoadErrorMessage')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void refetch()}
+            className="mt-3 self-start rounded-full bg-amber-600 px-4 py-2"
+          >
+            <Text className="text-xs font-semibold text-white">
+              {t('organizerDataRetry')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <OrganizerPanelNav
+        current="dashboard"
+        showCreatePlace={user.role === 'PLACE_OWNER'}
+      />
 
       <View className="mt-6 flex-row gap-4">
         <DashboardCard
-          title="Lieux"
+          title={t('profileStatsPlaces')}
           value={ownedPlaces.length}
           accent="text-[#2ecc71]"
         />
         <DashboardCard
-          title="Evenements"
+          title={t('profileStatsEvents')}
           value={organizerEvents.length}
           accent="text-[#ff4757]"
         />
@@ -68,16 +132,16 @@ export default function DashboardScreen() {
 
       <View className="mt-4 rounded-3xl bg-white p-5 dark:bg-gray-900">
         <Text className="text-lg font-bold text-gray-900 dark:text-white">
-          Etat du profil
+          {t('organizerDashboardProfileState')}
         </Text>
         <Text className="mt-3 text-gray-600 dark:text-gray-300">
-          Statut: {user?.OrganizerProfile?.status || 'INCONNU'}
+          {t('organizerDashboardStatusLabel')}: {user.OrganizerProfile?.status || t('organizerDashboardStatusFallbackUnknown')}
         </Text>
         <Text className="mt-2 text-gray-600 dark:text-gray-300">
-          Type: {user?.OrganizerProfile?.accountType || 'ORGANIZER'}
+          {t('organizerDashboardTypeLabel')}: {user.OrganizerProfile?.accountType || t('organizerDashboardTypeFallbackOrganizer')}
         </Text>
         <Text className="mt-2 text-gray-600 dark:text-gray-300">
-          Fonction: {user?.OrganizerProfile?.jobTitle || 'Gerant'}
+          {t('organizerDashboardRoleLabel')}: {user.OrganizerProfile?.jobTitle || t('organizerDashboardRoleFallback')}
         </Text>
       </View>
 
@@ -86,13 +150,13 @@ export default function DashboardScreen() {
           onPress={() => router.push('/event')}
           className="flex-1 items-center rounded-2xl bg-[#ff4757] py-4"
         >
-          <Text className="font-semibold text-white">Creer un evenement</Text>
+          <Text className="font-semibold text-white">{t('organizerDashboardCreateEvent')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => router.push('/organizer/events')}
           className="flex-1 items-center rounded-2xl bg-gray-900 py-4 dark:bg-gray-700"
         >
-          <Text className="font-semibold text-white">Voir mes evenements</Text>
+          <Text className="font-semibold text-white">{t('organizerDashboardViewEvents')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

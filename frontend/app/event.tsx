@@ -9,7 +9,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,8 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api from '../services/api';
 
 interface OwnedPlaceOption {
@@ -28,6 +29,7 @@ interface OwnedPlaceOption {
 export default function CreateEventScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { locale, t } = useI18n();
   const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(false);
   const [placesLoading, setPlacesLoading] = useState(true);
@@ -118,12 +120,12 @@ export default function CreateEventScreen() {
 
   const handleCreateEvent = async () => {
     if (!eventForm.title.trim()) {
-      Alert.alert('Erreur', 'Le titre est obligatoire.');
+      Alert.alert(t('commonErrorTitle'), t('createEventTitleRequired'));
       return;
     }
 
     if (eventForm.endTime < eventForm.startTime) {
-      Alert.alert('Erreur', 'La date de fin doit etre apres le debut.');
+      Alert.alert(t('commonErrorTitle'), t('createEventEndAfterStart'));
       return;
     }
 
@@ -163,14 +165,14 @@ export default function CreateEventScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert('Succes', 'Evenement publie.');
+      Alert.alert(t('createEventSuccessTitle'), t('createEventSuccessMessage'));
       router.replace({
         pathname: '/event/[id]',
         params: { id: response.data.id },
       });
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible de creer l'evenement.");
+      Alert.alert(t('commonErrorTitle'), t('createEventCreateFailed'));
     } finally {
       setLoading(false);
     }
@@ -186,7 +188,7 @@ export default function CreateEventScreen() {
           <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          Publier un evenement
+          {t('createEventTitle')}
         </Text>
       </View>
 
@@ -204,14 +206,14 @@ export default function CreateEventScreen() {
                   resizeMode="cover"
                 />
                 <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1">
-                  <Text className="text-xs font-bold text-white">Couverture</Text>
+                  <Text className="text-xs font-bold text-white">{t('createEventCover')}</Text>
                 </View>
               </>
             ) : (
               <View className="items-center">
                 <Ionicons name="images-outline" size={40} color="#999" />
                 <Text className="mt-2 font-medium text-gray-400">
-                  Ajouter des photos
+                  {t('createEventAddPhotos')}
                 </Text>
               </View>
             )}
@@ -242,7 +244,7 @@ export default function CreateEventScreen() {
 
         <View className="gap-4">
           <TextInput
-            placeholder="Titre"
+            placeholder={t('createEventFieldTitlePlaceholder')}
             placeholderTextColor={isDark ? '#666' : '#999'}
             className="rounded-xl bg-gray-50 p-4 text-lg text-gray-800 dark:bg-gray-800 dark:text-white"
             value={eventForm.title}
@@ -251,7 +253,7 @@ export default function CreateEventScreen() {
 
           <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
             <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-              Lieu rattache
+              {t('createEventAttachedPlace')}
             </Text>
             {placesLoading ? (
               <ActivityIndicator color="#4c669f" />
@@ -270,21 +272,20 @@ export default function CreateEventScreen() {
                     {place.name}
                   </Text>
                   <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {place.address || 'Adresse a confirmer'}
+                    {place.address || t('createEventAddressToConfirm')}
                   </Text>
                 </TouchableOpacity>
               ))
             ) : (
               <View>
                 <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  Aucun lieu rattache. Tu peux quand meme publier un evenement, ou
-                  creer un lieu avant.
+                  {t('createEventNoAttachedPlace')}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => router.push('/place')}
+                  onPress={() => router.push('/organizer/create-place')}
                   className="mt-3 self-start rounded-xl bg-[#2ecc71] px-4 py-3"
                 >
-                  <Text className="font-semibold text-white">Creer un lieu</Text>
+                  <Text className="font-semibold text-white">{t('createEventCreatePlace')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -293,7 +294,7 @@ export default function CreateEventScreen() {
           <View className="flex-row gap-4">
             <View className="flex-1 gap-2">
               <Text className="ml-1 font-medium text-gray-500 dark:text-gray-400">
-                Debut
+                {t('createEventStartLabel')}
               </Text>
               <View className="flex-row gap-2">
                 <TouchableOpacity
@@ -301,7 +302,7 @@ export default function CreateEventScreen() {
                   className="flex-1 items-center rounded-xl bg-gray-50 p-3 dark:bg-gray-800"
                 >
                   <Text className="text-gray-800 dark:text-white">
-                    {eventForm.startTime.toLocaleDateString()}
+                    {eventForm.startTime.toLocaleDateString(locale)}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -309,7 +310,7 @@ export default function CreateEventScreen() {
                   className="flex-1 items-center rounded-xl bg-gray-50 p-3 dark:bg-gray-800"
                 >
                   <Text className="text-gray-800 dark:text-white">
-                    {eventForm.startTime.toLocaleTimeString([], {
+                    {eventForm.startTime.toLocaleTimeString(locale, {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -322,7 +323,7 @@ export default function CreateEventScreen() {
           <View className="flex-row gap-4">
             <View className="flex-1 gap-2">
               <Text className="ml-1 font-medium text-gray-500 dark:text-gray-400">
-                Fin
+                {t('createEventEndLabel')}
               </Text>
               <View className="flex-row gap-2">
                 <TouchableOpacity
@@ -330,7 +331,7 @@ export default function CreateEventScreen() {
                   className="flex-1 items-center rounded-xl bg-gray-50 p-3 dark:bg-gray-800"
                 >
                   <Text className="text-gray-800 dark:text-white">
-                    {eventForm.endTime.toLocaleDateString()}
+                    {eventForm.endTime.toLocaleDateString(locale)}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -338,7 +339,7 @@ export default function CreateEventScreen() {
                   className="flex-1 items-center rounded-xl bg-gray-50 p-3 dark:bg-gray-800"
                 >
                   <Text className="text-gray-800 dark:text-white">
-                    {eventForm.endTime.toLocaleTimeString([], {
+                    {eventForm.endTime.toLocaleTimeString(locale, {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -349,7 +350,7 @@ export default function CreateEventScreen() {
           </View>
 
           <TextInput
-            placeholder="Prix (0 = Gratuit)"
+            placeholder={t('createEventPricePlaceholder')}
             placeholderTextColor={isDark ? '#666' : '#999'}
             keyboardType="numeric"
             className="rounded-xl bg-gray-50 p-4 text-gray-800 dark:bg-gray-800 dark:text-white"
@@ -357,7 +358,7 @@ export default function CreateEventScreen() {
             onChangeText={(price) => setEventForm((prev) => ({ ...prev, price }))}
           />
           <TextInput
-            placeholder="Description..."
+            placeholder={t('createEventDescriptionPlaceholder')}
             placeholderTextColor={isDark ? '#666' : '#999'}
             multiline
             className="h-32 rounded-xl bg-gray-50 p-4 text-gray-800 dark:bg-gray-800 dark:text-white"
@@ -378,7 +379,7 @@ export default function CreateEventScreen() {
             <ActivityIndicator color="white" />
           ) : (
             <Text className="text-lg font-bold text-white">
-              Publier maintenant
+              {t('createEventPublishNow')}
             </Text>
           )}
         </TouchableOpacity>
@@ -391,13 +392,15 @@ export default function CreateEventScreen() {
               <View className="overflow-hidden rounded-t-3xl bg-white pb-8 dark:bg-gray-900">
                 <View className="flex-row items-center justify-between border-b border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800">
                   <TouchableOpacity onPress={() => setShowPicker(false)}>
-                    <Text className="font-medium text-gray-500">Annuler</Text>
+                    <Text className="font-medium text-gray-500">{t('genericCancel')}</Text>
                   </TouchableOpacity>
                   <Text className="text-lg font-bold text-gray-800 dark:text-white">
-                    {pickerMode === 'date' ? 'Choisir une date' : 'Choisir une heure'}
+                    {pickerMode === 'date'
+                      ? t('createEventPickerDateTitle')
+                      : t('createEventPickerTimeTitle')}
                   </Text>
                   <TouchableOpacity onPress={() => setShowPicker(false)}>
-                    <Text className="text-lg font-bold text-[#4c669f]">OK</Text>
+                    <Text className="text-lg font-bold text-[#4c669f]">{t('createEventPickerConfirm')}</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker

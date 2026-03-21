@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import api from '../services/api';
+import { setStoredUserSession } from '@/services/user-session';
 
 export interface OwnedPlace {
   id: string;
@@ -106,6 +107,7 @@ export function useUserProfile() {
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [organizerEvents, setOrganizerEvents] = useState<OrganizerEvent[]>([]);
   const [connectionsCount, setConnectionsCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -119,6 +121,8 @@ export function useUserProfile() {
       setLoading(true);
     }
 
+    setError(null);
+
     try {
       const userRes = await api.get<UserProfile>('/users/me');
       const currentUser = userRes.data;
@@ -126,6 +130,7 @@ export function useUserProfile() {
         currentUser.role === 'ORGANIZER' || currentUser.role === 'PLACE_OWNER';
 
       setUser(currentUser);
+      await setStoredUserSession(currentUser);
 
       if (currentUser.id) {
         const [postsRes, outingsRes, savedPlacesRes, friendshipsRes] =
@@ -159,6 +164,7 @@ export function useUserProfile() {
       }
     } catch (error) {
       console.error('Erreur lors de la recuperation du profil:', error);
+      setError('PROFILE_LOAD_FAILED');
       if (!isRefresh) {
         setUser(null);
         setPosts([]);
@@ -214,6 +220,7 @@ export function useUserProfile() {
     connectionsCount,
     loading,
     refreshing,
+    error,
     refetch: fetchUserProfile,
     deletePost,
     updatePost,

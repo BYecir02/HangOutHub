@@ -1,6 +1,8 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { useI18n } from '@/hooks/use-i18n';
+
 interface ProfileStatsProps {
   postsCount: number;
   outingsCount?: number;
@@ -53,22 +55,24 @@ export default function ProfileStats({
   eventsCount = 0,
   onConnectionsPress,
 }: ProfileStatsProps) {
+  const { t } = useI18n();
+
   if (isOrganizer) {
     return (
       <View className="mt-5 px-5">
         <View className="flex-row rounded-2xl border border-gray-100 bg-gray-50 px-2 py-3 dark:border-gray-800 dark:bg-gray-900">
           <View className="flex-1">
             <StatItem
-              label="Connexions"
+              label={t('connectionsCountConnections')}
               value={connectionsCount}
               onPress={onConnectionsPress}
             />
           </View>
           <View className="flex-1 border-x border-gray-100 dark:border-gray-800">
-            <StatItem label="Lieux" value={placesCount} />
+            <StatItem label={t('profileStatsPlaces')} value={placesCount} />
           </View>
           <View className="flex-1">
-            <StatItem label="Evenements" value={eventsCount} />
+            <StatItem label={t('profileStatsEvents')} value={eventsCount} />
           </View>
         </View>
       </View>
@@ -80,19 +84,19 @@ export default function ProfileStats({
       <View className="flex-row rounded-2xl border border-gray-100 bg-gray-50 px-1 py-3 dark:border-gray-800 dark:bg-gray-900">
         <View className="flex-1">
           <StatItem
-            label="Connexions"
+            label={t('connectionsCountConnections')}
             value={connectionsCount}
             onPress={onConnectionsPress}
           />
         </View>
         <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
-          <StatItem label="Envies" value={savedCount} />
+          <StatItem label={t('profileStatsSaved')} value={savedCount} />
         </View>
         <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
-          <StatItem label="Sorties" value={outingsCount} />
+          <StatItem label={t('profileStatsOutings')} value={outingsCount} />
         </View>
         <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
-          <StatItem label="Posts" value={postsCount} />
+          <StatItem label={t('profileStatsPosts')} value={postsCount} />
         </View>
       </View>
     </View>

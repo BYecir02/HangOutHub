@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, useColorScheme } from 'react-native';
+import { View, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface SearchBarProps {
   placeholder?: string;

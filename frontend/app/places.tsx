@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
@@ -33,14 +34,11 @@ type PlaceFilter = 'all' | 'top' | 'budget';
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-const FILTERS: { id: PlaceFilter; label: string }[] = [
-  { id: 'all', label: 'Tout' },
-  { id: 'top', label: 'Bien notes' },
-  { id: 'budget', label: 'Petit budget' },
-];
+const FILTERS: PlaceFilter[] = ['all', 'top', 'budget'];
 
 export default function PlacesScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const cachedPlaces = getCache<PlaceItem[]>('places');
   const [places, setPlaces] = useState<PlaceItem[]>(cachedPlaces ?? []);
   const [loading, setLoading] = useState(!cachedPlaces);
@@ -74,6 +72,12 @@ export default function PlacesScreen() {
   useEffect(() => {
     void fetchPlaces();
   }, [fetchPlaces]);
+
+  const filterLabels: Record<PlaceFilter, string> = {
+    all: t('placesFilterAll'),
+    top: t('placesFilterTop'),
+    budget: t('placesFilterBudget'),
+  };
 
   const filteredPlaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -114,21 +118,20 @@ export default function PlacesScreen() {
           </TouchableOpacity>
           <View className="flex-1">
             <Text className="text-xs uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-              Lieux populaires
+              {t('placesLabel')}
             </Text>
             <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              Tous les lieux
+              {t('placesTitle')}
             </Text>
             <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Retrouve tous les lieux en un seul endroit et affine selon l&apos;ambiance
-              que tu cherches.
+              {t('placesSubtitle')}
             </Text>
           </View>
         </View>
       </View>
 
       <SearchBar
-        placeholder="Rechercher un lieu, une ville, une adresse..."
+        placeholder={t('placesSearchPlaceholder')}
         value={query}
         onChangeText={setQuery}
       />
@@ -144,12 +147,12 @@ export default function PlacesScreen() {
         style={{ flexGrow: 0 }}
       >
         {FILTERS.map((filter) => {
-          const active = activeFilter === filter.id;
+          const active = activeFilter === filter;
 
           return (
             <TouchableOpacity
-              key={filter.id}
-              onPress={() => setActiveFilter(filter.id)}
+              key={filter}
+              onPress={() => setActiveFilter(filter)}
               className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
               style={active ? { backgroundColor: '#2ecc71' } : undefined}
             >
@@ -158,7 +161,7 @@ export default function PlacesScreen() {
                   active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
                 }`}
               >
-                {filter.label}
+                {filterLabels[filter]}
               </Text>
             </TouchableOpacity>
           );
@@ -173,7 +176,7 @@ export default function PlacesScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              Chargement des lieux...
+              {t('placesLoading')}
             </Text>
           }
           renderItem={() => (
@@ -201,16 +204,16 @@ export default function PlacesScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              {filteredPlaces.length} resultat(s)
+              {t('placesResultsCount', { count: filteredPlaces.length })}
             </Text>
           }
           ListEmptyComponent={
             <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
               <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-                Aucun lieu ne correspond
+                {t('placesEmptyTitle')}
               </Text>
               <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-                Essaie une autre recherche ou reviens au filtre complet.
+                {t('placesEmptyDescription')}
               </Text>
             </View>
           }
@@ -245,7 +248,7 @@ export default function PlacesScreen() {
                 <View>
                   <View className="self-start rounded-full bg-green-100 px-3 py-1.5 dark:bg-green-900/30">
                     <Text className="text-xs font-semibold text-green-700 dark:text-green-300">
-                      {item.City?.name || 'Lieu a decouvrir'}
+                      {item.City?.name || t('placesLocationToDiscover')}
                     </Text>
                   </View>
 
@@ -259,7 +262,7 @@ export default function PlacesScreen() {
                     className="mt-1 text-sm text-gray-500 dark:text-gray-400"
                     numberOfLines={2}
                   >
-                    {item.address || item.City?.name || 'Adresse a confirmer'}
+                    {item.address || item.City?.name || t('homeAddressToConfirm')}
                   </Text>
                 </View>
 
@@ -269,7 +272,7 @@ export default function PlacesScreen() {
                     <Text className="ml-1 text-sm font-medium text-gray-700 dark:text-gray-200">
                       {typeof item.avgRating === 'number' && item.avgRating > 0
                         ? item.avgRating.toFixed(1)
-                        : 'Nouveau'}
+                        : t('placesNewBadge')}
                     </Text>
                   </View>
                   <Ionicons

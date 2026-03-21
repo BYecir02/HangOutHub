@@ -5,12 +5,13 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '../components/ui/SearchBar';
 import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
@@ -26,6 +27,7 @@ import {
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -84,7 +86,7 @@ export default function SearchScreen() {
       await refreshSearch();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible d'envoyer la demande.");
+      Alert.alert(t('commonErrorTitle'), t('searchRequestSendError'));
     }
   };
 
@@ -94,7 +96,7 @@ export default function SearchScreen() {
       await refreshSearch();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible d'accepter cette demande.");
+      Alert.alert(t('commonErrorTitle'), t('searchRequestAcceptError'));
     }
   };
 
@@ -104,7 +106,7 @@ export default function SearchScreen() {
       await refreshSearch();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Impossible de refuser cette demande.");
+      Alert.alert(t('commonErrorTitle'), t('searchRequestRejectError'));
     }
   };
 
@@ -114,7 +116,7 @@ export default function SearchScreen() {
       await refreshSearch();
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', 'Impossible de modifier cette relation.');
+      Alert.alert(t('commonErrorTitle'), t('searchRelationshipUpdateError'));
     }
   };
 
@@ -129,7 +131,7 @@ export default function SearchScreen() {
           />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Recherche
+          {t('searchTitle')}
         </Text>
       </View>
 
@@ -137,7 +139,7 @@ export default function SearchScreen() {
         value={query}
         onChangeText={setQuery}
         autoFocus
-        placeholder="Personnes, @pseudo..."
+        placeholder={t('searchPlaceholder')}
       />
 
       <ScrollView
@@ -147,8 +149,8 @@ export default function SearchScreen() {
         {query.trim().length < 2 ? (
           <SocialEmptyState
             icon="search-outline"
-            title="Trouve des personnes"
-            description="Tape au moins 2 caracteres pour chercher un pseudo, un prenom ou un nom."
+            title={t('searchHintTitle')}
+            description={t('searchHintDescription')}
           />
         ) : searchLoading ? (
           <View className="py-12">
@@ -157,7 +159,7 @@ export default function SearchScreen() {
         ) : results.length > 0 ? (
           <>
             <Text className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              Resultats
+              {t('searchResultsLabel')}
             </Text>
 
             {results.map((user) => {
@@ -170,8 +172,8 @@ export default function SearchScreen() {
                   subtitle={
                     user.bio?.trim() ||
                     (user.role === 'ORGANIZER' || user.role === 'PLACE_OWNER'
-                      ? 'Profil organisateur'
-                      : 'Pret a sortir')
+                      ? t('searchOrganizerProfile')
+                      : t('searchReadyToGoOut'))
                   }
                   onPress={() =>
                     router.push({
@@ -182,25 +184,25 @@ export default function SearchScreen() {
                   primaryAction={
                     user.relationStatus === 'NONE' ? (
                       <PersonActionButton
-                        label="Ajouter"
+                        label={t('searchActionAdd')}
                         onPress={() => handleSendRequest(user.id)}
                       />
                     ) : user.relationStatus === 'INCOMING_REQUEST' &&
                       friendshipId ? (
                       <PersonActionButton
-                        label="Accepter"
+                        label={t('searchActionAccept')}
                         onPress={() => handleAcceptRequest(friendshipId)}
                       />
                     ) : user.relationStatus === 'OUTGOING_REQUEST' ? (
-                      <PersonActionButton label="Envoyee" disabled />
+                      <PersonActionButton label={t('searchActionSent')} disabled />
                     ) : (
-                      <PersonActionButton label="Connecte" disabled />
+                      <PersonActionButton label={t('searchActionConnected')} disabled />
                     )
                   }
                   secondaryAction={
                     user.relationStatus === 'INCOMING_REQUEST' && friendshipId ? (
                       <PersonActionButton
-                        label="Refuser"
+                        label={t('searchActionReject')}
                         variant="neutral"
                         onPress={() => handleRejectRequest(friendshipId)}
                       />
@@ -208,7 +210,7 @@ export default function SearchScreen() {
                       (user.relationStatus === 'CONNECTED' ||
                         user.relationStatus === 'OUTGOING_REQUEST') ? (
                       <PersonActionButton
-                        label="Retirer"
+                        label={t('searchActionRemove')}
                         variant="neutral"
                         onPress={() => handleRemoveRelation(friendshipId)}
                       />
@@ -221,8 +223,8 @@ export default function SearchScreen() {
         ) : (
           <SocialEmptyState
             icon="person-outline"
-            title="Aucun profil trouve"
-            description="Essaie un pseudo, un prenom ou un nom plus precis."
+            title={t('searchNoResultTitle')}
+            description={t('searchNoResultDescription')}
           />
         )}
       </ScrollView>

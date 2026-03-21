@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
 
 interface EventDetail {
@@ -39,12 +40,16 @@ interface EventDetail {
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
-function formatEventDate(value?: string | null) {
+function formatEventDate(
+  value: string | null | undefined,
+  locale: string,
+  fallback: string,
+) {
   if (!value) {
-    return 'Date a confirmer';
+    return fallback;
   }
 
-  return new Date(value).toLocaleString('fr-FR', {
+  return new Date(value).toLocaleString(locale, {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -53,14 +58,19 @@ function formatEventDate(value?: string | null) {
   });
 }
 
-function formatPrice(value?: number | string | null) {
+function formatPrice(
+  value: number | string | null | undefined,
+  locale: string,
+  freeLabel: string,
+) {
   const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString('fr-FR')} FCFA` : 'Gratuit';
+  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
 }
 
 export default function EventDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
+  const { locale, t } = useI18n();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -110,13 +120,13 @@ export default function EventDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 px-8 dark:bg-black">
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Evenement introuvable
+          {t('eventDetailNotFound')}
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
           className="mt-4 rounded-xl bg-[#ff4757] px-5 py-3"
         >
-          <Text className="font-semibold text-white">Retour</Text>
+          <Text className="font-semibold text-white">{t('publicProfileBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -132,7 +142,7 @@ export default function EventDetailScreen() {
     router.push({
       pathname: '/outing',
       params: {
-        title: `Sortie - ${event.title}`,
+        title: t('eventDetailOutingTitle', { title: event.title }),
         placeId: event.Place?.id || undefined,
         scheduledDate: event.startTime,
         sourceLabel: event.title,
@@ -156,7 +166,7 @@ export default function EventDetailScreen() {
           </TouchableOpacity>
           <View className="rounded-full bg-black/45 px-3 py-2">
             <Text className="text-xs font-semibold uppercase tracking-widest text-white">
-              Evenement
+              {t('eventDetailTypeLabel')}
             </Text>
           </View>
         </View>
@@ -170,23 +180,22 @@ export default function EventDetailScreen() {
         <View className="mt-4 flex-row flex-wrap gap-2">
           <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
             <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-              {formatPrice(event.entryFee)}
+              {formatPrice(event.entryFee, locale, t('homePriceFree'))}
             </Text>
           </View>
           <View className="rounded-full bg-gray-200 px-3 py-2 dark:bg-gray-800">
             <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-              {event.Place?.City?.name || 'Ville non renseignee'}
+              {event.Place?.City?.name || t('eventDetailCityUnknown')}
             </Text>
           </View>
         </View>
 
         <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Passer a l action
+            {t('eventDetailActionTitle')}
           </Text>
           <Text className="mt-2 text-base leading-7 text-gray-700 dark:text-gray-200">
-            Si cet evenement te tente, transforme-le en sortie planifiee dans ton
-            profil.
+            {t('eventDetailActionDescription')}
           </Text>
 
           <View className="mt-4 flex-row gap-3">
@@ -195,7 +204,7 @@ export default function EventDetailScreen() {
               className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-4"
             >
               <Text className="text-sm font-semibold text-white">
-                Organiser une sortie
+                {t('profileOrganizeOutingCta')}
               </Text>
             </TouchableOpacity>
             {event.Place ? (
@@ -209,7 +218,7 @@ export default function EventDetailScreen() {
                 className="flex-1 items-center rounded-2xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800"
               >
                 <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                  Voir le lieu
+                  {t('eventDetailViewPlace')}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -221,10 +230,10 @@ export default function EventDetailScreen() {
             <Ionicons name="time-outline" size={20} color="#ff4757" />
             <View className="ml-3 flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Debut
+                {t('eventDetailStart')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {formatEventDate(event.startTime)}
+                {formatEventDate(event.startTime, locale, t('eventDetailDateToConfirm'))}
               </Text>
             </View>
           </View>
@@ -233,10 +242,10 @@ export default function EventDetailScreen() {
             <Ionicons name="hourglass-outline" size={20} color="#4c669f" />
             <View className="ml-3 flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Fin
+                {t('eventDetailEnd')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {formatEventDate(event.endTime)}
+                {formatEventDate(event.endTime, locale, t('eventDetailDateToConfirm'))}
               </Text>
             </View>
           </View>
@@ -245,7 +254,7 @@ export default function EventDetailScreen() {
             <Ionicons name="location-outline" size={20} color="#2ecc71" />
             <View className="ml-3 flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Lieu
+                {t('eventDetailPlace')}
               </Text>
               {event.Place ? (
                 <TouchableOpacity
@@ -257,15 +266,15 @@ export default function EventDetailScreen() {
                   }
                 >
                   <Text className="mt-1 text-base font-semibold text-gray-800 dark:text-gray-100">
-                    {event.Place.name || 'Lieu a confirmer'}
+                    {event.Place.name || t('homeLocationToConfirm')}
                   </Text>
                   <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {event.Place.address || event.address || 'Adresse a confirmer'}
+                    {event.Place.address || event.address || t('homeAddressToConfirm')}
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                  {event.address || 'Lieu a confirmer'}
+                  {event.address || t('homeLocationToConfirm')}
                 </Text>
               )}
             </View>
@@ -275,12 +284,12 @@ export default function EventDetailScreen() {
             <Ionicons name="person-outline" size={20} color="#f39c12" />
             <View className="ml-3 flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Organisateur
+                {t('eventDetailOrganizer')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
                 {event.User?.displayName ||
                   event.User?.username ||
-                  'Organisateur inconnu'}
+                  t('eventDetailUnknownOrganizer')}
               </Text>
             </View>
           </View>
@@ -288,16 +297,16 @@ export default function EventDetailScreen() {
 
         <View className="mt-6">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            A propos
+            {t('eventDetailAbout')}
           </Text>
           <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
-            {event.description || 'Aucune description disponible pour le moment.'}
+            {event.description || t('eventDetailDescriptionFallback')}
           </Text>
         </View>
 
         <View className="mt-6 pb-24">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            Galerie
+            {t('eventDetailGallery')}
           </Text>
           <ScrollView
             horizontal

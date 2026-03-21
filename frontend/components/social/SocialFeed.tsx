@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import PostItem from './PostItem';
 import { SkeletonBlock } from '../ui/Skeleton';
 import api from '../../services/api';
@@ -37,18 +38,23 @@ interface FeedPost {
   };
 }
 
-function EmptyState() {
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <View className="items-center px-6 py-16">
       <View className="h-16 w-16 items-center justify-center rounded-full bg-[#4c669f]/10">
         <Ionicons name="sparkles-outline" size={28} color="#4c669f" />
       </View>
       <Text className="mt-5 text-xl font-bold text-gray-900 dark:text-white">
-        Lance le feed
+        {title}
       </Text>
       <Text className="mt-3 text-center text-base leading-7 text-gray-500 dark:text-gray-400">
-        Les publications apparaitront ici. Pour poster, passe par le bouton +
-        central.
+        {description}
       </Text>
     </View>
   );
@@ -79,6 +85,7 @@ function SkeletonPost() {
 
 export default function SocialFeed() {
   const router = useRouter();
+  const { t } = useI18n();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,7 +104,7 @@ export default function SocialFeed() {
       const response = await api.get<FeedPost[]>('/posts/feed');
       setPosts(response.data);
     } catch (error) {
-      console.error('Erreur chargement feed social:', error);
+      console.error(t('socialFeedLoadError'), error);
       if (!isRefresh) {
         setPosts([]);
       }
@@ -106,7 +113,7 @@ export default function SocialFeed() {
       setRefreshing(false);
       setHasLoaded(true);
     }
-  }, [hasLoaded]);
+  }, [hasLoaded, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,9 +125,9 @@ export default function SocialFeed() {
     try {
       await api.delete(`/posts/${postId}`);
       setPosts((currentPosts) => currentPosts.filter((post) => post.id !== postId));
-      Alert.alert('Succes', 'Post supprime.');
+      Alert.alert(t('profileDeletePostSuccessTitle'), t('profileDeletePostSuccessMessage'));
     } catch {
-      Alert.alert('Erreur', 'Impossible de supprimer ce post.');
+      Alert.alert(t('commonErrorTitle'), t('socialFeedDeleteError'));
     }
   };
 
@@ -155,13 +162,13 @@ export default function SocialFeed() {
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-4">
           <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-            Social
+            {t('socialFeedHeaderLabel')}
           </Text>
           <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-            Vibes locales
+            {t('socialFeedHeaderTitle')}
           </Text>
           <Text className="mt-3 text-base leading-7 text-gray-500 dark:text-gray-400">
-            Suis les dernieres publications, reponds et fais vivre la communaute.
+            {t('socialFeedHeaderSubtitle')}
           </Text>
         </View>
 
@@ -202,7 +209,12 @@ export default function SocialFeed() {
         />
       )}
       ListHeaderComponent={renderHeader}
-      ListEmptyComponent={<EmptyState />}
+      ListEmptyComponent={
+        <EmptyState
+          title={t('socialFeedEmptyTitle')}
+          description={t('socialFeedEmptyDescription')}
+        />
+      }
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

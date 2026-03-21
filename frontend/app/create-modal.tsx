@@ -15,7 +15,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { storage } from '../services/api';
+import { useI18n } from '@/hooks/use-i18n';
+import type { TranslationKey } from '@/services/i18n';
+import {
+  resolveStoredUserSession,
+  type StoredUserSession,
+} from '@/services/user-session';
 
 type ActionItem = {
   label: string;
@@ -25,26 +30,24 @@ type ActionItem = {
   path: string;
 };
 
-interface StoredUser {
-  role?: string;
-  hasPlace?: boolean;
-}
-
-function getActionsForUser(user: StoredUser | null): ActionItem[] {
+function getActionsForUser(
+  user: StoredUserSession | null,
+  t: (key: TranslationKey) => string,
+): ActionItem[] {
   const role = user?.role || 'USER';
 
   if (role === 'ORGANIZER') {
     return [
       {
-        label: 'Evenement',
-        description: 'Publier une date et son ambiance',
+        label: t('createActionEventLabel'),
+        description: t('createActionEventPublishDesc'),
         icon: 'calendar-outline',
         color: '#ff4757',
         path: '/event',
       },
       {
-        label: 'Post',
-        description: 'Annoncer une info ou une vibe',
+        label: t('createActionPostLabel'),
+        description: t('createActionPostAnnounceDesc'),
         icon: 'create-outline',
         color: '#f39c12',
         path: '/post',
@@ -56,15 +59,15 @@ function getActionsForUser(user: StoredUser | null): ActionItem[] {
     if (!user?.hasPlace) {
       return [
         {
-          label: 'Mon lieu',
-          description: 'Creer la base de ton espace',
+          label: t('createActionMyPlaceLabel'),
+          description: t('createActionMyPlaceDesc'),
           icon: 'location-outline',
           color: '#2ecc71',
-          path: '/place',
+          path: '/organizer/create-place',
         },
         {
-          label: 'Post',
-          description: 'Partager une actualite rapide',
+          label: t('createActionPostLabel'),
+          description: t('createActionPostQuickDesc'),
           icon: 'create-outline',
           color: '#f39c12',
           path: '/post',
@@ -74,22 +77,22 @@ function getActionsForUser(user: StoredUser | null): ActionItem[] {
 
     return [
       {
-        label: 'Evenement',
-        description: 'Programmer une date dans ton lieu',
+        label: t('createActionEventLabel'),
+        description: t('createActionEventInPlaceDesc'),
         icon: 'calendar-outline',
         color: '#ff4757',
         path: '/event',
       },
       {
-        label: 'Ajouter un lieu',
-        description: 'Publier une nouvelle adresse',
+        label: t('createActionAddPlaceLabel'),
+        description: t('createActionAddPlaceDesc'),
         icon: 'location-outline',
         color: '#2ecc71',
-        path: '/place',
+        path: '/organizer/create-place',
       },
       {
-        label: 'Post',
-        description: 'Faire vivre ton activite',
+        label: t('createActionPostLabel'),
+        description: t('createActionPostActivityDesc'),
         icon: 'create-outline',
         color: '#f39c12',
         path: '/post',
@@ -99,15 +102,15 @@ function getActionsForUser(user: StoredUser | null): ActionItem[] {
 
   return [
     {
-      label: 'Sortie',
-      description: 'Planifier un rendez-vous entre amis',
+      label: t('createActionOutingLabel'),
+      description: t('createActionOutingDesc'),
       icon: 'people-outline',
       color: '#4c669f',
       path: '/outing',
     },
     {
-      label: 'Post',
-      description: 'Publier une photo ou une idee',
+      label: t('createActionPostLabel'),
+      description: t('createActionPostIdeaDesc'),
       icon: 'create-outline',
       color: '#f39c12',
       path: '/post',
@@ -117,21 +120,27 @@ function getActionsForUser(user: StoredUser | null): ActionItem[] {
 
 export default function CreateModalScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const translateY = useSharedValue(0);
-  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<StoredUserSession | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
 
       const hydrateUser = async () => {
-        const raw = await storage.getItem('userInfo');
-        if (!raw || !isMounted) {
+        const resolvedUser = await resolveStoredUserSession();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!resolvedUser) {
           setCurrentUser(null);
           return;
         }
 
-        setCurrentUser(JSON.parse(raw) as StoredUser);
+        setCurrentUser(resolvedUser);
       };
 
       void hydrateUser();
@@ -142,7 +151,7 @@ export default function CreateModalScreen() {
     }, []),
   );
 
-  const actions = getActionsForUser(currentUser);
+  const actions = getActionsForUser(currentUser, t);
 
   const handleClose = () => router.back();
 
@@ -198,10 +207,10 @@ export default function CreateModalScreen() {
           </View>
 
           <Text className="text-center text-xl font-bold text-gray-800 dark:text-white">
-            Que veux-tu creer ?
+            {t('createModalTitle')}
           </Text>
           <Text className="mt-2 text-center text-sm leading-6 text-gray-500 dark:text-gray-400">
-            Les raccourcis changent selon ton profil pour garder un parcours propre.
+            {t('createModalSubtitle')}
           </Text>
 
           <View className="mt-6">
@@ -232,7 +241,7 @@ export default function CreateModalScreen() {
 
           <TouchableOpacity onPress={handleClose} className="mt-4 items-center">
             <Text className="font-medium text-gray-400 dark:text-gray-500">
-              Annuler
+              {t('createModalCancel')}
             </Text>
           </TouchableOpacity>
         </Animated.View>

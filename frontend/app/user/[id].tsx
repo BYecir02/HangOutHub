@@ -5,12 +5,13 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '../../services/api';
 import PostItem from '../../components/social/PostItem';
 
@@ -67,6 +68,7 @@ export default function PublicProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   useColorScheme();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [posts, setPosts] = useState<UserPost[]>([]);
@@ -117,13 +119,13 @@ export default function PublicProfileScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
         <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-          Profil introuvable
+          {t('publicProfileNotFound')}
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
           className="mt-4 rounded-full bg-[#4c669f] px-5 py-3"
         >
-          <Text className="font-semibold text-white">Retour</Text>
+          <Text className="font-semibold text-white">{t('publicProfileBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -157,7 +159,7 @@ export default function PublicProfileScreen() {
           />
           <View className="items-end">
             <Text className="text-xs uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              Profil public
+              {t('publicProfileLabel')}
             </Text>
             {isOrganizer && profile.OrganizerProfile?.jobTitle ? (
               <Text className="mt-1 text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -174,7 +176,7 @@ export default function PublicProfileScreen() {
           @{profile.username}
         </Text>
         <Text className="mt-3 text-base text-gray-600 dark:text-gray-300">
-          {profile.bio || 'Aucune biographie pour le moment.'}
+          {profile.bio || t('profileNoBioYet')}
         </Text>
 
         <View className="mt-5 flex-row rounded-2xl border border-gray-100 bg-gray-50 px-1 py-3 dark:border-gray-800 dark:bg-gray-900">
@@ -183,7 +185,7 @@ export default function PublicProfileScreen() {
               {profile._count?.Post || posts.length}
             </Text>
             <Text className="mt-1 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              Posts
+              {t('profileStatsPosts')}
             </Text>
           </View>
           {isOrganizer ? (
@@ -192,7 +194,7 @@ export default function PublicProfileScreen() {
                 {profile.OwnedPlaces?.length || 0}
               </Text>
               <Text className="mt-1 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                Lieux
+                {t('profileStatsPlaces')}
               </Text>
             </View>
           ) : null}
@@ -202,7 +204,7 @@ export default function PublicProfileScreen() {
       {isOrganizer && profile.OwnedPlaces && profile.OwnedPlaces.length > 0 ? (
         <View className="mt-8 px-5">
           <Text className="mb-4 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Lieux associes
+            {t('publicProfilePlacesLabel')}
           </Text>
           {profile.OwnedPlaces.map((place) => (
             <TouchableOpacity
@@ -229,7 +231,7 @@ export default function PublicProfileScreen() {
                   {place.name}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {place.City?.name || 'Lieu'}
+                  {place.City?.name || t('publicProfilePlaceFallback')}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
@@ -250,10 +252,10 @@ export default function PublicProfileScreen() {
         ) : (
           <View className="mx-5 items-center rounded-[28px] bg-gray-50 px-6 py-10 dark:bg-gray-900">
             <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-              Aucun post public
+              {t('publicProfileNoPostsTitle')}
             </Text>
             <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-              Les publications publiques apparaitront ici.
+              {t('publicProfileNoPostsDescription')}
             </Text>
           </View>
         )}

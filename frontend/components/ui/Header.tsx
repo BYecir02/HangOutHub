@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, useColorScheme } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface HeaderProps {
   location?: string;

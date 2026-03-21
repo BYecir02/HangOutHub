@@ -18,6 +18,7 @@ import AuthStepIndicator from '@/components/auth/AuthStepIndicator';
 import AuthTextField from '@/components/auth/AuthTextField';
 import RoleOptionCard from '@/components/auth/RoleOptionCard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api from '@/services/api';
 
 type AccountType = 'USER' | 'PLACE' | 'NOMAD';
@@ -25,60 +26,69 @@ type AccountType = 'USER' | 'PLACE' | 'NOMAD';
 const ACCOUNT_OPTIONS: Record<
   AccountType,
   {
-    title: string;
-    description: string;
+    titleKey:
+      | 'registerRoleUserTitle'
+      | 'registerRolePlaceTitle'
+      | 'registerRoleNomadTitle';
+    descriptionKey:
+      | 'registerRoleUserDescription'
+      | 'registerRolePlaceDescription'
+      | 'registerRoleNomadDescription';
     icon: keyof typeof Ionicons.glyphMap;
     accentColor: string;
-    roleLabel: string;
+    roleLabelKey:
+      | 'registerRoleUserLabel'
+      | 'registerRolePlaceLabel'
+      | 'registerRoleNomadLabel';
   }
 > = {
   USER: {
-    title: 'Fetard',
-    description: 'Je veux explorer les lieux, suivre les events et publier mes sorties.',
+    titleKey: 'registerRoleUserTitle',
+    descriptionKey: 'registerRoleUserDescription',
     icon: 'sparkles-outline',
     accentColor: '#f39c12',
-    roleLabel: 'Public',
+    roleLabelKey: 'registerRoleUserLabel',
   },
   PLACE: {
-    title: 'Etablissement',
-    description: 'Je gere un lieu et je veux publier une adresse qui donne envie.',
+    titleKey: 'registerRolePlaceTitle',
+    descriptionKey: 'registerRolePlaceDescription',
     icon: 'business-outline',
     accentColor: '#2ecc71',
-    roleLabel: 'Lieu',
+    roleLabelKey: 'registerRolePlaceLabel',
   },
   NOMAD: {
-    title: 'Promoteur',
-    description: 'J organise des evenements et je veux activer ma communaute.',
+    titleKey: 'registerRoleNomadTitle',
+    descriptionKey: 'registerRoleNomadDescription',
     icon: 'radio-outline',
     accentColor: '#ff4757',
-    roleLabel: 'Event',
+    roleLabelKey: 'registerRoleNomadLabel',
   },
 };
 
-function getStepTitle(step: number) {
+function getStepTitleKey(step: number) {
   if (step === 1) {
-    return 'Choisis ta place';
+    return 'registerStepChoosePlace';
   }
 
   if (step === 2) {
-    return 'Pose tes bases';
+    return 'registerStepSetupBasics';
   }
 
-  return 'Cadre pro';
+  return 'registerStepProFrame';
 }
 
-function getStepDescription(step: number, accountType: AccountType) {
+function getStepDescriptionKey(step: number, accountType: AccountType) {
   if (step === 1) {
-    return 'On adapte le parcours selon ton role dans l application.';
+    return 'registerStepDescriptionChoose';
   }
 
   if (step === 2) {
     return accountType === 'USER'
-      ? 'Quelques infos et tu peux commencer a decouvrir la ville.'
-      : 'On cree ton compte avant de passer a la partie professionnelle.';
+      ? 'registerStepDescriptionUser'
+      : 'registerStepDescriptionPro';
   }
 
-  return 'Les infos pro servent a rendre ton espace plus credible et plus propre.';
+  return 'registerStepDescriptionProDetails';
 }
 
 export default function RegisterScreen() {
@@ -96,6 +106,7 @@ export default function RegisterScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t } = useI18n();
 
   const accentColor = ACCOUNT_OPTIONS[accountType].accentColor;
   const totalSteps = accountType === 'USER' ? 2 : 3;
@@ -106,11 +117,13 @@ export default function RegisterScreen() {
     }
 
     if (step === 2 && accountType !== 'USER') {
-      return 'Continuer';
+      return t('registerCtaContinue');
     }
 
-    return accountType === 'USER' ? 'Creer mon compte' : 'Envoyer ma demande';
-  }, [accountType, loading, step]);
+    return accountType === 'USER'
+      ? t('registerCtaCreateAccount')
+      : t('registerCtaSendRequest');
+  }, [accountType, loading, step, t]);
 
   const submitRegistration = async () => {
     setLoading(true);
@@ -130,9 +143,9 @@ export default function RegisterScreen() {
         });
 
         Alert.alert(
-          'Demande envoyee',
-          'Compte pro cree. Il sera visible apres validation de l equipe.',
-          [{ text: 'Retour au login', onPress: () => router.replace('/') }],
+          t('registerRequestSentTitle'),
+          t('registerRequestSentMessage'),
+          [{ text: t('registerBackToLogin'), onPress: () => router.replace('/') }],
         );
       } else {
         await api.post('/auth/register', {
@@ -143,14 +156,14 @@ export default function RegisterScreen() {
         });
 
         Alert.alert(
-          'Compte cree',
-          'Ton compte est pret. Tu peux maintenant te connecter.',
-          [{ text: 'Se connecter', onPress: () => router.replace('/') }],
+          t('registerAccountCreatedTitle'),
+          t('registerAccountCreatedMessage'),
+          [{ text: t('registerLoginCta'), onPress: () => router.replace('/') }],
         );
       }
     } catch (error: any) {
       const message =
-        error.response?.data?.message || "Erreur lors de l'inscription";
+        error.response?.data?.message || t('registerApiErrorFallback');
       Alert.alert('Oups', Array.isArray(message) ? message[0] : message);
     } finally {
       setLoading(false);
@@ -160,12 +173,12 @@ export default function RegisterScreen() {
   const handleNext = () => {
     if (step === 2) {
       if (!username || !email || !password || !phoneNumber) {
-        Alert.alert('Erreur', 'Les informations de connexion sont obligatoires.');
+        Alert.alert(t('commonErrorTitle'), t('registerCredentialsRequired'));
         return;
       }
 
       if (password.length < 6) {
-        Alert.alert('Erreur', 'Le mot de passe doit faire au moins 6 caracteres.');
+        Alert.alert(t('commonErrorTitle'), t('registerPasswordTooShort'));
         return;
       }
 
@@ -180,7 +193,7 @@ export default function RegisterScreen() {
 
     if (step === 3) {
       if (!companyName || !ifuNumber || !payoutInfo || !jobTitle) {
-        Alert.alert('Erreur', 'Toutes les informations professionnelles sont requises.');
+        Alert.alert(t('commonErrorTitle'), t('registerProInfoRequired'));
         return;
       }
 
@@ -250,7 +263,7 @@ export default function RegisterScreen() {
                   style={{ backgroundColor: `${accentColor}22` }}
                 >
                   <Text style={{ color: accentColor }} className="text-xs font-semibold uppercase tracking-[0.22em]">
-                    {ACCOUNT_OPTIONS[accountType].roleLabel}
+                    {t(ACCOUNT_OPTIONS[accountType].roleLabelKey)}
                   </Text>
                 </View>
               ) : (
@@ -264,14 +277,14 @@ export default function RegisterScreen() {
                   isDark ? 'text-white' : 'text-slate-950'
                 }`}
               >
-                {getStepTitle(step)}
+                {t(getStepTitleKey(step))}
               </Text>
               <Text
                 className={`mt-4 max-w-[92%] text-base leading-7 ${
                   isDark ? 'text-slate-300' : 'text-slate-600'
                 }`}
               >
-                {getStepDescription(step, accountType)}
+                {t(getStepDescriptionKey(step, accountType))}
               </Text>
             </View>
 
@@ -291,8 +304,8 @@ export default function RegisterScreen() {
               {step === 1 ? (
                 <View>
                   <RoleOptionCard
-                    title={ACCOUNT_OPTIONS.USER.title}
-                    description={ACCOUNT_OPTIONS.USER.description}
+                    title={t(ACCOUNT_OPTIONS.USER.titleKey)}
+                    description={t(ACCOUNT_OPTIONS.USER.descriptionKey)}
                     icon={ACCOUNT_OPTIONS.USER.icon}
                     accentColor={ACCOUNT_OPTIONS.USER.accentColor}
                     isDark={isDark}
@@ -300,8 +313,8 @@ export default function RegisterScreen() {
                     onPress={() => selectAccountType('USER')}
                   />
                   <RoleOptionCard
-                    title={ACCOUNT_OPTIONS.PLACE.title}
-                    description={ACCOUNT_OPTIONS.PLACE.description}
+                    title={t(ACCOUNT_OPTIONS.PLACE.titleKey)}
+                    description={t(ACCOUNT_OPTIONS.PLACE.descriptionKey)}
                     icon={ACCOUNT_OPTIONS.PLACE.icon}
                     accentColor={ACCOUNT_OPTIONS.PLACE.accentColor}
                     isDark={isDark}
@@ -309,8 +322,8 @@ export default function RegisterScreen() {
                     onPress={() => selectAccountType('PLACE')}
                   />
                   <RoleOptionCard
-                    title={ACCOUNT_OPTIONS.NOMAD.title}
-                    description={ACCOUNT_OPTIONS.NOMAD.description}
+                    title={t(ACCOUNT_OPTIONS.NOMAD.titleKey)}
+                    description={t(ACCOUNT_OPTIONS.NOMAD.descriptionKey)}
                     icon={ACCOUNT_OPTIONS.NOMAD.icon}
                     accentColor={ACCOUNT_OPTIONS.NOMAD.accentColor}
                     isDark={isDark}
@@ -323,37 +336,37 @@ export default function RegisterScreen() {
               {step === 2 ? (
                 <View>
                   <AuthTextField
-                    label="Nom d'utilisateur"
+                    label={t('registerUsernameLabel')}
                     isDark={isDark}
                     value={username}
                     onChangeText={setUsername}
                     autoCapitalize="none"
-                    placeholder="amina, novaevents..."
+                    placeholder={t('registerUsernamePlaceholder')}
                   />
                   <AuthTextField
-                    label="Email"
+                    label={t('registerEmailLabel')}
                     isDark={isDark}
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
                     keyboardType="email-address"
-                    placeholder="contact@hangouthub.dev"
+                    placeholder={t('registerEmailPlaceholder')}
                   />
                   <AuthTextField
-                    label="Telephone"
+                    label={t('registerPhoneLabel')}
                     isDark={isDark}
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
                     keyboardType="phone-pad"
-                    placeholder="+229 97 00 00 00"
+                    placeholder={t('registerPhonePlaceholder')}
                   />
                   <AuthTextField
-                    label="Mot de passe"
+                    label={t('registerPasswordLabel')}
                     isDark={isDark}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
-                    placeholder="6 caracteres minimum"
+                    placeholder={t('registerPasswordPlaceholder')}
                   />
                 </View>
               ) : null}
@@ -361,33 +374,33 @@ export default function RegisterScreen() {
               {step === 3 ? (
                 <View>
                   <AuthTextField
-                    label="Nom de l'activite"
+                    label={t('registerCompanyLabel')}
                     isDark={isDark}
                     value={companyName}
                     onChangeText={setCompanyName}
-                    placeholder="Nova Events, Code District..."
+                    placeholder={t('registerCompanyPlaceholder')}
                   />
                   <AuthTextField
-                    label="Numero IFU"
+                    label={t('registerIfuLabel')}
                     isDark={isDark}
                     value={ifuNumber}
                     onChangeText={setIfuNumber}
-                    placeholder="IFU-2026-..."
+                    placeholder={t('registerIfuPlaceholder')}
                   />
                   <AuthTextField
-                    label="Role"
+                    label={t('registerJobTitleLabel')}
                     isDark={isDark}
                     value={jobTitle}
                     onChangeText={setJobTitle}
-                    placeholder="Gerant, fondatrice, directeur artistique..."
+                    placeholder={t('registerJobTitlePlaceholder')}
                   />
                   <AuthTextField
-                    label="Reversement"
+                    label={t('registerPayoutLabel')}
                     isDark={isDark}
                     value={payoutInfo}
                     onChangeText={setPayoutInfo}
-                    placeholder="Numero MoMo ou IBAN"
-                    hint="Ces informations servent uniquement a preparer le compte pro."
+                    placeholder={t('registerPayoutPlaceholder')}
+                    hint={t('registerPayoutHint')}
                   />
                 </View>
               ) : null}
@@ -426,11 +439,11 @@ export default function RegisterScreen() {
                     isDark ? 'text-slate-300' : 'text-slate-600'
                   }`}
                 >
-                  Deja un compte ?
+                  {t('registerExistingAccount')}
                 </Text>
                 <TouchableOpacity onPress={() => router.replace('/')}>
                   <Text className="ml-2 text-sm font-semibold text-[#4c669f]">
-                    Retour au login
+                    {t('registerBackToLogin')}
                   </Text>
                 </TouchableOpacity>
               </View>

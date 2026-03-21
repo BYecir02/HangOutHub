@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
 
 interface ChatUser {
@@ -47,8 +48,8 @@ interface MeResponse {
   id: string;
 }
 
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString('fr-FR', {
+function formatTime(value: string, locale: string) {
+  return new Date(value).toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -56,10 +57,11 @@ function formatTime(value: string) {
 
 export default function OutingChatScreen() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const params = useLocalSearchParams<{ id?: string }>();
   const outingId = params.id;
 
-  const [title, setTitle] = useState('Discussion');
+  const [title, setTitle] = useState(t('outingChatDefaultTitle'));
   const [subtitle, setSubtitle] = useState('');
   const [messages, setMessages] = useState<OutingMessage[]>([]);
   const messagesRef = useRef<OutingMessage[]>([]);
@@ -92,14 +94,14 @@ export default function OutingChatScreen() {
         ]);
 
         setMyUserId(meResponse.data.id);
-        setTitle(outingResponse.data.title || 'Discussion');
+        setTitle(outingResponse.data.title || t('outingChatDefaultTitle'));
         const location =
           outingResponse.data.Place?.name ||
           outingResponse.data.Place?.City?.name ||
           outingResponse.data.Place?.address ||
-          'Lieu libre';
+          t('messagesLocationFallback');
         const dateLabel = outingResponse.data.scheduledDate
-          ? new Date(outingResponse.data.scheduledDate).toLocaleString('fr-FR', {
+          ? new Date(outingResponse.data.scheduledDate).toLocaleString(locale, {
               day: '2-digit',
               month: 'short',
               hour: '2-digit',
@@ -121,7 +123,7 @@ export default function OutingChatScreen() {
           setErrorMessage(
             getApiErrorMessage(
               error,
-              'Impossible de charger cette discussion pour le moment.',
+              t('outingChatLoadFailedDefault'),
             ),
           );
         }
@@ -130,7 +132,7 @@ export default function OutingChatScreen() {
         setRefreshing(false);
       }
     },
-    [outingId],
+    [locale, outingId, t],
   );
 
   useFocusEffect(
@@ -190,13 +192,13 @@ export default function OutingChatScreen() {
             <Ionicons name="arrow-back" size={24} color="#4c669f" />
           </TouchableOpacity>
           <Text className="text-xl font-bold text-gray-900 dark:text-white">
-            Discussion
+            {t('outingChatDefaultTitle')}
           </Text>
         </View>
 
         <View className="mt-12 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <Text className="text-base font-semibold text-gray-900 dark:text-white">
-            Chargement impossible
+            {t('outingChatLoadFailedTitle')}
           </Text>
           <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             {errorMessage}
@@ -205,7 +207,7 @@ export default function OutingChatScreen() {
             onPress={() => void loadChat()}
             className="mt-4 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
           >
-            <Text className="text-sm font-semibold text-white">Reessayer</Text>
+            <Text className="text-sm font-semibold text-white">{t('commonRetry')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -223,7 +225,7 @@ export default function OutingChatScreen() {
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            Sortie · En direct
+            {t('outingChatLiveLabel')}
           </Text>
           <Text className="text-lg font-bold text-gray-900 dark:text-white" numberOfLines={1}>
             {title}
@@ -239,7 +241,7 @@ export default function OutingChatScreen() {
       {syncWarning ? (
         <View className="mx-4 mb-2 rounded-2xl bg-orange-100 px-4 py-3 dark:bg-orange-900/30">
           <Text className="text-xs font-semibold text-orange-700 dark:text-orange-300">
-            Synchronisation instable. Derniers messages affiches.
+            {t('outingChatSyncWarning')}
           </Text>
         </View>
       ) : null}
@@ -258,16 +260,16 @@ export default function OutingChatScreen() {
         ListEmptyComponent={
           <View className="mt-16 items-center px-6">
             <Text className="text-base text-gray-500 dark:text-gray-400">
-              Aucun message pour le moment.
+              {t('outingChatEmptyTitle')}
             </Text>
             <Text className="mt-2 text-center text-sm text-gray-400 dark:text-gray-500">
-              Lance la conversation avec ton groupe de sortie.
+              {t('outingChatEmptyDescription')}
             </Text>
           </View>
         }
         renderItem={({ item }) => {
           const mine = item.senderId === myUserId;
-          const senderName = item.User?.displayName || item.User?.username || 'Membre';
+          const senderName = item.User?.displayName || item.User?.username || t('outingChatMemberFallback');
 
           return (
             <View className={`mb-3 ${mine ? 'items-end' : 'items-start'}`}>
@@ -288,7 +290,7 @@ export default function OutingChatScreen() {
                 </Text>
               </View>
               <Text className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                {formatTime(item.sentAt)}
+                {formatTime(item.sentAt, locale)}
               </Text>
             </View>
           );
@@ -300,7 +302,7 @@ export default function OutingChatScreen() {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Ecris ton message..."
+            placeholder={t('outingChatInputPlaceholder')}
             placeholderTextColor="#9ca3af"
             multiline
             className="max-h-28 flex-1 rounded-2xl bg-gray-100 px-4 py-3 text-gray-900 dark:bg-gray-900 dark:text-white"

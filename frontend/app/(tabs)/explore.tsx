@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import EventCard from '@/components/ui/EventCard';
 import SearchBar from '@/components/ui/SearchBar';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
@@ -27,8 +28,8 @@ interface EventItem {
   address?: string | null;
 }
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -38,6 +39,7 @@ function formatEventDate(value: string) {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const cachedEvents = getCache<EventItem[]>('events');
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
   const [loading, setLoading] = useState(!cachedEvents);
@@ -78,15 +80,15 @@ export default function ExploreScreen() {
         </TouchableOpacity>
         <View>
           <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest">
-            Explorer
+            {t('exploreLabel')}
           </Text>
           <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-            Tous les evenements
+            {t('exploreTitle')}
           </Text>
         </View>
       </View>
 
-      <SearchBar placeholder="Rechercher un evenement..." />
+      <SearchBar placeholder={t('exploreSearchPlaceholder')} />
 
       {loading && events.length === 0 ? (
         <FlatList
@@ -115,10 +117,10 @@ export default function ExploreScreen() {
           ListEmptyComponent={
             <View className="items-center py-16">
               <Text className="text-lg font-semibold text-gray-800 dark:text-white">
-                Aucun evenement disponible
+                {t('exploreEmptyTitle')}
               </Text>
               <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-                Ajoute un premier evenement ou reviens plus tard.
+                {t('exploreEmptyDescription')}
               </Text>
             </View>
           }
@@ -134,8 +136,8 @@ export default function ExploreScreen() {
           renderItem={({ item }) => (
             <EventCard
               title={item.title}
-              date={formatEventDate(item.startTime)}
-              location={item.Place?.name || item.address || 'Lieu a confirmer'}
+              date={formatEventDate(item.startTime, locale)}
+              location={item.Place?.name || item.address || t('homeLocationToConfirm')}
               imageUrl={
                 getImageUrl(item.coverUrl) ||
                 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200'
@@ -143,7 +145,7 @@ export default function ExploreScreen() {
               price={
                 Number(item.entryFee || 0) > 0
                   ? `${item.entryFee} FCFA`
-                  : 'Gratuit'
+                  : t('homePriceFree')
               }
               onPress={() =>
                 router.push({

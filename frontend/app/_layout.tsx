@@ -74,6 +74,12 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="notification-settings"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="help-support"
             options={{
               headerShown: false,
@@ -114,6 +120,9 @@ export default function RootLayout() {
             name="organizer/create-place"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
           />
+          <Stack.Screen name="organizer/dashboard" options={{ headerShown: false }} />
+          <Stack.Screen name="organizer/events" options={{ headerShown: false }} />
+          <Stack.Screen name="organizer/scanner" options={{ headerShown: false }} />
           <Stack.Screen
             name="comments"
             options={{

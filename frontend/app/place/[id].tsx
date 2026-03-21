@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl, storage } from '@/services/api';
 
 interface RelatedEvent {
@@ -43,16 +44,19 @@ interface PlaceDetail {
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-function formatPriceLevel(level?: number | null) {
+function formatPriceLevel(
+  level: number | null | undefined,
+  t: (key: 'placeDetailPriceUnknown' | 'placeDetailPriceLevel', params?: { symbols: string; level: number }) => string,
+) {
   if (!level || level < 1) {
-    return 'Prix non renseigne';
+    return t('placeDetailPriceUnknown');
   }
 
-  return `${'$'.repeat(level)} · Niveau ${level}`;
+  return t('placeDetailPriceLevel', { symbols: '$'.repeat(level), level });
 }
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -63,6 +67,7 @@ function formatEventDate(value: string) {
 export default function PlaceDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
+  const { locale, t } = useI18n();
   const [place, setPlace] = useState<PlaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
@@ -143,13 +148,13 @@ export default function PlaceDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 px-8 dark:bg-black">
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Lieu introuvable
+          {t('placeDetailNotFound')}
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
           className="mt-4 rounded-xl bg-[#2ecc71] px-5 py-3"
         >
-          <Text className="font-semibold text-white">Retour</Text>
+          <Text className="font-semibold text-white">{t('publicProfileBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -165,7 +170,7 @@ export default function PlaceDetailScreen() {
     router.push({
       pathname: '/outing',
       params: {
-        title: `Sortie a ${place.name}`,
+        title: t('placeDetailOutingTitle', { name: place.name }),
         placeId: place.id,
         sourceLabel: place.name,
       },
@@ -174,7 +179,7 @@ export default function PlaceDetailScreen() {
 
   const handleToggleSave = async () => {
     if (!canSave) {
-      Alert.alert('Connexion requise', 'Connecte-toi pour enregistrer un lieu.');
+      Alert.alert(t('placeDetailLoginRequiredTitle'), t('placeDetailLoginRequiredMessage'));
       return;
     }
 
@@ -184,13 +189,13 @@ export default function PlaceDetailScreen() {
       const response = await api.post<{ saved: boolean }>(`/places/${place.id}/save`);
       setIsSaved(response.data.saved);
       Alert.alert(
-        'Succes',
+        t('outingCreateSuccessTitle'),
         response.data.saved
-          ? 'Lieu ajoute a tes envies.'
-          : 'Lieu retire de tes envies.',
+          ? t('placeDetailSaveAdded')
+          : t('placeDetailSaveRemoved'),
       );
     } catch {
-      Alert.alert('Erreur', "Impossible de mettre a jour tes envies.");
+      Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
     } finally {
       setSaveLoading(false);
     }
@@ -212,7 +217,7 @@ export default function PlaceDetailScreen() {
           </TouchableOpacity>
           <View className="rounded-full bg-black/45 px-3 py-2">
             <Text className="text-xs font-semibold uppercase tracking-widest text-white">
-              Lieu
+              {t('placeDetailTypeLabel')}
             </Text>
           </View>
         </View>
@@ -226,12 +231,12 @@ export default function PlaceDetailScreen() {
         <View className="mt-4 flex-row flex-wrap gap-2">
           <View className="rounded-full bg-green-100 px-3 py-2 dark:bg-green-900/30">
             <Text className="text-xs font-semibold text-green-700 dark:text-green-300">
-              {place.City?.name || 'Ville non renseignee'}
+              {place.City?.name || t('placeDetailCityUnknown')}
             </Text>
           </View>
           <View className="rounded-full bg-gray-200 px-3 py-2 dark:bg-gray-800">
             <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-              {formatPriceLevel(place.priceLevel)}
+              {formatPriceLevel(place.priceLevel, t)}
             </Text>
           </View>
           {typeof place.avgRating === 'number' && place.avgRating > 0 ? (
@@ -246,11 +251,10 @@ export default function PlaceDetailScreen() {
 
         <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            Prochaine action
+            {t('placeDetailActionTitle')}
           </Text>
           <Text className="mt-2 text-base leading-7 text-gray-700 dark:text-gray-200">
-            Garde ce lieu pour plus tard ou transforme-le tout de suite en vraie
-            sortie.
+            {t('placeDetailActionDescription')}
           </Text>
 
           <View className="mt-4 flex-row gap-3">
@@ -259,7 +263,7 @@ export default function PlaceDetailScreen() {
               className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-4"
             >
               <Text className="text-sm font-semibold text-white">
-                Organiser une sortie
+                {t('profileOrganizeOutingCta')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -281,7 +285,7 @@ export default function PlaceDetailScreen() {
                       : 'text-gray-700 dark:text-gray-200'
                   }`}
                 >
-                  {isSaved ? 'Enregistre' : 'Enregistrer'}
+                  {isSaved ? t('placeDetailSaveActive') : t('placeDetailSaveIdle')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -293,10 +297,10 @@ export default function PlaceDetailScreen() {
             <Ionicons name="location-outline" size={20} color="#2ecc71" />
             <View className="ml-3 flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Adresse
+                {t('placeDetailAddressLabel')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {place.address || 'Adresse a confirmer'}
+                {place.address || t('homeAddressToConfirm')}
               </Text>
             </View>
           </View>
@@ -305,12 +309,12 @@ export default function PlaceDetailScreen() {
             <Ionicons name="person-outline" size={20} color="#4c669f" />
             <View className="ml-3 flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                Publie par
+                {t('placeDetailPublishedBy')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
                 {place.Owner?.displayName ||
                   place.Owner?.username ||
-                  'Organisateur inconnu'}
+                  t('placeDetailUnknownOrganizer')}
               </Text>
             </View>
           </View>
@@ -318,16 +322,16 @@ export default function PlaceDetailScreen() {
 
         <View className="mt-6">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            A propos
+            {t('placeDetailAbout')}
           </Text>
           <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
-            {place.description || 'Aucune description disponible pour le moment.'}
+            {place.description || t('placeDetailDescriptionFallback')}
           </Text>
         </View>
 
         <View className="mt-6">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            Galerie
+            {t('placeDetailGallery')}
           </Text>
           <ScrollView
             horizontal
@@ -347,7 +351,7 @@ export default function PlaceDetailScreen() {
 
         <View className="mt-6 pb-24">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            Evenements lies au lieu
+            {t('placeDetailRelatedEvents')}
           </Text>
           {place.Event && place.Event.length > 0 ? (
             place.Event.map((event) => (
@@ -376,7 +380,7 @@ export default function PlaceDetailScreen() {
                     {event.title}
                   </Text>
                   <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {formatEventDate(event.startTime)}
+                    {formatEventDate(event.startTime, locale)}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -384,7 +388,7 @@ export default function PlaceDetailScreen() {
             ))
           ) : (
             <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-              Aucun evenement rattache a ce lieu pour le moment.
+              {t('placeDetailNoRelatedEvents')}
             </Text>
           )}
         </View>

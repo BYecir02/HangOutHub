@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
 import api, { storage } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -22,10 +23,12 @@ import {
   updateMySettings,
 } from '@/services/settings';
 import { syncAppPreferencesFromSettings } from '@/services/app-preferences';
+import { clearStoredUserSession } from '@/services/user-session';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
   const isDark = colorScheme === 'dark';
   const iconColor = isDark ? '#fff' : '#333';
   const chevronColor = isDark ? '#555' : '#ccc';
@@ -80,19 +83,19 @@ export default function SettingsScreen() {
       console.error('Erreur sauvegarde settings:', error);
       setSettings(previousSettings);
       await syncAppPreferencesFromSettings(previousSettings);
-      Alert.alert('Erreur', 'Impossible de sauvegarder ce parametre.');
+      Alert.alert(t('commonErrorTitle'), t('settingsSaveError'));
     }
   };
 
   const handleLogout = async () => {
     Alert.alert(
-      "Déconnexion",
-      "Es-tu sûr de vouloir te déconnecter ?",
+      t('settingsLogoutTitle'),
+      t('settingsLogoutMessage'),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t('genericCancel'), style: 'cancel' },
         {
-          text: "Se déconnecter",
-          style: "destructive",
+          text: t('settingsLogoutConfirm'),
+          style: 'destructive',
           onPress: async () => {
             try {
               // 1. Logout backend (invalider la session)
@@ -100,12 +103,12 @@ export default function SettingsScreen() {
               // 2. Supprimer le token et les infos locales
               await storage.removeItem('userToken');
               await storage.removeItem('refreshToken');
-              await storage.removeItem('userInfo');
+              await clearStoredUserSession();
               // 3. Rediriger vers la page de connexion (index)
               router.replace('/');
             } catch (error) {
               console.error("Erreur lors de la déconnexion:", error);
-              Alert.alert("Erreur", "Impossible de se déconnecter.");
+              Alert.alert(t('commonErrorTitle'), t('settingsLogoutFailed'));
             }
           }
         }
@@ -115,24 +118,27 @@ export default function SettingsScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      "Supprimer mon compte",
-      "Cette action est irréversible. Toutes vos données seront effacées.",
+      t('settingsDeleteTitle'),
+      t('settingsDeleteMessage'),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t('genericCancel'), style: 'cancel' },
         { 
-          text: "Supprimer définitivement", 
-          style: "destructive", 
+          text: t('settingsDeleteConfirm'),
+          style: 'destructive',
           onPress: async () => {
             try {
               await api.delete('/users/me');
               await storage.removeItem('userToken');
               await storage.removeItem('refreshToken');
-              await storage.removeItem('userInfo');
+              await clearStoredUserSession();
               router.replace('/');
-              Alert.alert("Compte supprimé", "Votre compte a été supprimé avec succès.");
+              Alert.alert(
+                t('settingsDeleteSuccessTitle'),
+                t('settingsDeleteSuccessMessage'),
+              );
             } catch (error) {
               console.error(error);
-              Alert.alert("Erreur", "Impossible de supprimer le compte.");
+              Alert.alert(t('commonErrorTitle'), t('settingsDeleteFailed'));
             }
           }
         }
@@ -210,7 +216,7 @@ export default function SettingsScreen() {
             <Ionicons name="arrow-back" size={24} color={iconColor} />
           </TouchableOpacity>
           <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-            Parametres
+            {t('settingsTitle')}
           </Text>
         </View>
 
@@ -223,13 +229,13 @@ export default function SettingsScreen() {
         {!loading && !settings ? (
           <View className="bg-white dark:bg-gray-900 rounded-xl p-5 mb-6">
             <Text className="text-gray-700 dark:text-gray-200 font-semibold mb-2">
-              Impossible de charger les parametres
+              {t('settingsLoadError')}
             </Text>
             <TouchableOpacity
               onPress={() => void loadSettings()}
               className="self-start rounded-lg bg-[#4c669f] px-4 py-2"
             >
-              <Text className="text-white font-semibold">Reessayer</Text>
+              <Text className="text-white font-semibold">{t('commonRetry')}</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -237,14 +243,32 @@ export default function SettingsScreen() {
         {!loading && settings ? (
           <>
             {/* Section Compte */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">Compte</Text>
+            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsSectionAccount')}</Text>
             <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
+              <TouchableOpacity
+                onPress={() => router.push('/edit-profile')}
+                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
+              >
+                <Ionicons name="person-outline" size={22} color={iconColor} />
+                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsEditProfile')}</Text>
+                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
+              </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={() => router.push('/notifications')}
                 className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
               >
                 <Ionicons name="notifications-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">Centre de notifications</Text>
+                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsNotificationInbox')}</Text>
+                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/notification-settings')}
+                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
+              >
+                <Ionicons name="notifications-circle-outline" size={22} color={iconColor} />
+                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsNotificationPreferences')}</Text>
                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
               </TouchableOpacity>
 
@@ -253,55 +277,17 @@ export default function SettingsScreen() {
                 className="flex-row items-center p-4"
               >
                 <Ionicons name="lock-closed-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">Preferences de contenu</Text>
+                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsInterestCenter')}</Text>
                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
               </TouchableOpacity>
             </View>
 
-            {/* Section Notifications */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">Notifications</Text>
-            <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
-              {renderToggleRow(
-                'chatbubble-ellipses-outline',
-                'Messages de sortie',
-                settings.notificationMessages,
-                (nextValue) => {
-                  void handleUpdateSetting('notificationMessages', nextValue);
-                },
-              )}
-              {renderToggleRow(
-                'calendar-outline',
-                'Invitations de sorties',
-                settings.notificationOutingInvites,
-                (nextValue) => {
-                  void handleUpdateSetting('notificationOutingInvites', nextValue);
-                },
-              )}
-              {renderToggleRow(
-                'people-outline',
-                'Demandes d\'amis',
-                settings.notificationFriendRequests,
-                (nextValue) => {
-                  void handleUpdateSetting('notificationFriendRequests', nextValue);
-                },
-              )}
-              {renderToggleRow(
-                'location-outline',
-                'Activite des lieux sauvegardes',
-                settings.notificationSavedPlacesActivity,
-                (nextValue) => {
-                  void handleUpdateSetting('notificationSavedPlacesActivity', nextValue);
-                },
-                false,
-              )}
-            </View>
-
             {/* Section Confidentialite */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">Confidentialite</Text>
+            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsPrivacySection')}</Text>
             <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
               {renderToggleRow(
                 'eye-outline',
-                'Profil public',
+                t('settingsProfilePublic'),
                 settings.profilePublic,
                 (nextValue) => {
                   void handleUpdateSetting('profilePublic', nextValue);
@@ -310,12 +296,12 @@ export default function SettingsScreen() {
 
               {renderChoiceRow(
                 'globe-outline',
-                'Visibilite par defaut des posts',
+                t('settingsDefaultPostVisibility'),
                 settings.defaultPostVisibility,
                 [
-                  { value: 'public', label: 'Public' },
-                  { value: 'friends', label: 'Amis' },
-                  { value: 'private', label: 'Prive' },
+                  { value: 'public', label: t('settingsVisibilityPublic') },
+                  { value: 'friends', label: t('settingsVisibilityFriends') },
+                  { value: 'private', label: t('settingsVisibilityPrivate') },
                 ],
                 (nextValue) => {
                   void handleUpdateSetting(
@@ -327,12 +313,12 @@ export default function SettingsScreen() {
 
               {renderChoiceRow(
                 'people-circle-outline',
-                'Qui peut t\'inviter en sortie',
+                t('settingsOutingInviteScope'),
                 settings.allowOutingInvitesFrom,
                 [
-                  { value: 'everyone', label: 'Tout le monde' },
-                  { value: 'connections', label: 'Mes connexions' },
-                  { value: 'nobody', label: 'Personne' },
+                  { value: 'everyone', label: t('settingsOutingInviteEveryone') },
+                  { value: 'connections', label: t('settingsOutingInviteConnections') },
+                  { value: 'nobody', label: t('settingsOutingInviteNobody') },
                 ],
                 (nextValue) => {
                   void handleUpdateSetting(
@@ -345,16 +331,16 @@ export default function SettingsScreen() {
             </View>
 
             {/* Section Application */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">Application</Text>
+            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsAppSection')}</Text>
             <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
               {renderChoiceRow(
                 'contrast-outline',
-                'Theme',
+                t('settingsTheme'),
                 settings.theme,
                 [
-                  { value: 'system', label: 'Systeme' },
-                  { value: 'light', label: 'Clair' },
-                  { value: 'dark', label: 'Sombre' },
+                  { value: 'system', label: t('settingsThemeSystem') },
+                  { value: 'light', label: t('settingsThemeLight') },
+                  { value: 'dark', label: t('settingsThemeDark') },
                 ],
                 (nextValue) => {
                   void handleUpdateSetting('theme', nextValue as AppTheme);
@@ -363,11 +349,11 @@ export default function SettingsScreen() {
 
               {renderChoiceRow(
                 'language-outline',
-                'Langue',
+                t('settingsLanguage'),
                 settings.language,
                 [
-                  { value: 'fr', label: 'Francais' },
-                  { value: 'en', label: 'English' },
+                  { value: 'fr', label: t('settingsLanguageFrench') },
+                  { value: 'en', label: t('settingsLanguageEnglish') },
                 ],
                 (nextValue) => {
                   void handleUpdateSetting('language', nextValue as AppLanguage);
@@ -376,7 +362,7 @@ export default function SettingsScreen() {
 
               {renderToggleRow(
                 'cellular-outline',
-                'Mode economie de donnees',
+                t('settingsDataSaver'),
                 settings.dataSaver,
                 (nextValue) => {
                   void handleUpdateSetting('dataSaver', nextValue);
@@ -388,7 +374,7 @@ export default function SettingsScreen() {
                 className="flex-row items-center p-4"
               >
                 <Ionicons name="help-circle-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">Aide & Support</Text>
+                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsHelpSupport')}</Text>
                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
               </TouchableOpacity>
             </View>
@@ -398,15 +384,15 @@ export default function SettingsScreen() {
         {/* Bouton Déconnexion */}
         <TouchableOpacity onPress={handleLogout} className="flex-row items-center justify-center bg-gray-200 dark:bg-gray-800 p-4 rounded-xl border border-gray-300 dark:border-gray-700 mt-4">
           <Ionicons name="log-out-outline" size={22} color={isDark ? "#fff" : "#333"} />
-          <Text className="ml-2 text-gray-800 dark:text-white font-bold text-base">Se déconnecter</Text>
+           <Text className="ml-2 text-gray-800 dark:text-white font-bold text-base">{t('settingsLogout')}</Text>
         </TouchableOpacity>
 
         {/* Zone Danger */}
         <View className="mt-8">
-             <Text className="text-red-500 font-bold mb-2 uppercase text-xs tracking-wider">Zone Danger</Text>
+             <Text className="text-red-500 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsDangerSection')}</Text>
              <TouchableOpacity onPress={handleDeleteAccount} className="flex-row items-center justify-center bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/50">
                 <Ionicons name="trash-outline" size={22} color="#ff4757" />
-                <Text className="ml-2 text-red-600 font-bold text-base">Supprimer mon compte</Text>
+               <Text className="ml-2 text-red-600 font-bold text-base">{t('settingsDeleteAccount')}</Text>
              </TouchableOpacity>
         </View>
         

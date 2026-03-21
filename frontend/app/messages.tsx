@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
 
 interface ChatUser {
@@ -43,8 +44,8 @@ interface OutingChatSummary {
   lastMessage?: ChatMessage | null;
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -54,6 +55,7 @@ function formatDate(value: string) {
 
 export default function MessagesScreen() {
   const router = useRouter();
+  const { locale, t } = useI18n();
   const [chats, setChats] = useState<OutingChatSummary[]>([]);
   const chatsRef = useRef<OutingChatSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,7 @@ export default function MessagesScreen() {
           setErrorMessage(
             getApiErrorMessage(
               error,
-              'Impossible de charger les discussions pour le moment.',
+              t('messagesLoadFailedDefault'),
             ),
           );
         }
@@ -98,7 +100,7 @@ export default function MessagesScreen() {
         setRefreshing(false);
       }
     },
-    [],
+    [t],
   );
 
   useFocusEffect(
@@ -165,13 +167,13 @@ export default function MessagesScreen() {
             <Ionicons name="arrow-back" size={24} color="#4c669f" />
           </TouchableOpacity>
           <Text className="text-xl font-bold text-gray-900 dark:text-white">
-            Discussions
+            {t('messagesTitle')}
           </Text>
         </View>
 
         <View className="mt-12 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <Text className="text-base font-semibold text-gray-900 dark:text-white">
-            Chargement impossible
+            {t('messagesLoadFailedTitle')}
           </Text>
           <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             {errorMessage}
@@ -180,7 +182,7 @@ export default function MessagesScreen() {
             onPress={() => void loadChats()}
             className="mt-4 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
           >
-            <Text className="text-sm font-semibold text-white">Reessayer</Text>
+            <Text className="text-sm font-semibold text-white">{t('commonRetry')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -194,14 +196,14 @@ export default function MessagesScreen() {
           <Ionicons name="arrow-back" size={24} color="#4c669f" />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Discussions
+          {t('messagesTitle')}
         </Text>
       </View>
 
       {syncWarning ? (
         <View className="mx-5 mb-3 rounded-2xl bg-orange-100 px-4 py-3 dark:bg-orange-900/30">
           <Text className="text-xs font-semibold text-orange-700 dark:text-orange-300">
-            Synchronisation instable. Dernieres donnees affichees.
+            {t('messagesSyncWarning')}
           </Text>
         </View>
       ) : null}
@@ -212,7 +214,7 @@ export default function MessagesScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Rechercher une sortie..."
+            placeholder={t('messagesSearchPlaceholder')}
             placeholderTextColor="#9ca3af"
             className="ml-2 flex-1 text-gray-900 dark:text-white"
           />
@@ -232,7 +234,7 @@ export default function MessagesScreen() {
                 filter === 'all' ? 'text-white' : 'text-gray-700 dark:text-gray-300'
               }`}
             >
-              Toutes
+                {t('messagesFilterAll')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -250,7 +252,7 @@ export default function MessagesScreen() {
                   : 'text-gray-700 dark:text-gray-300'
               }`}
             >
-              A venir
+                {t('messagesFilterUpcoming')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -268,7 +270,7 @@ export default function MessagesScreen() {
                   : 'text-gray-700 dark:text-gray-300'
               }`}
             >
-              Avec messages
+                {t('messagesFilterWithMessages')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -286,7 +288,7 @@ export default function MessagesScreen() {
                   : 'text-gray-700 dark:text-gray-300'
               }`}
             >
-              Non lus
+                {t('messagesFilterUnread')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -306,10 +308,10 @@ export default function MessagesScreen() {
           ListEmptyComponent={
             <View className="mt-16 items-center px-6">
               <Text className="text-base text-gray-500 dark:text-gray-400">
-                Aucune discussion disponible pour le moment.
+                {t('messagesEmptyTitle')}
               </Text>
               <Text className="mt-2 text-center text-sm text-gray-400 dark:text-gray-500">
-                Cree une sortie ou accepte une invitation pour commencer a chatter.
+                {t('messagesEmptyDescription')}
               </Text>
             </View>
           }
@@ -318,12 +320,12 @@ export default function MessagesScreen() {
               item.Place?.name ||
               item.Place?.City?.name ||
               item.Place?.address ||
-              'Lieu libre';
-            const lastMessageText = item.lastMessage?.content || 'Aucun message pour le moment.';
+              t('messagesLocationFallback');
+            const lastMessageText = item.lastMessage?.content || t('messagesLastMessageEmpty');
             const lastMessageAuthor =
               item.lastMessage?.User?.displayName ||
               item.lastMessage?.User?.username ||
-              'Systeme';
+              t('messagesSystemAuthor');
 
             return (
               <TouchableOpacity
@@ -340,7 +342,7 @@ export default function MessagesScreen() {
                     {item.title}
                   </Text>
                   <Text className="text-xs text-gray-400 dark:text-gray-500">
-                    {formatDate(item.scheduledDate)}
+                    {formatDate(item.scheduledDate, locale)}
                   </Text>
                 </View>
 
@@ -356,18 +358,22 @@ export default function MessagesScreen() {
 
                 <View className="mt-4 flex-row items-center justify-between">
                   <Text className="text-xs text-gray-400 dark:text-gray-500">
-                    {item.participantsCount} participant(s)
+                    {item.participantsCount > 1
+                      ? t('messagesParticipantsMany', { count: item.participantsCount })
+                      : t('messagesParticipantsOne', { count: item.participantsCount })}
                   </Text>
                   <View className="flex-row items-center gap-2">
                     <View className="rounded-full bg-[#4c669f]/10 px-3 py-1">
                       <Text className="text-xs font-semibold text-[#4c669f]">
-                        {item.messagesCount} msg
+                        {item.messagesCount} {t('messagesCountMsg')}
                       </Text>
                     </View>
                     {item.unreadCount > 0 ? (
                       <View className="rounded-full bg-red-500 px-3 py-1">
                         <Text className="text-xs font-semibold text-white">
-                          {item.unreadCount} non lu{item.unreadCount > 1 ? 's' : ''}
+                          {item.unreadCount > 1
+                            ? t('messagesUnreadMany', { count: item.unreadCount })
+                            : t('messagesUnreadOne', { count: item.unreadCount })}
                         </Text>
                       </View>
                     ) : null}

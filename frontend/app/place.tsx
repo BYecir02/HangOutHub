@@ -7,7 +7,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -15,11 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
-import api, { storage } from '../services/api';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/hooks/use-i18n';
+import api from '../services/api';
+import { patchStoredUserSession } from '@/services/user-session';
 
 export default function CreatePlaceScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
   const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -53,8 +56,8 @@ export default function CreatePlaceScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission refusee',
-          'La localisation est necessaire pour placer le lieu correctement.',
+          t('createPlacePermissionDeniedTitle'),
+          t('createPlacePermissionDeniedMessage'),
         );
         return;
       }
@@ -78,7 +81,7 @@ export default function CreatePlaceScreen() {
         setAddress(formattedAddress);
       }
     } catch {
-      Alert.alert('Erreur', 'Impossible de recuperer la position GPS.');
+      Alert.alert(t('commonErrorTitle'), t('createPlaceGpsError'));
     } finally {
       setLocationLoading(false);
     }
@@ -87,8 +90,8 @@ export default function CreatePlaceScreen() {
   const handleSubmit = async () => {
     if (!name.trim() || !address.trim() || !coords) {
       Alert.alert(
-        'Oups',
-        "Le nom, l'adresse et la localisation GPS sont obligatoires.",
+        t('createPlaceMissingRequiredTitle'),
+        t('createPlaceMissingRequiredMessage'),
       );
       return;
     }
@@ -127,21 +130,16 @@ export default function CreatePlaceScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const userInfo = await storage.getItem('userInfo');
-      if (userInfo) {
-        const parsed = JSON.parse(userInfo) as Record<string, unknown>;
-        parsed.hasPlace = true;
-        await storage.setItem('userInfo', JSON.stringify(parsed));
-      }
+      await patchStoredUserSession({ hasPlace: true });
 
-      Alert.alert('Succes', 'Le lieu a ete ajoute.');
+      Alert.alert(t('createPlaceSuccessTitle'), t('createPlaceSuccessMessage'));
       router.replace({
         pathname: '/place/[id]',
         params: { id: response.data.id },
       });
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', 'Impossible de creer le lieu.');
+      Alert.alert(t('commonErrorTitle'), t('createPlaceCreateFailed'));
     } finally {
       setLoading(false);
     }
@@ -157,13 +155,13 @@ export default function CreatePlaceScreen() {
           <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          Ajouter un lieu
+          {t('createPlaceTitle')}
         </Text>
         <TouchableOpacity onPress={handleSubmit} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="#2ecc71" />
           ) : (
-            <Text className="text-lg font-bold text-[#2ecc71]">Publier</Text>
+            <Text className="text-lg font-bold text-[#2ecc71]">{t('createPlacePublish')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -182,7 +180,7 @@ export default function CreatePlaceScreen() {
                   resizeMode="cover"
                 />
                 <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1">
-                  <Text className="text-xs font-bold text-white">Couverture</Text>
+                  <Text className="text-xs font-bold text-white">{t('createPlaceCover')}</Text>
                 </View>
               </>
             ) : (
@@ -191,7 +189,7 @@ export default function CreatePlaceScreen() {
                   <Ionicons name="images" size={32} color="#999" />
                 </View>
                 <Text className="font-medium text-gray-400">
-                  Ajouter des photos
+                  {t('createPlaceAddPhotos')}
                 </Text>
               </View>
             )}
@@ -229,12 +227,12 @@ export default function CreatePlaceScreen() {
         <View className="space-y-5 px-5 pb-10">
           <View>
             <Text className="mb-2 ml-1 font-medium text-gray-500 dark:text-gray-400">
-              Nom du lieu <Text className="text-red-500">*</Text>
+              {t('createPlaceNameLabel')} <Text className="text-red-500">*</Text>
             </Text>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="Ex: Le Code Bar"
+              placeholder={t('createPlaceNamePlaceholder')}
               placeholderTextColor={isDark ? '#666' : '#999'}
               className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-lg font-bold text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
@@ -242,12 +240,12 @@ export default function CreatePlaceScreen() {
 
           <View className="pt-3">
             <Text className="mb-2 ml-1 font-medium text-gray-500 dark:text-gray-400">
-              Description
+              {t('createPlaceDescriptionLabel')}
             </Text>
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Ambiance, specialites, horaires..."
+              placeholder={t('createPlaceDescriptionPlaceholder')}
               placeholderTextColor={isDark ? '#666' : '#999'}
               multiline
               numberOfLines={4}
@@ -258,7 +256,7 @@ export default function CreatePlaceScreen() {
 
           <View className="pt-3">
             <Text className="mb-3 ml-1 font-medium text-gray-500 dark:text-gray-400">
-              Niveau de prix
+              {t('createPlacePriceLevelLabel')}
             </Text>
             <View className="flex-row gap-3">
               {[1, 2, 3, 4].map((level) => (
@@ -287,7 +285,7 @@ export default function CreatePlaceScreen() {
 
           <View className="pt-3">
             <Text className="mb-3 ml-1 font-medium text-gray-500 dark:text-gray-400">
-              Localisation <Text className="text-red-500">*</Text>
+              {t('createPlaceLocationLabel')} <Text className="text-red-500">*</Text>
             </Text>
 
             <TouchableOpacity
@@ -313,8 +311,8 @@ export default function CreatePlaceScreen() {
                     }`}
                   >
                     {coords
-                      ? 'Position GPS detectee'
-                      : 'Utiliser ma position actuelle'}
+                      ? t('createPlaceGpsDetected')
+                      : t('createPlaceUseCurrentPosition')}
                   </Text>
                 </>
               )}
@@ -323,7 +321,7 @@ export default function CreatePlaceScreen() {
             <TextInput
               value={address}
               onChangeText={setAddress}
-              placeholder="Adresse (ex: Haie Vive, Rue 120)"
+              placeholder={t('createPlaceAddressPlaceholder')}
               placeholderTextColor={isDark ? '#666' : '#999'}
               className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />

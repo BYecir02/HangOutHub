@@ -50,6 +50,15 @@ const isLanguagePreference = (
   value: string | null,
 ): value is StoredLanguagePreference => value === 'fr' || value === 'en';
 
+const detectDeviceLanguage = (): StoredLanguagePreference => {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale || '';
+    return locale.toLowerCase().startsWith('en') ? 'en' : 'fr';
+  } catch {
+    return 'fr';
+  }
+};
+
 const notifyTheme = () => {
   themeListeners.forEach((listener) => {
     listener(currentThemePreference);
@@ -85,6 +94,8 @@ export const loadAppPreferences = async (force = false) => {
 
   if (isLanguagePreference(storedLanguage)) {
     currentLanguagePreference = storedLanguage;
+  } else {
+    currentLanguagePreference = detectDeviceLanguage();
   }
 
   if (storedDataSaver === 'true' || storedDataSaver === 'false') {

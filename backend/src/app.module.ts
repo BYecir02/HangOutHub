@@ -15,6 +15,7 @@ import { StorageModule } from './storage/storage.module';
 import { OutingsModule } from './outings/outings.module';
 import { FriendshipsModule } from './friendships/friendships.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OrganizerScannerModule } from './organizer-scanner/organizer-scanner.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     OutingsModule,
     FriendshipsModule,
     NotificationsModule,
+    OrganizerScannerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
