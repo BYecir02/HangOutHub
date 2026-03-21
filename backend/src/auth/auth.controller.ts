@@ -11,11 +11,13 @@ import { AuthGuard } from '@nestjs/passport';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterOrganizerDto } from './dto/register-organizer.dto';
 
 interface LogoutRequest {
   headers: {
     authorization?: string;
+    'user-agent'?: string;
   };
 }
 
@@ -34,8 +36,14 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  login(@Body() loginDto: LoginDto, @Request() req: LogoutRequest) {
+    return this.authService.login(loginDto, req.headers['user-agent']);
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  refresh(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refresh(refreshTokenDto.refreshToken);
   }
 
   @UseGuards(AuthGuard('jwt'))

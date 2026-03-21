@@ -17,18 +17,49 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(
     req: Request,
-    payload: { sub: string; username: string; role: string },
+    payload: {
+      sub: string;
+      username: string;
+      role: string;
+      sid?: string;
+      type?: 'access' | 'refresh';
+    },
   ) {
-    // Récupérer le token brut depuis le header (Bearer eyJ...)
-    const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+    if (payload.type && payload.type !== 'access') {
+      throw new UnauthorizedException('Token invalide');
+    }
 
-    // ✅ Vérifier si la session est active en BDD
-    const session = await this.prisma.session.findUnique({
-      where: { token: token || '' },
+    const now = new Date();
+    const bearerToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+
+    // Nouveau flux: on cherche la session via l'identifiant de session (sid).
+    if (payload.sid) {
+      const session = await this.prisma.session.findUnique({
+        where: { token: payload.sid },
+      });
+
+      if (
+        !session ||
+        session.userId !== payload.sub ||
+        session.revokedAt ||
+        (session.expiresAt && session.expiresAt < now)
+      ) {
+        throw new UnauthorizedException('Session expiree ou invalide');
+      }
+
+      return {
+        userId: payload.sub,
+        username: payload.username,
+        role: payload.role,
+      };
+    }
+
+    // Compatibilite legacy: anciennes sessions stockant l'access token brut.
+    const legacySession = await this.prisma.session.findUnique({
+      where: { token: bearerToken || '' },
     });
 
-    if (!session) {
-      // Si pas de session en base, le token a été révoqué (logout)
+    if (!legacySession) {
       throw new UnauthorizedException('Session expirée ou invalide');
     }
 

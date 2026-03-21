@@ -26,6 +26,7 @@ export default function SettingsScreen() {
               await api.post('/auth/logout').catch(() => {});
               // 2. Supprimer le token et les infos locales
               await storage.removeItem('userToken');
+              await storage.removeItem('refreshToken');
               await storage.removeItem('userInfo');
               // 3. Rediriger vers la page de connexion (index)
               router.replace('/');
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
             try {
               await api.delete('/users/me');
               await storage.removeItem('userToken');
+              await storage.removeItem('refreshToken');
               await storage.removeItem('userInfo');
               router.replace('/');
               Alert.alert("Compte supprimé", "Votre compte a été supprimé avec succès.");

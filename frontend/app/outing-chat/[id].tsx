@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import api from '@/services/api';
+import api, { getApiErrorMessage } from '@/services/api';
 
 interface ChatUser {
   id: string;
@@ -62,14 +62,17 @@ export default function OutingChatScreen() {
   const [title, setTitle] = useState('Discussion');
   const [subtitle, setSubtitle] = useState('');
   const [messages, setMessages] = useState<OutingMessage[]>([]);
+  const messagesRef = useRef<OutingMessage[]>([]);
   const [myUserId, setMyUserId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncWarning, setSyncWarning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState('');
 
   const loadChat = useCallback(
-    async (isRefresh = false) => {
+    async ({ isRefresh = false, silent = false } = {}) => {
       if (!outingId) {
         setLoading(false);
         return;
@@ -77,7 +80,7 @@ export default function OutingChatScreen() {
 
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (!silent) {
         setLoading(true);
       }
 
@@ -105,9 +108,23 @@ export default function OutingChatScreen() {
           : '';
         setSubtitle(dateLabel ? `${dateLabel} · ${location}` : location);
         setMessages(messagesResponse.data);
+        messagesRef.current = messagesResponse.data;
+        setErrorMessage(null);
+        setSyncWarning(false);
       } catch (error) {
         console.error('Erreur chargement discussion sortie:', error);
-        setMessages([]);
+
+        if (messagesRef.current.length > 0) {
+          setSyncWarning(true);
+        } else {
+          setMessages([]);
+          setErrorMessage(
+            getApiErrorMessage(
+              error,
+              'Impossible de charger cette discussion pour le moment.',
+            ),
+          );
+        }
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -119,6 +136,14 @@ export default function OutingChatScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadChat();
+
+      const interval = setInterval(() => {
+        void loadChat({ silent: true });
+      }, 4000);
+
+      return () => {
+        clearInterval(interval);
+      };
     }, [loadChat]),
   );
 
@@ -135,7 +160,12 @@ export default function OutingChatScreen() {
       const response = await api.post<OutingMessage>(`/outings/${outingId}/messages`, {
         content,
       });
-      setMessages((current) => [...current, response.data]);
+      setMessages((current) => {
+        const next = [...current, response.data];
+        messagesRef.current = next;
+        return next;
+      });
+      setSyncWarning(false);
       setDraft('');
     } catch (error) {
       console.error('Erreur envoi message:', error);
@@ -152,6 +182,36 @@ export default function OutingChatScreen() {
     );
   }
 
+  if (errorMessage && messages.length === 0) {
+    return (
+      <View className="flex-1 bg-gray-50 px-6 pt-16 dark:bg-black">
+        <View className="flex-row items-center">
+          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+            <Ionicons name="arrow-back" size={24} color="#4c669f" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-gray-900 dark:text-white">
+            Discussion
+          </Text>
+        </View>
+
+        <View className="mt-12 rounded-3xl bg-white p-5 dark:bg-gray-900">
+          <Text className="text-base font-semibold text-gray-900 dark:text-white">
+            Chargement impossible
+          </Text>
+          <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {errorMessage}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void loadChat()}
+            className="mt-4 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">Reessayer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-gray-50 dark:bg-black"
@@ -163,7 +223,7 @@ export default function OutingChatScreen() {
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            Sortie
+            Sortie · En direct
           </Text>
           <Text className="text-lg font-bold text-gray-900 dark:text-white" numberOfLines={1}>
             {title}
@@ -176,13 +236,21 @@ export default function OutingChatScreen() {
         </View>
       </View>
 
+      {syncWarning ? (
+        <View className="mx-4 mb-2 rounded-2xl bg-orange-100 px-4 py-3 dark:bg-orange-900/30">
+          <Text className="text-xs font-semibold text-orange-700 dark:text-orange-300">
+            Synchronisation instable. Derniers messages affiches.
+          </Text>
+        </View>
+      ) : null}
+
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void loadChat(true)}
+            onRefresh={() => void loadChat({ isRefresh: true })}
             tintColor="#4c669f"
           />
         }

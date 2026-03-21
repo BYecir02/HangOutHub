@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,9 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useMemo } from 'react';
 
-import api from '@/services/api';
+import api, { getApiErrorMessage } from '@/services/api';
 
 interface ChatUser {
   id: string;
@@ -33,6 +32,7 @@ interface OutingChatSummary {
   scheduledDate: string;
   participantsCount: number;
   messagesCount: number;
+  unreadCount: number;
   Place?: {
     name?: string | null;
     address?: string | null;
@@ -55,35 +55,63 @@ function formatDate(value: string) {
 export default function MessagesScreen() {
   const router = useRouter();
   const [chats, setChats] = useState<OutingChatSummary[]>([]);
+  const chatsRef = useRef<OutingChatSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncWarning, setSyncWarning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'withMessages'>(
-    'all',
+  const [filter, setFilter] = useState<
+    'all' | 'upcoming' | 'withMessages' | 'unread'
+  >('all');
+
+  const loadChats = useCallback(
+    async ({ isRefresh = false, silent = false } = {}) => {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else if (!silent) {
+        setLoading(true);
+      }
+
+      try {
+        const response = await api.get<OutingChatSummary[]>('/outings/chats');
+        setChats(response.data);
+        chatsRef.current = response.data;
+        setSyncWarning(false);
+        setErrorMessage(null);
+      } catch (error) {
+        console.error('Erreur chargement discussions:', error);
+
+        if (chatsRef.current.length > 0) {
+          setSyncWarning(true);
+        } else {
+          setChats([]);
+          setErrorMessage(
+            getApiErrorMessage(
+              error,
+              'Impossible de charger les discussions pour le moment.',
+            ),
+          );
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [],
   );
-
-  const loadChats = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const response = await api.get<OutingChatSummary[]>('/outings/chats');
-      setChats(response.data);
-    } catch (error) {
-      console.error('Erreur chargement discussions:', error);
-      setChats([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
       void loadChats();
+
+      const interval = setInterval(() => {
+        void loadChats({ silent: true });
+      }, 10000);
+
+      return () => {
+        clearInterval(interval);
+      };
     }, [loadChats]),
   );
 
@@ -103,6 +131,10 @@ export default function MessagesScreen() {
         return false;
       }
 
+      if (filter === 'unread' && chat.unreadCount <= 0) {
+        return false;
+      }
+
       if (!normalizedQuery) {
         return true;
       }
@@ -117,6 +149,44 @@ export default function MessagesScreen() {
     });
   }, [chats, filter, query]);
 
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
+        <ActivityIndicator color="#4c669f" />
+      </View>
+    );
+  }
+
+  if (errorMessage && chats.length === 0) {
+    return (
+      <View className="flex-1 bg-gray-50 px-6 pt-16 dark:bg-black">
+        <View className="flex-row items-center">
+          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+            <Ionicons name="arrow-back" size={24} color="#4c669f" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-gray-900 dark:text-white">
+            Discussions
+          </Text>
+        </View>
+
+        <View className="mt-12 rounded-3xl bg-white p-5 dark:bg-gray-900">
+          <Text className="text-base font-semibold text-gray-900 dark:text-white">
+            Chargement impossible
+          </Text>
+          <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {errorMessage}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void loadChats()}
+            className="mt-4 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">Reessayer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
       <View className="flex-row items-center px-5 pb-4">
@@ -127,6 +197,14 @@ export default function MessagesScreen() {
           Discussions
         </Text>
       </View>
+
+      {syncWarning ? (
+        <View className="mx-5 mb-3 rounded-2xl bg-orange-100 px-4 py-3 dark:bg-orange-900/30">
+          <Text className="text-xs font-semibold text-orange-700 dark:text-orange-300">
+            Synchronisation instable. Dernieres donnees affichees.
+          </Text>
+        </View>
+      ) : null}
 
       <View className="px-5 pb-4">
         <View className="flex-row items-center rounded-2xl bg-white px-3 py-2 dark:bg-gray-900">
@@ -193,21 +271,34 @@ export default function MessagesScreen() {
               Avec messages
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setFilter('unread')}
+            className={`rounded-full px-4 py-2 ${
+              filter === 'unread'
+                ? 'bg-[#4c669f]'
+                : 'bg-gray-200 dark:bg-gray-800'
+            }`}
+          >
+            <Text
+              className={`text-xs font-semibold ${
+                filter === 'unread'
+                  ? 'text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              Non lus
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#4c669f" />
-        </View>
-      ) : (
-        <FlatList
+      <FlatList
           data={filteredChats}
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => void loadChats(true)}
+              onRefresh={() => void loadChats({ isRefresh: true })}
               tintColor="#4c669f"
             />
           }
@@ -267,17 +358,25 @@ export default function MessagesScreen() {
                   <Text className="text-xs text-gray-400 dark:text-gray-500">
                     {item.participantsCount} participant(s)
                   </Text>
-                  <View className="rounded-full bg-[#4c669f]/10 px-3 py-1">
-                    <Text className="text-xs font-semibold text-[#4c669f]">
-                      {item.messagesCount} msg
-                    </Text>
+                  <View className="flex-row items-center gap-2">
+                    <View className="rounded-full bg-[#4c669f]/10 px-3 py-1">
+                      <Text className="text-xs font-semibold text-[#4c669f]">
+                        {item.messagesCount} msg
+                      </Text>
+                    </View>
+                    {item.unreadCount > 0 ? (
+                      <View className="rounded-full bg-red-500 px-3 py-1">
+                        <Text className="text-xs font-semibold text-white">
+                          {item.unreadCount} non lu{item.unreadCount > 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               </TouchableOpacity>
             );
           }}
         />
-      )}
     </View>
   );
 }

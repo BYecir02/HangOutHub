@@ -68,6 +68,14 @@ export class OutingsController {
     );
   }
 
+  @Post(':id/messages/read')
+  markMessagesAsRead(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.outingsService.markMessagesAsRead(req.user.userId, id);
+  }
+
   @Get(':id')
   findOne(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.outingsService.findOneForUser(req.user.userId, id);

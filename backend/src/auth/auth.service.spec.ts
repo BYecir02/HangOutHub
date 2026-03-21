@@ -27,6 +27,8 @@ describe('AuthService', () => {
           useValue: {
             session: {
               create: jest.fn(),
+              findUnique: jest.fn(),
+              update: jest.fn(),
               deleteMany: jest.fn(),
             },
           },

@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AuthTextField from '@/components/auth/AuthTextField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import api, { storage } from '@/services/api';
+import api, { getApiErrorMessage, storage } from '@/services/api';
 
 interface StoredUser {
   role?: string;
@@ -80,12 +80,14 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { access_token, user } = response.data as {
+      const { access_token, refresh_token, user } = response.data as {
         access_token: string;
+        refresh_token: string;
         user: StoredUser;
       };
 
       await storage.setItem('userToken', access_token);
+      await storage.setItem('refreshToken', refresh_token);
       await storage.setItem('userInfo', JSON.stringify(user));
 
       const isPro =
@@ -99,6 +101,7 @@ export default function LoginScreen() {
       if (user.organizerStatus === 'PENDING') {
         Alert.alert('Validation en cours', 'Compte pro en attente de validation.');
         await storage.removeItem('userToken');
+        await storage.removeItem('refreshToken');
         await storage.removeItem('userInfo');
         return;
       }
@@ -108,9 +111,14 @@ export default function LoginScreen() {
       } else {
         router.replace('/(tabs)/profile');
       }
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Erreur de connexion';
-      Alert.alert('Oups', Array.isArray(message) ? message[0] : message);
+    } catch (error) {
+      Alert.alert(
+        'Oups',
+        getApiErrorMessage(
+          error,
+          'Connexion impossible pour le moment. Reessaie dans un instant.',
+        ),
+      );
     } finally {
       setLoading(false);
     }

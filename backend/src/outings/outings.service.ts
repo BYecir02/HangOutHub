@@ -12,6 +12,18 @@ import { CreateOutingDto } from './dto/create-outing.dto';
 export class OutingsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async touchChatReadAt(userId: string, outingId: string) {
+    await this.prisma.outingParticipant.updateMany({
+      where: {
+        outingId,
+        userId,
+      },
+      data: {
+        chatLastReadAt: new Date(),
+      },
+    });
+  }
+
   private async assertChatAccess(userId: string, outingId: string) {
     const outing = await this.prisma.outing.findUnique({
       where: { id: outingId },
@@ -102,8 +114,39 @@ export class OutingsService {
             OutingParticipant: true,
           },
         },
+        OutingParticipant: {
+          where: {
+            userId,
+          },
+          select: {
+            chatLastReadAt: true,
+          },
+          take: 1,
+        },
       },
     });
+
+    const unreadCounts = new Map<string, number>();
+
+    await Promise.all(
+      outings.map(async (outing) => {
+        const lastReadAt = outing.OutingParticipant[0]?.chatLastReadAt;
+        const unreadCount = await this.prisma.chatMessage.count({
+          where: {
+            outingId: outing.id,
+            senderId: {
+              not: userId,
+            },
+            ...(lastReadAt
+              ? {
+                  OR: [{ sentAt: null }, { sentAt: { gt: lastReadAt } }],
+                }
+              : {}),
+          },
+        });
+        unreadCounts.set(outing.id, unreadCount);
+      }),
+    );
 
     const chats = outings.map((outing) => ({
       id: outing.id,
@@ -113,6 +156,7 @@ export class OutingsService {
       User: outing.User,
       participantsCount: outing._count.OutingParticipant,
       messagesCount: outing._count.ChatMessage,
+      unreadCount: unreadCounts.get(outing.id) || 0,
       lastMessage: outing.ChatMessage[0] ?? null,
     }));
 
@@ -132,6 +176,7 @@ export class OutingsService {
 
   async findMessages(userId: string, outingId: string) {
     await this.assertChatAccess(userId, outingId);
+    await this.touchChatReadAt(userId, outingId);
 
     return this.prisma.chatMessage.findMany({
       where: { outingId },
@@ -152,7 +197,7 @@ export class OutingsService {
   async sendMessage(userId: string, outingId: string, content: string) {
     await this.assertChatAccess(userId, outingId);
 
-    return this.prisma.chatMessage.create({
+    const message = await this.prisma.chatMessage.create({
       data: {
         outingId,
         senderId: userId,
@@ -169,6 +214,19 @@ export class OutingsService {
         },
       },
     });
+
+    await this.touchChatReadAt(userId, outingId);
+
+    return message;
+  }
+
+  async markMessagesAsRead(userId: string, outingId: string) {
+    await this.assertChatAccess(userId, outingId);
+    await this.touchChatReadAt(userId, outingId);
+
+    return {
+      success: true,
+    };
   }
 
   async create(userId: string, createOutingDto: CreateOutingDto) {
