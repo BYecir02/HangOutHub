@@ -96,6 +96,14 @@ export default function ProfileScreen() {
     user?.role === 'ORGANIZER' || user?.role === 'PLACE_OWNER';
   const [activeTab, setActiveTab] = useState('');
 
+  const organizerPublicProfileLabel = useMemo(() => {
+    if (user?.role === 'PLACE_OWNER') {
+      return t('profileOrganizerPublicLabelPlaceOwner');
+    }
+
+    return t('profileOrganizerPublicLabelOrganizer');
+  }, [t, user?.role]);
+
   React.useEffect(() => {
     if (!user || activeTab) {
       return;
@@ -355,6 +363,9 @@ export default function ProfileScreen() {
             <View className="px-5">
               <View className="rounded-3xl bg-gray-50 p-5 dark:bg-gray-900">
                 <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  {organizerPublicProfileLabel}
+                </Text>
+                <Text className="mt-2 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
                   {t('profileStructureLabel')}
                 </Text>
                 <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
@@ -370,32 +381,53 @@ export default function ProfileScreen() {
           {isOrganizer && activeTab === 'places'
             ? (
               <View className="px-5">
-                {ownedPlaces.map((place) => (
-                  <TouchableOpacity
-                    key={place.id}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/place/[id]',
-                        params: { id: place.id },
-                      })
+                {ownedPlaces.length > 0 ? (
+                  ownedPlaces.map((place) => (
+                    <TouchableOpacity
+                      key={place.id}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/place/[id]',
+                          params: { id: place.id },
+                        })
+                      }
+                      className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER }}
+                        className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        resizeMode="cover"
+                      />
+                      <View className="ml-4 flex-1 justify-center">
+                        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                          {place.name}
+                        </Text>
+                        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {place.City?.name || place.address || t('homeAddressToConfirm')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <EmptyPanel
+                    icon="business-outline"
+                    color="#2ecc71"
+                    title={t('profileOrganizerEmptyPlacesTitle')}
+                    description={t('profileOrganizerEmptyPlacesDescription')}
+                    actionLabel={
+                      user?.role === 'PLACE_OWNER'
+                        ? t('profileOrganizerEmptyPlacesActionCreate')
+                        : t('profileOrganizerEmptyPlacesActionManageEvents')
                     }
-                    className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
-                  >
-                    <Image
-                      source={{ uri: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER }}
-                      className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                      resizeMode="cover"
-                    />
-                    <View className="ml-4 flex-1 justify-center">
-                      <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                        {place.name}
-                      </Text>
-                      <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {place.City?.name || place.address || t('homeAddressToConfirm')}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                    onPress={() =>
+                      router.push(
+                        user?.role === 'PLACE_OWNER'
+                          ? '/organizer/create-place'
+                          : '/organizer/events',
+                      )
+                    }
+                  />
+                )}
               </View>
             )
             : null}
@@ -403,32 +435,43 @@ export default function ProfileScreen() {
           {isOrganizer && activeTab === 'events'
             ? (
               <View className="px-5">
-                {organizerEvents.map((event) => (
-                  <TouchableOpacity
-                    key={event.id}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/event/[id]',
-                        params: { id: event.id },
-                      })
-                    }
-                    className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
-                  >
-                    <Image
-                      source={{ uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER }}
-                      className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                      resizeMode="cover"
-                    />
-                    <View className="ml-4 flex-1 justify-center">
-                      <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                        {event.title}
-                      </Text>
-                      <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {formatEventDate(event.startTime, locale)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                {organizerEvents.length > 0 ? (
+                  organizerEvents.map((event) => (
+                    <TouchableOpacity
+                      key={event.id}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/event/[id]',
+                          params: { id: event.id },
+                        })
+                      }
+                      className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER }}
+                        className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        resizeMode="cover"
+                      />
+                      <View className="ml-4 flex-1 justify-center">
+                        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                          {event.title}
+                        </Text>
+                        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {formatEventDate(event.startTime, locale)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <EmptyPanel
+                    icon="ticket-outline"
+                    color="#ff4757"
+                    title={t('profileOrganizerEmptyEventsTitle')}
+                    description={t('profileOrganizerEmptyEventsDescription')}
+                    actionLabel={t('profileOrganizerEmptyEventsActionCreate')}
+                    onPress={() => router.push('/event')}
+                  />
+                )}
               </View>
             )
             : null}

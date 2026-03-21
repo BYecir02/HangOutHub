@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  ParseUUIDPipe,
   Param,
   Post,
   Req,
@@ -14,18 +16,28 @@ import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
+import { CreateEventBookingDto } from './dto/create-event-booking.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventsService } from './events.service';
 
 interface AuthenticatedRequest {
   user: {
     userId: string;
+    role: string;
   };
 }
 
 @Controller('events')
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
+
+  private ensureOrganizerRole(req: AuthenticatedRequest) {
+    if (req.user.role !== 'ORGANIZER' && req.user.role !== 'PLACE_OWNER') {
+      throw new ForbiddenException(
+        'Acces reserve aux organisateurs et gerants de lieux.',
+      );
+    }
+  }
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
@@ -55,6 +67,7 @@ export class EventsController {
     @UploadedFiles()
     files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
   ) {
+    this.ensureOrganizerRole(req);
     return this.eventsService.create(req.user.userId, createEventDto, files);
   }
 
@@ -67,6 +80,32 @@ export class EventsController {
   @Get('mine')
   findMine(@Req() req: AuthenticatedRequest) {
     return this.eventsService.findMine(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/book')
+  createBooking(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateEventBookingDto,
+  ) {
+    return this.eventsService.createBooking(req.user.userId, id, body);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('my-bookings')
+  findMyBookings(@Req() req: AuthenticatedRequest) {
+    return this.eventsService.findMyBookings(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/scans')
+  findEventScans(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    this.ensureOrganizerRole(req);
+    return this.eventsService.findEventScans(id, req.user.userId, req.user.role);
   }
 
   @Get(':id')

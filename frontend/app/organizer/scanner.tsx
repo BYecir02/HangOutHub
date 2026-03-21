@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { CameraView, BarcodeType, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 
-import OrganizerPanelNav from '@/components/organizer/OrganizerPanelNav';
+import OrganizerExitPanelButton from '@/components/organizer/OrganizerExitPanelButton';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -56,6 +56,17 @@ const statusTitleKey: Record<ScannerVerificationStatus, TranslationKey> = {
   UNAUTHORIZED_SCANNER: 'scannerStatusUnauthorized',
 };
 
+const statusMessageKey: Record<ScannerVerificationStatus, TranslationKey> = {
+  VALID_CHECKED_IN_NOW: 'scannerStatusMessageValidNow',
+  VALID_ALREADY_CHECKED_IN: 'scannerStatusMessageAlreadyUsed',
+  INVALID_CODE: 'scannerStatusMessageInvalid',
+  BOOKING_NOT_FOUND: 'scannerStatusMessageNotFound',
+  NOT_FOR_THIS_EVENT: 'scannerStatusMessageWrongEvent',
+  BOOKING_NOT_CONFIRMED: 'scannerStatusMessageNotConfirmed',
+  EVENT_EXPIRED: 'scannerStatusMessageExpired',
+  UNAUTHORIZED_SCANNER: 'scannerStatusMessageUnauthorized',
+};
+
 export default function ScannerScreen() {
   const router = useRouter();
   const { t } = useI18n();
@@ -67,6 +78,8 @@ export default function ScannerScreen() {
   const [scanResult, setScanResult] =
     useState<ScannerVerificationResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [cameraMountError, setCameraMountError] = useState<string | null>(null);
+  const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
   const freezeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAllowed = useOrganizerGuard({
@@ -147,7 +160,18 @@ export default function ScannerScreen() {
     setScanResult(null);
     setScanError(null);
     setIsScanFrozen(false);
+    setCameraMountError(null);
+    setCameraInstanceKey((current) => current + 1);
   }, []);
+
+  const handleCameraMountError = useCallback(
+    (mountError: { message?: string }) => {
+      setCameraMountError(
+        mountError.message || t('scannerCameraUnavailableMessage'),
+      );
+    },
+    [t],
+  );
 
   if (loading) {
     return (
@@ -188,6 +212,9 @@ export default function ScannerScreen() {
 
   return (
     <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
+      <View className="mb-3 flex-row justify-end">
+        <OrganizerExitPanelButton />
+      </View>
       <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
         {t('organizerEventsLabel')}
       </Text>
@@ -213,11 +240,6 @@ export default function ScannerScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
-
-      <OrganizerPanelNav
-        current="scanner"
-        showCreatePlace={user.role === 'PLACE_OWNER'}
-      />
 
       <View className="mt-6 rounded-3xl bg-white p-6 dark:bg-gray-900">
         {!permission ? (
@@ -252,18 +274,43 @@ export default function ScannerScreen() {
 
         {permission?.granted ? (
           <View>
-            <View className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-              <CameraView
-                className="h-72 w-full"
-                onBarcodeScanned={handleBarcodeScanned}
-                barcodeScannerSettings={{
-                  barcodeTypes: ['qr' as BarcodeType],
-                }}
-              />
-            </View>
+            {cameraMountError ? (
+              <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/60 dark:bg-red-900/20">
+                <Text className="text-base font-semibold text-red-700 dark:text-red-300">
+                  {t('scannerCameraUnavailableTitle')}
+                </Text>
+                <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
+                  {cameraMountError}
+                </Text>
+                <TouchableOpacity
+                  onPress={resetScanState}
+                  className="mt-4 self-start rounded-full bg-red-600 px-4 py-2"
+                >
+                  <Text className="text-xs font-semibold text-white">
+                    {t('scannerCameraRetry')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
+                <CameraView
+                  key={cameraInstanceKey}
+                  style={{ height: 288, width: '100%' }}
+                  onMountError={handleCameraMountError}
+                  onBarcodeScanned={handleBarcodeScanned}
+                  barcodeScannerSettings={{
+                    barcodeTypes: ['qr' as BarcodeType],
+                  }}
+                />
+              </View>
+            )}
 
             <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              {isProcessingScan ? t('scannerProcessing') : t('scannerReadyHint')}
+              {cameraMountError
+                ? t('scannerCameraUnavailableMessage')
+                : isProcessingScan
+                  ? t('scannerProcessing')
+                  : t('scannerReadyHint')}
             </Text>
 
             {scanResult ? (
@@ -272,7 +319,7 @@ export default function ScannerScreen() {
                   {t(statusTitleKey[scanResult.status])}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                  {scanResult.message || t('scannerStatusUnknown')}
+                  {t(statusMessageKey[scanResult.status])}
                 </Text>
 
                 {scanResult.attendee ? (

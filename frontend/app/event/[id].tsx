@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   Text,
@@ -11,7 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl } from '@/services/api';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import {
+  EventBookingTicket,
+  createEventBooking,
+} from '@/services/event-bookings';
 
 interface EventDetail {
   id: string;
@@ -73,6 +78,8 @@ export default function EventDetailScreen() {
   const { locale, t } = useI18n();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
+  const [booking, setBooking] = useState<EventBookingTicket | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -150,6 +157,41 @@ export default function EventDetailScreen() {
     });
   };
 
+  const handleJoinEvent = async () => {
+    if (!event) {
+      return;
+    }
+
+    if (booking) {
+      router.push({
+        pathname: '/my-tickets',
+        params: {
+          bookingId: booking.id,
+        },
+      });
+      return;
+    }
+
+    setJoining(true);
+    try {
+      const reserved = await createEventBooking(event.id);
+      setBooking(reserved);
+
+      Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
+
+      router.push({
+        pathname: '/my-tickets',
+        params: {
+          bookingId: reserved.id,
+        },
+      });
+    } catch (error) {
+      Alert.alert(t('commonErrorTitle'), getApiErrorMessage(error, t('eventDetailJoinFailed')));
+    } finally {
+      setJoining(false);
+    }
+  };
+
   return (
     <ScrollView
       className="flex-1 bg-gray-50 dark:bg-black"
@@ -199,6 +241,21 @@ export default function EventDetailScreen() {
           </Text>
 
           <View className="mt-4 flex-row gap-3">
+            <TouchableOpacity
+              onPress={handleJoinEvent}
+              disabled={joining}
+              className={`flex-1 items-center rounded-2xl px-4 py-4 ${
+                joining ? 'bg-[#ff9aa3]' : 'bg-[#ff4757]'
+              }`}
+            >
+              <Text className="text-sm font-semibold text-white">
+                {joining
+                  ? t('eventDetailJoining')
+                  : booking
+                    ? t('eventDetailViewTicket')
+                    : t('eventDetailJoinCta')}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={handleCreateOuting}
               className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-4"

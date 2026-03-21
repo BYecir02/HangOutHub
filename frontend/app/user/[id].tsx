@@ -135,6 +135,12 @@ export default function PublicProfileScreen() {
     profile.role === 'ORGANIZER' || profile.role === 'PLACE_OWNER';
   const coverUrl = getImageUrl(profile.coverUrl) || COVER_PLACEHOLDER;
   const avatarUrl = getImageUrl(profile.avatarUrl) || 'https://i.pravatar.cc/150';
+  const publicProfileLabel =
+    profile.role === 'PLACE_OWNER'
+      ? t('publicProfileLabelPlaceOwner')
+      : profile.role === 'ORGANIZER'
+        ? t('publicProfileLabelOrganizer')
+        : t('publicProfileLabel');
 
   return (
     <ScrollView
@@ -159,7 +165,7 @@ export default function PublicProfileScreen() {
           />
           <View className="items-end">
             <Text className="text-xs uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              {t('publicProfileLabel')}
+              {publicProfileLabel}
             </Text>
             {isOrganizer && profile.OrganizerProfile?.jobTitle ? (
               <Text className="mt-1 text-sm font-semibold text-gray-700 dark:text-gray-300">

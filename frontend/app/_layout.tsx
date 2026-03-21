@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,8 +11,11 @@ import '../global.css';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { storage } from '@/services/api';
 import {
+  getCurrentThemePreference,
   loadAppPreferences,
+  subscribeThemePreference,
   syncAppPreferencesFromSettings,
+  type StoredThemePreference,
 } from '@/services/app-preferences';
 import { getMySettings } from '@/services/settings';
 
@@ -23,10 +26,25 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { setColorScheme } = useNativeWindColorScheme();
+  const [themePreference, setThemePreference] = useState<StoredThemePreference>(
+    getCurrentThemePreference(),
+  );
 
   useEffect(() => {
-    setColorScheme(colorScheme === 'dark' ? 'dark' : 'light');
-  }, [colorScheme, setColorScheme]);
+    const unsubscribe = subscribeThemePreference(setThemePreference);
+    void loadAppPreferences();
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (themePreference === 'system') {
+      setColorScheme('system');
+      return;
+    }
+
+    setColorScheme(themePreference);
+  }, [setColorScheme, themePreference]);
 
   useEffect(() => {
     let isMounted = true;
@@ -110,6 +128,8 @@ export default function RootLayout() {
           <Stack.Screen name="place/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="events" options={{ headerShown: false }} />
+          <Stack.Screen name="event-scans/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="my-tickets" options={{ headerShown: false }} />
           <Stack.Screen name="places" options={{ headerShown: false }} />
           <Stack.Screen name="discover" options={{ headerShown: false }} />
           <Stack.Screen
@@ -120,9 +140,7 @@ export default function RootLayout() {
             name="organizer/create-place"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
           />
-          <Stack.Screen name="organizer/dashboard" options={{ headerShown: false }} />
-          <Stack.Screen name="organizer/events" options={{ headerShown: false }} />
-          <Stack.Screen name="organizer/scanner" options={{ headerShown: false }} />
+          <Stack.Screen name="organizer" options={{ headerShown: false }} />
           <Stack.Screen
             name="comments"
             options={{

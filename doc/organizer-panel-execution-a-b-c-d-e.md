@@ -1,4 +1,4 @@
-# Execution A-B-C-D-E-F-G-H-I-J-K-L - Panel Organizer
+# Execution A-B-C-D-E-F-G-H-I-J-K-L-M-N-O-P-Q-R-S - Panel Organizer
 
 ## A. Aligner le scope (fait)
 Surface incluse dans le panel organizer:
@@ -188,6 +188,198 @@ Notes techniques:
 - migration DB checkedInAt non incluse dans ce lot pour eviter un couplage fort avec les blockers backend existants
 - checked-in est materialise via status USED (MVP)
 
+Validation smoke test (API):
+- organizer seed utilise: nova@hangouthub.dev
+- resultat attendu confirme:
+  - premier scan: VALID_CHECKED_IN_NOW
+  - second scan meme QR: VALID_ALREADY_CHECKED_IN
+
+## M. Mettre en qualite UX dashboard (fait)
+Objectif:
+- rendre le dashboard organizer plus operationnel (KPI, statuts clairs, actions rapides, empty states utiles)
+
+Implementation realisee:
+- KPI utiles et lisibles:
+  - lieux publies
+  - evenements publies
+  - evenements a venir + hint prochain event
+- statut organizer explicite:
+  - badge visuel dedie (approved/pending/rejected/suspended/unknown)
+- centre d actions:
+  - ouvrir scanner
+  - gerer evenements
+  - creer un lieu (si PLACE_OWNER)
+- empty states localises:
+  - aucun evenement publie -> CTA creation event
+  - PLACE_OWNER sans lieu -> CTA creation place
+
+## N. Normaliser l UX events organizer (fait)
+Objectif:
+- supprimer les impasses UX sur la gestion des events organizer
+- rendre explicites les statuts d events et les prochaines actions
+
+Implementation realisee:
+- centre d actions sur l ecran events:
+  - creer un evenement
+  - ouvrir le scanner
+- normalisation de la liste events:
+  - statuts visuels par event (a venir / en cours / termine)
+  - tri oriente operationnel (upcoming/live en priorite)
+  - resume rapide des volumes (upcoming/live/past)
+- CTA directs par carte event:
+  - ouvrir le detail
+  - modifier plus tard (avec redirection assistee vers le detail)
+- empty state renforce:
+  - CTA creation event
+  - CTA retour dashboard
+
+## O. Optimiser les sections profile organizer (fait)
+Objectif:
+- completer les empty states des tabs organizer dans le profil
+- clarifier les labels de profil public selon le role
+
+Implementation realisee:
+- navigation organizer refondue en tabs dediees:
+  - barre d onglets persistante (dashboard/events/scanner)
+  - visible uniquement sur les routes /organizer/*
+  - suppression de la navigation inline dupliquee dans chaque ecran
+- profil organizer, tab places:
+  - empty state explicite
+  - CTA contextuel (creer un lieu pour PLACE_OWNER, sinon voir les evenements)
+- profil organizer, tab events:
+  - empty state explicite
+  - CTA direct pour publier un evenement
+- labels profil public clarifies:
+  - libelle adapte au role (organizer/place owner) dans le profil organizer et le profil public
+
+Renforcement complementaire (scanner):
+- ajout d un fallback camera indisponible sur l ecran scanner
+- bouton de relance camera pour eviter un ecran vide en cas d erreur de montage
+
+## P. Finaliser la parite i18n organizer (fait)
+Objectif:
+- supprimer les derniers retours non localises sur la surface organizer + scanner + create modal
+
+Implementation realisee:
+- scanner:
+  - remplacement du message brut backend par des messages localises par statut metier
+  - conservation d un titre de statut localise + detail localise (FR/EN)
+- dashboard organizer:
+  - remplacement de l affichage enum brut du type de compte (ORGANIZER/PLACE_OWNER)
+  - mapping vers des labels lisibles localises
+- create modal:
+  - verification complete de la surface role-based (labels + descriptions) deja 100% branchee i18n
+
+Resultat:
+- coherence FR/EN renforcee sur tout le parcours organizer principal
+- plus de message scanner en langue technique backend dans l UI organizer
+
+## Q. Qualite du code (fait)
+Objectif:
+- nettoyer les zones organizer les plus exposees (duplication date/statut, logs bruyants, any evitables)
+
+Implementation realisee:
+- ajout d un helper UI organizer central:
+  - format date/heure court
+  - calcul de phase event (upcoming/live/past)
+  - poids de tri par phase
+  - tone status organizer (badge)
+- ecrans organizer refactors pour reutiliser ces helpers:
+  - dashboard
+  - events
+- hook profil durci:
+  - logs convertis en debug warning dev-only (plus de bruit en prod)
+- composant profile header:
+  - remplacement du type any par UserProfile | null
+
+Resultat:
+- moins de duplication locale sur organizer
+- base plus stable pour les lots R/S/T
+
+## R. Resoudre blockers backend critiques (fait)
+Objectif:
+- stabiliser le backend sur auth/users/prisma pour eliminer les erreurs bloquantes de demarrage
+
+Implementation realisee:
+- verification compile backend (`npm run build`) sur la base actuelle: aucun blocage TypeScript detecte
+- correction du blocage operationnel principal observe (`EADDRINUSE` sur 3000):
+  - ajout d un fallback de port automatique dans `backend/src/main.ts`
+  - si `PORT` est occupe, tentative sur ports suivants (3001+)
+  - log explicite du port final utilise
+- nettoyage typage middleware HTTP dans `main.ts` (types Express explicites)
+- verification runtime:
+  - demarrage backend confirme meme si 3000 est deja pris
+  - regeneration Prisma OK apres liberation du process lock Windows
+
+Resultat:
+- `start:dev` ne casse plus sur conflit de port local
+- base backend exploitable pour les validations fonctionnelles suivantes
+
+## S. Stabiliser les contrats API organizer (fait)
+Objectif:
+- verifier et figer les payloads/reponses des endpoints organizer critiques
+
+Implementation realisee:
+- audit code des routes cibles:
+  - `GET /users/me`
+  - `GET /events/mine`
+  - `POST /places`
+  - `POST /organizer/scanner/verify`
+- documentation detaillee des schemas (champs obligatoires/optionnels, types, contraintes, erreurs) dans:
+  - `doc/organizer-api-contracts-s.md`
+
+Resultat:
+- contrat API explicite et partageable entre front/backend
+- reduction des ambiguities de payload pour les prochains lots (T/U/V)
+
+## T. Tester les parcours critiques (fait)
+Objectif:
+- valider les parcours organizer critiques en conditions reelles
+
+Execution initiale (22/03/2026):
+- smoke test API realise sur:
+  - auth organizer/place owner/user
+  - `GET /users/me`
+  - `GET /events/mine`
+  - `POST /events`
+  - `POST /organizer/scanner/verify`
+- rapport detaille:
+  - `doc/organizer-flow-validation-t.md`
+
+Findings:
+- point critique detecte puis corrige:
+  - `POST /events` etait accessible a un user standard (role `USER`)
+  - role gate ajoute et revalide: `USER` bloque (403), `ORGANIZER` autorise
+
+## U. User acceptance interne (demarre - lot QR participant livre)
+Objectif:
+- activer le flux de base participant -> billet QR -> scan organizer avec donnees reelles
+
+Implementation realisee:
+- backend:
+  - `POST /events/:id/book` (creation reservation + QR sur reservations confirmees)
+  - `GET /events/my-bookings` (liste des billets du user connecte)
+  - `GET /events/:id/scans` (historique scans + compteurs event)
+- frontend:
+  - bouton `Participer` sur la fiche event
+  - ecran `Mes billets` avec affichage QR scannable
+  - navigation directe vers le billet apres reservation
+  - suivi organizer branche sur `GET /events/:id/scans`:
+    - bouton `Voir les scans` depuis chaque carte event organizer
+    - ecran dedie avec compteurs (attendus/scannes/en attente/restants)
+    - historique des participants scannes
+
+Validation smoke test (22/03/2026):
+- booking user: `BOOK_STATUS=CONFIRMED`, `BOOK_QR_PRESENT=True`
+- listing user: `MY_BOOKINGS_CONTAINS_NEW=True`
+- scanner organizer idempotent:
+  - `SCAN_1_STATUS=VALID_CHECKED_IN_NOW`
+  - `SCAN_2_STATUS=VALID_ALREADY_CHECKED_IN`
+- endpoint scans event:
+  - `EVENT_SCANS_EXPECTED=1`
+  - `EVENT_SCANS_SCANNED=1`
+  - `EVENT_SCANS_ITEMS=1`
+
 ## Delta code realise dans cette phase
 - frontend/services/organizer-access.ts (nouveau)
 - frontend/components/organizer/OrganizerPanelNav.tsx (nouveau)
@@ -212,7 +404,23 @@ Notes techniques:
 - backend/src/organizer-scanner/organizer-scanner.controller.ts (nouveau)
 - backend/src/organizer-scanner/organizer-scanner.module.ts (nouveau)
 - backend/src/app.module.ts
+- backend/src/main.ts
+- backend/src/events/events.controller.ts
+- backend/src/events/events.service.ts
+- backend/src/events/dto/create-event-booking.dto.ts (nouveau)
+- frontend/services/event-bookings.ts (nouveau)
+- frontend/app/my-tickets.tsx (nouveau)
+- frontend/app/event-scans/[id].tsx (nouveau)
+- frontend/app/event/[id].tsx
+- frontend/app.d.ts
+- frontend/app/organizer/dashboard.tsx
+- doc/organizer-api-contracts-s.md
+- doc/organizer-flow-validation-t.md
 
-## Points restant apres A-B-C-D-E-F-G-H-I-J-K-L
-- empty states organizer complets dans profile tabs organizer
-- correction erreurs backend TS (auth/users) pour stabilite globale
+## Points restant apres A-B-C-D-E-F-G-H-I-J-K-L-M-N-O-P-Q-R-S
+- U. User acceptance interne (suite)
+- V. Verrouiller la regression
+- W. Write docs
+- X. eXperience monitoring
+- Y. Yield release plan
+- Z. Zero dette immediate post-release

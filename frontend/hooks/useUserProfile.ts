@@ -4,6 +4,14 @@ import { useFocusEffect } from 'expo-router';
 import api from '../services/api';
 import { setStoredUserSession } from '@/services/user-session';
 
+const debugProfileError = (context: string, error: unknown) => {
+  if (!__DEV__) {
+    return;
+  }
+
+  console.warn(`[useUserProfile] ${context}`, error);
+};
+
 export interface OwnedPlace {
   id: string;
   name: string;
@@ -163,7 +171,7 @@ export function useUserProfile() {
         setOrganizerEvents([]);
       }
     } catch (error) {
-      console.error('Erreur lors de la recuperation du profil:', error);
+      debugProfileError('fetchUserProfile failed', error);
       setError('PROFILE_LOAD_FAILED');
       if (!isRefresh) {
         setUser(null);
@@ -185,7 +193,7 @@ export function useUserProfile() {
       await api.delete(`/posts/${postId}`);
       setPosts((currentPosts) => currentPosts.filter((p) => p.id !== postId));
     } catch (error) {
-      console.error('Erreur suppression post:', error);
+      debugProfileError('deletePost failed', error);
       throw error;
     }
   };
@@ -199,7 +207,7 @@ export function useUserProfile() {
         ),
       );
     } catch (error) {
-      console.error('Erreur modification post:', error);
+      debugProfileError('updatePost failed', error);
       throw error;
     }
   };
