@@ -185,6 +185,17 @@ export default function OutingDetailScreen() {
     }
   };
 
+  const handleOpenDiscussion = () => {
+    if (!outing) {
+      return;
+    }
+
+    router.push({
+      pathname: '/outing-chat/[id]',
+      params: { id: outing.id },
+    });
+  };
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
@@ -240,6 +251,13 @@ export default function OutingDetailScreen() {
               outing.Place?.address ||
               'Lieu libre'}
           </Text>
+
+          <TouchableOpacity
+            onPress={handleOpenDiscussion}
+            className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2"
+          >
+            <Text className="font-semibold text-white">Ouvrir la discussion</Text>
+          </TouchableOpacity>
         </View>
 
         <View className="mt-6 rounded-3xl bg-gray-50 p-4 dark:bg-gray-900">

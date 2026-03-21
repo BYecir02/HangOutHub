@@ -14,7 +14,7 @@ import EventCard from '@/components/ui/EventCard';
 import Header from '@/components/ui/Header';
 import PlaceCard from '@/components/ui/PlaceCard';
 import SuggestionCard from '@/components/ui/SuggestionCard';
-import api, { getImageUrl } from '@/services/api';
+import api, { getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { Category } from '@/types';
 
@@ -98,11 +98,17 @@ export default function HomeScreen() {
     };
 
     const loadHomeData = async () => {
+      const token = await storage.getItem('userToken');
+      const notificationsRequest: Promise<{ data: NotificationCountResponse }> =
+        token
+          ? api.get<NotificationCountResponse>('/notifications/unread-count')
+          : Promise.resolve({ data: { unreadCount: 0 } });
+
       const results = await Promise.allSettled([
         api.get<Category[]>('/categories'),
         api.get<HomeEvent[]>('/events'),
         api.get<HomePlace[]>('/places'),
-        api.get<NotificationCountResponse>('/notifications/unread-count'),
+        notificationsRequest,
       ]);
 
       if (!isMounted) {

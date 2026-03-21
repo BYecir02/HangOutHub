@@ -176,7 +176,9 @@ export default function CategoryDiscoverScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => {
-            if (!params.id) {
+            const categoryId = params.id;
+
+            if (!categoryId) {
               return;
             }
 
@@ -184,10 +186,10 @@ export default function CategoryDiscoverScreen() {
               setRefreshing(true);
               try {
                 const response = await api.get<CategoryResult>(
-                  `/categories/${params.id}/discover`,
+                  `/categories/${categoryId}/discover`,
                 );
                 setData(response.data);
-                setCategoryCache(params.id, response.data);
+                setCategoryCache(categoryId, response.data);
               } finally {
                 setRefreshing(false);
               }

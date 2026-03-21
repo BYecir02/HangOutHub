@@ -12,6 +12,165 @@ import { CreateOutingDto } from './dto/create-outing.dto';
 export class OutingsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async assertChatAccess(userId: string, outingId: string) {
+    const outing = await this.prisma.outing.findUnique({
+      where: { id: outingId },
+      select: {
+        id: true,
+        creatorId: true,
+        OutingParticipant: {
+          where: { userId },
+          select: { status: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!outing) {
+      throw new NotFoundException('Sortie introuvable');
+    }
+
+    const participant = outing.OutingParticipant[0];
+    const canAccess =
+      outing.creatorId === userId ||
+      (participant && participant.status !== 'DECLINED');
+
+    if (!canAccess) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a acceder a cette discussion.",
+      );
+    }
+  }
+
+  async findChats(userId: string) {
+    const outings = await this.prisma.outing.findMany({
+      where: {
+        OR: [
+          { creatorId: userId },
+          {
+            OutingParticipant: {
+              some: {
+                userId,
+                status: {
+                  not: 'DECLINED',
+                },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: { scheduledDate: 'desc' },
+      include: {
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            City: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        ChatMessage: {
+          orderBy: { sentAt: 'desc' },
+          take: 1,
+          include: {
+            User: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            ChatMessage: true,
+            OutingParticipant: true,
+          },
+        },
+      },
+    });
+
+    const chats = outings.map((outing) => ({
+      id: outing.id,
+      title: outing.title,
+      scheduledDate: outing.scheduledDate,
+      Place: outing.Place,
+      User: outing.User,
+      participantsCount: outing._count.OutingParticipant,
+      messagesCount: outing._count.ChatMessage,
+      lastMessage: outing.ChatMessage[0] ?? null,
+    }));
+
+    chats.sort((left, right) => {
+      const leftActivity = new Date(
+        left.lastMessage?.sentAt || left.scheduledDate,
+      ).getTime();
+      const rightActivity = new Date(
+        right.lastMessage?.sentAt || right.scheduledDate,
+      ).getTime();
+
+      return rightActivity - leftActivity;
+    });
+
+    return chats;
+  }
+
+  async findMessages(userId: string, outingId: string) {
+    await this.assertChatAccess(userId, outingId);
+
+    return this.prisma.chatMessage.findMany({
+      where: { outingId },
+      orderBy: { sentAt: 'asc' },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async sendMessage(userId: string, outingId: string, content: string) {
+    await this.assertChatAccess(userId, outingId);
+
+    return this.prisma.chatMessage.create({
+      data: {
+        outingId,
+        senderId: userId,
+        content,
+      },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
   async create(userId: string, createOutingDto: CreateOutingDto) {
     const participantIds = Array.from(
       new Set(

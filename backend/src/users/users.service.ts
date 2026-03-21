@@ -22,6 +22,24 @@ type SanitizedUser<T extends { passwordHash?: string | null }> = Omit<
   'passwordHash'
 >;
 
+export interface UserPreferenceTag {
+  id: number;
+  name: string;
+}
+
+export interface UserPreferenceCategory {
+  id: number;
+  name: string;
+  color: string;
+  icon: string;
+  tags: UserPreferenceTag[];
+}
+
+export interface UserTagPreferencesResponse {
+  categories: UserPreferenceCategory[];
+  selectedTagIds: number[];
+}
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -232,5 +250,78 @@ export class UsersService {
       where: { userId },
       data: { status: 'APPROVED' },
     });
+  }
+
+  async getTagPreferences(userId: string): Promise<UserTagPreferencesResponse> {
+    const [categories, interests] = await Promise.all([
+      this.prisma.category.findMany({
+        orderBy: { name: 'asc' },
+        include: {
+          Tag: {
+            select: {
+              id: true,
+              name: true,
+            },
+            orderBy: { name: 'asc' },
+          },
+        },
+      }),
+      this.prisma.userTagInterest.findMany({
+        where: { userId },
+        select: { tagId: true },
+      }),
+    ]);
+
+    return {
+      categories: categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        color: category.color,
+        icon: category.icon,
+        tags: category.Tag,
+      })),
+      selectedTagIds: interests.map((interest) => interest.tagId),
+    };
+  }
+
+  async updateTagPreferences(
+    userId: string,
+    tagIds: number[],
+  ): Promise<UserTagPreferencesResponse> {
+    const uniqueTagIds = Array.from(new Set(tagIds));
+
+    if (uniqueTagIds.length > 0) {
+      const existingTags = await this.prisma.tag.findMany({
+        where: {
+          id: {
+            in: uniqueTagIds,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existingTags.length !== uniqueTagIds.length) {
+        throw new NotFoundException('Certains tags sont introuvables.');
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.userTagInterest.deleteMany({
+        where: { userId },
+      }),
+      ...(uniqueTagIds.length > 0
+        ? [
+            this.prisma.userTagInterest.createMany({
+              data: uniqueTagIds.map((tagId) => ({
+                userId,
+                tagId,
+              })),
+              skipDuplicates: true,
+            }),
+          ]
+        : []),
+    ]);
+
+    return this.getTagPreferences(userId);
   }
 }

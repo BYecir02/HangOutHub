@@ -83,6 +83,11 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
           <Stack.Screen name="connections" options={{ headerShown: false }} />
+          <Stack.Screen name="messages" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="outing-chat/[id]"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />

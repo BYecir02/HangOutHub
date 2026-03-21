@@ -146,11 +146,8 @@ export default function SocialFeed() {
     });
   };
 
-  const handleMessagesPlaceholder = () => {
-    Alert.alert(
-      'Messagerie bientot disponible',
-      'Les conversations privees et de groupe arriveront dans une prochaine version.',
-    );
+  const handleOpenMessages = () => {
+    router.push('/messages');
   };
 
   const renderHeader = () => (
@@ -169,26 +166,11 @@ export default function SocialFeed() {
         </View>
 
         <TouchableOpacity
-          onPress={handleMessagesPlaceholder}
+          onPress={handleOpenMessages}
           className="h-12 w-12 items-center justify-center rounded-2xl bg-[#4c669f]"
         >
           <Ionicons name="chatbubble-ellipses-outline" size={22} color="#ffffff" />
         </TouchableOpacity>
-      </View>
-
-      <View className="mt-6 flex-row items-start rounded-3xl bg-[#4c669f]/10 p-4">
-        <View className="mr-3 mt-0.5 h-10 w-10 items-center justify-center rounded-2xl bg-[#4c669f]">
-          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
-        </View>
-        <View className="flex-1">
-          <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-            Conversations plus tard
-          </Text>
-          <Text className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
-            La messagerie privee et les groupes ne font pas encore partie du
-            parcours MVP principal.
-          </Text>
-        </View>
       </View>
     </View>
   );
