@@ -5,11 +5,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  useColorScheme,
   Switch,
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import api, { storage } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -205,6 +205,15 @@ export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50 dark:bg-black">
       <View className="p-5">
+        <View className="flex-row items-center mb-4 pt-10">
+          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+            <Ionicons name="arrow-back" size={24} color={iconColor} />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+            Parametres
+          </Text>
+        </View>
+
         {loading ? (
           <View className="py-12 items-center">
             <ActivityIndicator size="large" color="#4c669f" />

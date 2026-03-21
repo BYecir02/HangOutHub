@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -21,6 +22,11 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const { setColorScheme } = useNativeWindColorScheme();
+
+  useEffect(() => {
+    setColorScheme(colorScheme === 'dark' ? 'dark' : 'light');
+  }, [colorScheme, setColorScheme]);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,9 +70,7 @@ export default function RootLayout() {
           <Stack.Screen
             name="settings"
             options={{
-              headerShown: true,
-              title: 'Parametres',
-              headerBackTitle: 'Retour',
+              headerShown: false,
             }}
           />
           <Stack.Screen
