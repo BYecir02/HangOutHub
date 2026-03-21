@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +8,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { storage } from '@/services/api';
+import {
+  loadAppPreferences,
+  syncAppPreferencesFromSettings,
+} from '@/services/app-preferences';
+import { getMySettings } from '@/services/settings';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -14,6 +21,36 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const bootstrapPreferences = async () => {
+      await loadAppPreferences();
+
+      const token = await storage.getItem('userToken');
+
+      if (!token || !isMounted) {
+        return;
+      }
+
+      try {
+        const settings = await getMySettings();
+
+        if (isMounted) {
+          await syncAppPreferencesFromSettings(settings);
+        }
+      } catch {
+        // Ignore l'erreur: l'app continue sur les preferences locales.
+      }
+    };
+
+    void bootstrapPreferences();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

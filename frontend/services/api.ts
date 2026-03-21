@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { getCurrentDataSaver } from './app-preferences';
+
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const API_URL = `${BASE_URL}/api/v1`;
@@ -197,12 +199,38 @@ export const getImageUrl = (url: string | null | undefined) => {
     return null;
   }
 
+  const applyDataSaverOnRemoteUrl = (value: string) => {
+    if (!getCurrentDataSaver()) {
+      return value;
+    }
+
+    try {
+      const parsed = new URL(value);
+
+      if (parsed.hostname.includes('images.unsplash.com')) {
+        const currentWidth = Number(parsed.searchParams.get('w') || 0);
+
+        if (!currentWidth || currentWidth > 720) {
+          parsed.searchParams.set('w', '720');
+        }
+
+        parsed.searchParams.set('q', '60');
+        parsed.searchParams.set('auto', 'format');
+        return parsed.toString();
+      }
+    } catch {
+      return value;
+    }
+
+    return value;
+  };
+
   if (url.includes('/uploads/')) {
     const path = url.substring(url.indexOf('/uploads/'));
     return `${BASE_URL}${path}`;
   }
 
-  return url;
+  return applyDataSaverOnRemoteUrl(url);
 };
 
 export default api;

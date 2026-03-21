@@ -12,6 +12,102 @@ import { CreateOutingDto } from './dto/create-outing.dto';
 export class OutingsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async getInvitePolicy(
+    inviterId: string,
+    participantIds: string[],
+  ) {
+    if (participantIds.length === 0) {
+      return {
+        notifiableParticipantIds: [] as string[],
+      };
+    }
+
+    const participants = await this.prisma.user.findMany({
+      where: {
+        id: { in: participantIds },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        UserSettings: {
+          select: {
+            allowOutingInvitesFrom: true,
+            notificationOutingInvites: true,
+          },
+        },
+      },
+    });
+
+    if (participants.length !== participantIds.length) {
+      throw new BadRequestException('Certaines invitations sont invalides.');
+    }
+
+    const acceptedConnections = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          {
+            requesterId: inviterId,
+            receiverId: {
+              in: participantIds,
+            },
+          },
+          {
+            receiverId: inviterId,
+            requesterId: {
+              in: participantIds,
+            },
+          },
+        ],
+      },
+      select: {
+        requesterId: true,
+        receiverId: true,
+      },
+    });
+
+    const connectedParticipantIds = new Set(
+      acceptedConnections.map((connection) =>
+        connection.requesterId === inviterId
+          ? connection.receiverId
+          : connection.requesterId,
+      ),
+    );
+
+    const blockedByPrivacy = participants.filter((participant) => {
+      const inviteScope =
+        participant.UserSettings?.allowOutingInvitesFrom || 'connections';
+
+      if (inviteScope === 'nobody') {
+        return true;
+      }
+
+      if (
+        inviteScope === 'connections' &&
+        !connectedParticipantIds.has(participant.id)
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (blockedByPrivacy.length > 0) {
+      throw new BadRequestException(
+        'Certaines invitations sont bloquees par les parametres de confidentialite des participants.',
+      );
+    }
+
+    return {
+      notifiableParticipantIds: participants
+        .filter(
+          (participant) =>
+            participant.UserSettings?.notificationOutingInvites !== false,
+        )
+        .map((participant) => participant.id),
+    };
+  }
+
   private async touchChatReadAt(userId: string, outingId: string) {
     await this.prisma.outingParticipant.updateMany({
       where: {
@@ -217,6 +313,41 @@ export class OutingsService {
 
     await this.touchChatReadAt(userId, outingId);
 
+    const recipients = await this.prisma.outingParticipant.findMany({
+      where: {
+        outingId,
+        userId: { not: userId },
+        status: { not: 'DECLINED' },
+      },
+      select: {
+        userId: true,
+        User: {
+          select: {
+            UserSettings: {
+              select: {
+                notificationMessages: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const notifiableRecipientIds = recipients
+      .filter((participant) => participant.User?.UserSettings?.notificationMessages !== false)
+      .map((participant) => participant.userId);
+
+    if (notifiableRecipientIds.length > 0) {
+      await this.prisma.notification.createMany({
+        data: notifiableRecipientIds.map((participantId) => ({
+          userId: participantId,
+          actorId: userId,
+          type: 'OUTING_MESSAGE',
+          isRead: false,
+        })),
+      });
+    }
+
     return message;
   }
 
@@ -249,45 +380,7 @@ export class OutingsService {
       }
     }
 
-    if (participantIds.length > 0) {
-      const acceptedConnections = await this.prisma.friendship.findMany({
-        where: {
-          status: 'ACCEPTED',
-          OR: [
-            {
-              requesterId: userId,
-              receiverId: {
-                in: participantIds,
-              },
-            },
-            {
-              receiverId: userId,
-              requesterId: {
-                in: participantIds,
-              },
-            },
-          ],
-        },
-        select: {
-          requesterId: true,
-          receiverId: true,
-        },
-      });
-
-      const allowedParticipantIds = new Set(
-        acceptedConnections.map((connection) =>
-          connection.requesterId === userId
-            ? connection.receiverId
-            : connection.requesterId,
-        ),
-      );
-
-      if (allowedParticipantIds.size !== participantIds.length) {
-        throw new BadRequestException(
-          'Certaines invitations sont invalides. Invitez uniquement vos connexions.',
-        );
-      }
-    }
+    const invitePolicy = await this.getInvitePolicy(userId, participantIds);
 
     const outing = await this.prisma.outing.create({
       data: {
@@ -348,9 +441,9 @@ export class OutingsService {
       },
     });
 
-    if (participantIds.length > 0) {
+    if (invitePolicy.notifiableParticipantIds.length > 0) {
       await this.prisma.notification.createMany({
-        data: participantIds.map((participantId) => ({
+        data: invitePolicy.notifiableParticipantIds.map((participantId) => ({
           userId: participantId,
           actorId: userId,
           type: 'OUTING_INVITE',
@@ -516,43 +609,7 @@ export class OutingsService {
       return this.findOneForUser(userId, outingId);
     }
 
-    const acceptedConnections = await this.prisma.friendship.findMany({
-      where: {
-        status: 'ACCEPTED',
-        OR: [
-          {
-            requesterId: userId,
-            receiverId: {
-              in: uniqueIds,
-            },
-          },
-          {
-            receiverId: userId,
-            requesterId: {
-              in: uniqueIds,
-            },
-          },
-        ],
-      },
-      select: {
-        requesterId: true,
-        receiverId: true,
-      },
-    });
-
-    const allowedParticipantIds = new Set(
-      acceptedConnections.map((connection) =>
-        connection.requesterId === userId
-          ? connection.receiverId
-          : connection.requesterId,
-      ),
-    );
-
-    if (allowedParticipantIds.size !== uniqueIds.length) {
-      throw new BadRequestException(
-        'Certaines invitations sont invalides. Invitez uniquement vos connexions.',
-      );
-    }
+    const invitePolicy = await this.getInvitePolicy(userId, uniqueIds);
 
     await this.prisma.outingParticipant.createMany({
       data: uniqueIds.map((participantId) => ({
@@ -564,14 +621,16 @@ export class OutingsService {
       skipDuplicates: true,
     });
 
-    await this.prisma.notification.createMany({
-      data: uniqueIds.map((participantId) => ({
-        userId: participantId,
-        actorId: userId,
-        type: 'OUTING_INVITE',
-        isRead: false,
-      })),
-    });
+    if (invitePolicy.notifiableParticipantIds.length > 0) {
+      await this.prisma.notification.createMany({
+        data: invitePolicy.notifiableParticipantIds.map((participantId) => ({
+          userId: participantId,
+          actorId: userId,
+          type: 'OUTING_INVITE',
+          isRead: false,
+        })),
+      });
+    }
 
     return this.findOneForUser(userId, outingId);
   }

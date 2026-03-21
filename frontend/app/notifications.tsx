@@ -12,6 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import SocialEmptyState from '../components/social/SocialEmptyState';
+import { useAppLanguage } from '@/hooks/use-app-language';
 import api from '../services/api';
 import { getFriendshipOverview } from '../services/friendships';
 import {
@@ -35,6 +36,8 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const appLanguage = useAppLanguage();
+  const locale = appLanguage === 'en' ? 'en-US' : 'fr-FR';
   const [loading, setLoading] = useState(true);
   const [friendships, setFriendships] =
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
@@ -45,7 +48,7 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const formatEventDate = (value: string) =>
-    new Date(value).toLocaleString('fr-FR', {
+    new Date(value).toLocaleString(locale, {
       day: '2-digit',
       month: 'short',
       hour: '2-digit',

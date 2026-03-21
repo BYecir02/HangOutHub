@@ -22,6 +22,15 @@ export class NotificationsService {
   }
 
   async getActivity(userId: string) {
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: { notificationSavedPlacesActivity: true },
+    });
+
+    if (settings?.notificationSavedPlacesActivity === false) {
+      return [];
+    }
+
     const savedPlaces = await this.prisma.savedPlace.findMany({
       where: { userId },
       select: { placeId: true },

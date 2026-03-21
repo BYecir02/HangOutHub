@@ -21,6 +21,7 @@ import {
   type UserSettings,
   updateMySettings,
 } from '@/services/settings';
+import { syncAppPreferencesFromSettings } from '@/services/app-preferences';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function SettingsScreen() {
     try {
       const nextSettings = await getMySettings();
       setSettings(nextSettings);
+      await syncAppPreferencesFromSettings(nextSettings);
     } catch (error) {
       console.error('Erreur chargement settings:', error);
       setSettings(null);
@@ -66,15 +68,18 @@ export default function SettingsScreen() {
     };
 
     setSettings(optimisticSettings);
+    await syncAppPreferencesFromSettings(optimisticSettings);
 
     try {
       const savedSettings = await updateMySettings({
         [key]: value,
       } as Partial<UserSettings>);
       setSettings(savedSettings);
+      await syncAppPreferencesFromSettings(savedSettings);
     } catch (error) {
       console.error('Erreur sauvegarde settings:', error);
       setSettings(previousSettings);
+      await syncAppPreferencesFromSettings(previousSettings);
       Alert.alert('Erreur', 'Impossible de sauvegarder ce parametre.');
     }
   };

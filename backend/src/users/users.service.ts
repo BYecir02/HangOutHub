@@ -262,10 +262,19 @@ export class UsersService {
             Outing: true,
           },
         },
+        UserSettings: {
+          select: {
+            profilePublic: true,
+          },
+        },
       },
     });
 
     if (!user) {
+      return null;
+    }
+
+    if (user.UserSettings && user.UserSettings.profilePublic === false) {
       return null;
     }
 

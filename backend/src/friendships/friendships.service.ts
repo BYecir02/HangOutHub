@@ -289,14 +289,21 @@ export class FriendshipsService {
       },
     });
 
-    await this.prisma.notification.create({
-      data: {
-        userId: targetUserId,
-        actorId: userId,
-        type: 'FRIEND_REQUEST',
-        isRead: false,
-      },
+    const receiverSettings = await this.prisma.userSettings.findUnique({
+      where: { userId: targetUserId },
+      select: { notificationFriendRequests: true },
     });
+
+    if (receiverSettings?.notificationFriendRequests !== false) {
+      await this.prisma.notification.create({
+        data: {
+          userId: targetUserId,
+          actorId: userId,
+          type: 'FRIEND_REQUEST',
+          isRead: false,
+        },
+      });
+    }
 
     return friendship;
   }

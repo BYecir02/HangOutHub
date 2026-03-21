@@ -15,6 +15,7 @@ import EventCard from '@/components/ui/EventCard';
 import Header from '@/components/ui/Header';
 import PlaceCard from '@/components/ui/PlaceCard';
 import SuggestionCard from '@/components/ui/SuggestionCard';
+import { useAppLanguage } from '@/hooks/use-app-language';
 import api, { getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { Category } from '@/types';
@@ -51,8 +52,8 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-function formatEventDate(value: string) {
-  return new Date(value).toLocaleString('fr-FR', {
+function formatEventDate(value: string, locale: 'fr-FR' | 'en-US') {
+  return new Date(value).toLocaleString(locale, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -60,9 +61,12 @@ function formatEventDate(value: string) {
   });
 }
 
-function formatEventPrice(value: number | string | null) {
+function formatEventPrice(
+  value: number | string | null,
+  locale: 'fr-FR' | 'en-US',
+) {
   const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString('fr-FR')} FCFA` : 'Gratuit';
+  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : 'Gratuit';
 }
 
 function SectionPlaceholder({ message }: { message: string }) {
@@ -80,6 +84,8 @@ export default function HomeScreen() {
   const placesRoute = '/places' as Href;
   const eventsRoute = '/events' as Href;
   const discoverRoute = '/discover' as Href;
+  const appLanguage = useAppLanguage();
+  const locale = appLanguage === 'en' ? 'en-US' : 'fr-FR';
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<HomeEvent[]>([]);
   const [places, setPlaces] = useState<HomePlace[]>([]);
@@ -205,7 +211,7 @@ export default function HomeScreen() {
         id: event.id,
         title: event.title,
         category: event.Place?.name || event.address || 'Lieu a confirmer',
-        date: formatEventDate(event.startTime),
+        date: formatEventDate(event.startTime, locale),
         image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
         reason:
           index === 0
@@ -214,7 +220,7 @@ export default function HomeScreen() {
               ? 'A ne pas manquer'
               : 'Selection locale',
       })),
-    [featuredEvents],
+    [featuredEvents, locale],
   );
 
   const handleCategoryPress = (categoryId: number) => {
@@ -302,10 +308,10 @@ export default function HomeScreen() {
             renderItem={({ item }) => (
               <EventCard
                 title={item.title}
-                date={formatEventDate(item.startTime)}
+                date={formatEventDate(item.startTime, locale)}
                 location={item.Place?.name || item.address || 'Lieu a confirmer'}
                 imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                price={formatEventPrice(item.entryFee)}
+                price={formatEventPrice(item.entryFee, locale)}
                 onPress={() =>
                   router.push({
                     pathname: '/event/[id]',
