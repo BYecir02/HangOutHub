@@ -115,6 +115,7 @@ export default function RootLayout() {
             name="event"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
           />
+          <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
           <Stack.Screen
             name="outing"
@@ -134,10 +135,6 @@ export default function RootLayout() {
           <Stack.Screen name="discover" options={{ headerShown: false }} />
           <Stack.Screen
             name="post"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen
-            name="organizer/create-place"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}
           />
           <Stack.Screen name="organizer" options={{ headerShown: false }} />

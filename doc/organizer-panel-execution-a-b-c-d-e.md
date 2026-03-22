@@ -351,7 +351,7 @@ Findings:
   - `POST /events` etait accessible a un user standard (role `USER`)
   - role gate ajoute et revalide: `USER` bloque (403), `ORGANIZER` autorise
 
-## U. User acceptance interne (demarre - lot QR participant livre)
+## U. User acceptance interne (fait)
 Objectif:
 - activer le flux de base participant -> billet QR -> scan organizer avec donnees reelles
 
@@ -379,6 +379,45 @@ Validation smoke test (22/03/2026):
   - `EVENT_SCANS_EXPECTED=1`
   - `EVENT_SCANS_SCANNED=1`
   - `EVENT_SCANS_ITEMS=1`
+
+Validation complementaire (22/03/2026):
+- lot A edition event:
+  - `PATCH /events/:id` autorise organizer proprietaire
+  - edition titre/date/lieu/tarif unique validee
+- lot B multi-tarifs:
+  - creation event avec `ticketTypes` validee
+  - selection de tarif cote participant validee
+  - booking enregistre avec `ticketTypeId` coherent
+- stock/sold-out:
+  - decrement de `TicketType.quantity` a la reservation confirmee
+  - blocage 400 lorsque tarif epuise
+  - UI participant: tri disponible puis sold-out + badges stock/sold-out
+- scanner idempotent sur billet confirme:
+  - `U_SCAN1_STATUS=VALID_CHECKED_IN_NOW`
+  - `U_SCAN2_STATUS=VALID_ALREADY_CHECKED_IN`
+  - `U_SCAN_COUNTER=1`
+
+Resultat:
+- le parcours acceptance organizer/participant est valide de bout en bout
+- U peut etre considere clos pour la release candidate courante
+
+## V. Verrouiller la regression (fait)
+Objectif:
+- automatiser un filet de securite minimal mais concret sur les flux critiques organizer/booking/scans
+
+Implementation realisee:
+- script de regression versionne:
+  - `backend/scripts/regression-v.ps1`
+- checks couverts:
+  - disponibilite API
+  - login seeds organizer/participant
+  - role gate create event (`USER` bloque en 403)
+  - booking event idempotent
+  - listing `my-bookings` coherent
+  - endpoint scans accessible organizer
+  - endpoint scans interdit user standard (403)
+- rapport de validation V:
+  - `doc/organizer-regression-v.md`
 
 ## Delta code realise dans cette phase
 - frontend/services/organizer-access.ts (nouveau)
@@ -408,18 +447,20 @@ Validation smoke test (22/03/2026):
 - backend/src/events/events.controller.ts
 - backend/src/events/events.service.ts
 - backend/src/events/dto/create-event-booking.dto.ts (nouveau)
+- backend/src/events/dto/update-event.dto.ts (nouveau)
 - frontend/services/event-bookings.ts (nouveau)
 - frontend/app/my-tickets.tsx (nouveau)
 - frontend/app/event-scans/[id].tsx (nouveau)
 - frontend/app/event/[id].tsx
+- frontend/app/event-edit/[id].tsx (nouveau)
 - frontend/app.d.ts
 - frontend/app/organizer/dashboard.tsx
 - doc/organizer-api-contracts-s.md
 - doc/organizer-flow-validation-t.md
+- backend/scripts/regression-v.ps1 (nouveau)
+- doc/organizer-regression-v.md (nouveau)
 
 ## Points restant apres A-B-C-D-E-F-G-H-I-J-K-L-M-N-O-P-Q-R-S
-- U. User acceptance interne (suite)
-- V. Verrouiller la regression
 - W. Write docs
 - X. eXperience monitoring
 - Y. Yield release plan

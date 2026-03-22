@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Platform,
   ScrollView,
@@ -12,13 +11,12 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api from '../services/api';
+import api from '@/services/api';
 
 interface OwnedPlaceOption {
   id: string;
@@ -33,13 +31,32 @@ interface DraftTicketType {
   quantity: string;
 }
 
-export default function CreateEventScreen() {
+interface EventPayload {
+  id: string;
+  title: string;
+  description?: string | null;
+  startTime: string;
+  endTime?: string | null;
+  entryFee?: number | string | null;
+  placeId?: string | null;
+  TicketType?: Array<{
+    id: string;
+    name: string;
+    price: number | string;
+    quantity: number;
+  }>;
+}
+
+export default function EditEventScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string }>();
+  const eventId = typeof params.id === 'string' ? params.id : '';
   const colorScheme = useColorScheme();
-  const { locale, t } = useI18n();
   const isDark = colorScheme === 'dark';
-  const [loading, setLoading] = useState(false);
-  const [placesLoading, setPlacesLoading] = useState(true);
+  const { locale, t } = useI18n();
+
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [ownedPlaces, setOwnedPlaces] = useState<OwnedPlaceOption[]>([]);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({
@@ -48,63 +65,77 @@ export default function CreateEventScreen() {
     startTime: new Date(),
     endTime: new Date(Date.now() + 3600000),
   });
-  const [ticketTypes, setTicketTypes] = useState<DraftTicketType[]>([
-    {
-      id: `ticket-${Date.now()}`,
-      name: 'Standard',
-      price: '0',
-      quantity: '100',
-    },
-  ]);
+  const [ticketTypes, setTicketTypes] = useState<DraftTicketType[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [currentField, setCurrentField] = useState<'start' | 'end'>('start');
-  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
-  const [coverIndex, setCoverIndex] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
 
-    const fetchOwnedPlaces = async () => {
+    const bootstrap = async () => {
+      if (!eventId) {
+        setInitialLoading(false);
+        return;
+      }
+
       try {
-        const response = await api.get('/users/me');
-        const places = response.data?.OwnedPlaces || [];
-        if (isMounted) {
-          setOwnedPlaces(places);
-          setSelectedPlaceId(places[0]?.id || null);
+        const [eventRes, meRes] = await Promise.all([
+          api.get<EventPayload>(`/events/${eventId}`),
+          api.get('/users/me'),
+        ]);
+
+        if (!isMounted) {
+          return;
         }
+
+        const event = eventRes.data;
+        const places = meRes.data?.OwnedPlaces || [];
+        const eventTicketTypes = (event.TicketType || []).map((ticketType) => ({
+          id: ticketType.id,
+          name: ticketType.name,
+          price: String(Number(ticketType.price || 0)),
+          quantity: String(ticketType.quantity || 1),
+        }));
+
+        setOwnedPlaces(places);
+        setSelectedPlaceId(event.placeId || places[0]?.id || null);
+        setEventForm({
+          title: event.title || '',
+          description: event.description || '',
+          startTime: new Date(event.startTime),
+          endTime: new Date(event.endTime || event.startTime),
+        });
+        setTicketTypes(
+          eventTicketTypes.length > 0
+            ? eventTicketTypes
+            : [
+                {
+                  id: `ticket-${Date.now()}`,
+                  name: 'Standard',
+                  price: String(Number(event.entryFee || 0)),
+                  quantity: '100',
+                },
+              ],
+        );
       } catch {
         if (isMounted) {
-          setOwnedPlaces([]);
-          setSelectedPlaceId(null);
+          Alert.alert(t('commonErrorTitle'), t('eventEditLoadFailed'));
+          router.back();
         }
       } finally {
         if (isMounted) {
-          setPlacesLoading(false);
+          setInitialLoading(false);
         }
       }
     };
 
-    void fetchOwnedPlaces();
+    void bootstrap();
 
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      allowsMultipleSelection: true,
-      selectionLimit: 5,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setImages((current) => [...current, ...result.assets]);
-    }
-  };
+  }, [eventId, router, t]);
 
   const showDatepicker = (field: 'start' | 'end', mode: 'date' | 'time') => {
     setCurrentField(field);
@@ -112,7 +143,7 @@ export default function CreateEventScreen() {
     setShowPicker(true);
   };
 
-  const onDateChange = (_event: any, selectedDate?: Date) => {
+  const onDateChange = (_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowPicker(false);
     }
@@ -132,7 +163,11 @@ export default function CreateEventScreen() {
     setEventForm((prev) => ({ ...prev, endTime: selectedDate }));
   };
 
-  const handleCreateEvent = async () => {
+  const handleSave = async () => {
+    if (!eventId) {
+      return;
+    }
+
     if (!eventForm.title.trim()) {
       Alert.alert(t('commonErrorTitle'), t('createEventTitleRequired'));
       return;
@@ -171,53 +206,27 @@ export default function CreateEventScreen() {
       ? Math.min(...serializedTicketTypes.map((ticketType) => ticketType.price))
       : 0;
 
-    setLoading(true);
+    setSaving(true);
     try {
-      const formData = new FormData();
-      formData.append('title', eventForm.title.trim());
-      formData.append('description', eventForm.description.trim());
-      formData.append('startTime', eventForm.startTime.toISOString());
-      formData.append('endTime', eventForm.endTime.toISOString());
-      formData.append('entryFee', String(minimumPrice));
-      formData.append('ticketTypes', JSON.stringify(serializedTicketTypes));
-
-      if (selectedPlaceId) {
-        formData.append('placeId', selectedPlaceId);
-      }
-
-      if (images.length > 0) {
-        const coverImage = images[coverIndex];
-        formData.append('cover', {
-          uri: coverImage.uri,
-          name: coverImage.fileName || 'event-cover.jpg',
-          type: coverImage.mimeType || 'image/jpeg',
-        } as any);
-
-        images.forEach((img, index) => {
-          if (index !== coverIndex) {
-            formData.append('gallery', {
-              uri: img.uri,
-              name: img.fileName || `gallery-${index}.jpg`,
-              type: img.mimeType || 'image/jpeg',
-            } as any);
-          }
-        });
-      }
-
-      const response = await api.post('/events', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      await api.patch(`/events/${eventId}`, {
+        title: eventForm.title.trim(),
+        description: eventForm.description.trim(),
+        startTime: eventForm.startTime.toISOString(),
+        endTime: eventForm.endTime.toISOString(),
+        entryFee: minimumPrice,
+        placeId: selectedPlaceId || undefined,
+        ticketTypes: JSON.stringify(serializedTicketTypes),
       });
 
-      Alert.alert(t('createEventSuccessTitle'), t('createEventSuccessMessage'));
+      Alert.alert(t('eventEditSuccessTitle'), t('eventEditSuccessMessage'));
       router.replace({
         pathname: '/event/[id]',
-        params: { id: response.data.id },
+        params: { id: eventId },
       });
-    } catch (error) {
-      console.error(error);
-      Alert.alert(t('commonErrorTitle'), t('createEventCreateFailed'));
+    } catch {
+      Alert.alert(t('commonErrorTitle'), t('eventEditSaveFailed'));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -255,6 +264,14 @@ export default function CreateEventScreen() {
     });
   };
 
+  if (initialLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white dark:bg-black">
+        <ActivityIndicator size="large" color="#4c669f" />
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">
       <View className="flex-row items-center border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
@@ -265,60 +282,11 @@ export default function CreateEventScreen() {
           <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          {t('createEventTitle')}
+          {t('eventEditTitle')}
         </Text>
       </View>
 
       <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
-        <View className="mb-6">
-          <TouchableOpacity
-            onPress={pickImage}
-            className="relative h-48 items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900"
-          >
-            {images.length > 0 ? (
-              <>
-                <Image
-                  source={{ uri: images[coverIndex].uri }}
-                  className="h-full w-full"
-                  resizeMode="cover"
-                />
-                <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1">
-                  <Text className="text-xs font-bold text-white">{t('createEventCover')}</Text>
-                </View>
-              </>
-            ) : (
-              <View className="items-center">
-                <Ionicons name="images-outline" size={40} color="#999" />
-                <Text className="mt-2 font-medium text-gray-400">
-                  {t('createEventAddPhotos')}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {images.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
-              {images.map((img, index) => (
-                <TouchableOpacity
-                  key={`${img.uri}-${index}`}
-                  onPress={() => setCoverIndex(index)}
-                  className={`mr-3 h-16 w-16 overflow-hidden rounded-lg border-2 ${
-                    index === coverIndex ? 'border-[#ff4757]' : 'border-transparent'
-                  }`}
-                >
-                  <Image source={{ uri: img.uri }} className="h-16 w-16" />
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={pickImage}
-                className="h-16 w-16 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
-              >
-                <Ionicons name="add" size={24} color="#999" />
-              </TouchableOpacity>
-            </ScrollView>
-          ) : null}
-        </View>
-
         <View className="gap-4">
           <TextInput
             placeholder={t('createEventFieldTitlePlaceholder')}
@@ -332,9 +300,7 @@ export default function CreateEventScreen() {
             <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
               {t('createEventAttachedPlace')}
             </Text>
-            {placesLoading ? (
-              <ActivityIndicator color="#4c669f" />
-            ) : ownedPlaces.length > 0 ? (
+            {ownedPlaces.length > 0 ? (
               ownedPlaces.map((place) => (
                 <TouchableOpacity
                   key={place.id}
@@ -354,17 +320,9 @@ export default function CreateEventScreen() {
                 </TouchableOpacity>
               ))
             ) : (
-              <View>
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  {t('createEventNoAttachedPlace')}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push('/organizer/create-place')}
-                  className="mt-3 self-start rounded-xl bg-[#2ecc71] px-4 py-3"
-                >
-                  <Text className="font-semibold text-white">{t('createEventCreatePlace')}</Text>
-                </TouchableOpacity>
-              </View>
+              <Text className="text-sm text-gray-500 dark:text-gray-400">
+                {t('createEventNoAttachedPlace')}
+              </Text>
             )}
           </View>
 
@@ -433,9 +391,9 @@ export default function CreateEventScreen() {
               </Text>
               <TouchableOpacity
                 onPress={addTicketType}
-                className="rounded-full border border-[#ff4757] px-3 py-1.5"
+                className="rounded-full border border-[#4c669f] px-3 py-1.5"
               >
-                <Text className="text-xs font-semibold text-[#ff4757]">
+                <Text className="text-xs font-semibold text-[#4c669f]">
                   {t('createEventTicketTypeAdd')}
                 </Text>
               </TouchableOpacity>
@@ -488,6 +446,7 @@ export default function CreateEventScreen() {
               </View>
             ))}
           </View>
+
           <TextInput
             placeholder={t('createEventDescriptionPlaceholder')}
             placeholderTextColor={isDark ? '#666' : '#999'}
@@ -502,15 +461,15 @@ export default function CreateEventScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={handleCreateEvent}
-          disabled={loading}
-          className="mb-10 mt-8 items-center rounded-xl bg-[#ff4757] py-4"
+          onPress={handleSave}
+          disabled={saving}
+          className="mb-10 mt-8 items-center rounded-xl bg-[#4c669f] py-4"
         >
-          {loading ? (
+          {saving ? (
             <ActivityIndicator color="white" />
           ) : (
             <Text className="text-lg font-bold text-white">
-              {t('createEventPublishNow')}
+              {t('eventEditSaveButton')}
             </Text>
           )}
         </TouchableOpacity>

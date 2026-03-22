@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Patch,
   ParseUUIDPipe,
   Param,
   Post,
@@ -19,6 +20,7 @@ import { memoryStorage } from 'multer';
 import { CreateEventBookingDto } from './dto/create-event-booking.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventsService } from './events.service';
+import { UpdateEventDto } from './dto/update-event.dto';
 
 interface AuthenticatedRequest {
   user: {
@@ -80,6 +82,17 @@ export class EventsController {
   @Get('mine')
   findMine(@Req() req: AuthenticatedRequest) {
     return this.eventsService.findMine(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch(':id')
+  update(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateEventDto,
+  ) {
+    this.ensureOrganizerRole(req);
+    return this.eventsService.update(id, req.user.userId, req.user.role, body);
   }
 
   @UseGuards(AuthGuard('jwt'))

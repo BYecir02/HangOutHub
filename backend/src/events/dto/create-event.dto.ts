@@ -36,6 +36,10 @@ export class CreateEventDto {
   @IsUUID()
   placeId?: string; // Si l'événement se passe dans un lieu référencé (Bar, etc.)
 
+  @IsOptional()
+  @IsString()
+  ticketTypes?: string;
+
   // Note : Dans ton schéma, l'Event n'est pas lié directement à Category,
   // mais via des Tags. On verra ça après, restons simple pour la création.
 }

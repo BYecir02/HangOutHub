@@ -8,6 +8,17 @@ import { getCurrentDataSaver } from './app-preferences';
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 const API_URL = `${BASE_URL}/api/v1`;
+const isNgrokBaseUrl =
+  BASE_URL.includes('ngrok-free.app') ||
+  BASE_URL.includes('ngrok-free.dev') ||
+  BASE_URL.includes('.ngrok.io');
+const defaultHeaders: Record<string, string> = {
+  'Content-Type': 'application/json',
+};
+
+if (isNgrokBaseUrl) {
+  defaultHeaders['ngrok-skip-browser-warning'] = 'true';
+}
 const ACCESS_TOKEN_KEY = 'userToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_INFO_KEY = 'userInfo';
@@ -18,16 +29,12 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: defaultHeaders,
 });
 
 const refreshClient = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: defaultHeaders,
 });
 
 let refreshInFlight: Promise<string | null> | null = null;

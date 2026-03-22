@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -25,6 +25,15 @@ import {
 
 const SCAN_THROTTLE_MS = 1000;
 const SCAN_FREEZE_MS = 1500;
+const RECENT_SCANS_LIMIT = 8;
+
+interface RecentScanItem {
+  id: string;
+  attendeeName: string;
+  ticketName: string;
+  status: ScannerVerificationStatus;
+  scannedAt: string;
+}
 
 const statusToneClass: Record<ScannerVerificationStatus, string> = {
   VALID_CHECKED_IN_NOW:
@@ -69,8 +78,8 @@ const statusMessageKey: Record<ScannerVerificationStatus, TranslationKey> = {
 
 export default function ScannerScreen() {
   const router = useRouter();
-  const { t } = useI18n();
-  const { loading, user, error, refetch } = useUserProfile();
+  const { locale, t } = useI18n();
+  const { loading, user, organizerEvents, error, refetch } = useUserProfile();
   const [permission, requestPermission] = useCameraPermissions();
   const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [isScanFrozen, setIsScanFrozen] = useState(false);
@@ -78,9 +87,26 @@ export default function ScannerScreen() {
   const [scanResult, setScanResult] =
     useState<ScannerVerificationResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [recentScans, setRecentScans] = useState<RecentScanItem[]>([]);
   const [cameraMountError, setCameraMountError] = useState<string | null>(null);
   const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
   const freezeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scanEligibleEvents = useMemo(() => {
+    const now = Date.now();
+
+    return organizerEvents.filter((event) => {
+      const boundaryRaw = event.endTime || event.startTime;
+      const boundary = new Date(boundaryRaw).getTime();
+
+      if (!Number.isFinite(boundary)) {
+        return false;
+      }
+
+      return boundary >= now;
+    });
+  }, [organizerEvents]);
 
   const isAllowed = useOrganizerGuard({
     user,
@@ -95,6 +121,18 @@ export default function ScannerScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (scanEligibleEvents.length === 0) {
+      setSelectedEventId('');
+      return;
+    }
+
+    const hasSelection = scanEligibleEvents.some((event) => event.id === selectedEventId);
+    if (!hasSelection) {
+      setSelectedEventId(scanEligibleEvents[0].id);
+    }
+  }, [scanEligibleEvents, selectedEventId]);
 
   const releaseScan = useCallback(() => {
     if (freezeTimeoutRef.current) {
@@ -126,6 +164,12 @@ export default function ScannerScreen() {
         return;
       }
 
+      if (!selectedEventId) {
+        setScanError(t('scannerSelectEventRequired'));
+        await triggerHaptic(false);
+        return;
+      }
+
       setLastScanAt(now);
       setIsProcessingScan(true);
       setIsScanFrozen(true);
@@ -138,9 +182,27 @@ export default function ScannerScreen() {
             : 'web';
         const result = await verifyOrganizerScan({
           code: data,
+          eventId: selectedEventId,
           source,
         });
         setScanResult(result);
+        if (result.attendee) {
+          const attendeeName =
+            result.attendee.displayName || result.attendee.username || '-';
+          const ticketName = result.ticket?.ticketTypeName || '-';
+          const scannedAt = result.checkedInAt || new Date().toISOString();
+
+          setRecentScans((current) => [
+            {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              attendeeName,
+              ticketName,
+              status: result.status,
+              scannedAt,
+            },
+            ...current,
+          ].slice(0, RECENT_SCANS_LIMIT));
+        }
         await triggerHaptic(result.status === 'VALID_CHECKED_IN_NOW');
       } catch (scanRequestError) {
         setScanResult(null);
@@ -153,7 +215,15 @@ export default function ScannerScreen() {
         releaseScan();
       }
     },
-    [isProcessingScan, isScanFrozen, lastScanAt, releaseScan, t, triggerHaptic],
+    [
+      isProcessingScan,
+      isScanFrozen,
+      lastScanAt,
+      releaseScan,
+      selectedEventId,
+      t,
+      triggerHaptic,
+    ],
   );
 
   const resetScanState = useCallback(() => {
@@ -163,6 +233,32 @@ export default function ScannerScreen() {
     setCameraMountError(null);
     setCameraInstanceKey((current) => current + 1);
   }, []);
+
+  const selectedEvent = scanEligibleEvents.find((event) => event.id === selectedEventId);
+
+  const formatRecentScanTime = (value: string) => {
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return '--:--';
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
+  };
+
+  const openSelectedEventScans = () => {
+    if (!selectedEventId) {
+      return;
+    }
+
+    router.push({
+      pathname: '/event-scans/[id]',
+      params: { id: selectedEventId },
+    });
+  };
 
   const handleCameraMountError = useCallback(
     (mountError: { message?: string }) => {
@@ -224,6 +320,66 @@ export default function ScannerScreen() {
       <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
         {t('scannerSubtitle')}
       </Text>
+
+      <View className="mt-4 rounded-2xl bg-white p-4 dark:bg-gray-900">
+        <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+          {t('scannerEventPickerTitle')}
+        </Text>
+        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {t('scannerEventPickerSubtitle')}
+        </Text>
+
+        {scanEligibleEvents.length === 0 ? (
+          <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+            {t('scannerEventNoEvents')}
+          </Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mt-3"
+            contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+          >
+            {scanEligibleEvents.map((event) => {
+              const selected = event.id === selectedEventId;
+              return (
+                <TouchableOpacity
+                  key={event.id}
+                  onPress={() => setSelectedEventId(event.id)}
+                  className={selected
+                    ? 'rounded-full bg-[#4c669f] px-4 py-2'
+                    : 'rounded-full border border-gray-300 px-4 py-2 dark:border-gray-700'}
+                >
+                  <Text
+                    numberOfLines={1}
+                    className={selected
+                      ? 'max-w-[220px] text-xs font-semibold text-white'
+                      : 'max-w-[220px] text-xs font-semibold text-gray-700 dark:text-gray-200'}
+                  >
+                    {event.title}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {selectedEvent ? (
+          <View className="mt-3 flex-row items-center justify-between">
+            <Text className="mr-3 flex-1 text-sm text-gray-600 dark:text-gray-300" numberOfLines={1}>
+              {t('scannerActiveEvent')}: {selectedEvent.title}
+            </Text>
+            <TouchableOpacity
+              onPress={openSelectedEventScans}
+              className="rounded-full border border-[#4c669f] px-3 py-1.5"
+            >
+              <Text className="text-xs font-semibold text-[#4c669f]">
+                {t('scannerOpenAllScans')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
 
       {error ? (
         <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
@@ -347,21 +503,40 @@ export default function ScannerScreen() {
               </View>
             ) : null}
 
-            <View className="mt-5 flex-row gap-3">
-              <TouchableOpacity
-                onPress={resetScanState}
-                className="flex-1 items-center rounded-2xl bg-[#4c669f] py-3"
-              >
-                <Text className="font-semibold text-white">{t('scannerRescanButton')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push('/organizer/events')}
-                className="flex-1 items-center rounded-2xl border border-gray-300 py-3 dark:border-gray-700"
-              >
-                <Text className="font-semibold text-gray-700 dark:text-gray-200">
-                  {t('organizerDashboardViewEvents')}
+            <View className="mt-6 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                {t('scannerRecentScansTitle')}
+              </Text>
+
+              {recentScans.length === 0 ? (
+                <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  {t('scannerRecentScansEmpty')}
                 </Text>
-              </TouchableOpacity>
+              ) : (
+                recentScans.map((item) => (
+                  <View
+                    key={item.id}
+                    className="mt-3 flex-row items-center justify-between rounded-xl bg-gray-100 px-3 py-2 dark:bg-gray-800"
+                  >
+                    <View className="mr-3 flex-1">
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
+                        {item.attendeeName}
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-gray-500 dark:text-gray-400" numberOfLines={1}>
+                        {item.ticketName}
+                      </Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                        {t(statusTitleKey[item.status])}
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        {formatRecentScanTime(item.scannedAt)}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         ) : null}

@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateEventBookingDto } from './dto/create-event-booking.dto';
 import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventDto } from './dto/update-event.dto';
 
 @Injectable()
 export class EventsService {
@@ -17,6 +18,60 @@ export class EventsService {
     private prisma: PrismaService,
     private storageService: StorageService,
   ) {}
+
+  private parseTicketTypesPayload(raw?: string) {
+    if (!raw) {
+      return [] as Array<{ name: string; price: number; quantity: number }>;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new BadRequestException('Format ticketTypes invalide.');
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new BadRequestException('ticketTypes doit etre une liste.');
+    }
+
+    const normalized = parsed.map((item) => {
+      const candidate = item as {
+        name?: string;
+        price?: number | string;
+        quantity?: number | string;
+      };
+
+      const name = (candidate.name || '').trim();
+      const price = Number(candidate.price || 0);
+      const quantity = Number(candidate.quantity || 0);
+
+      if (!name) {
+        throw new BadRequestException('Chaque tarif doit avoir un nom.');
+      }
+
+      if (!Number.isFinite(price) || price < 0) {
+        throw new BadRequestException('Prix de tarif invalide.');
+      }
+
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        throw new BadRequestException('Quantite de tarif invalide.');
+      }
+
+      return { name, price, quantity };
+    });
+
+    const dedup = new Set<string>();
+    for (const ticketType of normalized) {
+      const key = ticketType.name.toLowerCase();
+      if (dedup.has(key)) {
+        throw new BadRequestException('Les noms de tarifs doivent etre uniques.');
+      }
+      dedup.add(key);
+    }
+
+    return normalized;
+  }
 
   private formatBooking(booking: {
     id: string;
@@ -83,6 +138,13 @@ export class EventsService {
         ? await this.storageService.uploadFiles('events', files.gallery)
         : [];
 
+    const ticketTypes = this.parseTicketTypesPayload(createEventDto.ticketTypes);
+    const fallbackEntryFee = Number(createEventDto.entryFee || 0);
+    const minTicketPrice =
+      ticketTypes.length > 0
+        ? Math.min(...ticketTypes.map((ticketType) => ticketType.price))
+        : fallbackEntryFee;
+
     return this.prisma.event.create({
       data: {
         title: createEventDto.title,
@@ -91,11 +153,22 @@ export class EventsService {
         endTime: createEventDto.endTime
           ? new Date(createEventDto.endTime)
           : null,
-        entryFee: createEventDto.entryFee || 0,
+        entryFee: minTicketPrice,
         coverUrl,
         images: galleryUrls,
         organizerId: userId,
         placeId: createEventDto.placeId || null,
+        ...(ticketTypes.length > 0
+          ? {
+              TicketType: {
+                create: ticketTypes.map((ticketType) => ({
+                  name: ticketType.name,
+                  price: ticketType.price,
+                  quantity: ticketType.quantity,
+                })),
+              },
+            }
+          : {}),
       },
     });
   }
@@ -126,6 +199,146 @@ export class EventsService {
     });
   }
 
+  async update(
+    eventId: string,
+    userId: string,
+    role: string,
+    payload: UpdateEventDto,
+  ) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true,
+        organizerId: true,
+        placeId: true,
+        startTime: true,
+        endTime: true,
+        Place: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Evenement introuvable');
+    }
+
+    const normalizedRole = role.toUpperCase();
+    const canEditAsOrganizer =
+      normalizedRole === 'ORGANIZER' && event.organizerId === userId;
+    const canEditAsPlaceOwner =
+      normalizedRole === 'PLACE_OWNER' && event.Place?.ownerId === userId;
+
+    if (!canEditAsOrganizer && !canEditAsPlaceOwner) {
+      throw new ForbiddenException(
+        'Vous ne pouvez pas modifier cet evenement.',
+      );
+    }
+
+    if (payload.placeId) {
+      const place = await this.prisma.place.findUnique({
+        where: { id: payload.placeId },
+        select: {
+          id: true,
+          ownerId: true,
+        },
+      });
+
+      if (!place) {
+        throw new BadRequestException('Lieu introuvable pour cet evenement.');
+      }
+
+      if (normalizedRole === 'PLACE_OWNER' && place.ownerId !== userId) {
+        throw new ForbiddenException('Vous ne pouvez pas lier ce lieu.');
+      }
+    }
+
+    const nextStartTime = payload.startTime
+      ? new Date(payload.startTime)
+      : event.startTime;
+    const nextEndTime = payload.endTime
+      ? new Date(payload.endTime)
+      : event.endTime;
+
+    if (nextEndTime && nextEndTime < nextStartTime) {
+      throw new BadRequestException(
+        'La date de fin doit etre posterieure a la date de debut.',
+      );
+    }
+
+    const ticketTypes = this.parseTicketTypesPayload(payload.ticketTypes);
+
+    if (payload.ticketTypes !== undefined) {
+      const existingTicketBookings = await this.prisma.booking.count({
+        where: {
+          eventId,
+          ticketTypeId: {
+            not: null,
+          },
+          NOT: {
+            status: 'CANCELLED',
+          },
+        },
+      });
+
+      if (existingTicketBookings > 0) {
+        throw new BadRequestException(
+          'Impossible de modifier les tarifs: des reservations existent deja.',
+        );
+      }
+
+      await this.prisma.ticketType.deleteMany({
+        where: {
+          eventId,
+        },
+      });
+    }
+
+    return this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        ...(payload.title !== undefined ? { title: payload.title } : {}),
+        ...(payload.description !== undefined
+          ? { description: payload.description }
+          : {}),
+        ...(payload.startTime !== undefined
+          ? { startTime: new Date(payload.startTime) }
+          : {}),
+        ...(payload.endTime !== undefined
+          ? { endTime: new Date(payload.endTime) }
+          : {}),
+        ...(payload.entryFee !== undefined ? { entryFee: payload.entryFee } : {}),
+        ...(payload.placeId !== undefined ? { placeId: payload.placeId } : {}),
+        ...(payload.ticketTypes !== undefined
+          ? {
+              TicketType: {
+                create: ticketTypes.map((ticketType) => ({
+                  name: ticketType.name,
+                  price: ticketType.price,
+                  quantity: ticketType.quantity,
+                })),
+              },
+              entryFee:
+                ticketTypes.length > 0
+                  ? Math.min(...ticketTypes.map((ticketType) => ticketType.price))
+                  : Number(payload.entryFee || 0),
+            }
+          : {}),
+      },
+      include: {
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+      },
+    });
+  }
+
   async createBooking(
     userId: string,
     eventId: string,
@@ -141,7 +354,9 @@ export class EventsService {
         TicketType: {
           select: {
             id: true,
+            name: true,
             price: true,
+            quantity: true,
           },
         },
       },
@@ -160,8 +375,20 @@ export class EventsService {
       ? event.TicketType.find((ticketType) => ticketType.id === payload.ticketTypeId)
       : null;
 
+    if (!payload.ticketTypeId && event.TicketType.length > 0) {
+      throw new BadRequestException(
+        'Selectionne un tarif pour reserver cet evenement.',
+      );
+    }
+
     if (payload.ticketTypeId && !selectedTicketType) {
       throw new BadRequestException('Type de billet invalide pour cet evenement.');
+    }
+
+    if (selectedTicketType && selectedTicketType.quantity <= 0) {
+      throw new BadRequestException(
+        `Le tarif ${selectedTicketType.name} est epuise.`,
+      );
     }
 
     const existing = await this.prisma.booking.findFirst({
@@ -248,38 +475,62 @@ export class EventsService {
     const status = paymentRequired ? 'PENDING' : 'CONFIRMED';
     const qrCode = paymentRequired ? null : randomUUID();
 
-    const created = await this.prisma.booking.create({
-      data: {
-        userId,
-        eventId,
-        ticketTypeId: selectedTicketType?.id || null,
-        status,
-        qrCode,
-      },
-      include: {
-        Event: {
-          select: {
-            id: true,
-            title: true,
-            startTime: true,
-            endTime: true,
-            coverUrl: true,
-            organizerId: true,
-            Place: {
-              select: {
-                id: true,
-                name: true,
+    const created = await this.prisma.$transaction(async (tx) => {
+      if (selectedTicketType) {
+        const stockUpdate = await tx.ticketType.updateMany({
+          where: {
+            id: selectedTicketType.id,
+            quantity: {
+              gt: 0,
+            },
+          },
+          data: {
+            quantity: {
+              decrement: 1,
+            },
+          },
+        });
+
+        if (stockUpdate.count === 0) {
+          throw new BadRequestException(
+            `Le tarif ${selectedTicketType.name} est epuise.`,
+          );
+        }
+      }
+
+      return tx.booking.create({
+        data: {
+          userId,
+          eventId,
+          ticketTypeId: selectedTicketType?.id || null,
+          status,
+          qrCode,
+        },
+        include: {
+          Event: {
+            select: {
+              id: true,
+              title: true,
+              startTime: true,
+              endTime: true,
+              coverUrl: true,
+              organizerId: true,
+              Place: {
+                select: {
+                  id: true,
+                  name: true,
+                },
               },
             },
           },
-        },
-        TicketType: {
-          select: {
-            id: true,
-            name: true,
+          TicketType: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
+      });
     });
 
     return this.formatBooking(created);
@@ -457,6 +708,17 @@ export class EventsService {
                 name: true,
               },
             },
+          },
+        },
+        TicketType: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            quantity: true,
+          },
+          orderBy: {
+            price: 'asc',
           },
         },
       },

@@ -140,6 +140,13 @@ export default function OrganizerEventsScreen() {
     });
   };
 
+  const openEventEdit = (eventId: string) => {
+    router.push({
+      pathname: '/event-edit/[id]',
+      params: { id: eventId },
+    });
+  };
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
@@ -333,6 +340,15 @@ export default function OrganizerEventsScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                onPress={() => openEventEdit(event.id)}
+                className="mt-3 rounded-2xl border border-[#4c669f] px-4 py-3"
+              >
+                <Text className="text-center text-sm font-semibold text-[#4c669f]">
+                  {t('organizerEventsActionEdit')}
+                </Text>
+              </TouchableOpacity>
             </View>
           ))
         ) : (

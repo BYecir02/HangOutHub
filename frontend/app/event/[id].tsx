@@ -40,6 +40,12 @@ interface EventDetail {
       name?: string | null;
     } | null;
   } | null;
+  TicketType?: Array<{
+    id: string;
+    name: string;
+    price: number | string;
+    quantity: number;
+  }>;
 }
 
 const EVENT_PLACEHOLDER =
@@ -80,6 +86,7 @@ export default function EventDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [booking, setBooking] = useState<EventBookingTicket | null>(null);
+  const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
@@ -96,6 +103,8 @@ export default function EventDetailScreen() {
         const response = await api.get<EventDetail>(`/events/${params.id}`);
         if (isMounted) {
           setEvent(response.data);
+          const ticketTypes = response.data.TicketType || [];
+          setSelectedTicketTypeId(ticketTypes[0]?.id || '');
         }
       } catch {
         if (isMounted) {
@@ -140,6 +149,37 @@ export default function EventDetailScreen() {
   }
 
   const heroImage = getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER;
+  const ticketTypes = [...(event.TicketType || [])].sort((a, b) => {
+    const aSoldOut = a.quantity <= 0;
+    const bSoldOut = b.quantity <= 0;
+
+    if (aSoldOut === bSoldOut) {
+      return Number(a.price || 0) - Number(b.price || 0);
+    }
+
+    return aSoldOut ? 1 : -1;
+  });
+  const cheapestAvailableTicket = ticketTypes
+    .filter((ticketType) => ticketType.quantity > 0)
+    .reduce<typeof ticketTypes[number] | null>((current, ticketType) => {
+      if (!current) {
+        return ticketType;
+      }
+
+      return Number(ticketType.price || 0) < Number(current.price || 0)
+        ? ticketType
+        : current;
+    }, null);
+  const selectedTicketType = ticketTypes.find(
+    (ticketType) => ticketType.id === selectedTicketTypeId,
+  );
+  const selectedTicketSoldOut = Boolean(
+    selectedTicketType && selectedTicketType.quantity <= 0,
+  );
+  const displayPrice =
+    ticketTypes.length > 0
+      ? Math.min(...ticketTypes.map((ticketType) => Number(ticketType.price || 0)))
+      : event.entryFee;
   const gallery =
     event.images?.length > 0
       ? event.images.map((image) => getImageUrl(image) || EVENT_PLACEHOLDER)
@@ -172,9 +212,17 @@ export default function EventDetailScreen() {
       return;
     }
 
+    if ((event.TicketType || []).length > 0 && !selectedTicketTypeId) {
+      Alert.alert(t('commonErrorTitle'), t('eventDetailTicketTypeRequired'));
+      return;
+    }
+
     setJoining(true);
     try {
-      const reserved = await createEventBooking(event.id);
+      const reserved = await createEventBooking(
+        event.id,
+        selectedTicketTypeId || undefined,
+      );
       setBooking(reserved);
 
       Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
@@ -222,7 +270,7 @@ export default function EventDetailScreen() {
         <View className="mt-4 flex-row flex-wrap gap-2">
           <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
             <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-              {formatPrice(event.entryFee, locale, t('homePriceFree'))}
+              {formatPrice(displayPrice, locale, t('homePriceFree'))}
             </Text>
           </View>
           <View className="rounded-full bg-gray-200 px-3 py-2 dark:bg-gray-800">
@@ -240,16 +288,76 @@ export default function EventDetailScreen() {
             {t('eventDetailActionDescription')}
           </Text>
 
+          {ticketTypes.length > 0 ? (
+            <View className="mt-4">
+              <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                {t('eventDetailTicketTypesTitle')}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mt-2"
+                contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+              >
+                {ticketTypes.map((ticketType) => {
+                  const isSelected = ticketType.id === selectedTicketTypeId;
+                  const isSoldOut = ticketType.quantity <= 0;
+                  const isBestValue =
+                    !isSoldOut &&
+                    cheapestAvailableTicket &&
+                    cheapestAvailableTicket.id === ticketType.id;
+                  return (
+                    <TouchableOpacity
+                      key={ticketType.id}
+                      onPress={() => setSelectedTicketTypeId(ticketType.id)}
+                      className={isSoldOut
+                        ? 'rounded-full border border-gray-200 bg-gray-100 px-3 py-2 opacity-70 dark:border-gray-700 dark:bg-gray-800'
+                        : isSelected
+                          ? 'rounded-full bg-[#ff4757] px-3 py-2'
+                          : 'rounded-full border border-gray-300 px-3 py-2 dark:border-gray-700'}
+                    >
+                      <Text className={isSoldOut
+                        ? 'text-xs font-semibold text-gray-500 dark:text-gray-400'
+                        : isSelected
+                          ? 'text-xs font-semibold text-white'
+                          : 'text-xs font-semibold text-gray-700 dark:text-gray-200'}>
+                        {ticketType.name} · {formatPrice(ticketType.price, locale, t('homePriceFree'))}
+                      </Text>
+                      {isBestValue ? (
+                        <Text className={isSelected
+                          ? 'mt-1 text-[11px] font-semibold text-white/95'
+                          : 'mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300'}>
+                          {t('eventDetailTicketBestValue')}
+                        </Text>
+                      ) : null}
+                      <Text className={isSoldOut
+                        ? 'mt-1 text-[11px] text-gray-500 dark:text-gray-400'
+                        : isSelected
+                          ? 'mt-1 text-[11px] text-white/90'
+                          : 'mt-1 text-[11px] text-gray-500 dark:text-gray-400'}>
+                        {isSoldOut
+                          ? t('eventDetailTicketSoldOut')
+                          : t('eventDetailTicketRemaining', { count: ticketType.quantity })}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
+
           <View className="mt-4 flex-row gap-3">
             <TouchableOpacity
               onPress={handleJoinEvent}
-              disabled={joining}
+              disabled={joining || selectedTicketSoldOut}
               className={`flex-1 items-center rounded-2xl px-4 py-4 ${
-                joining ? 'bg-[#ff9aa3]' : 'bg-[#ff4757]'
+                joining || selectedTicketSoldOut ? 'bg-[#ff9aa3]' : 'bg-[#ff4757]'
               }`}
             >
               <Text className="text-sm font-semibold text-white">
-                {joining
+                {selectedTicketSoldOut
+                  ? t('eventDetailTicketSoldOutCta')
+                  : joining
                   ? t('eventDetailJoining')
                   : booking
                     ? t('eventDetailViewTicket')
