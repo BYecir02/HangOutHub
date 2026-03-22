@@ -211,11 +211,11 @@ export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50 dark:bg-black">
       <View className="p-5">
-        <View className="flex-row items-center mb-4 pt-10">
-          <TouchableOpacity onPress={() => router.back()} className="mr-4">
-            <Ionicons name="arrow-back" size={24} color={iconColor} />
-          </TouchableOpacity>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+        <View className="mb-4 pt-16">
+          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            {t('settingsLabel')}
+          </Text>
+          <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
             {t('settingsTitle')}
           </Text>
         </View>
@@ -274,10 +274,19 @@ export default function SettingsScreen() {
 
               <TouchableOpacity
                 onPress={() => router.push('/preferences')}
-                className="flex-row items-center p-4"
+                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
               >
                 <Ionicons name="lock-closed-outline" size={22} color={iconColor} />
                 <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsInterestCenter')}</Text>
+                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleLogout}
+                className="flex-row items-center p-4"
+              >
+                <Ionicons name="log-out-outline" size={22} color="#ff4757" />
+                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsLogout')}</Text>
                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
               </TouchableOpacity>
             </View>
@@ -381,19 +390,19 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
-        {/* Bouton Déconnexion */}
-        <TouchableOpacity onPress={handleLogout} className="flex-row items-center justify-center bg-gray-200 dark:bg-gray-800 p-4 rounded-xl border border-gray-300 dark:border-gray-700 mt-4">
-          <Ionicons name="log-out-outline" size={22} color={isDark ? "#fff" : "#333"} />
-           <Text className="ml-2 text-gray-800 dark:text-white font-bold text-base">{t('settingsLogout')}</Text>
-        </TouchableOpacity>
-
         {/* Zone Danger */}
         <View className="mt-8">
              <Text className="text-red-500 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsDangerSection')}</Text>
-             <TouchableOpacity onPress={handleDeleteAccount} className="flex-row items-center justify-center bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/50">
-                <Ionicons name="trash-outline" size={22} color="#ff4757" />
-               <Text className="ml-2 text-red-600 font-bold text-base">{t('settingsDeleteAccount')}</Text>
-             </TouchableOpacity>
+             <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-red-100 dark:border-red-900/40">
+               <TouchableOpacity
+                 onPress={handleDeleteAccount}
+                 className="flex-row items-center p-4"
+               >
+                 <Ionicons name="trash-outline" size={22} color="#ff4757" />
+                 <Text className="flex-1 ml-3 text-red-600 font-semibold text-base">{t('settingsDeleteAccount')}</Text>
+                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
+               </TouchableOpacity>
+             </View>
         </View>
         
         <Text className="text-center text-gray-400 mt-8 text-xs">Hangout Hub v1.0.0</Text>

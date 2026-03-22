@@ -53,9 +53,11 @@ export interface EventScansResponse {
 export const createEventBooking = async (
   eventId: string,
   ticketTypeId?: string,
+  promoCode?: string,
 ): Promise<EventBookingTicket> => {
   const response = await api.post<EventBookingTicket>(`/events/${eventId}/book`, {
     ticketTypeId,
+    promoCode,
   });
 
   return response.data;

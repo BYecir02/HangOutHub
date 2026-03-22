@@ -8,6 +8,17 @@ export class CategoriesService {
 
   findAll() {
     return this.prisma.category.findMany({
+      include: {
+        Tag: {
+          select: {
+            id: true,
+            name: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
       orderBy: { name: 'asc' },
     });
   }

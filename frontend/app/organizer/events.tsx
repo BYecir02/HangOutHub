@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
+  Pressable,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -10,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import OrganizerExitPanelButton from '@/components/organizer/OrganizerExitPanelButton';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -68,6 +69,9 @@ function getPhaseLabelKey(phase: OrganizerEventPhase) {
 export default function OrganizerEventsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const [openActionsEventId, setOpenActionsEventId] = useState<string | null>(
+    null,
+  );
   const {
     organizerEvents,
     loading,
@@ -126,6 +130,13 @@ export default function OrganizerEventsScreen() {
     };
   }, [organizerEvents]);
 
+  const selectedEvent = useMemo(
+    () =>
+      eventsOverview.items.find((item) => item.event.id === openActionsEventId)
+        ?.event ?? null,
+    [eventsOverview.items, openActionsEventId],
+  );
+
   const openEventDetail = (eventId: string) => {
     router.push({
       pathname: '/event/[id]',
@@ -145,6 +156,10 @@ export default function OrganizerEventsScreen() {
       pathname: '/event-edit/[id]',
       params: { id: eventId },
     });
+  };
+
+  const openEventTeam = (eventId: string) => {
+    router.push(`/organizer/event-team?id=${eventId}` as never);
   };
 
   if (loading) {
@@ -183,10 +198,8 @@ export default function OrganizerEventsScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <View className="mb-3 flex-row justify-end">
-        <OrganizerExitPanelButton />
-      </View>
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
       <View className="flex-row items-center justify-between">
         <View>
           <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -289,66 +302,64 @@ export default function OrganizerEventsScreen() {
           eventsOverview.items.map(({ event, phase }) => (
             <View
               key={event.id}
-              className="mb-4 rounded-3xl bg-white p-3 dark:bg-gray-900"
+              className="relative mb-4 rounded-3xl bg-white p-3 dark:bg-gray-900"
             >
-              <View className="flex-row">
-                <Image
-                  source={{
-                    uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
-                  }}
-                  className="h-24 w-24 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                  resizeMode="cover"
-                />
-                <View className="ml-4 flex-1 justify-center">
-                  <View className="flex-row items-center justify-between">
-                    <Text
-                      className="mr-2 flex-1 text-lg font-semibold text-gray-900 dark:text-white"
-                      numberOfLines={1}
-                    >
-                      {event.title}
-                    </Text>
-                    <View className={getPhaseBadgeClassName(phase)}>
-                      <Text className={getPhaseTextClassName(phase)}>
-                        {t(getPhaseLabelKey(phase))}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {formatEventDate(event.startTime, locale)}
-                  </Text>
-                  <Text className="mt-1 text-sm text-gray-400 dark:text-gray-500">
-                    {event.Place?.name || t('homeLocationToConfirm')}
-                  </Text>
-                </View>
-              </View>
-
-              <View className="mt-3 flex-row">
-                <TouchableOpacity
-                  onPress={() => openEventDetail(event.id)}
-                  className="mr-3 flex-1 rounded-2xl bg-[#ff4757] px-4 py-3"
-                >
-                  <Text className="text-center text-sm font-semibold text-white">
-                    {t('organizerEventsActionViewDetail')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => openEventScans(event.id)}
-                  className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700"
-                >
-                  <Text className="text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
-                    {t('organizerEventsActionViewScans')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
               <TouchableOpacity
-                onPress={() => openEventEdit(event.id)}
-                className="mt-3 rounded-2xl border border-[#4c669f] px-4 py-3"
+                activeOpacity={0.9}
+                onPress={() => {
+                  setOpenActionsEventId(null);
+                  openEventDetail(event.id);
+                }}
               >
-                <Text className="text-center text-sm font-semibold text-[#4c669f]">
-                  {t('organizerEventsActionEdit')}
-                </Text>
+                <View className="flex-row">
+                  <Image
+                    source={{
+                      uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
+                    }}
+                    className="h-24 w-24 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                    resizeMode="cover"
+                  />
+                  <View className="ml-4 flex-1 justify-center">
+                    <View className="flex-row items-center justify-between">
+                      <Text
+                        className="mr-2 flex-1 text-lg font-semibold text-gray-900 dark:text-white"
+                        numberOfLines={1}
+                      >
+                        {event.title}
+                      </Text>
+                      <View className="flex-row items-center">
+                        <View className={getPhaseBadgeClassName(phase)}>
+                          <Text className={getPhaseTextClassName(phase)}>
+                            {t(getPhaseLabelKey(phase))}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={(pressEvent) => {
+                            pressEvent.stopPropagation();
+                            setOpenActionsEventId((current) =>
+                              current === event.id ? null : event.id,
+                            );
+                          }}
+                          className="ml-2 rounded-full p-1.5"
+                        >
+                          <Ionicons
+                            name="ellipsis-horizontal"
+                            size={18}
+                            color="#6b7280"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {formatEventDate(event.startTime, locale)}
+                    </Text>
+                    <Text className="mt-1 text-sm text-gray-400 dark:text-gray-500">
+                      {event.Place?.name || t('homeLocationToConfirm')}
+                    </Text>
+                  </View>
+                </View>
               </TouchableOpacity>
+
             </View>
           ))
         ) : (
@@ -378,6 +389,76 @@ export default function OrganizerEventsScreen() {
           </View>
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <Modal
+        transparent
+        visible={Boolean(selectedEvent)}
+        animationType="fade"
+        onRequestClose={() => setOpenActionsEventId(null)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/35"
+          onPress={() => setOpenActionsEventId(null)}
+        >
+          <Pressable
+            className="rounded-t-3xl bg-white p-5 dark:bg-gray-900"
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text
+              className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
+              numberOfLines={1}
+            >
+              {selectedEvent?.title}
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (!selectedEvent) {
+                  return;
+                }
+                setOpenActionsEventId(null);
+                openEventScans(selectedEvent.id);
+              }}
+              className="mt-4 rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700"
+            >
+              <Text className="text-center text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('organizerEventsActionViewScans')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (!selectedEvent) {
+                  return;
+                }
+                setOpenActionsEventId(null);
+                openEventEdit(selectedEvent.id);
+              }}
+              className="mt-3 rounded-2xl border border-[#4c669f] px-4 py-3"
+            >
+              <Text className="text-center text-sm font-semibold text-[#4c669f]">
+                {t('organizerEventsActionEdit')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (!selectedEvent) {
+                  return;
+                }
+                setOpenActionsEventId(null);
+                openEventTeam(selectedEvent.id);
+              }}
+              className="mt-3 rounded-2xl border border-gray-300 px-4 py-3 dark:border-gray-700"
+            >
+              <Text className="text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
+                {t('organizerEventsActionTeam')}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }

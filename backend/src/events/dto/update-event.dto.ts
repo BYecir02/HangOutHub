@@ -1,5 +1,8 @@
 import {
   IsDateString,
+  IsIn,
+  IsInt,
+  Max,
   IsNumber,
   IsOptional,
   IsString,
@@ -16,6 +19,14 @@ export class UpdateEventDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  cancellationPolicy?: string;
+
+  @IsOptional()
+  @IsString()
+  refundPolicy?: string;
 
   @IsOptional()
   @IsDateString()
@@ -38,4 +49,53 @@ export class UpdateEventDto {
   @IsOptional()
   @IsString()
   ticketTypes?: string;
+
+  @IsOptional()
+  @IsString()
+  existingImages?: string;
+
+  @IsOptional()
+  @IsString()
+  existingCoverUrl?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  checkInOpensAtOffsetMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  checkInClosesAtOffsetMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  maxTicketsPerUser?: number;
+
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
+
+  @IsOptional()
+  @IsIn(['PERCENT', 'FIXED'])
+  promoType?: 'PERCENT' | 'FIXED';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  promoValue?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  promoMaxRedemptions?: number;
+
+  @IsOptional()
+  @IsDateString()
+  promoEndsAt?: string;
 }

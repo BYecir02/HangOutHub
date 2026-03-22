@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -8,11 +8,15 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
-import OrganizerExitPanelButton from '@/components/organizer/OrganizerExitPanelButton';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import {
+  fetchOrganizerAnalytics,
+  OrganizerAnalyticsResponse,
+} from '@/services/organizer-analytics';
 import {
   formatOrganizerDateTime,
   getOrganizerStatusTone,
@@ -45,6 +49,11 @@ function DashboardCard({
 export default function DashboardScreen() {
   const router = useRouter();
   const { t, locale } = useI18n();
+  const [analytics, setAnalytics] = useState<OrganizerAnalyticsResponse | null>(
+    null,
+  );
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(false);
   const {
     user,
     organizerEvents,
@@ -91,6 +100,50 @@ export default function DashboardScreen() {
         ? t('organizerDashboardTypeOrganizer')
         : t('organizerDashboardTypeFallbackUnknown');
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!user || !isAllowed) {
+        return;
+      }
+
+      let cancelled = false;
+
+      const loadAnalytics = async () => {
+        setAnalyticsLoading(true);
+        setAnalyticsError(false);
+
+        try {
+          const data = await fetchOrganizerAnalytics();
+          if (!cancelled) {
+            setAnalytics(data);
+          }
+        } catch {
+          if (!cancelled) {
+            setAnalyticsError(true);
+          }
+        } finally {
+          if (!cancelled) {
+            setAnalyticsLoading(false);
+          }
+        }
+      };
+
+      void loadAnalytics();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [isAllowed, user]),
+  );
+
+  const grossRevenueLabel = analytics
+    ? new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'XOF',
+        maximumFractionDigits: 0,
+      }).format(analytics.summary.grossRevenue)
+    : '...';
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
@@ -128,9 +181,6 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <View className="mb-3 flex-row justify-end">
-        <OrganizerExitPanelButton />
-      </View>
       <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
         {t('organizerDashboardLabel')}
       </Text>
@@ -195,44 +245,81 @@ export default function DashboardScreen() {
         />
       </View>
 
-      <View className="mt-4 rounded-3xl bg-white p-5 dark:bg-gray-900">
-        <Text className="text-lg font-bold text-gray-900 dark:text-white">
-          {t('organizerDashboardActionCenterTitle')}
-        </Text>
+      <View className="mt-5 rounded-3xl bg-white p-5 dark:bg-gray-900">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-lg font-bold text-gray-900 dark:text-white">
+            {t('organizerDashboardAnalyticsTitle')}
+          </Text>
+          {analyticsLoading ? (
+            <ActivityIndicator size="small" color="#4c669f" />
+          ) : null}
+        </View>
         <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {t('organizerDashboardActionCenterSubtitle')}
+          {t('organizerDashboardAnalyticsSubtitle')}
         </Text>
 
-        <View className="mt-4 gap-3">
-          <TouchableOpacity
-            onPress={() => router.push('/organizer/scanner')}
-            className="items-center rounded-2xl bg-[#4c669f] py-3"
-          >
-            <Text className="font-semibold text-white">
-              {t('organizerDashboardActionOpenScanner')}
-            </Text>
-          </TouchableOpacity>
-          <View className="flex-row gap-3">
-            <TouchableOpacity
-              onPress={() => router.push('/organizer/events')}
-              className="flex-1 items-center rounded-2xl border border-gray-300 py-3 dark:border-gray-700"
-            >
-              <Text className="font-semibold text-gray-700 dark:text-gray-200">
-                {t('organizerDashboardActionManageEvents')}
-              </Text>
-            </TouchableOpacity>
+        {analyticsError ? (
+          <Text className="mt-3 text-sm text-red-500 dark:text-red-300">
+            {t('organizerDashboardAnalyticsLoadError')}
+          </Text>
+        ) : null}
 
-            {user.role === 'PLACE_OWNER' ? (
-              <TouchableOpacity
-                onPress={() => router.push('/organizer/create-place')}
-                className="flex-1 items-center rounded-2xl border border-gray-300 py-3 dark:border-gray-700"
-              >
-                <Text className="font-semibold text-gray-700 dark:text-gray-200">
-                  {t('organizerDashboardActionCreatePlace')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
+        <View className="mt-4 flex-row gap-3">
+          <DashboardCard
+            title={t('organizerDashboardKpiBookings')}
+            value={analytics?.summary.totalBookings ?? 0}
+            accent="text-[#1f6feb]"
+          />
+          <DashboardCard
+            title={t('organizerDashboardKpiScanned')}
+            value={analytics?.summary.scannedBookings ?? 0}
+            accent="text-[#ff7f11]"
+            hint={`${analytics?.summary.checkInRate ?? 0}%`}
+          />
+        </View>
+
+        <View className="mt-3 flex-row gap-3">
+          <DashboardCard
+            title={t('organizerDashboardKpiRevenue')}
+            value={grossRevenueLabel}
+            accent="text-[#2ecc71]"
+          />
+          <DashboardCard
+            title={t('organizerDashboardKpiPromoUsed')}
+            value={analytics?.summary.promoRedemptions ?? 0}
+            accent="text-[#9b59b6]"
+          />
+        </View>
+
+        <View className="mt-4">
+          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            {t('organizerDashboardTopEventsTitle')}
+          </Text>
+
+          {(analytics?.topEvents || []).length === 0 ? (
+            <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {t('organizerDashboardTopEventsEmpty')}
+            </Text>
+          ) : (
+            <View className="mt-2 gap-2">
+              {(analytics?.topEvents || []).map((eventItem) => (
+                <View
+                  key={eventItem.eventId}
+                  className="rounded-2xl border border-gray-200 px-3 py-3 dark:border-gray-700"
+                >
+                  <Text className="font-semibold text-gray-900 dark:text-white">
+                    {eventItem.title}
+                  </Text>
+                  <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {t('organizerDashboardTopEventsLine', {
+                      bookings: eventItem.bookingsTotal,
+                      scanned: eventItem.scannedCount,
+                    })}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 

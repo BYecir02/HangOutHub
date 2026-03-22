@@ -116,6 +116,17 @@ export class OrganizerScannerService {
             placeId: true,
             startTime: true,
             endTime: true,
+            checkInOpensAtOffsetMin: true,
+            checkInClosesAtOffsetMin: true,
+            EventCollaborator: {
+              where: {
+                userId,
+              },
+              select: {
+                permission: true,
+              },
+              take: 1,
+            },
             Place: {
               select: {
                 ownerId: true,
@@ -155,7 +166,10 @@ export class OrganizerScannerService {
 
     const isAuthorizedForEvent =
       (role === 'ORGANIZER' && booking.Event.organizerId === userId) ||
-      (role === 'PLACE_OWNER' && booking.Event.Place?.ownerId === userId);
+      (role === 'PLACE_OWNER' && booking.Event.Place?.ownerId === userId) ||
+      ['SCAN', 'EDIT'].includes(
+        booking.Event.EventCollaborator[0]?.permission?.toUpperCase() || '',
+      );
 
     if (!isAuthorizedForEvent) {
       return this.buildResult(
@@ -165,11 +179,20 @@ export class OrganizerScannerService {
       );
     }
 
-    const eventEnd = booking.Event.endTime || booking.Event.startTime;
-    if (eventEnd < new Date()) {
+    const now = new Date();
+    const checkInOpensAtOffsetMin = booking.Event.checkInOpensAtOffsetMin ?? -60;
+    const checkInClosesAtOffsetMin = booking.Event.checkInClosesAtOffsetMin ?? 180;
+    const checkInOpensAt = new Date(
+      booking.Event.startTime.getTime() + checkInOpensAtOffsetMin * 60_000,
+    );
+    const checkInClosesAt = new Date(
+      booking.Event.startTime.getTime() + checkInClosesAtOffsetMin * 60_000,
+    );
+
+    if (now < checkInOpensAt || now > checkInClosesAt) {
       return this.buildResult(
         'EVENT_EXPIRED',
-        'Evenement termine. Check-in indisponible.',
+        'Check-in indisponible pour le moment.',
         basePayload,
       );
     }

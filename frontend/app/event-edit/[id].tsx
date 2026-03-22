@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -31,19 +33,41 @@ interface DraftTicketType {
   quantity: string;
 }
 
+interface EventImageItem {
+  uri: string;
+  fileName?: string;
+  mimeType?: string;
+  isLocal: boolean;
+}
+
 interface EventPayload {
   id: string;
   title: string;
   description?: string | null;
+  cancellationPolicy?: string | null;
+  refundPolicy?: string | null;
   startTime: string;
   endTime?: string | null;
+  checkInOpensAtOffsetMin?: number | null;
+  checkInClosesAtOffsetMin?: number | null;
+  maxTicketsPerUser?: number | null;
   entryFee?: number | string | null;
+  coverUrl?: string | null;
+  images?: string[];
   placeId?: string | null;
   TicketType?: Array<{
     id: string;
     name: string;
     price: number | string;
     quantity: number;
+  }>;
+  Promotion?: Array<{
+    id: string;
+    code?: string | null;
+    discountType?: string | null;
+    discountValue?: number | string | null;
+    maxRedemptions?: number | null;
+    endDate?: string | null;
   }>;
 }
 
@@ -62,10 +86,22 @@ export default function EditEventScreen() {
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
+    cancellationPolicy: '',
+    refundPolicy: '',
     startTime: new Date(),
     endTime: new Date(Date.now() + 3600000),
+    checkInOpensAtOffsetMin: '-60',
+    checkInClosesAtOffsetMin: '180',
+    maxTicketsPerUser: '1',
+    promoCode: '',
+    promoType: 'PERCENT' as 'PERCENT' | 'FIXED',
+    promoValue: '',
+    promoMaxRedemptions: '',
+    promoEndsAt: '',
   });
   const [ticketTypes, setTicketTypes] = useState<DraftTicketType[]>([]);
+  const [images, setImages] = useState<EventImageItem[]>([]);
+  const [coverIndex, setCoverIndex] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [currentField, setCurrentField] = useState<'start' | 'end'>('start');
@@ -98,13 +134,53 @@ export default function EditEventScreen() {
           quantity: String(ticketType.quantity || 1),
         }));
 
+        const existingCover = event.coverUrl || '';
+        const existingGallery = (event.images || []).filter(
+          (imageUrl) => imageUrl && imageUrl !== existingCover,
+        );
+        const eventPromo = event.Promotion?.[0];
+        const mergedImages: EventImageItem[] = [];
+
+        if (existingCover) {
+          mergedImages.push({
+            uri: existingCover,
+            isLocal: false,
+          });
+        }
+
+        for (const imageUrl of existingGallery) {
+          mergedImages.push({
+            uri: imageUrl,
+            isLocal: false,
+          });
+        }
+
         setOwnedPlaces(places);
         setSelectedPlaceId(event.placeId || places[0]?.id || null);
         setEventForm({
           title: event.title || '',
           description: event.description || '',
+          cancellationPolicy: event.cancellationPolicy || '',
+          refundPolicy: event.refundPolicy || '',
           startTime: new Date(event.startTime),
           endTime: new Date(event.endTime || event.startTime),
+          checkInOpensAtOffsetMin: String(event.checkInOpensAtOffsetMin ?? -60),
+          checkInClosesAtOffsetMin: String(event.checkInClosesAtOffsetMin ?? 180),
+          maxTicketsPerUser: String(event.maxTicketsPerUser ?? 1),
+          promoCode: eventPromo?.code || '',
+          promoType:
+            eventPromo?.discountType?.toUpperCase() === 'FIXED' ? 'FIXED' : 'PERCENT',
+          promoValue:
+            eventPromo?.discountValue !== undefined && eventPromo?.discountValue !== null
+              ? String(Number(eventPromo.discountValue))
+              : '',
+          promoMaxRedemptions:
+            eventPromo?.maxRedemptions !== undefined && eventPromo?.maxRedemptions !== null
+              ? String(eventPromo.maxRedemptions)
+              : '',
+          promoEndsAt: eventPromo?.endDate
+            ? new Date(eventPromo.endDate).toISOString().slice(0, 16)
+            : '',
         });
         setTicketTypes(
           eventTicketTypes.length > 0
@@ -118,6 +194,8 @@ export default function EditEventScreen() {
                 },
               ],
         );
+        setImages(mergedImages);
+        setCoverIndex(0);
       } catch {
         if (isMounted) {
           Alert.alert(t('commonErrorTitle'), t('eventEditLoadFailed'));
@@ -136,6 +214,27 @@ export default function EditEventScreen() {
       isMounted = false;
     };
   }, [eventId, router, t]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const nextItems = result.assets.map((asset) => ({
+        uri: asset.uri,
+        fileName: asset.fileName || undefined,
+        mimeType: asset.mimeType,
+        isLocal: true,
+      }));
+
+      setImages((current) => [...current, ...nextItems]);
+    }
+  };
 
   const showDatepicker = (field: 'start' | 'end', mode: 'date' | 'time') => {
     setCurrentField(field);
@@ -161,6 +260,22 @@ export default function EditEventScreen() {
     }
 
     setEventForm((prev) => ({ ...prev, endTime: selectedDate }));
+  };
+
+  const openTeamScreen = () => {
+    if (!eventId) {
+      return;
+    }
+
+    router.push(`/organizer/event-team?id=${eventId}` as never);
+  };
+
+  const openRevisionsScreen = () => {
+    if (!eventId) {
+      return;
+    }
+
+    router.push(`/organizer/event-revisions?id=${eventId}` as never);
   };
 
   const handleSave = async () => {
@@ -202,20 +317,145 @@ export default function EditEventScreen() {
       quantity: Number(ticketType.quantity || 0),
     }));
 
-    const minimumPrice = serializedTicketTypes.length > 0
-      ? Math.min(...serializedTicketTypes.map((ticketType) => ticketType.price))
-      : 0;
+    const checkInOpensAtOffsetMin = Number(eventForm.checkInOpensAtOffsetMin || -60);
+    const checkInClosesAtOffsetMin = Number(
+      eventForm.checkInClosesAtOffsetMin || 180,
+    );
+
+    if (
+      !Number.isInteger(checkInOpensAtOffsetMin) ||
+      !Number.isInteger(checkInClosesAtOffsetMin) ||
+      checkInClosesAtOffsetMin <= checkInOpensAtOffsetMin
+    ) {
+      Alert.alert(t('commonErrorTitle'), t('createEventCheckInWindowInvalid'));
+      return;
+    }
+
+    const maxTicketsPerUser = Number(eventForm.maxTicketsPerUser || 1);
+    if (!Number.isInteger(maxTicketsPerUser) || maxTicketsPerUser < 1 || maxTicketsPerUser > 20) {
+      Alert.alert(t('commonErrorTitle'), t('createEventMaxTicketsPerUserInvalid'));
+      return;
+    }
+
+    const normalizedPromoCode = eventForm.promoCode.trim().toUpperCase();
+    let promoValue: number | null = null;
+    let promoMaxRedemptions: number | null = null;
+    let promoEndsAtIso: string | null = null;
+
+    if (normalizedPromoCode) {
+      promoValue = Number(eventForm.promoValue || 0);
+      if (!Number.isFinite(promoValue) || promoValue <= 0) {
+        Alert.alert(t('commonErrorTitle'), t('createEventPromoValueInvalid'));
+        return;
+      }
+
+      if (eventForm.promoType === 'PERCENT' && promoValue > 100) {
+        Alert.alert(t('commonErrorTitle'), t('createEventPromoValuePercentInvalid'));
+        return;
+      }
+
+      if (eventForm.promoMaxRedemptions.trim()) {
+        promoMaxRedemptions = Number(eventForm.promoMaxRedemptions);
+        if (!Number.isInteger(promoMaxRedemptions) || promoMaxRedemptions < 1) {
+          Alert.alert(t('commonErrorTitle'), t('createEventPromoQuotaInvalid'));
+          return;
+        }
+      }
+
+      if (eventForm.promoEndsAt.trim()) {
+        const parsedPromoEnd = new Date(eventForm.promoEndsAt);
+        if (Number.isNaN(parsedPromoEnd.getTime())) {
+          Alert.alert(t('commonErrorTitle'), t('createEventPromoEndDateInvalid'));
+          return;
+        }
+
+        promoEndsAtIso = parsedPromoEnd.toISOString();
+      }
+    }
+
+    const minimumPrice =
+      serializedTicketTypes.length > 0
+        ? Math.min(...serializedTicketTypes.map((ticketType) => ticketType.price))
+        : 0;
 
     setSaving(true);
     try {
-      await api.patch(`/events/${eventId}`, {
-        title: eventForm.title.trim(),
-        description: eventForm.description.trim(),
-        startTime: eventForm.startTime.toISOString(),
-        endTime: eventForm.endTime.toISOString(),
-        entryFee: minimumPrice,
-        placeId: selectedPlaceId || undefined,
-        ticketTypes: JSON.stringify(serializedTicketTypes),
+      const formData = new FormData();
+      formData.append('title', eventForm.title.trim());
+      formData.append('description', eventForm.description.trim());
+      formData.append('cancellationPolicy', eventForm.cancellationPolicy.trim());
+      formData.append('refundPolicy', eventForm.refundPolicy.trim());
+      formData.append('startTime', eventForm.startTime.toISOString());
+      formData.append('endTime', eventForm.endTime.toISOString());
+      formData.append('entryFee', String(minimumPrice));
+      formData.append('ticketTypes', JSON.stringify(serializedTicketTypes));
+      formData.append(
+        'checkInOpensAtOffsetMin',
+        String(checkInOpensAtOffsetMin),
+      );
+      formData.append(
+        'checkInClosesAtOffsetMin',
+        String(checkInClosesAtOffsetMin),
+      );
+      formData.append('maxTicketsPerUser', String(maxTicketsPerUser));
+
+      if (normalizedPromoCode) {
+        formData.append('promoCode', normalizedPromoCode);
+        formData.append('promoType', eventForm.promoType);
+        formData.append('promoValue', String(promoValue || 0));
+
+        if (promoMaxRedemptions !== null) {
+          formData.append('promoMaxRedemptions', String(promoMaxRedemptions));
+        }
+
+        if (promoEndsAtIso) {
+          formData.append('promoEndsAt', promoEndsAtIso);
+        }
+      } else {
+        formData.append('promoCode', '');
+      }
+
+      if (selectedPlaceId) {
+        formData.append('placeId', selectedPlaceId);
+      }
+
+      if (images.length > 0) {
+        const coverImage = images[coverIndex];
+
+        if (coverImage?.isLocal) {
+          formData.append('cover', {
+            uri: coverImage.uri,
+            name: coverImage.fileName || 'event-cover.jpg',
+            type: coverImage.mimeType || 'image/jpeg',
+          } as never);
+        } else if (coverImage?.uri) {
+          formData.append('existingCoverUrl', coverImage.uri);
+        }
+
+        const retainedGallery = images
+          .filter((_, index) => index !== coverIndex)
+          .filter((item) => !item.isLocal)
+          .map((item) => item.uri);
+        formData.append('existingImages', JSON.stringify(retainedGallery));
+
+        images.forEach((item, index) => {
+          if (index === coverIndex || !item.isLocal) {
+            return;
+          }
+
+          formData.append('gallery', {
+            uri: item.uri,
+            name: item.fileName || `gallery-${index}.jpg`,
+            type: item.mimeType || 'image/jpeg',
+          } as never);
+        });
+      } else {
+        formData.append('existingCoverUrl', '');
+        formData.append('existingImages', '[]');
+      }
+
+      await api.patch(`/events/${eventId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       Alert.alert(t('eventEditSuccessTitle'), t('eventEditSuccessMessage'));
@@ -284,9 +524,74 @@ export default function EditEventScreen() {
         <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
           {t('eventEditTitle')}
         </Text>
+        <TouchableOpacity
+          onPress={openTeamScreen}
+          className="rounded-xl border border-[#4c669f] px-3 py-2"
+        >
+          <Text className="text-xs font-semibold text-[#4c669f]">
+            {t('eventEditOpenTeam')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={openRevisionsScreen}
+          className="ml-2 rounded-xl border border-gray-300 px-3 py-2 dark:border-gray-700"
+        >
+          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+            {t('eventEditOpenRevisions')}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
+        <View className="mb-6">
+          <TouchableOpacity
+            onPress={pickImage}
+            className="relative h-48 items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900"
+          >
+            {images.length > 0 ? (
+              <>
+                <Image
+                  source={{ uri: images[coverIndex].uri }}
+                  className="h-full w-full"
+                  resizeMode="cover"
+                />
+                <View className="absolute bottom-2 right-2 rounded-full bg-black/60 px-3 py-1">
+                  <Text className="text-xs font-bold text-white">{t('createEventCover')}</Text>
+                </View>
+              </>
+            ) : (
+              <View className="items-center">
+                <Ionicons name="images-outline" size={40} color="#999" />
+                <Text className="mt-2 font-medium text-gray-400">
+                  {t('createEventAddPhotos')}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {images.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
+              {images.map((img, index) => (
+                <TouchableOpacity
+                  key={`${img.uri}-${index}`}
+                  onPress={() => setCoverIndex(index)}
+                  className={`mr-3 h-16 w-16 overflow-hidden rounded-lg border-2 ${
+                    index === coverIndex ? 'border-[#4c669f]' : 'border-transparent'
+                  }`}
+                >
+                  <Image source={{ uri: img.uri }} className="h-16 w-16" />
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                onPress={pickImage}
+                className="h-16 w-16 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <Ionicons name="add" size={24} color="#999" />
+              </TouchableOpacity>
+            </ScrollView>
+          ) : null}
+        </View>
+
         <View className="gap-4">
           <TextInput
             placeholder={t('createEventFieldTitlePlaceholder')}
@@ -385,6 +690,140 @@ export default function EditEventScreen() {
           </View>
 
           <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
+            <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('createEventCheckInWindowTitle')}
+            </Text>
+            <View className="flex-row gap-2">
+              <TextInput
+                placeholder={t('createEventCheckInOpenPlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                keyboardType="numbers-and-punctuation"
+                className="flex-1 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+                value={eventForm.checkInOpensAtOffsetMin}
+                onChangeText={(value) =>
+                  setEventForm((prev) => ({ ...prev, checkInOpensAtOffsetMin: value }))
+                }
+              />
+              <TextInput
+                placeholder={t('createEventCheckInClosePlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                keyboardType="numbers-and-punctuation"
+                className="flex-1 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+                value={eventForm.checkInClosesAtOffsetMin}
+                onChangeText={(value) =>
+                  setEventForm((prev) => ({ ...prev, checkInClosesAtOffsetMin: value }))
+                }
+              />
+            </View>
+            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('createEventCheckInWindowHint')}
+            </Text>
+
+            <Text className="mb-2 mt-4 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('createEventMaxTicketsPerUserTitle')}
+            </Text>
+            <TextInput
+              placeholder={t('createEventMaxTicketsPerUserPlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              keyboardType="numeric"
+              className="rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              value={eventForm.maxTicketsPerUser}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, maxTicketsPerUser: value }))
+              }
+            />
+            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('createEventMaxTicketsPerUserHint')}
+            </Text>
+          </View>
+
+          <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
+            <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('createEventPromoTitle')}
+            </Text>
+            <TextInput
+              placeholder={t('createEventPromoCodePlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              autoCapitalize="characters"
+              className="rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              value={eventForm.promoCode}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, promoCode: value }))
+              }
+            />
+            <View className="mt-2 flex-row gap-2">
+              <TouchableOpacity
+                onPress={() => setEventForm((prev) => ({ ...prev, promoType: 'PERCENT' }))}
+                className={`flex-1 rounded-xl border px-3 py-3 ${
+                  eventForm.promoType === 'PERCENT'
+                    ? 'border-[#4c669f] bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                }`}
+              >
+                <Text
+                  className={`text-center text-sm font-semibold ${
+                    eventForm.promoType === 'PERCENT'
+                      ? 'text-[#4c669f]'
+                      : 'text-gray-700 dark:text-gray-200'
+                  }`}
+                >
+                  {t('createEventPromoTypePercent')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setEventForm((prev) => ({ ...prev, promoType: 'FIXED' }))}
+                className={`flex-1 rounded-xl border px-3 py-3 ${
+                  eventForm.promoType === 'FIXED'
+                    ? 'border-[#4c669f] bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                }`}
+              >
+                <Text
+                  className={`text-center text-sm font-semibold ${
+                    eventForm.promoType === 'FIXED'
+                      ? 'text-[#4c669f]'
+                      : 'text-gray-700 dark:text-gray-200'
+                  }`}
+                >
+                  {t('createEventPromoTypeFixed')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              placeholder={t('createEventPromoValuePlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              keyboardType="numbers-and-punctuation"
+              className="mt-2 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              value={eventForm.promoValue}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, promoValue: value }))
+              }
+            />
+            <TextInput
+              placeholder={t('createEventPromoQuotaPlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              keyboardType="numeric"
+              className="mt-2 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              value={eventForm.promoMaxRedemptions}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, promoMaxRedemptions: value }))
+              }
+            />
+            <TextInput
+              placeholder={t('createEventPromoEndDatePlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              className="mt-2 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              value={eventForm.promoEndsAt}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, promoEndsAt: value }))
+              }
+            />
+            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('createEventPromoHint')}
+            </Text>
+          </View>
+
+          <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
             <View className="flex-row items-center justify-between">
               <Text className="text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                 {t('createEventTicketTypesTitle')}
@@ -458,6 +897,34 @@ export default function EditEventScreen() {
               setEventForm((prev) => ({ ...prev, description }))
             }
           />
+
+          <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
+            <Text className="mb-2 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('createEventPoliciesTitle')}
+            </Text>
+            <TextInput
+              placeholder={t('createEventCancellationPolicyPlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              multiline
+              className="h-24 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              textAlignVertical="top"
+              value={eventForm.cancellationPolicy}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, cancellationPolicy: value }))
+              }
+            />
+            <TextInput
+              placeholder={t('createEventRefundPolicyPlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              multiline
+              className="mt-2 h-24 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+              textAlignVertical="top"
+              value={eventForm.refundPolicy}
+              onChangeText={(value) =>
+                setEventForm((prev) => ({ ...prev, refundPolicy: value }))
+              }
+            />
+          </View>
         </View>
 
         <TouchableOpacity

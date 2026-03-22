@@ -46,6 +46,25 @@ export interface UserSettingsResponse {
   notificationOutingInvites: boolean;
   notificationFriendRequests: boolean;
   notificationSavedPlacesActivity: boolean;
+  organizerNotifyBookings: boolean;
+  organizerNotifyTeamUpdates: boolean;
+  organizerNotifyReminderD1: boolean;
+  organizerNotifyReminderH3: boolean;
+  organizerNotifyReminderH1: boolean;
+  organizerNotificationPriorityMin: 'IMPORTANT' | 'URGENT';
+  organizerScannerOfflineAuto: boolean;
+  organizerScannerAutoSync: boolean;
+  organizerScannerHaptics: boolean;
+  organizerScannerSound: boolean;
+  organizerScannerStrictWindow: boolean;
+  organizerDefaultCheckInOpenOffsetMin: number;
+  organizerDefaultCheckInCloseOffsetMin: number;
+  organizerDefaultMaxTicketsPerUser: number;
+  organizerDefaultCancellationPolicy: string | null;
+  organizerDefaultRefundPolicy: string | null;
+  organizerTeamInviteScope: 'OWNER_ONLY' | 'OWNER_AND_EDITORS';
+  organizerTeamDefaultPermission: 'EDIT' | 'SCAN';
+  organizerTeamRequireRemovalConfirm: boolean;
   profilePublic: boolean;
   defaultPostVisibility: 'public' | 'friends' | 'private';
   allowOutingInvitesFrom: 'everyone' | 'connections' | 'nobody';
@@ -59,6 +78,25 @@ type StoredUserSettings = {
   notificationOutingInvites: boolean;
   notificationFriendRequests: boolean;
   notificationSavedPlacesActivity: boolean;
+  organizerNotifyBookings: boolean;
+  organizerNotifyTeamUpdates: boolean;
+  organizerNotifyReminderD1: boolean;
+  organizerNotifyReminderH3: boolean;
+  organizerNotifyReminderH1: boolean;
+  organizerNotificationPriorityMin: string;
+  organizerScannerOfflineAuto: boolean;
+  organizerScannerAutoSync: boolean;
+  organizerScannerHaptics: boolean;
+  organizerScannerSound: boolean;
+  organizerScannerStrictWindow: boolean;
+  organizerDefaultCheckInOpenOffsetMin: number;
+  organizerDefaultCheckInCloseOffsetMin: number;
+  organizerDefaultMaxTicketsPerUser: number;
+  organizerDefaultCancellationPolicy: string | null;
+  organizerDefaultRefundPolicy: string | null;
+  organizerTeamInviteScope: string;
+  organizerTeamDefaultPermission: string;
+  organizerTeamRequireRemovalConfirm: boolean;
   profilePublic: boolean;
   defaultPostVisibility: string;
   allowOutingInvitesFrom: string;
@@ -77,6 +115,35 @@ export class UsersService {
       notificationOutingInvites: settings.notificationOutingInvites,
       notificationFriendRequests: settings.notificationFriendRequests,
       notificationSavedPlacesActivity: settings.notificationSavedPlacesActivity,
+      organizerNotifyBookings: settings.organizerNotifyBookings,
+      organizerNotifyTeamUpdates: settings.organizerNotifyTeamUpdates,
+      organizerNotifyReminderD1: settings.organizerNotifyReminderD1,
+      organizerNotifyReminderH3: settings.organizerNotifyReminderH3,
+      organizerNotifyReminderH1: settings.organizerNotifyReminderH1,
+      organizerNotificationPriorityMin:
+        settings.organizerNotificationPriorityMin as 'IMPORTANT' | 'URGENT',
+      organizerScannerOfflineAuto: settings.organizerScannerOfflineAuto,
+      organizerScannerAutoSync: settings.organizerScannerAutoSync,
+      organizerScannerHaptics: settings.organizerScannerHaptics,
+      organizerScannerSound: settings.organizerScannerSound,
+      organizerScannerStrictWindow: settings.organizerScannerStrictWindow,
+      organizerDefaultCheckInOpenOffsetMin:
+        settings.organizerDefaultCheckInOpenOffsetMin,
+      organizerDefaultCheckInCloseOffsetMin:
+        settings.organizerDefaultCheckInCloseOffsetMin,
+      organizerDefaultMaxTicketsPerUser:
+        settings.organizerDefaultMaxTicketsPerUser,
+      organizerDefaultCancellationPolicy:
+        settings.organizerDefaultCancellationPolicy,
+      organizerDefaultRefundPolicy: settings.organizerDefaultRefundPolicy,
+      organizerTeamInviteScope: settings.organizerTeamInviteScope as
+        | 'OWNER_ONLY'
+        | 'OWNER_AND_EDITORS',
+      organizerTeamDefaultPermission: settings.organizerTeamDefaultPermission as
+        | 'EDIT'
+        | 'SCAN',
+      organizerTeamRequireRemovalConfirm:
+        settings.organizerTeamRequireRemovalConfirm,
       profilePublic: settings.profilePublic,
       defaultPostVisibility: settings.defaultPostVisibility as
         | 'public'

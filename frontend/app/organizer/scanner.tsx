@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   ScrollView,
   Text,
@@ -11,21 +12,24 @@ import { useRouter } from 'expo-router';
 import { CameraView, BarcodeType, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 
-import OrganizerExitPanelButton from '@/components/organizer/OrganizerExitPanelButton';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { getApiErrorMessage } from '@/services/api';
+import { getApiErrorMessage, isApiNetworkError } from '@/services/api';
 import { TranslationKey } from '@/services/i18n';
 import {
+  enqueueOfflineScan,
+  listOfflineScans,
   ScannerVerificationResult,
   ScannerVerificationStatus,
+  syncOfflineScans,
   verifyOrganizerScan,
 } from '@/services/organizer-scanner';
 
 const SCAN_THROTTLE_MS = 1000;
 const SCAN_FREEZE_MS = 1500;
 const RECENT_SCANS_LIMIT = 8;
+const OFFLINE_SYNC_INTERVAL_MS = 15000;
 
 interface RecentScanItem {
   id: string;
@@ -91,6 +95,11 @@ export default function ScannerScreen() {
   const [recentScans, setRecentScans] = useState<RecentScanItem[]>([]);
   const [cameraMountError, setCameraMountError] = useState<string | null>(null);
   const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
+  const [offlineSyncing, setOfflineSyncing] = useState(false);
+  const [offlineSyncMessage, setOfflineSyncMessage] = useState<string | null>(
+    null,
+  );
   const freezeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scanEligibleEvents = useMemo(() => {
@@ -133,6 +142,15 @@ export default function ScannerScreen() {
       setSelectedEventId(scanEligibleEvents[0].id);
     }
   }, [scanEligibleEvents, selectedEventId]);
+
+  const refreshOfflineQueueCount = useCallback(async () => {
+    const items = await listOfflineScans(selectedEventId || undefined);
+    setOfflineQueueCount(items.length);
+  }, [selectedEventId]);
+
+  useEffect(() => {
+    void refreshOfflineQueueCount();
+  }, [refreshOfflineQueueCount]);
 
   const releaseScan = useCallback(() => {
     if (freezeTimeoutRef.current) {
@@ -206,9 +224,26 @@ export default function ScannerScreen() {
         await triggerHaptic(result.status === 'VALID_CHECKED_IN_NOW');
       } catch (scanRequestError) {
         setScanResult(null);
-        setScanError(
-          getApiErrorMessage(scanRequestError, t('scannerUnexpectedError')),
-        );
+        if (isApiNetworkError(scanRequestError) && selectedEventId) {
+          const source =
+            Platform.OS === 'ios' || Platform.OS === 'android'
+              ? Platform.OS
+              : 'web';
+
+          await enqueueOfflineScan({
+            code: data,
+            eventId: selectedEventId,
+            source,
+          });
+
+          setScanError(t('scannerOfflineQueued'));
+          setOfflineSyncMessage(null);
+          await refreshOfflineQueueCount();
+        } else {
+          setScanError(
+            getApiErrorMessage(scanRequestError, t('scannerUnexpectedError')),
+          );
+        }
         await triggerHaptic(false);
       } finally {
         setIsProcessingScan(false);
@@ -223,6 +258,7 @@ export default function ScannerScreen() {
       selectedEventId,
       t,
       triggerHaptic,
+      refreshOfflineQueueCount,
     ],
   );
 
@@ -259,6 +295,85 @@ export default function ScannerScreen() {
       params: { id: selectedEventId },
     });
   };
+
+  const syncQueuedScans = useCallback(async (options?: { silent?: boolean }) => {
+    if (!selectedEventId || offlineSyncing || offlineQueueCount === 0) {
+      return;
+    }
+
+    const silent = options?.silent ?? false;
+
+    setOfflineSyncing(true);
+
+    if (!silent) {
+      setOfflineSyncMessage(null);
+    }
+
+    try {
+      const result = await syncOfflineScans(selectedEventId);
+
+      if (!silent && result.synced > 0 && result.failed === 0) {
+        setOfflineSyncMessage(
+          t('scannerOfflineSyncSuccess', { count: result.synced }),
+        );
+      } else if (!silent && result.synced > 0 && result.failed > 0) {
+        setOfflineSyncMessage(
+          t('scannerOfflineSyncPartial', {
+            synced: result.synced,
+            failed: result.failed,
+          }),
+        );
+      } else if (!silent && result.remaining === 0) {
+        setOfflineSyncMessage(t('scannerOfflineSyncNoPending'));
+      } else if (!silent) {
+        setOfflineSyncMessage(t('scannerOfflineSyncFailed'));
+      }
+
+      await refreshOfflineQueueCount();
+    } catch {
+      if (!silent) {
+        setOfflineSyncMessage(t('scannerOfflineSyncFailed'));
+      }
+    } finally {
+      setOfflineSyncing(false);
+    }
+  }, [
+    offlineQueueCount,
+    offlineSyncing,
+    refreshOfflineQueueCount,
+    selectedEventId,
+    t,
+  ]);
+
+  useEffect(() => {
+    if (!selectedEventId || offlineQueueCount === 0) {
+      return;
+    }
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void syncQueuedScans({ silent: true });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [offlineQueueCount, selectedEventId, syncQueuedScans]);
+
+  useEffect(() => {
+    if (!selectedEventId || offlineQueueCount === 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      void syncQueuedScans({ silent: true });
+    }, OFFLINE_SYNC_INTERVAL_MS);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [offlineQueueCount, selectedEventId, syncQueuedScans]);
 
   const handleCameraMountError = useCallback(
     (mountError: { message?: string }) => {
@@ -308,9 +423,6 @@ export default function ScannerScreen() {
 
   return (
     <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <View className="mb-3 flex-row justify-end">
-        <OrganizerExitPanelButton />
-      </View>
       <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
         {t('organizerEventsLabel')}
       </Text>
@@ -378,6 +490,38 @@ export default function ScannerScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        ) : null}
+      </View>
+
+      <View className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800/60 dark:bg-sky-900/20">
+        <Text className="text-sm font-semibold text-sky-800 dark:text-sky-200">
+          {t('scannerOfflineQueueTitle')}
+        </Text>
+        <Text className="mt-1 text-xs text-sky-700 dark:text-sky-300">
+          {t('scannerOfflineQueueSubtitle')}
+        </Text>
+        <Text className="mt-3 text-sm font-medium text-sky-800 dark:text-sky-200">
+          {t('scannerOfflinePendingCount', { count: offlineQueueCount })}
+        </Text>
+        <TouchableOpacity
+          onPress={() => void syncQueuedScans()}
+          disabled={offlineSyncing || offlineQueueCount === 0}
+          className={
+            offlineSyncing || offlineQueueCount === 0
+              ? 'mt-3 rounded-xl bg-sky-300 px-4 py-3'
+              : 'mt-3 rounded-xl bg-sky-600 px-4 py-3'
+          }
+        >
+          <Text className="text-center text-sm font-semibold text-white">
+            {offlineSyncing
+              ? t('scannerOfflineSyncing')
+              : t('scannerOfflineSyncAction')}
+          </Text>
+        </TouchableOpacity>
+        {offlineSyncMessage ? (
+          <Text className="mt-2 text-xs text-sky-700 dark:text-sky-300">
+            {offlineSyncMessage}
+          </Text>
         ) : null}
       </View>
 

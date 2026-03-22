@@ -68,6 +68,11 @@ model Event {
   description String?
   startTime   DateTime     @db.Timestamp(6)
   endTime     DateTime?    @db.Timestamp(6)
+  checkInOpensAtOffsetMin  Int? @default(-60)
+  checkInClosesAtOffsetMin Int? @default(180)
+  maxTicketsPerUser        Int? @default(1)
+  cancellationPolicy String?
+  refundPolicy       String?
   coverUrl    String?      @db.VarChar(255)
   entryFee    Decimal?     @default(0) @db.Decimal(10, 2)
   images      String[]     @default([])
@@ -76,8 +81,36 @@ model Event {
   User        User         @relation(fields: [organizerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Place       Place?       @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   EventTag    EventTag[]
+  EventCollaborator EventCollaborator[]
+  EventRevision EventRevision[]
   Promotion   Promotion[]
   TicketType  TicketType[]
+}
+
+model EventRevision {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  eventId     String    @db.Uuid
+  actorUserId String?   @db.Uuid
+  action      String    @db.VarChar(32)
+  snapshot    Json
+  createdAt   DateTime? @default(now()) @db.Timestamp(6)
+  Event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Actor       User?     @relation("EventRevisionActor", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([eventId, createdAt])
+  @@index([actorUserId])
+}
+
+model EventCollaborator {
+  eventId    String    @db.Uuid
+  userId     String    @db.Uuid
+  permission String?   @default("EDIT") @db.VarChar(16)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  Event      Event     @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([eventId, userId])
+  @@index([userId])
 }
 
 model EventTag {
@@ -104,10 +137,18 @@ model Notification {
   userId                          String    @db.Uuid
   actorId                         String?   @db.Uuid
   type                            String    @db.VarChar(50)
+  title                           String?   @db.VarChar(120)
+  message                         String?
+  severity                        String?   @default("INFO") @db.VarChar(16)
+  payload                         Json?
+  targetPath                      String?   @db.VarChar(255)
   isRead                          Boolean?  @default(false)
   createdAt                       DateTime? @default(now()) @db.Timestamp(6)
   User_Notification_actorIdToUser User?     @relation("Notification_actorIdToUser", fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   User_Notification_userIdToUser  User      @relation("Notification_userIdToUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, type, createdAt])
 }
 
 model Outing {
@@ -230,13 +271,20 @@ model PlaceTag {
 }
 
 model Promotion {
-  id      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  placeId String?   @db.Uuid
-  eventId String?   @db.Uuid
-  budget  Decimal?  @db.Decimal(10, 2)
-  endDate DateTime? @db.Timestamp(6)
-  Event   Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  Place   Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId        String?   @db.Uuid
+  eventId        String?   @db.Uuid
+  budget         Decimal?  @db.Decimal(10, 2)
+  endDate        DateTime? @db.Timestamp(6)
+  code           String?   @db.VarChar(32)
+  discountType   String?   @default("PERCENT") @db.VarChar(16)
+  discountValue  Decimal?  @db.Decimal(10, 2)
+  maxRedemptions Int?
+  redeemedCount  Int?      @default(0)
+  Event          Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Place          Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([eventId, code])
 }
 
 model Post {
@@ -435,6 +483,25 @@ model UserSettings {
   notificationOutingInvites        Boolean  @default(true)
   notificationFriendRequests       Boolean  @default(true)
   notificationSavedPlacesActivity  Boolean  @default(true)
+  organizerNotifyBookings          Boolean  @default(true)
+  organizerNotifyTeamUpdates       Boolean  @default(true)
+  organizerNotifyReminderD1        Boolean  @default(true)
+  organizerNotifyReminderH3        Boolean  @default(true)
+  organizerNotifyReminderH1        Boolean  @default(true)
+  organizerNotificationPriorityMin String   @default("IMPORTANT") @db.VarChar(16)
+  organizerScannerOfflineAuto      Boolean  @default(true)
+  organizerScannerAutoSync         Boolean  @default(true)
+  organizerScannerHaptics          Boolean  @default(true)
+  organizerScannerSound            Boolean  @default(true)
+  organizerScannerStrictWindow     Boolean  @default(true)
+  organizerDefaultCheckInOpenOffsetMin  Int  @default(-60)
+  organizerDefaultCheckInCloseOffsetMin Int  @default(180)
+  organizerDefaultMaxTicketsPerUser     Int  @default(1)
+  organizerDefaultCancellationPolicy    String?
+  organizerDefaultRefundPolicy          String?
+  organizerTeamInviteScope         String   @default("OWNER_ONLY") @db.VarChar(24)
+  organizerTeamDefaultPermission   String   @default("EDIT") @db.VarChar(16)
+  organizerTeamRequireRemovalConfirm Boolean @default(true)
   profilePublic                    Boolean  @default(true)
   defaultPostVisibility            String   @default("public") @db.VarChar(20)
   allowOutingInvitesFrom           String   @default("connections") @db.VarChar(20)
@@ -470,6 +537,8 @@ model User {
   ChatMessage                             ChatMessage[]
   DeviceToken                             DeviceToken[]
   Event                                   Event[]
+  EventCollaborator                       EventCollaborator[]
+  EventRevisionActor                      EventRevision[]      @relation("EventRevisionActor")
   Friendship_Friendship_receiverIdToUser  Friendship[]         @relation("Friendship_receiverIdToUser")
   Friendship_Friendship_requesterIdToUser Friendship[]         @relation("Friendship_requesterIdToUser")
   Notification_Notification_actorIdToUser Notification[]       @relation("Notification_actorIdToUser")

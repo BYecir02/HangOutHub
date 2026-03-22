@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Patch,
@@ -18,7 +19,9 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
 import { CreateEventBookingDto } from './dto/create-event-booking.dto';
+import { CreateEventCollaboratorDto } from './dto/create-event-collaborator.dto';
 import { CreateEventDto } from './dto/create-event.dto';
+import { OrganizerAnalyticsOverview } from './events.service';
 import { EventsService } from './events.service';
 import { UpdateEventDto } from './dto/update-event.dto';
 
@@ -85,14 +88,96 @@ export class EventsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Get('analytics/overview')
+  getOrganizerAnalytics(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<OrganizerAnalyticsOverview> {
+    this.ensureOrganizerRole(req);
+    return this.eventsService.getOrganizerAnalytics(
+      req.user.userId,
+      req.user.role,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'cover', maxCount: 1 },
+        { name: 'gallery', maxCount: 10 },
+      ],
+      {
+        storage: memoryStorage(),
+        fileFilter: (_req, file, cb) => {
+          if (!file.mimetype.startsWith('image/')) {
+            return cb(
+              new BadRequestException('Seules les images sont autorisees.'),
+              false,
+            );
+          }
+          cb(null, true);
+        },
+      },
+    ),
+  )
   update(
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateEventDto,
+    @UploadedFiles()
+    files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
   ) {
-    this.ensureOrganizerRole(req);
-    return this.eventsService.update(id, req.user.userId, req.user.role, body);
+    return this.eventsService.update(
+      id,
+      req.user.userId,
+      req.user.role,
+      body,
+      files,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/collaborators')
+  listCollaborators(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.listCollaborators(
+      id,
+      req.user.userId,
+      req.user.role,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/collaborators')
+  addCollaborator(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateEventCollaboratorDto,
+  ) {
+    return this.eventsService.addCollaborator(
+      id,
+      req.user.userId,
+      req.user.role,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/collaborators/:userId')
+  removeCollaborator(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) collaboratorUserId: string,
+  ) {
+    return this.eventsService.removeCollaborator(
+      id,
+      req.user.userId,
+      req.user.role,
+      collaboratorUserId,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -117,8 +202,24 @@ export class EventsController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    this.ensureOrganizerRole(req);
-    return this.eventsService.findEventScans(id, req.user.userId, req.user.role);
+    return this.eventsService.findEventScans(
+      id,
+      req.user.userId,
+      req.user.role,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/revisions')
+  listEventRevisions(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.listEventRevisions(
+      id,
+      req.user.userId,
+      req.user.role,
+    );
   }
 
   @Get(':id')

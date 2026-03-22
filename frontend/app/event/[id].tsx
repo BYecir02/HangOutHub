@@ -5,6 +5,7 @@ import {
   Image,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -22,6 +23,8 @@ interface EventDetail {
   id: string;
   title: string;
   description?: string | null;
+  cancellationPolicy?: string | null;
+  refundPolicy?: string | null;
   startTime: string;
   endTime?: string | null;
   coverUrl?: string | null;
@@ -45,6 +48,15 @@ interface EventDetail {
     name: string;
     price: number | string;
     quantity: number;
+  }>;
+  Promotion?: Array<{
+    id: string;
+    code?: string | null;
+    discountType?: string | null;
+    discountValue?: number | string | null;
+    maxRedemptions?: number | null;
+    redeemedCount?: number | null;
+    endDate?: string | null;
   }>;
 }
 
@@ -87,6 +99,7 @@ export default function EventDetailScreen() {
   const [joining, setJoining] = useState(false);
   const [booking, setBooking] = useState<EventBookingTicket | null>(null);
   const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<string>('');
+  const [promoCode, setPromoCode] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -222,6 +235,7 @@ export default function EventDetailScreen() {
       const reserved = await createEventBooking(
         event.id,
         selectedTicketTypeId || undefined,
+        promoCode.trim() || undefined,
       );
       setBooking(reserved);
 
@@ -346,6 +360,23 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
 
+          <View className="mt-4">
+            <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('eventDetailPromoCodeTitle')}
+            </Text>
+            <TextInput
+              value={promoCode}
+              onChangeText={setPromoCode}
+              autoCapitalize="characters"
+              placeholder={t('eventDetailPromoCodePlaceholder')}
+              placeholderTextColor="#9CA3AF"
+              className="mt-2 rounded-xl border border-gray-200 bg-white px-3 py-3 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('eventDetailPromoCodeHint')}
+            </Text>
+          </View>
+
           <View className="mt-4 flex-row gap-3">
             <TouchableOpacity
               onPress={handleJoinEvent}
@@ -466,6 +497,25 @@ export default function EventDetailScreen() {
           </Text>
           <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
             {event.description || t('eventDetailDescriptionFallback')}
+          </Text>
+        </View>
+
+        <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
+          <Text className="text-lg font-bold text-gray-900 dark:text-white">
+            {t('eventDetailPoliciesTitle')}
+          </Text>
+          <Text className="mt-3 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            {t('eventDetailCancellationPolicyTitle')}
+          </Text>
+          <Text className="mt-1 text-base leading-7 text-gray-600 dark:text-gray-300">
+            {event.cancellationPolicy || t('eventDetailPolicyNotProvided')}
+          </Text>
+
+          <Text className="mt-4 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            {t('eventDetailRefundPolicyTitle')}
+          </Text>
+          <Text className="mt-1 text-base leading-7 text-gray-600 dark:text-gray-300">
+            {event.refundPolicy || t('eventDetailPolicyNotProvided')}
           </Text>
         </View>
 
