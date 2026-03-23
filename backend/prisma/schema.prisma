@@ -411,10 +411,15 @@ model Tag {
   id              Int               @id @default(autoincrement())
   name            String            @db.VarChar(50)
   categoryId      Int?
+  status          String            @default("APPROVED") @db.VarChar(16)
+  submittedByUserId String?         @db.Uuid
   EventTag        EventTag[]
   PlaceTag        PlaceTag[]
   Category        Category?         @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   UserTagInterest UserTagInterest[]
+
+  @@index([categoryId, status])
+  @@index([submittedByUserId])
 }
 
 model TicketType {
@@ -488,6 +493,8 @@ model UserSettings {
   organizerNotifyReminderD1        Boolean  @default(true)
   organizerNotifyReminderH3        Boolean  @default(true)
   organizerNotifyReminderH1        Boolean  @default(true)
+  organizerReminderMode            String   @default("preset") @db.VarChar(16)
+  organizerReminderOffsetsMin      Int[]    @default([])
   organizerNotificationPriorityMin String   @default("IMPORTANT") @db.VarChar(16)
   organizerScannerOfflineAuto      Boolean  @default(true)
   organizerScannerAutoSync         Boolean  @default(true)

@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -25,6 +27,7 @@ import {
   syncOfflineScans,
   verifyOrganizerScan,
 } from '@/services/organizer-scanner';
+import { getOrganizerEventPhase } from '@/services/organizer-ui';
 
 const SCAN_THROTTLE_MS = 1000;
 const SCAN_FREEZE_MS = 1500;
@@ -97,6 +100,7 @@ export default function ScannerScreen() {
   const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [offlineSyncing, setOfflineSyncing] = useState(false);
+  const [eventPickerVisible, setEventPickerVisible] = useState(false);
   const [offlineSyncMessage, setOfflineSyncMessage] = useState<string | null>(
     null,
   );
@@ -271,6 +275,30 @@ export default function ScannerScreen() {
   }, []);
 
   const selectedEvent = scanEligibleEvents.find((event) => event.id === selectedEventId);
+  const selectedEventPhase = selectedEvent
+    ? getOrganizerEventPhase(selectedEvent.startTime, selectedEvent.endTime)
+    : null;
+
+  const selectedEventPhaseClass =
+    selectedEventPhase === 'upcoming'
+      ? 'rounded-full bg-emerald-100 px-2.5 py-1 dark:bg-emerald-900/30'
+      : selectedEventPhase === 'live'
+        ? 'rounded-full bg-amber-100 px-2.5 py-1 dark:bg-amber-900/30'
+        : 'rounded-full bg-gray-200 px-2.5 py-1 dark:bg-gray-800';
+
+  const selectedEventPhaseTextClass =
+    selectedEventPhase === 'upcoming'
+      ? 'text-xs font-semibold text-emerald-700 dark:text-emerald-300'
+      : selectedEventPhase === 'live'
+        ? 'text-xs font-semibold text-amber-700 dark:text-amber-300'
+        : 'text-xs font-semibold text-gray-600 dark:text-gray-300';
+
+  const selectedEventPhaseLabel =
+    selectedEventPhase === 'upcoming'
+      ? t('organizerEventsPhaseUpcoming')
+      : selectedEventPhase === 'live'
+        ? t('organizerEventsPhaseLive')
+        : t('organizerEventsPhasePast');
 
   const formatRecentScanTime = (value: string) => {
     const parsed = new Date(value);
@@ -283,6 +311,52 @@ export default function ScannerScreen() {
       hour: '2-digit',
       minute: '2-digit',
     }).format(parsed);
+  };
+
+  const formatScannerBoundaryMoment = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '--:--';
+    }
+
+    const now = new Date();
+    const isSameDay =
+      parsed.getFullYear() === now.getFullYear() &&
+      parsed.getMonth() === now.getMonth() &&
+      parsed.getDate() === now.getDate();
+
+    if (isSameDay) {
+      return new Intl.DateTimeFormat(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(parsed);
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
+  };
+
+  const getScanStatusMessage = (result: ScannerVerificationResult) => {
+    if (result.status === 'EVENT_EXPIRED' && result.checkInWindow) {
+      const windowDate =
+        result.checkInWindow.reason === 'TOO_EARLY'
+          ? result.checkInWindow.opensAt
+          : result.checkInWindow.closesAt;
+
+      const formattedTime = formatScannerBoundaryMoment(windowDate);
+
+      if (result.checkInWindow.reason === 'TOO_EARLY') {
+        return t('scannerStatusMessageExpiredTooEarly', { time: formattedTime });
+      }
+
+      return t('scannerStatusMessageExpiredTooLate', { time: formattedTime });
+    }
+
+    return t(statusMessageKey[result.status]);
   };
 
   const openSelectedEventScans = () => {
@@ -422,7 +496,8 @@ export default function ScannerScreen() {
   const statusTone = scanResult ? statusToneClass[scanResult.status] : null;
 
   return (
-    <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
+    <>
+      <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
       <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
         {t('organizerEventsLabel')}
       </Text>
@@ -434,96 +509,79 @@ export default function ScannerScreen() {
       </Text>
 
       <View className="mt-4 rounded-2xl bg-white p-4 dark:bg-gray-900">
-        <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-          {t('scannerEventPickerTitle')}
-        </Text>
-        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {t('scannerEventPickerSubtitle')}
-        </Text>
-
         {scanEligibleEvents.length === 0 ? (
-          <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
             {t('scannerEventNoEvents')}
           </Text>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            className="mt-3"
-            contentContainerStyle={{ gap: 8, paddingRight: 8 }}
-          >
-            {scanEligibleEvents.map((event) => {
-              const selected = event.id === selectedEventId;
-              return (
-                <TouchableOpacity
-                  key={event.id}
-                  onPress={() => setSelectedEventId(event.id)}
-                  className={selected
-                    ? 'rounded-full bg-[#4c669f] px-4 py-2'
-                    : 'rounded-full border border-gray-300 px-4 py-2 dark:border-gray-700'}
+        ) : selectedEvent ? (
+          <>
+            <View className="flex-row items-center justify-between">
+              <View className="mr-3 flex-1">
+                <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  {t('scannerActiveEvent')}
+                </Text>
+                <Text
+                  className="mt-1 text-base font-semibold text-gray-900 dark:text-white"
+                  numberOfLines={1}
                 >
-                  <Text
-                    numberOfLines={1}
-                    className={selected
-                      ? 'max-w-[220px] text-xs font-semibold text-white'
-                      : 'max-w-[220px] text-xs font-semibold text-gray-700 dark:text-gray-200'}
-                  >
-                    {event.title}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
+                  {selectedEvent.title}
+                </Text>
+                <View className="mt-2 self-start">
+                  <View className={selectedEventPhaseClass}>
+                    <Text className={selectedEventPhaseTextClass}>
+                      {selectedEventPhaseLabel}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-        {selectedEvent ? (
-          <View className="mt-3 flex-row items-center justify-between">
-            <Text className="mr-3 flex-1 text-sm text-gray-600 dark:text-gray-300" numberOfLines={1}>
-              {t('scannerActiveEvent')}: {selectedEvent.title}
+              <TouchableOpacity
+                onPress={() => setEventPickerVisible(true)}
+                className="rounded-full border border-[#4c669f] px-3 py-1.5"
+              >
+                <Text className="text-xs font-semibold text-[#4c669f]">
+                  {t('scannerSwitchEvent')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+          </>
+        ) : null}
+      </View>
+
+      {offlineQueueCount > 0 ? (
+        <View className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800/60 dark:bg-sky-900/20">
+          <Text className="text-sm font-semibold text-sky-800 dark:text-sky-200">
+            {t('scannerOfflineQueueTitle')}
+          </Text>
+          <Text className="mt-1 text-xs text-sky-700 dark:text-sky-300">
+            {t('scannerOfflineQueueSubtitle')}
+          </Text>
+          <Text className="mt-3 text-sm font-medium text-sky-800 dark:text-sky-200">
+            {t('scannerOfflinePendingCount', { count: offlineQueueCount })}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void syncQueuedScans()}
+            disabled={offlineSyncing}
+            className={
+              offlineSyncing
+                ? 'mt-3 rounded-xl bg-sky-300 px-4 py-3'
+                : 'mt-3 rounded-xl bg-sky-600 px-4 py-3'
+            }
+          >
+            <Text className="text-center text-sm font-semibold text-white">
+              {offlineSyncing
+                ? t('scannerOfflineSyncing')
+                : t('scannerOfflineSyncAction')}
             </Text>
-            <TouchableOpacity
-              onPress={openSelectedEventScans}
-              className="rounded-full border border-[#4c669f] px-3 py-1.5"
-            >
-              <Text className="text-xs font-semibold text-[#4c669f]">
-                {t('scannerOpenAllScans')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </View>
-
-      <View className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800/60 dark:bg-sky-900/20">
-        <Text className="text-sm font-semibold text-sky-800 dark:text-sky-200">
-          {t('scannerOfflineQueueTitle')}
-        </Text>
-        <Text className="mt-1 text-xs text-sky-700 dark:text-sky-300">
-          {t('scannerOfflineQueueSubtitle')}
-        </Text>
-        <Text className="mt-3 text-sm font-medium text-sky-800 dark:text-sky-200">
-          {t('scannerOfflinePendingCount', { count: offlineQueueCount })}
-        </Text>
-        <TouchableOpacity
-          onPress={() => void syncQueuedScans()}
-          disabled={offlineSyncing || offlineQueueCount === 0}
-          className={
-            offlineSyncing || offlineQueueCount === 0
-              ? 'mt-3 rounded-xl bg-sky-300 px-4 py-3'
-              : 'mt-3 rounded-xl bg-sky-600 px-4 py-3'
-          }
-        >
-          <Text className="text-center text-sm font-semibold text-white">
-            {offlineSyncing
-              ? t('scannerOfflineSyncing')
-              : t('scannerOfflineSyncAction')}
-          </Text>
-        </TouchableOpacity>
-        {offlineSyncMessage ? (
-          <Text className="mt-2 text-xs text-sky-700 dark:text-sky-300">
-            {offlineSyncMessage}
-          </Text>
-        ) : null}
-      </View>
+          </TouchableOpacity>
+          {offlineSyncMessage ? (
+            <Text className="mt-2 text-xs text-sky-700 dark:text-sky-300">
+              {offlineSyncMessage}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {error ? (
         <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
@@ -619,7 +677,7 @@ export default function ScannerScreen() {
                   {t(statusTitleKey[scanResult.status])}
                 </Text>
                 <Text className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                  {t(statusMessageKey[scanResult.status])}
+                  {getScanStatusMessage(scanResult)}
                 </Text>
 
                 {scanResult.attendee ? (
@@ -648,9 +706,19 @@ export default function ScannerScreen() {
             ) : null}
 
             <View className="mt-6 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                {t('scannerRecentScansTitle')}
-              </Text>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('scannerRecentScansTitle')}
+                </Text>
+                <TouchableOpacity
+                  onPress={openSelectedEventScans}
+                  className="rounded-full border border-gray-300 px-3 py-1.5 dark:border-gray-700"
+                >
+                  <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    {t('scannerOpenAllScans')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               {recentScans.length === 0 ? (
                 <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -685,6 +753,60 @@ export default function ScannerScreen() {
           </View>
         ) : null}
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <Modal
+        transparent
+        visible={eventPickerVisible}
+        animationType="fade"
+        onRequestClose={() => setEventPickerVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/35"
+          onPress={() => setEventPickerVisible(false)}
+        >
+          <Pressable
+            className="rounded-t-3xl bg-white p-5 dark:bg-gray-900"
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+              {t('scannerEventPickerTitle')}
+            </Text>
+            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('scannerEventPickerSubtitle')}
+            </Text>
+
+            <View className="mt-4 max-h-72">
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {scanEligibleEvents.map((event) => {
+                  const selected = event.id === selectedEventId;
+                  return (
+                    <TouchableOpacity
+                      key={event.id}
+                      onPress={() => {
+                        setSelectedEventId(event.id);
+                        setEventPickerVisible(false);
+                      }}
+                      className={selected
+                        ? 'mb-2 rounded-2xl border border-[#4c669f] bg-[#4c669f]/10 px-4 py-3'
+                        : 'mb-2 rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700'}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        className={selected
+                          ? 'text-sm font-semibold text-[#4c669f]'
+                          : 'text-sm font-semibold text-gray-800 dark:text-gray-100'}
+                      >
+                        {event.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }

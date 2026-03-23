@@ -41,8 +41,57 @@ export interface OrganizerReminderSweepResult {
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationsService.name);
   private remindersInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly remindersSweepWindowMs = 15 * 60 * 1000;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeReminderOffsets(offsets: number[] | null | undefined): number[] {
+    if (!Array.isArray(offsets)) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        offsets
+          .filter((offset) => Number.isInteger(offset))
+          .map((offset) => Number(offset))
+          .filter((offset) => offset >= 15 && offset <= 10080),
+      ),
+    )
+      .sort((a, b) => b - a)
+      .slice(0, 3);
+  }
+
+  private resolveReminderOffsets(settings?: {
+    organizerReminderMode?: string | null;
+    organizerReminderOffsetsMin?: number[] | null;
+    organizerNotifyReminderD1?: boolean | null;
+    organizerNotifyReminderH3?: boolean | null;
+    organizerNotifyReminderH1?: boolean | null;
+  } | null): number[] {
+    const customOffsets =
+      settings?.organizerReminderMode === 'custom'
+        ? this.normalizeReminderOffsets(settings.organizerReminderOffsetsMin)
+        : [];
+
+    if (customOffsets.length > 0) {
+      return customOffsets;
+    }
+
+    const legacyOffsets: number[] = [];
+
+    if (settings?.organizerNotifyReminderD1 !== false) {
+      legacyOffsets.push(1440);
+    }
+    if (settings?.organizerNotifyReminderH3 !== false) {
+      legacyOffsets.push(180);
+    }
+    if (settings?.organizerNotifyReminderH1 !== false) {
+      legacyOffsets.push(60);
+    }
+
+    return this.normalizeReminderOffsets(legacyOffsets);
+  }
 
   onModuleInit() {
     this.remindersInterval = setInterval(() => {
@@ -259,14 +308,15 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
   async emitUpcomingEventReminders(): Promise<OrganizerReminderSweepResult> {
     const now = new Date();
-    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const maxReminderHorizonMs = 7 * 24 * 60 * 60 * 1000;
+    const horizon = new Date(now.getTime() + maxReminderHorizonMs);
     let notificationsCreated = 0;
 
     const upcomingEvents = await this.prisma.event.findMany({
       where: {
         startTime: {
           gte: now,
-          lte: in24h,
+          lte: horizon,
         },
       },
       select: {
@@ -281,6 +331,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
                 organizerNotifyReminderD1: true,
                 organizerNotifyReminderH3: true,
                 organizerNotifyReminderH1: true,
+                organizerReminderMode: true,
+                organizerReminderOffsetsMin: true,
                 organizerNotificationPriorityMin: true,
               },
             },
@@ -289,44 +341,24 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    const reminders = [
-      {
-        key: 'D-1',
-        label: 'dans 24h',
-        minMs: 23 * 60 * 60 * 1000,
-        maxMs: 24 * 60 * 60 * 1000,
-        severity: 'IMPORTANT' as const,
-      },
-      {
-        key: 'H-3',
-        label: 'dans 3h',
-        minMs: 2 * 60 * 60 * 1000 + 45 * 60 * 1000,
-        maxMs: 3 * 60 * 60 * 1000,
-        severity: 'IMPORTANT' as const,
-      },
-      {
-        key: 'H-1',
-        label: 'dans 1h',
-        minMs: 45 * 60 * 1000,
-        maxMs: 60 * 60 * 1000,
-        severity: 'URGENT' as const,
-      },
-    ];
-
     for (const event of upcomingEvents) {
       const deltaMs = event.startTime.getTime() - now.getTime();
+      const settings = event.User?.UserSettings;
+      const reminderOffsetsMin = this.resolveReminderOffsets(settings);
 
-      for (const reminder of reminders) {
-        const settings = event.User?.UserSettings;
-        if (reminder.key === 'D-1' && settings?.organizerNotifyReminderD1 === false) {
-          continue;
-        }
-        if (reminder.key === 'H-3' && settings?.organizerNotifyReminderH3 === false) {
-          continue;
-        }
-        if (reminder.key === 'H-1' && settings?.organizerNotifyReminderH1 === false) {
-          continue;
-        }
+      for (const reminderOffsetMin of reminderOffsetsMin) {
+        const reminderOffsetMs = reminderOffsetMin * 60 * 1000;
+        const minWindowMs = Math.max(
+          0,
+          reminderOffsetMs - this.remindersSweepWindowMs,
+        );
+        const maxWindowMs = reminderOffsetMs;
+        const reminderSeverity =
+          reminderOffsetMin <= 90 ? ('URGENT' as const) : ('IMPORTANT' as const);
+        const reminderLabel =
+          reminderOffsetMin >= 60
+            ? `dans ${Math.floor(reminderOffsetMin / 60)}h`
+            : `dans ${reminderOffsetMin}min`;
 
         const minPriority =
           settings?.organizerNotificationPriorityMin === 'URGENT'
@@ -337,16 +369,16 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
           URGENT: 2,
         };
 
-        if (severityRank[reminder.severity] < severityRank[minPriority]) {
+        if (severityRank[reminderSeverity] < severityRank[minPriority]) {
           continue;
         }
 
-        if (deltaMs < reminder.minMs || deltaMs > reminder.maxMs) {
+        if (deltaMs < minWindowMs || deltaMs > maxWindowMs) {
           continue;
         }
 
-        const title = `Rappel evenement ${reminder.key}`;
-        const message = `${event.title} commence ${reminder.label}.`;
+        const title = `Rappel evenement M-${reminderOffsetMin}`;
+        const message = `${event.title} commence ${reminderLabel}.`;
         const targetPath = `/event/${event.id}`;
 
         const existing = await this.prisma.notification.findFirst({
@@ -371,12 +403,12 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             type: 'ORGANIZER_EVENT_REMINDER',
             title,
             message,
-            severity: reminder.severity,
+            severity: reminderSeverity,
             targetPath,
             payload: {
               eventId: event.id,
               eventTitle: event.title,
-              reminderKey: reminder.key,
+              reminderOffsetMin,
             },
             isRead: false,
           },

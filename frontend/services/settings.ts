@@ -15,6 +15,8 @@ export interface UserSettings {
   organizerNotifyReminderD1: boolean;
   organizerNotifyReminderH3: boolean;
   organizerNotifyReminderH1: boolean;
+  organizerReminderMode: 'preset' | 'custom';
+  organizerReminderOffsetsMin: number[];
   organizerNotificationPriorityMin: 'IMPORTANT' | 'URGENT';
   organizerScannerOfflineAuto: boolean;
   organizerScannerAutoSync: boolean;

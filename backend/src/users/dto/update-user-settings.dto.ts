@@ -1,4 +1,13 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class UpdateUserSettingsDto {
   @IsOptional()
@@ -36,6 +45,18 @@ export class UpdateUserSettingsDto {
   @IsOptional()
   @IsBoolean()
   organizerNotifyReminderH1?: boolean;
+
+  @IsOptional()
+  @IsIn(['preset', 'custom'])
+  organizerReminderMode?: 'preset' | 'custom';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsInt({ each: true })
+  @Min(15, { each: true })
+  @Max(10080, { each: true })
+  organizerReminderOffsetsMin?: number[];
 
   @IsOptional()
   @IsIn(['IMPORTANT', 'URGENT'])

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   Image,
   Modal,
@@ -15,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { getImageUrl } from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import {
   formatOrganizerDateTime,
   getOrganizerEventPhase,
@@ -69,9 +70,11 @@ function getPhaseLabelKey(phase: OrganizerEventPhase) {
 export default function OrganizerEventsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const [activeFilter, setActiveFilter] = useState<'all' | OrganizerEventPhase>('all');
   const [openActionsEventId, setOpenActionsEventId] = useState<string | null>(
     null,
   );
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const {
     organizerEvents,
     loading,
@@ -137,6 +140,14 @@ export default function OrganizerEventsScreen() {
     [eventsOverview.items, openActionsEventId],
   );
 
+  const filteredItems = useMemo(() => {
+    if (activeFilter === 'all') {
+      return eventsOverview.items;
+    }
+
+    return eventsOverview.items.filter((item) => item.phase === activeFilter);
+  }, [activeFilter, eventsOverview.items]);
+
   const openEventDetail = (eventId: string) => {
     router.push({
       pathname: '/event/[id]',
@@ -160,6 +171,47 @@ export default function OrganizerEventsScreen() {
 
   const openEventTeam = (eventId: string) => {
     router.push(`/organizer/event-team?id=${eventId}` as never);
+  };
+
+  const requestDeleteEvent = (eventId: string, eventTitle: string) => {
+    Alert.alert(
+      t('organizerEventsDeleteConfirmTitle'),
+      t('organizerEventsDeleteConfirmMessage', { title: eventTitle }),
+      [
+        {
+          text: t('genericCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('organizerEventsDeleteConfirmAction'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeletingEventId(eventId);
+              try {
+                await api.delete(`/events/${eventId}`);
+                setOpenActionsEventId(null);
+                await refetch();
+                Alert.alert(
+                  t('organizerEventsDeleteSuccessTitle'),
+                  t('organizerEventsDeleteSuccessMessage'),
+                );
+              } catch (error: any) {
+                const apiMessage =
+                  error?.response?.data?.message &&
+                  typeof error.response.data.message === 'string'
+                    ? error.response.data.message
+                    : t('organizerEventsDeleteFailed');
+
+                Alert.alert(t('commonErrorTitle'), apiMessage);
+              } finally {
+                setDeletingEventId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   if (loading) {
@@ -211,42 +263,17 @@ export default function OrganizerEventsScreen() {
         </View>
         <TouchableOpacity
           onPress={() => router.push('/event')}
-          className="rounded-full bg-[#ff4757] p-3"
+          className="rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
         >
-          <Ionicons name="add" size={22} color="white" />
+          <Text className="text-sm font-semibold text-[#ff4757]">
+            {t('organizerEventsCreate')}
+          </Text>
         </TouchableOpacity>
       </View>
 
       <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
         {t('organizerEventsSubtitle')}
       </Text>
-
-      <View className="mt-5 rounded-3xl bg-white p-4 dark:bg-gray-900">
-        <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-          {t('organizerEventsActionCenterTitle')}
-        </Text>
-        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {t('organizerEventsActionCenterSubtitle')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.push('/event')}
-          className="mt-4 flex-row items-center justify-center rounded-2xl bg-[#ff4757] px-4 py-3"
-        >
-          <Ionicons name="add-circle-outline" size={16} color="white" />
-          <Text className="ml-2 font-semibold text-white">
-            {t('organizerEventsCreate')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.push('/organizer/scanner')}
-          className="mt-3 flex-row items-center justify-center rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700"
-        >
-          <Ionicons name="qr-code-outline" size={16} color="#ff4757" />
-          <Text className="ml-2 font-semibold text-gray-800 dark:text-gray-100">
-            {t('organizerEventsOpenScanner')}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {error ? (
         <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
@@ -266,40 +293,60 @@ export default function OrganizerEventsScreen() {
 
       {eventsOverview.items.length > 0 ? (
         <View className="mt-4 rounded-2xl bg-white p-4 dark:bg-gray-900">
-          <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-            {t('organizerEventsPublishedCount', {
-              count: eventsOverview.items.length,
-            })}
-          </Text>
-          <View className="mt-3 flex-row flex-wrap">
-            <View className="mb-2 mr-2 rounded-full bg-emerald-100 px-3 py-1.5 dark:bg-emerald-900/30">
-              <Text className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                {t('organizerEventsSummaryUpcoming', {
+          <View className="flex-row flex-wrap gap-2">
+            {(
+              [
+                {
+                  key: 'all',
+                  label: t('organizerEventsFilterAll'),
+                  count: eventsOverview.items.length,
+                },
+                {
+                  key: 'upcoming',
+                  label: t('organizerEventsFilterUpcoming'),
                   count: eventsOverview.counts.upcoming,
-                })}
-              </Text>
-            </View>
-            <View className="mb-2 mr-2 rounded-full bg-amber-100 px-3 py-1.5 dark:bg-amber-900/30">
-              <Text className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                {t('organizerEventsSummaryLive', {
+                },
+                {
+                  key: 'live',
+                  label: t('organizerEventsFilterLive'),
                   count: eventsOverview.counts.live,
-                })}
-              </Text>
-            </View>
-            <View className="mb-2 rounded-full bg-gray-200 px-3 py-1.5 dark:bg-gray-800">
-              <Text className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                {t('organizerEventsSummaryPast', {
+                },
+                {
+                  key: 'past',
+                  label: t('organizerEventsFilterPast'),
                   count: eventsOverview.counts.past,
-                })}
-              </Text>
-            </View>
+                },
+              ] as const
+            ).map((filter) => {
+              const isActive = activeFilter === filter.key;
+              return (
+                <TouchableOpacity
+                  key={filter.key}
+                  onPress={() => setActiveFilter(filter.key)}
+                  className={`rounded-full px-3 py-1.5 ${
+                    isActive
+                      ? 'bg-[#4c669f]'
+                      : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      isActive ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {`${filter.label} (${filter.count})`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       ) : null}
 
       <View className="mt-6 pb-24">
         {eventsOverview.items.length > 0 ? (
-          eventsOverview.items.map(({ event, phase }) => (
+          filteredItems.length > 0 ? (
+            filteredItems.map(({ event, phase }) => (
             <View
               key={event.id}
               className="relative mb-4 rounded-3xl bg-white p-3 dark:bg-gray-900"
@@ -361,7 +408,25 @@ export default function OrganizerEventsScreen() {
               </TouchableOpacity>
 
             </View>
-          ))
+            ))
+          ) : (
+            <View className="items-center rounded-3xl bg-white px-6 py-10 dark:bg-gray-900">
+              <Text className="text-center text-lg font-semibold text-gray-900 dark:text-white">
+                {t('organizerEventsEmptyFilteredTitle')}
+              </Text>
+              <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+                {t('organizerEventsEmptyFilteredDescription')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setActiveFilter('all')}
+                className="mt-5 rounded-xl border border-gray-200 px-5 py-3 dark:border-gray-700"
+              >
+                <Text className="font-semibold text-gray-700 dark:text-gray-200">
+                  {t('organizerEventsFilterAll')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )
         ) : (
           <View className="items-center rounded-3xl bg-white px-6 py-10 dark:bg-gray-900">
             <Text className="text-center text-lg font-semibold text-gray-900 dark:text-white">
@@ -455,6 +520,25 @@ export default function OrganizerEventsScreen() {
               <Text className="text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
                 {t('organizerEventsActionTeam')}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (!selectedEvent || deletingEventId) {
+                  return;
+                }
+                requestDeleteEvent(selectedEvent.id, selectedEvent.title);
+              }}
+              disabled={Boolean(deletingEventId)}
+              className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-900/20"
+            >
+              {deletingEventId === selectedEvent?.id ? (
+                <ActivityIndicator color="#ef4444" />
+              ) : (
+                <Text className="text-center text-sm font-semibold text-red-600 dark:text-red-300">
+                  {t('organizerEventsActionDelete')}
+                </Text>
+              )}
             </TouchableOpacity>
           </Pressable>
         </Pressable>

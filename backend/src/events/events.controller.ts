@@ -138,6 +138,15 @@ export class EventsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  remove(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.remove(id, req.user.userId, req.user.role);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id/collaborators')
   listCollaborators(
     @Req() req: AuthenticatedRequest,

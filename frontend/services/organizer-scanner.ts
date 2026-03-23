@@ -15,6 +15,13 @@ export interface ScannerVerificationResult {
   status: ScannerVerificationStatus;
   bookingId: string | null;
   eventId: string | null;
+  checkInWindow:
+    | {
+        opensAt: string;
+        closesAt: string;
+        reason: 'TOO_EARLY' | 'TOO_LATE';
+      }
+    | null;
   attendee: {
     id: string;
     displayName: string | null;

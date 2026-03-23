@@ -128,32 +128,16 @@ export default function OrganizerNotificationsScreen() {
         urgentOnly: activeFilter === 'urgent',
       });
 
-      const unreadIds = (response.items || [])
-        .filter((item) => !item.isRead)
-        .map((item) => item.id);
-
-      const unreadSet = new Set(unreadIds);
-      const normalizedResponseItems = (response.items || []).map((item) =>
-        unreadSet.has(item.id)
-          ? {
-              ...item,
-              isRead: true,
-            }
-          : item,
-      );
-
-      if (isReset && unreadIds.length > 0) {
-        await markOrganizerNotificationsBatchRead(unreadIds);
-      }
+      const newItems = response.items || [];
 
       if (isReset) {
-        setItems(normalizedResponseItems);
+        setItems(newItems);
       } else {
         setItems((current) => {
           const currentIds = new Set(current.map((item) => item.id));
           const next = [...current];
 
-          for (const item of normalizedResponseItems) {
+          for (const item of newItems) {
             if (!currentIds.has(item.id)) {
               next.push(item);
             }
@@ -441,18 +425,20 @@ export default function OrganizerNotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="mt-3 flex-row justify-end">
-        <TouchableOpacity
-          onPress={() => {
-            void markVisibleAsRead();
-          }}
-          className="rounded-full border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            {t('organizerNotificationsMarkVisibleRead')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {filteredItems.some((item) => !item.isRead) ? (
+        <View className="mt-3 flex-row justify-end">
+          <TouchableOpacity
+            onPress={() => {
+              void markVisibleAsRead();
+            }}
+            className="rounded-full border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+          >
+            <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+              {t('organizerNotificationsMarkVisibleRead')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {loading ? (
         <View className="mt-8 items-center justify-center rounded-2xl bg-white p-8 dark:bg-gray-900">

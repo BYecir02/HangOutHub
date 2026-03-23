@@ -51,6 +51,8 @@ export interface UserSettingsResponse {
   organizerNotifyReminderD1: boolean;
   organizerNotifyReminderH3: boolean;
   organizerNotifyReminderH1: boolean;
+  organizerReminderMode: 'preset' | 'custom';
+  organizerReminderOffsetsMin: number[];
   organizerNotificationPriorityMin: 'IMPORTANT' | 'URGENT';
   organizerScannerOfflineAuto: boolean;
   organizerScannerAutoSync: boolean;
@@ -83,6 +85,8 @@ type StoredUserSettings = {
   organizerNotifyReminderD1: boolean;
   organizerNotifyReminderH3: boolean;
   organizerNotifyReminderH1: boolean;
+  organizerReminderMode?: string;
+  organizerReminderOffsetsMin?: number[];
   organizerNotificationPriorityMin: string;
   organizerScannerOfflineAuto: boolean;
   organizerScannerAutoSync: boolean;
@@ -109,7 +113,56 @@ type StoredUserSettings = {
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeReminderOffsets(
+    offsets: number[] | null | undefined,
+  ): number[] {
+    if (!Array.isArray(offsets)) {
+      return [];
+    }
+
+    const uniqueSorted = Array.from(
+      new Set(
+        offsets
+          .filter((offset) => Number.isInteger(offset))
+          .map((offset) => Number(offset))
+          .filter((offset) => offset >= 15 && offset <= 10080),
+      ),
+    )
+      .sort((a, b) => b - a)
+      .slice(0, 3);
+
+    return uniqueSorted;
+  }
+
+  private buildLegacyReminderOffsets(settings: {
+    organizerNotifyReminderD1: boolean;
+    organizerNotifyReminderH3: boolean;
+    organizerNotifyReminderH1: boolean;
+  }): number[] {
+    const offsets: number[] = [];
+
+    if (settings.organizerNotifyReminderD1) {
+      offsets.push(1440);
+    }
+    if (settings.organizerNotifyReminderH3) {
+      offsets.push(180);
+    }
+    if (settings.organizerNotifyReminderH1) {
+      offsets.push(60);
+    }
+
+    return offsets;
+  }
+
   private mapSettings(settings: StoredUserSettings): UserSettingsResponse {
+    const normalizedCustomOffsets = this.normalizeReminderOffsets(
+      settings.organizerReminderOffsetsMin,
+    );
+
+    const fallbackLegacyOffsets = this.normalizeReminderOffsets(
+      this.buildLegacyReminderOffsets(settings),
+    );
+
     return {
       notificationMessages: settings.notificationMessages,
       notificationOutingInvites: settings.notificationOutingInvites,
@@ -120,6 +173,12 @@ export class UsersService {
       organizerNotifyReminderD1: settings.organizerNotifyReminderD1,
       organizerNotifyReminderH3: settings.organizerNotifyReminderH3,
       organizerNotifyReminderH1: settings.organizerNotifyReminderH1,
+      organizerReminderMode:
+        settings.organizerReminderMode === 'custom' ? 'custom' : 'preset',
+      organizerReminderOffsetsMin:
+        normalizedCustomOffsets.length > 0
+          ? normalizedCustomOffsets
+          : fallbackLegacyOffsets,
       organizerNotificationPriorityMin:
         settings.organizerNotificationPriorityMin as 'IMPORTANT' | 'URGENT',
       organizerScannerOfflineAuto: settings.organizerScannerOfflineAuto,
@@ -139,9 +198,8 @@ export class UsersService {
       organizerTeamInviteScope: settings.organizerTeamInviteScope as
         | 'OWNER_ONLY'
         | 'OWNER_AND_EDITORS',
-      organizerTeamDefaultPermission: settings.organizerTeamDefaultPermission as
-        | 'EDIT'
-        | 'SCAN',
+      organizerTeamDefaultPermission:
+        settings.organizerTeamDefaultPermission as 'EDIT' | 'SCAN',
       organizerTeamRequireRemovalConfirm:
         settings.organizerTeamRequireRemovalConfirm,
       profilePublic: settings.profilePublic,
@@ -476,9 +534,31 @@ export class UsersService {
   ): Promise<UserSettingsResponse> {
     await this.getOrCreateSettings(userId);
 
+    const updatePayload: UpdateUserSettingsDto = { ...updateUserSettingsDto };
+    const reminderOffsetsInput = Array.isArray(
+      updatePayload.organizerReminderOffsetsMin,
+    )
+      ? (updatePayload.organizerReminderOffsetsMin as number[])
+      : undefined;
+    const normalizedReminderOffsets = reminderOffsetsInput
+      ? this.normalizeReminderOffsets(reminderOffsetsInput)
+      : undefined;
+
+    if (normalizedReminderOffsets) {
+      updatePayload.organizerReminderOffsetsMin = normalizedReminderOffsets;
+    }
+
+    if (
+      updatePayload.organizerReminderMode === 'custom' &&
+      normalizedReminderOffsets &&
+      normalizedReminderOffsets.length === 0
+    ) {
+      updatePayload.organizerReminderMode = 'preset';
+    }
+
     const settings = await this.prisma.userSettings.update({
       where: { userId },
-      data: updateUserSettingsDto,
+      data: updatePayload,
     });
 
     return this.mapSettings(settings);

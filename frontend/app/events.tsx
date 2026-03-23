@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '@/components/ui/SearchBar';
@@ -102,6 +102,12 @@ export default function EventsScreen() {
   useEffect(() => {
     void fetchEvents();
   }, [fetchEvents]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchEvents(true);
+    }, [fetchEvents]),
+  );
 
   const filterLabels: Record<EventFilter, string> = {
     all: t('eventsFilterAll'),

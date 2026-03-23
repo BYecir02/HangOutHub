@@ -193,6 +193,12 @@ export default function HomeScreen() {
     };
   }, [loadHomeData]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadHomeData();
+    }, [loadHomeData]),
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
 

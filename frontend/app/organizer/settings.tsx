@@ -22,6 +22,31 @@ import {
   updateMySettings,
 } from '@/services/settings';
 
+const REMINDER_PRESETS = [1440, 180, 60] as const;
+
+function formatReminderOffset(offsetMin: number) {
+  if (offsetMin % 1440 === 0) {
+    const days = offsetMin / 1440;
+    return days === 1 ? '1 jour' : `${days} jours`;
+  }
+
+  if (offsetMin % 60 === 0) {
+    const hours = offsetMin / 60;
+    return hours === 1 ? '1 heure' : `${hours} heures`;
+  }
+
+  return `${offsetMin} min`;
+}
+
+function normalizeReminderOffsets(offsets: number[]) {
+  return Array.from(
+    new Set(offsets.filter((offset) => Number.isInteger(offset))),
+  )
+    .filter((offset) => offset >= 15 && offset <= 10080)
+    .sort((a, b) => b - a)
+    .slice(0, 3);
+}
+
 function SectionTitle({ label }: { label: string }) {
   return (
     <Text className="mb-2 mt-5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -61,12 +86,27 @@ export default function OrganizerSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [customReminderInput, setCustomReminderInput] = useState('');
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
       const next = await getMySettings();
-      setSettings(next);
+      const fallbackLegacyOffsets = normalizeReminderOffsets([
+        next.organizerNotifyReminderD1 ? 1440 : 0,
+        next.organizerNotifyReminderH3 ? 180 : 0,
+        next.organizerNotifyReminderH1 ? 60 : 0,
+      ]);
+
+      setSettings({
+        ...next,
+        organizerReminderMode:
+          next.organizerReminderMode === 'custom' ? 'custom' : 'preset',
+        organizerReminderOffsetsMin:
+          normalizeReminderOffsets(next.organizerReminderOffsetsMin || []).length > 0
+            ? normalizeReminderOffsets(next.organizerReminderOffsetsMin || [])
+            : fallbackLegacyOffsets,
+      });
     } catch {
       setSettings(null);
     } finally {
@@ -93,6 +133,73 @@ export default function OrganizerSettingsScreen() {
     });
   };
 
+  const addReminderOffset = (offsetMin: number) => {
+    setSettings((current) => {
+      if (!current) {
+        return current;
+      }
+
+      if (offsetMin < 15 || offsetMin > 10080) {
+        return current;
+      }
+
+      const nextOffsets = normalizeReminderOffsets([
+        ...(current.organizerReminderOffsetsMin || []),
+        offsetMin,
+      ]);
+
+      if (nextOffsets.length === 0 || nextOffsets.length > 3) {
+        return current;
+      }
+
+      return {
+        ...current,
+        organizerReminderMode: 'custom',
+        organizerReminderOffsetsMin: nextOffsets,
+      };
+    });
+  };
+
+  const removeReminderOffset = (offsetMin: number) => {
+    setSettings((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextOffsets = normalizeReminderOffsets(
+        (current.organizerReminderOffsetsMin || []).filter(
+          (offset) => offset !== offsetMin,
+        ),
+      );
+
+      return {
+        ...current,
+        organizerReminderOffsetsMin: nextOffsets,
+      };
+    });
+  };
+
+  const addCustomReminderFromInput = () => {
+    const parsed = Number(customReminderInput);
+    if (!Number.isInteger(parsed)) {
+      Alert.alert(t('commonErrorTitle'), t('organizerSettingsReminderCustomInvalid'));
+      return;
+    }
+
+    if (parsed < 15 || parsed > 10080) {
+      Alert.alert(t('commonErrorTitle'), t('organizerSettingsReminderCustomRange'));
+      return;
+    }
+
+    if ((settings?.organizerReminderOffsetsMin || []).length >= 3) {
+      Alert.alert(t('commonErrorTitle'), t('organizerSettingsReminderCustomMax'));
+      return;
+    }
+
+    addReminderOffset(parsed);
+    setCustomReminderInput('');
+  };
+
   const saveAll = async () => {
     if (!settings) {
       return;
@@ -100,7 +207,24 @@ export default function OrganizerSettingsScreen() {
 
     setSaving(true);
     try {
-      await updateMySettings(settings);
+      const normalizedOffsets = normalizeReminderOffsets(
+        settings.organizerReminderOffsetsMin || [],
+      );
+
+      const payload: UserSettings = {
+        ...settings,
+        organizerReminderOffsetsMin: normalizedOffsets,
+        organizerNotifyReminderD1: normalizedOffsets.includes(1440),
+        organizerNotifyReminderH3: normalizedOffsets.includes(180),
+        organizerNotifyReminderH1: normalizedOffsets.includes(60),
+        organizerReminderMode:
+          settings.organizerReminderMode === 'custom' && normalizedOffsets.length > 0
+            ? 'custom'
+            : 'preset',
+      };
+
+      const saved = await updateMySettings(payload);
+      setSettings(saved);
       Alert.alert(t('organizerSettingsSavedTitle'), t('organizerSettingsSavedMessage'));
     } catch {
       Alert.alert(t('commonErrorTitle'), t('organizerSettingsSaveError'));
@@ -182,21 +306,134 @@ export default function OrganizerSettingsScreen() {
           value={settings.organizerNotifyTeamUpdates}
           onChange={(next) => patch('organizerNotifyTeamUpdates', next)}
         />
-        <ToggleRow
-          label={t('organizerSettingsNotifyReminderD1')}
-          value={settings.organizerNotifyReminderD1}
-          onChange={(next) => patch('organizerNotifyReminderD1', next)}
-        />
-        <ToggleRow
-          label={t('organizerSettingsNotifyReminderH3')}
-          value={settings.organizerNotifyReminderH3}
-          onChange={(next) => patch('organizerNotifyReminderH3', next)}
-        />
-        <ToggleRow
-          label={t('organizerSettingsNotifyReminderH1')}
-          value={settings.organizerNotifyReminderH1}
-          onChange={(next) => patch('organizerNotifyReminderH1', next)}
-        />
+        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
+            {t('organizerSettingsReminderMode')}
+          </Text>
+          <View className="flex-row gap-2">
+            {(['preset', 'custom'] as const).map((mode) => {
+              const active = settings.organizerReminderMode === mode;
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  onPress={() => {
+                    setSettings((current) => {
+                      if (!current) {
+                        return current;
+                      }
+
+                      if (mode === 'preset') {
+                        return {
+                          ...current,
+                          organizerReminderMode: 'preset',
+                          organizerReminderOffsetsMin: [...REMINDER_PRESETS],
+                        };
+                      }
+
+                      return {
+                        ...current,
+                        organizerReminderMode: 'custom',
+                        organizerReminderOffsetsMin: normalizeReminderOffsets(
+                          current.organizerReminderOffsetsMin || [...REMINDER_PRESETS],
+                        ),
+                      };
+                    });
+                  }}
+                  className={`rounded-full px-3 py-2 ${
+                    active
+                      ? 'bg-[#4c669f]'
+                      : 'bg-gray-200 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {mode === 'preset'
+                      ? t('organizerSettingsReminderModePreset')
+                      : t('organizerSettingsReminderModeCustom')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {settings.organizerReminderMode === 'preset' ? (
+            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('organizerSettingsReminderPresetHelp')}
+            </Text>
+          ) : null}
+        </View>
+
+        {settings.organizerReminderMode === 'custom' ? (
+          <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
+              {t('organizerSettingsReminderCustomTitle')}
+            </Text>
+
+            <View className="flex-row flex-wrap gap-2">
+              {REMINDER_PRESETS.map((offset) => {
+                const isSelected = (settings.organizerReminderOffsetsMin || []).includes(
+                  offset,
+                );
+                return (
+                  <TouchableOpacity
+                    key={offset}
+                    onPress={() => addReminderOffset(offset)}
+                    disabled={isSelected}
+                    className={`rounded-full px-3 py-2 ${
+                      isSelected
+                        ? 'bg-[#92A5C7]'
+                        : 'bg-gray-200 dark:bg-gray-800'
+                    }`}
+                  >
+                    <Text className="text-xs font-semibold text-gray-800 dark:text-gray-100">
+                      {formatReminderOffset(offset)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View className="mt-3 flex-row items-center gap-2">
+              <TextInput
+                value={customReminderInput}
+                onChangeText={setCustomReminderInput}
+                keyboardType="numeric"
+                placeholder={t('organizerSettingsReminderCustomPlaceholder')}
+                placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
+                className="flex-1 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
+              />
+              <TouchableOpacity
+                onPress={addCustomReminderFromInput}
+                className="rounded-xl bg-[#4c669f] px-4 py-3"
+              >
+                <Text className="text-xs font-semibold text-white">
+                  {t('organizerSettingsReminderAdd')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {t('organizerSettingsReminderCustomHint')}
+            </Text>
+
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              {(settings.organizerReminderOffsetsMin || []).map((offset) => (
+                <TouchableOpacity
+                  key={`reminder-${offset}`}
+                  onPress={() => removeReminderOffset(offset)}
+                  className="rounded-full bg-[#4c669f]/10 px-3 py-2"
+                >
+                  <Text className="text-xs font-semibold text-[#4c669f]">
+                    {formatReminderOffset(offset)} x
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
         <View className="px-4 py-3">
           <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
             {t('organizerSettingsPriorityMin')}

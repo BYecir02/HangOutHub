@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,12 +20,16 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api from '@/services/api';
+import { clearCache } from '@/services/dataCache';
+import { getMySettings } from '@/services/settings';
 
 interface OwnedPlaceOption {
   id: string;
   name: string;
   address?: string | null;
 }
+
+type EventPlaceSource = 'owned' | 'all';
 
 interface DraftTicketType {
   id: string;
@@ -75,13 +80,18 @@ export default function EditEventScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const eventId = typeof params.id === 'string' ? params.id : '';
+  const { width: windowWidth } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const pickerModalWidth = Math.max(280, Math.min(360, windowWidth - 24));
   const { locale, t } = useI18n();
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [ownedPlaces, setOwnedPlaces] = useState<OwnedPlaceOption[]>([]);
+  const [allPlaces, setAllPlaces] = useState<OwnedPlaceOption[]>([]);
+  const [placeSource, setPlaceSource] = useState<EventPlaceSource>('owned');
+  const [placeSearch, setPlaceSearch] = useState('');
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -105,6 +115,14 @@ export default function EditEventScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [currentField, setCurrentField] = useState<'start' | 'end'>('start');
+  const [checkInInputMode, setCheckInInputMode] = useState<'picker' | 'manual'>(
+    'picker',
+  );
+  const [showCheckInPicker, setShowCheckInPicker] = useState(false);
+  const [checkInPickerTarget, setCheckInPickerTarget] = useState<'open' | 'close'>(
+    'open',
+  );
+  const [checkInPickerValue, setCheckInPickerValue] = useState(new Date());
 
   useEffect(() => {
     let isMounted = true;
@@ -116,9 +134,11 @@ export default function EditEventScreen() {
       }
 
       try {
-        const [eventRes, meRes] = await Promise.all([
+        const [eventRes, meRes, allPlacesRes, settingsRes] = await Promise.all([
           api.get<EventPayload>(`/events/${eventId}`),
           api.get('/users/me'),
+          api.get<OwnedPlaceOption[]>('/places'),
+          getMySettings().catch(() => null),
         ]);
 
         if (!isMounted) {
@@ -127,6 +147,17 @@ export default function EditEventScreen() {
 
         const event = eventRes.data;
         const places = meRes.data?.OwnedPlaces || [];
+        const fetchedPlaces = (allPlacesRes.data || []).map((place) => ({
+          id: place.id,
+          name: place.name,
+          address: place.address,
+        }));
+        const openDefault = settingsRes?.organizerDefaultCheckInOpenOffsetMin;
+        const closeDefault = settingsRes?.organizerDefaultCheckInCloseOffsetMin;
+        const maxTicketsDefault = settingsRes?.organizerDefaultMaxTicketsPerUser;
+        const cancellationPolicyDefault =
+          settingsRes?.organizerDefaultCancellationPolicy || '';
+        const refundPolicyDefault = settingsRes?.organizerDefaultRefundPolicy || '';
         const eventTicketTypes = (event.TicketType || []).map((ticketType) => ({
           id: ticketType.id,
           name: ticketType.name,
@@ -156,17 +187,24 @@ export default function EditEventScreen() {
         }
 
         setOwnedPlaces(places);
-        setSelectedPlaceId(event.placeId || places[0]?.id || null);
+        setAllPlaces(fetchedPlaces);
+        setSelectedPlaceId(
+          event.placeId || places[0]?.id || fetchedPlaces[0]?.id || null,
+        );
         setEventForm({
           title: event.title || '',
           description: event.description || '',
-          cancellationPolicy: event.cancellationPolicy || '',
-          refundPolicy: event.refundPolicy || '',
+          cancellationPolicy: event.cancellationPolicy || cancellationPolicyDefault,
+          refundPolicy: event.refundPolicy || refundPolicyDefault,
           startTime: new Date(event.startTime),
           endTime: new Date(event.endTime || event.startTime),
-          checkInOpensAtOffsetMin: String(event.checkInOpensAtOffsetMin ?? -60),
-          checkInClosesAtOffsetMin: String(event.checkInClosesAtOffsetMin ?? 180),
-          maxTicketsPerUser: String(event.maxTicketsPerUser ?? 1),
+          checkInOpensAtOffsetMin: String(
+            event.checkInOpensAtOffsetMin ?? openDefault ?? -60,
+          ),
+          checkInClosesAtOffsetMin: String(
+            event.checkInClosesAtOffsetMin ?? closeDefault ?? 180,
+          ),
+          maxTicketsPerUser: String(event.maxTicketsPerUser ?? maxTicketsDefault ?? 1),
           promoCode: eventPromo?.code || '',
           promoType:
             eventPromo?.discountType?.toUpperCase() === 'FIXED' ? 'FIXED' : 'PERCENT',
@@ -215,6 +253,20 @@ export default function EditEventScreen() {
     };
   }, [eventId, router, t]);
 
+  const availablePlaces = useMemo(() => {
+    const sourceItems = placeSource === 'all' ? allPlaces : ownedPlaces;
+    const normalizedSearch = placeSearch.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return sourceItems;
+    }
+
+    return sourceItems.filter((place) => {
+      const haystack = `${place.name || ''} ${place.address || ''}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [allPlaces, ownedPlaces, placeSearch, placeSource]);
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images',
@@ -242,6 +294,40 @@ export default function EditEventScreen() {
     setShowPicker(true);
   };
 
+  const parseOffsetMinutes = (rawValue: string, fallback: number) => {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+
+    return Math.trunc(parsed);
+  };
+
+  const minutesToPickerDate = (totalMinutes: number) => {
+    const clamped = Math.max(0, Math.min(23 * 60 + 59, Math.trunc(totalMinutes)));
+    const hours = Math.floor(clamped / 60);
+    const minutes = clamped % 60;
+    const next = new Date();
+    next.setHours(hours, minutes, 0, 0);
+    return next;
+  };
+
+  const formatDurationLabel = (totalMinutes: number) => {
+    const safeMinutes = Math.max(0, Math.trunc(totalMinutes));
+    const hours = Math.floor(safeMinutes / 60);
+    const minutes = safeMinutes % 60;
+
+    if (hours > 0 && minutes > 0) {
+      return `${hours}h ${minutes}min`;
+    }
+
+    if (hours > 0) {
+      return `${hours}h`;
+    }
+
+    return `${minutes}min`;
+  };
+
   const onDateChange = (_event: unknown, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowPicker(false);
@@ -261,6 +347,49 @@ export default function EditEventScreen() {
 
     setEventForm((prev) => ({ ...prev, endTime: selectedDate }));
   };
+
+  const openCheckInDurationPicker = (target: 'open' | 'close') => {
+    setCheckInPickerTarget(target);
+
+    if (target === 'open') {
+      const opensAt = Math.abs(parseOffsetMinutes(eventForm.checkInOpensAtOffsetMin, -60));
+      setCheckInPickerValue(minutesToPickerDate(opensAt));
+    } else {
+      const closesAt = Math.max(0, parseOffsetMinutes(eventForm.checkInClosesAtOffsetMin, 180));
+      setCheckInPickerValue(minutesToPickerDate(closesAt));
+    }
+
+    setShowCheckInPicker(true);
+  };
+
+  const onCheckInPickerChange = (_event: unknown, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowCheckInPicker(false);
+    }
+
+    if (!selectedDate) {
+      return;
+    }
+
+    setCheckInPickerValue(selectedDate);
+    const totalMinutes = selectedDate.getHours() * 60 + selectedDate.getMinutes();
+
+    if (checkInPickerTarget === 'open') {
+      setEventForm((prev) => ({
+        ...prev,
+        checkInOpensAtOffsetMin: String(-Math.max(0, totalMinutes)),
+      }));
+      return;
+    }
+
+    setEventForm((prev) => ({
+      ...prev,
+      checkInClosesAtOffsetMin: String(Math.max(0, totalMinutes)),
+    }));
+  };
+
+  const checkInOpenMinutes = Math.abs(parseOffsetMinutes(eventForm.checkInOpensAtOffsetMin, -60));
+  const checkInCloseMinutes = Math.max(0, parseOffsetMinutes(eventForm.checkInClosesAtOffsetMin, 180));
 
   const openTeamScreen = () => {
     if (!eventId) {
@@ -458,6 +587,9 @@ export default function EditEventScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      clearCache('events');
+      clearCache('discover');
+
       Alert.alert(t('eventEditSuccessTitle'), t('eventEditSuccessMessage'));
       router.replace({
         pathname: '/event/[id]',
@@ -605,8 +737,44 @@ export default function EditEventScreen() {
             <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
               {t('createEventAttachedPlace')}
             </Text>
-            {ownedPlaces.length > 0 ? (
-              ownedPlaces.map((place) => (
+            <View className="mb-3 flex-row gap-2">
+              {(['owned', 'all'] as const).map((source) => {
+                const active = placeSource === source;
+
+                return (
+                  <TouchableOpacity
+                    key={source}
+                    onPress={() => setPlaceSource(source)}
+                    className={`rounded-full px-3 py-2 ${
+                      active
+                        ? 'bg-[#4c669f]'
+                        : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800'
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-semibold ${
+                        active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      {source === 'owned'
+                        ? t('createEventPlaceSourceOwned')
+                        : t('createEventPlaceSourceAll')}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TextInput
+              value={placeSearch}
+              onChangeText={setPlaceSearch}
+              placeholder={t('createEventPlaceSearchPlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              className="mb-3 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+            />
+
+            {availablePlaces.length > 0 ? (
+              availablePlaces.map((place) => (
                 <TouchableOpacity
                   key={place.id}
                   onPress={() => setSelectedPlaceId(place.id)}
@@ -625,9 +793,21 @@ export default function EditEventScreen() {
                 </TouchableOpacity>
               ))
             ) : (
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                {t('createEventNoAttachedPlace')}
-              </Text>
+              <View>
+                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                  {placeSource === 'owned'
+                    ? t('createEventNoAttachedPlace')
+                    : t('createEventNoMatchingPlace')}
+                </Text>
+                {placeSource === 'owned' ? (
+                  <TouchableOpacity
+                    onPress={() => router.push('/organizer/create-place')}
+                    className="mt-3 self-start rounded-xl bg-[#2ecc71] px-4 py-3"
+                  >
+                    <Text className="font-semibold text-white">{t('createEventCreatePlace')}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             )}
           </View>
 
@@ -693,28 +873,95 @@ export default function EditEventScreen() {
             <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
               {t('createEventCheckInWindowTitle')}
             </Text>
-            <View className="flex-row gap-2">
-              <TextInput
-                placeholder={t('createEventCheckInOpenPlaceholder')}
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                keyboardType="numbers-and-punctuation"
-                className="flex-1 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
-                value={eventForm.checkInOpensAtOffsetMin}
-                onChangeText={(value) =>
-                  setEventForm((prev) => ({ ...prev, checkInOpensAtOffsetMin: value }))
-                }
-              />
-              <TextInput
-                placeholder={t('createEventCheckInClosePlaceholder')}
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                keyboardType="numbers-and-punctuation"
-                className="flex-1 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
-                value={eventForm.checkInClosesAtOffsetMin}
-                onChangeText={(value) =>
-                  setEventForm((prev) => ({ ...prev, checkInClosesAtOffsetMin: value }))
-                }
-              />
+            <View className="mb-3 flex-row gap-2">
+              <TouchableOpacity
+                onPress={() => setCheckInInputMode('picker')}
+                className={`rounded-full px-3 py-2 ${
+                  checkInInputMode === 'picker'
+                    ? 'bg-[#4c669f]'
+                    : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800'
+                }`}
+              >
+                <Text
+                  className={`text-xs font-semibold ${
+                    checkInInputMode === 'picker'
+                      ? 'text-white'
+                      : 'text-gray-700 dark:text-gray-200'
+                  }`}
+                >
+                  {t('createEventCheckInInputModePicker')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setCheckInInputMode('manual')}
+                className={`rounded-full px-3 py-2 ${
+                  checkInInputMode === 'manual'
+                    ? 'bg-[#4c669f]'
+                    : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800'
+                }`}
+              >
+                <Text
+                  className={`text-xs font-semibold ${
+                    checkInInputMode === 'manual'
+                      ? 'text-white'
+                      : 'text-gray-700 dark:text-gray-200'
+                  }`}
+                >
+                  {t('createEventCheckInInputModeManual')}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {checkInInputMode === 'picker' ? (
+              <View className="gap-2">
+                <TouchableOpacity
+                  onPress={() => openCheckInDurationPicker('open')}
+                  className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <Text className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('createEventCheckInOpensBefore')}
+                  </Text>
+                  <Text className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+                    {formatDurationLabel(checkInOpenMinutes)}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => openCheckInDurationPicker('close')}
+                  className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <Text className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('createEventCheckInClosesAfter')}
+                  </Text>
+                  <Text className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+                    {formatDurationLabel(checkInCloseMinutes)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View className="flex-row gap-2">
+                <TextInput
+                  placeholder={t('createEventCheckInOpenPlaceholder')}
+                  placeholderTextColor={isDark ? '#666' : '#999'}
+                  keyboardType="numbers-and-punctuation"
+                  className="flex-1 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+                  value={eventForm.checkInOpensAtOffsetMin}
+                  onChangeText={(value) =>
+                    setEventForm((prev) => ({ ...prev, checkInOpensAtOffsetMin: value }))
+                  }
+                />
+                <TextInput
+                  placeholder={t('createEventCheckInClosePlaceholder')}
+                  placeholderTextColor={isDark ? '#666' : '#999'}
+                  keyboardType="numbers-and-punctuation"
+                  className="flex-1 rounded-xl bg-white p-3 text-gray-800 dark:bg-gray-800 dark:text-white"
+                  value={eventForm.checkInClosesAtOffsetMin}
+                  onChangeText={(value) =>
+                    setEventForm((prev) => ({ ...prev, checkInClosesAtOffsetMin: value }))
+                  }
+                />
+              </View>
+            )}
             <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               {t('createEventCheckInWindowHint')}
             </Text>
@@ -972,8 +1219,9 @@ export default function EditEventScreen() {
                   onChange={onDateChange}
                   style={{
                     height: 200,
-                    width: '100%',
+                    width: pickerModalWidth,
                     backgroundColor: isDark ? '#111827' : 'white',
+                    alignSelf: 'center',
                   }}
                   textColor={isDark ? 'white' : 'black'}
                 />
@@ -989,6 +1237,62 @@ export default function EditEventScreen() {
             is24Hour
             display="default"
             onChange={onDateChange}
+          />
+        )
+      ) : null}
+
+      {showCheckInPicker ? (
+        Platform.OS === 'ios' ? (
+          <Modal transparent animationType="slide" visible={showCheckInPicker}>
+            <View className="flex-1 justify-end bg-black/50">
+              <View className="overflow-hidden rounded-t-3xl bg-white pb-8 dark:bg-gray-900">
+                <View className="flex-row items-center border-b border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800">
+                  <TouchableOpacity
+                    onPress={() => setShowCheckInPicker(false)}
+                    className="w-20"
+                  >
+                    <Text className="font-medium text-gray-500">{t('genericCancel')}</Text>
+                  </TouchableOpacity>
+                  <Text className="flex-1 text-center text-lg font-bold text-gray-800 dark:text-white">
+                    {checkInPickerTarget === 'open'
+                      ? t('createEventCheckInPickerTitleOpen')
+                      : t('createEventCheckInPickerTitleClose')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowCheckInPicker(false)}
+                    className="w-20 items-end"
+                  >
+                    <Text className="text-lg font-bold text-[#4c669f]">
+                      {t('createEventPickerConfirm')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View className="items-center px-4 pt-2">
+                  <DateTimePicker
+                    value={checkInPickerValue}
+                    mode="time"
+                    is24Hour
+                    display="spinner"
+                    onChange={onCheckInPickerChange}
+                    style={{
+                      height: 200,
+                      width: pickerModalWidth,
+                      backgroundColor: isDark ? '#111827' : 'white',
+                      alignSelf: 'center',
+                    }}
+                    textColor={isDark ? 'white' : 'black'}
+                  />
+                </View>
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={checkInPickerValue}
+            mode="time"
+            is24Hour
+            display="default"
+            onChange={onCheckInPickerChange}
           />
         )
       ) : null}

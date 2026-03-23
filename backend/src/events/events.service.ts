@@ -784,6 +784,14 @@ export class EventsService {
           id: {
             in: tagIds,
           },
+          OR: [
+            {
+              status: 'APPROVED',
+            },
+            {
+              submittedByUserId: userId,
+            },
+          ],
         },
       });
 
@@ -871,6 +879,65 @@ export class EventsService {
       },
       orderBy: { startTime: 'asc' },
     });
+  }
+
+  async remove(eventId: string, userId: string, role: string) {
+    const normalizedRole = role.toUpperCase();
+    const { event } = await this.getEventAuthorizationContext(eventId, userId);
+
+    const canDeleteAsOrganizer =
+      normalizedRole === 'ORGANIZER' && event.organizerId === userId;
+    const canDeleteAsPlaceOwner =
+      normalizedRole === 'PLACE_OWNER' && event.Place?.ownerId === userId;
+
+    if (!canDeleteAsOrganizer && !canDeleteAsPlaceOwner) {
+      throw new ForbiddenException(
+        'Vous ne pouvez pas supprimer cet evenement.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const bookingsCount = await tx.booking.count({
+        where: {
+          eventId,
+        },
+      });
+
+      if (bookingsCount > 0) {
+        throw new BadRequestException(
+          'Impossible de supprimer un evenement ayant deja des reservations.',
+        );
+      }
+
+      await tx.eventTag.deleteMany({
+        where: {
+          eventId,
+        },
+      });
+
+      await tx.promotion.deleteMany({
+        where: {
+          eventId,
+        },
+      });
+
+      await tx.ticketType.deleteMany({
+        where: {
+          eventId,
+        },
+      });
+
+      await tx.event.delete({
+        where: {
+          id: eventId,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      id: eventId,
+    };
   }
 
   async getOrganizerAnalytics(

@@ -17,6 +17,13 @@ export interface VerifyScanResult {
   status: ScanStatus;
   bookingId: string | null;
   eventId: string | null;
+  checkInWindow:
+    | {
+        opensAt: string;
+        closesAt: string;
+        reason: 'TOO_EARLY' | 'TOO_LATE';
+      }
+    | null;
   attendee: {
     id: string;
     displayName: string | null;
@@ -50,6 +57,7 @@ export class OrganizerScannerService {
       message,
       bookingId: extra?.bookingId ?? null,
       eventId: extra?.eventId ?? null,
+      checkInWindow: extra?.checkInWindow ?? null,
       attendee: extra?.attendee ?? null,
       ticket: extra?.ticket ?? null,
       checkedInAt: extra?.checkedInAt ?? null,
@@ -190,10 +198,19 @@ export class OrganizerScannerService {
     );
 
     if (now < checkInOpensAt || now > checkInClosesAt) {
+      const reason = now < checkInOpensAt ? 'TOO_EARLY' : 'TOO_LATE';
+
       return this.buildResult(
         'EVENT_EXPIRED',
-        'Check-in indisponible pour le moment.',
-        basePayload,
+        'Le scan n est pas disponible a ce moment.',
+        {
+          ...basePayload,
+          checkInWindow: {
+            opensAt: checkInOpensAt.toISOString(),
+            closesAt: checkInClosesAt.toISOString(),
+            reason,
+          },
+        },
       );
     }
 
