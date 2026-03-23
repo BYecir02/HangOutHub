@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import {
   EventBookingTicket,
+  cancelEventBooking,
   createEventBooking,
+  getMyEventBookings,
 } from '@/services/event-bookings';
 
 interface EventDetail {
@@ -97,45 +100,69 @@ export default function EventDetailScreen() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [booking, setBooking] = useState<EventBookingTicket | null>(null);
   const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<string>('');
   const [promoCode, setPromoCode] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchEvent = useCallback(async () => {
+    if (!params.id) {
+      setLoading(false);
+      return;
+    }
 
-    const fetchEvent = async () => {
-      if (!params.id) {
-        if (isMounted) {
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const response = await api.get<EventDetail>(`/events/${params.id}`);
-        if (isMounted) {
-          setEvent(response.data);
-          const ticketTypes = response.data.TicketType || [];
-          setSelectedTicketTypeId(ticketTypes[0]?.id || '');
-        }
-      } catch {
-        if (isMounted) {
-          setEvent(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void fetchEvent();
-
-    return () => {
-      isMounted = false;
-    };
+    setLoading(true);
+    try {
+      const response = await api.get<EventDetail>(`/events/${params.id}`);
+      setEvent(response.data);
+      const ticketTypes = response.data.TicketType || [];
+      setSelectedTicketTypeId((previous) => previous || ticketTypes[0]?.id || '');
+    } catch {
+      setEvent(null);
+    } finally {
+      setLoading(false);
+    }
   }, [params.id]);
+
+  useEffect(() => {
+    void fetchEvent();
+  }, [fetchEvent]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+
+      const loadMyBookingForEvent = async () => {
+        if (!params.id) {
+          return;
+        }
+
+        try {
+          const bookings = await getMyEventBookings();
+          if (!isMounted) {
+            return;
+          }
+
+          const existingBooking = bookings.find((item) => {
+            const status = (item.status || '').toUpperCase();
+            return item.eventId === params.id && status !== 'CANCELLED';
+          });
+
+          setBooking(existingBooking || null);
+        } catch {
+          if (isMounted) {
+            setBooking(null);
+          }
+        }
+      };
+
+      void loadMyBookingForEvent();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [params.id]),
+  );
 
   if (loading) {
     return (
@@ -189,14 +216,31 @@ export default function EventDetailScreen() {
   const selectedTicketSoldOut = Boolean(
     selectedTicketType && selectedTicketType.quantity <= 0,
   );
+  const hasActiveBooking = Boolean(
+    booking && (booking.status || '').toUpperCase() !== 'CANCELLED',
+  );
+  const bookingStatus = (booking?.status || '').toUpperCase();
+  const canCancelBooking =
+    hasActiveBooking &&
+    !['USED', 'CHECKED_IN'].includes(bookingStatus) &&
+    new Date(event.startTime).getTime() > Date.now();
   const displayPrice =
-    ticketTypes.length > 0
+    cheapestAvailableTicket
+      ? Number(cheapestAvailableTicket.price || 0)
+      : ticketTypes.length > 0
       ? Math.min(...ticketTypes.map((ticketType) => Number(ticketType.price || 0)))
       : event.entryFee;
   const gallery =
     event.images?.length > 0
       ? event.images.map((image) => getImageUrl(image) || EVENT_PLACEHOLDER)
       : [heroImage];
+  const primaryActionLabel = joining
+    ? t('eventDetailJoining')
+    : hasActiveBooking
+    ? t('eventDetailViewTicket')
+    : selectedTicketSoldOut
+    ? t('eventDetailTicketSoldOutCta')
+    : t('eventDetailJoinCta');
 
   const handleCreateOuting = () => {
     router.push({
@@ -215,11 +259,11 @@ export default function EventDetailScreen() {
       return;
     }
 
-    if (booking) {
+    if (hasActiveBooking && booking) {
       router.push({
-        pathname: '/my-tickets',
+        pathname: '/my-ticket/[id]',
         params: {
-          bookingId: booking.id,
+          id: booking.id,
         },
       });
       return;
@@ -242,9 +286,9 @@ export default function EventDetailScreen() {
       Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
 
       router.push({
-        pathname: '/my-tickets',
+        pathname: '/my-ticket/[id]',
         params: {
-          bookingId: reserved.id,
+          id: reserved.id,
         },
       });
     } catch (error) {
@@ -254,12 +298,56 @@ export default function EventDetailScreen() {
     }
   };
 
+  const handleCancelBooking = () => {
+    if (!booking?.id || !canCancelBooking || cancelling) {
+      return;
+    }
+
+    Alert.alert(
+      t('eventDetailCancelConfirmTitle'),
+      t('eventDetailCancelConfirmMessage'),
+      [
+        {
+          text: t('genericCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('eventDetailCancelAction'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setCancelling(true);
+              try {
+                const cancelled = await cancelEventBooking(booking.id);
+                setBooking(cancelled);
+                await fetchEvent();
+                Alert.alert(
+                  t('eventDetailCancelSuccessTitle'),
+                  t('eventDetailCancelSuccessMessage'),
+                );
+              } catch (error) {
+                Alert.alert(
+                  t('commonErrorTitle'),
+                  getApiErrorMessage(error, t('eventDetailCancelFailed')),
+                );
+              } finally {
+                setCancelling(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-black"
-      showsVerticalScrollIndicator={false}
-    >
-      <View className="relative">
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
+        <View className="relative">
         <Image source={{ uri: heroImage }} className="h-80 w-full" resizeMode="cover" />
         <View className="absolute inset-x-0 top-0 flex-row items-center justify-between px-5 pt-14">
           <TouchableOpacity
@@ -274,9 +362,9 @@ export default function EventDetailScreen() {
             </Text>
           </View>
         </View>
-      </View>
+        </View>
 
-      <View className="-mt-8 rounded-t-[28px] bg-gray-50 px-5 pt-6 dark:bg-black">
+        <View className="-mt-8 rounded-t-[28px] bg-gray-50 px-5 pt-6 dark:bg-black">
         <Text className="text-3xl font-bold text-gray-900 dark:text-white">
           {event.title}
         </Text>
@@ -307,12 +395,7 @@ export default function EventDetailScreen() {
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
                 {t('eventDetailTicketTypesTitle')}
               </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="mt-2"
-                contentContainerStyle={{ gap: 8, paddingRight: 8 }}
-              >
+              <View className="mt-3 gap-3">
                 {ticketTypes.map((ticketType) => {
                   const isSelected = ticketType.id === selectedTicketTypeId;
                   const isSoldOut = ticketType.quantity <= 0;
@@ -324,39 +407,48 @@ export default function EventDetailScreen() {
                     <TouchableOpacity
                       key={ticketType.id}
                       onPress={() => setSelectedTicketTypeId(ticketType.id)}
+                      disabled={isSoldOut}
                       className={isSoldOut
-                        ? 'rounded-full border border-gray-200 bg-gray-100 px-3 py-2 opacity-70 dark:border-gray-700 dark:bg-gray-800'
+                        ? 'rounded-2xl border border-gray-200 bg-gray-100 px-4 py-3 opacity-70 dark:border-gray-700 dark:bg-gray-800'
                         : isSelected
-                          ? 'rounded-full bg-[#ff4757] px-3 py-2'
-                          : 'rounded-full border border-gray-300 px-3 py-2 dark:border-gray-700'}
+                          ? 'rounded-2xl border border-[#ff4757] bg-red-50 px-4 py-3 dark:bg-red-950/30'
+                          : 'rounded-2xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900'}
                     >
-                      <Text className={isSoldOut
-                        ? 'text-xs font-semibold text-gray-500 dark:text-gray-400'
-                        : isSelected
-                          ? 'text-xs font-semibold text-white'
-                          : 'text-xs font-semibold text-gray-700 dark:text-gray-200'}>
-                        {ticketType.name} · {formatPrice(ticketType.price, locale, t('homePriceFree'))}
-                      </Text>
-                      {isBestValue ? (
-                        <Text className={isSelected
-                          ? 'mt-1 text-[11px] font-semibold text-white/95'
-                          : 'mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300'}>
-                          {t('eventDetailTicketBestValue')}
+                      <View className="flex-row items-center justify-between gap-3">
+                        <Text className={isSoldOut
+                          ? 'flex-1 text-sm font-semibold text-gray-500 dark:text-gray-400'
+                          : 'flex-1 text-sm font-semibold text-gray-800 dark:text-gray-100'}>
+                          {ticketType.name}
                         </Text>
-                      ) : null}
-                      <Text className={isSoldOut
-                        ? 'mt-1 text-[11px] text-gray-500 dark:text-gray-400'
-                        : isSelected
-                          ? 'mt-1 text-[11px] text-white/90'
-                          : 'mt-1 text-[11px] text-gray-500 dark:text-gray-400'}>
-                        {isSoldOut
-                          ? t('eventDetailTicketSoldOut')
-                          : t('eventDetailTicketRemaining', { count: ticketType.quantity })}
-                      </Text>
+                        <Text className={isSoldOut
+                          ? 'text-sm font-bold text-gray-500 dark:text-gray-400'
+                          : 'text-sm font-bold text-[#ff4757]'}>
+                          {formatPrice(ticketType.price, locale, t('homePriceFree'))}
+                        </Text>
+                      </View>
+
+                      <View className="mt-2 flex-row items-center justify-between gap-2">
+                        {isBestValue ? (
+                          <View className="rounded-full bg-emerald-100 px-2 py-1 dark:bg-emerald-900/40">
+                            <Text className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                              {t('eventDetailTicketBestValue')}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View />
+                        )}
+                        <Text className={isSoldOut
+                          ? 'text-[11px] text-gray-500 dark:text-gray-400'
+                          : 'text-[11px] text-gray-600 dark:text-gray-300'}>
+                          {isSoldOut
+                            ? t('eventDetailTicketSoldOut')
+                            : t('eventDetailTicketRemaining', { count: ticketType.quantity })}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+              </View>
             </View>
           ) : null}
 
@@ -377,48 +469,6 @@ export default function EventDetailScreen() {
             </Text>
           </View>
 
-          <View className="mt-4 flex-row gap-3">
-            <TouchableOpacity
-              onPress={handleJoinEvent}
-              disabled={joining || selectedTicketSoldOut}
-              className={`flex-1 items-center rounded-2xl px-4 py-4 ${
-                joining || selectedTicketSoldOut ? 'bg-[#ff9aa3]' : 'bg-[#ff4757]'
-              }`}
-            >
-              <Text className="text-sm font-semibold text-white">
-                {selectedTicketSoldOut
-                  ? t('eventDetailTicketSoldOutCta')
-                  : joining
-                  ? t('eventDetailJoining')
-                  : booking
-                    ? t('eventDetailViewTicket')
-                    : t('eventDetailJoinCta')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleCreateOuting}
-              className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-4"
-            >
-              <Text className="text-sm font-semibold text-white">
-                {t('profileOrganizeOutingCta')}
-              </Text>
-            </TouchableOpacity>
-            {event.Place ? (
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: '/place/[id]',
-                    params: { id: event.Place?.id || '' },
-                  })
-                }
-                className="flex-1 items-center rounded-2xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800"
-              >
-                <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                  {t('eventDetailViewPlace')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
         </View>
 
         <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
@@ -491,17 +541,19 @@ export default function EventDetailScreen() {
           </View>
         </View>
 
-        <View className="mt-6">
+        <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
             {t('eventDetailAbout')}
+          </Text>
+
+          <Text className="mt-4 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+            {t('eventDetailAboutDescriptionTitle')}
           </Text>
           <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
             {event.description || t('eventDetailDescriptionFallback')}
           </Text>
-        </View>
 
-        <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white">
+          <Text className="mt-5 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
             {t('eventDetailPoliciesTitle')}
           </Text>
           <Text className="mt-3 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -538,7 +590,61 @@ export default function EventDetailScreen() {
             ))}
           </ScrollView>
         </View>
+        </View>
+      </ScrollView>
+
+      <View className="border-t border-gray-200 bg-white px-4 pb-5 pt-3 dark:border-gray-800 dark:bg-gray-950">
+        <TouchableOpacity
+          onPress={handleJoinEvent}
+          disabled={joining || (!hasActiveBooking && selectedTicketSoldOut)}
+          className={`items-center rounded-2xl px-4 py-4 ${
+            joining || (!hasActiveBooking && selectedTicketSoldOut)
+              ? 'bg-[#ff9aa3]'
+              : 'bg-[#ff4757]'
+          }`}
+        >
+          <Text className="text-sm font-semibold text-white">{primaryActionLabel}</Text>
+        </TouchableOpacity>
+
+        <View className="mt-3 flex-row gap-3">
+          {canCancelBooking ? (
+            <TouchableOpacity
+              onPress={handleCancelBooking}
+              disabled={cancelling}
+              className="flex-1 items-center rounded-2xl border border-red-300 bg-red-50 px-4 py-3 dark:border-red-700 dark:bg-red-900/20"
+            >
+              <Text className="text-sm font-semibold text-red-700 dark:text-red-300">
+                {cancelling ? t('eventDetailCancelling') : t('eventDetailCancelAction')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity
+            onPress={handleCreateOuting}
+            className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">
+              {t('profileOrganizeOutingCta')}
+            </Text>
+          </TouchableOpacity>
+
+          {event.Place ? (
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/place/[id]',
+                  params: { id: event.Place?.id || '' },
+                })
+              }
+              className="flex-1 items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                {t('eventDetailViewPlace')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
-    </ScrollView>
+    </View>
   );
 }

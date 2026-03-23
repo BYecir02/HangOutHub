@@ -22,6 +22,7 @@ if (isNgrokBaseUrl) {
 const ACCESS_TOKEN_KEY = 'userToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_INFO_KEY = 'userInfo';
+const AUTH_REDIRECT_REASON_KEY = 'authRedirectReason';
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
@@ -84,6 +85,13 @@ const isAuthRoute = (url: string) =>
   url.includes('/auth/register') ||
   url.includes('/auth/refresh');
 
+const isSilentUnauthorizedEndpoint = (url: string) =>
+  url.includes('/notifications/organizer/unread-count') ||
+  url.includes('/notifications/unread-count') ||
+  url.includes('/events/my-bookings') ||
+  url.includes('/users/me') ||
+  url.includes('/users/me/settings');
+
 const refreshAccessToken = async (): Promise<string | null> => {
   const refreshToken = await storage.getItem(REFRESH_TOKEN_KEY);
 
@@ -119,10 +127,10 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const data = error.response?.data;
     const originalRequest = error.config as RetryableRequestConfig | undefined;
-    const isOrganizerUnreadCountEndpoint =
-      (error.config?.url || '').includes('/notifications/organizer/unread-count');
+    const requestPath = error.config?.url || '';
+    const isSilent401 = status === 401 && isSilentUnauthorizedEndpoint(requestPath);
 
-    if (status && !(status === 401 && isOrganizerUnreadCountEndpoint)) {
+    if (status && !isSilent401) {
       console.error(`[API ${status}] ${method} ${requestUrl}`, data);
     }
 
@@ -153,6 +161,7 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch (refreshError) {
+        await storage.setItem(AUTH_REDIRECT_REASON_KEY, 'session_expired');
         await clearAuthState();
         router.replace('/');
         return Promise.reject(refreshError);

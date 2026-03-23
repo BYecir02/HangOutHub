@@ -68,6 +68,15 @@ export const getMyEventBookings = async (): Promise<EventBookingTicket[]> => {
   return response.data;
 };
 
+export const cancelEventBooking = async (
+  bookingId: string,
+): Promise<EventBookingTicket> => {
+  const response = await api.patch<EventBookingTicket>(
+    `/events/bookings/${bookingId}/cancel`,
+  );
+  return response.data;
+};
+
 export const getEventScans = async (eventId: string): Promise<EventScansResponse> => {
   const response = await api.get<EventScansResponse>(`/events/${eventId}/scans`);
   return response.data;

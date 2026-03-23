@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LogBox } from 'react-native';
 
 import '../global.css';
 
@@ -31,6 +33,10 @@ export default function RootLayout() {
   );
 
   useEffect(() => {
+    LogBox.ignoreLogs([
+      'SafeAreaView has been deprecated and will be removed in a future release.',
+    ]);
+
     const unsubscribe = subscribeThemePreference(setThemePreference);
     void loadAppPreferences();
 
@@ -78,8 +84,9 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
+      <SafeAreaProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -131,6 +138,7 @@ export default function RootLayout() {
           <Stack.Screen name="events" options={{ headerShown: false }} />
           <Stack.Screen name="event-scans/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="my-tickets" options={{ headerShown: false }} />
+          <Stack.Screen name="my-ticket/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="places" options={{ headerShown: false }} />
           <Stack.Screen name="discover" options={{ headerShown: false }} />
           <Stack.Screen
@@ -160,9 +168,10 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
           <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

@@ -122,9 +122,7 @@ export default function ProfileHeader({
 
         <View className="mt-4 flex-row gap-3">
           <TouchableOpacity
-            className={`items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700 ${
-              isOrganizer ? 'flex-1' : 'w-full'
-            }`}
+            className="flex-1 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
             onPress={() => router.push('/edit-profile')}
           >
             <Text className="text-sm font-bold text-gray-800 dark:text-white">
@@ -132,17 +130,27 @@ export default function ProfileHeader({
             </Text>
           </TouchableOpacity>
 
-          {isOrganizer ? (
-            <TouchableOpacity
-              className="flex-1 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
-              onPress={() => router.push('/organizer/dashboard')}
-            >
-              <Text className="text-sm font-bold text-gray-800 dark:text-white">
-                {t('profileOrganizerPanel')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
+          <TouchableOpacity
+            className="flex-1 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
+            onPress={() => router.push('/my-tickets')}
+          >
+            <Text className="text-sm font-bold text-gray-800 dark:text-white">
+              {t('myTicketsTitle')}
+            </Text>
+          </TouchableOpacity>
+
         </View>
+
+        {isOrganizer ? (
+          <TouchableOpacity
+            className="mt-3 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
+            onPress={() => router.push('/organizer/dashboard')}
+          >
+            <Text className="text-sm font-bold text-gray-800 dark:text-white">
+              {t('profileOrganizerPanel')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );

@@ -41,6 +41,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -71,7 +72,22 @@ export default function LoginScreen() {
   };
 
   useEffect(() => {
+    const restoreAuthNotice = async () => {
+      const reason = await storage.getItem('authRedirectReason');
+
+      if (reason === 'session_expired') {
+        setAuthNotice(t('loginSessionExpiredNotice'));
+      }
+
+      if (reason) {
+        await storage.removeItem('authRedirectReason');
+      }
+    };
+
+    void restoreAuthNotice();
+
     const checkLogin = async () => {
+    
       try {
         const token = await storage.getItem('userToken');
 
@@ -253,6 +269,22 @@ export default function LoginScreen() {
                     {t('loginCardTitle')}
                   </Text>
                 </View>
+
+                {authNotice ? (
+                  <View
+                    className={`mt-4 rounded-2xl px-4 py-3 ${
+                      isDark ? 'bg-amber-900/30' : 'bg-amber-50'
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm ${
+                        isDark ? 'text-amber-200' : 'text-amber-700'
+                      }`}
+                    >
+                      {authNotice}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
 
               <AuthTextField

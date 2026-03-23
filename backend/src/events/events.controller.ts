@@ -200,6 +200,15 @@ export class EventsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Patch('bookings/:bookingId/cancel')
+  cancelBooking(
+    @Req() req: AuthenticatedRequest,
+    @Param('bookingId', ParseUUIDPipe) bookingId: string,
+  ) {
+    return this.eventsService.cancelBooking(req.user.userId, bookingId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get('my-bookings')
   findMyBookings(@Req() req: AuthenticatedRequest) {
     return this.eventsService.findMyBookings(req.user.userId);

@@ -1921,6 +1921,109 @@ export class EventsService {
     return this.formatBooking(created);
   }
 
+  async cancelBooking(userId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            endTime: true,
+            coverUrl: true,
+            organizerId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        TicketType: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!booking || booking.userId !== userId) {
+      throw new NotFoundException('Reservation introuvable.');
+    }
+
+    const status = (booking.status || 'PENDING').toUpperCase();
+
+    if (status === 'CANCELLED') {
+      return this.formatBooking(booking);
+    }
+
+    if (status === 'USED' || status === 'CHECKED_IN') {
+      throw new BadRequestException(
+        'Impossible d annuler une reservation deja utilisee.',
+      );
+    }
+
+    if (booking.Event) {
+      const eventStartAt = new Date(booking.Event.startTime).getTime();
+      if (eventStartAt <= Date.now()) {
+        throw new BadRequestException(
+          'Impossible d annuler une reservation apres le debut de l evenement.',
+        );
+      }
+    }
+
+    const cancelled = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'CANCELLED',
+        },
+        include: {
+          Event: {
+            select: {
+              id: true,
+              title: true,
+              startTime: true,
+              endTime: true,
+              coverUrl: true,
+              organizerId: true,
+              Place: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          TicketType: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (booking.ticketTypeId) {
+        await tx.ticketType.update({
+          where: { id: booking.ticketTypeId },
+          data: {
+            quantity: {
+              increment: 1,
+            },
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    return this.formatBooking(cancelled);
+  }
+
   async findMyBookings(userId: string) {
     const bookings = await this.prisma.booking.findMany({
       where: {
