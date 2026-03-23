@@ -19,7 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api from '@/services/api';
+import api, { getApiErrorMessage } from '@/services/api';
 import { clearCache } from '@/services/dataCache';
 import { getMySettings } from '@/services/settings';
 
@@ -36,6 +36,12 @@ interface DraftTicketType {
   name: string;
   price: string;
   quantity: string;
+}
+
+interface NormalizedTicketTypePayload {
+  name: string;
+  price: number;
+  quantity: number;
 }
 
 interface EventImageItem {
@@ -110,6 +116,9 @@ export default function EditEventScreen() {
     promoEndsAt: '',
   });
   const [ticketTypes, setTicketTypes] = useState<DraftTicketType[]>([]);
+  const [initialTicketTypes, setInitialTicketTypes] = useState<
+    NormalizedTicketTypePayload[]
+  >([]);
   const [images, setImages] = useState<EventImageItem[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
@@ -123,6 +132,38 @@ export default function EditEventScreen() {
     'open',
   );
   const [checkInPickerValue, setCheckInPickerValue] = useState(new Date());
+
+  const normalizeTicketTypes = (
+    items: Array<{
+      name: string;
+      price: number | string;
+      quantity: number | string;
+    }>,
+  ): NormalizedTicketTypePayload[] =>
+    items.map((ticketType) => ({
+      name: ticketType.name.trim(),
+      price: Number(ticketType.price || 0),
+      quantity: Number(ticketType.quantity || 0),
+    }));
+
+  const areTicketTypesEqual = (
+    left: NormalizedTicketTypePayload[],
+    right: NormalizedTicketTypePayload[],
+  ) => {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((item, index) => {
+      const candidate = right[index];
+      return (
+        candidate !== undefined &&
+        candidate.name === item.name &&
+        candidate.price === item.price &&
+        candidate.quantity === item.quantity
+      );
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -231,6 +272,19 @@ export default function EditEventScreen() {
                   quantity: '100',
                 },
               ],
+        );
+        setInitialTicketTypes(
+          normalizeTicketTypes(
+            eventTicketTypes.length > 0
+              ? eventTicketTypes
+              : [
+                  {
+                    name: 'Standard',
+                    price: String(Number(event.entryFee || 0)),
+                    quantity: '100',
+                  },
+                ],
+          ),
         );
         setImages(mergedImages);
         setCoverIndex(0);
@@ -440,11 +494,11 @@ export default function EditEventScreen() {
       return;
     }
 
-    const serializedTicketTypes = ticketTypes.map((ticketType) => ({
-      name: ticketType.name.trim(),
-      price: Number(ticketType.price || 0),
-      quantity: Number(ticketType.quantity || 0),
-    }));
+    const serializedTicketTypes = normalizeTicketTypes(ticketTypes);
+    const shouldUpdateTicketTypes = !areTicketTypesEqual(
+      serializedTicketTypes,
+      initialTicketTypes,
+    );
 
     const checkInOpensAtOffsetMin = Number(eventForm.checkInOpensAtOffsetMin || -60);
     const checkInClosesAtOffsetMin = Number(
@@ -517,7 +571,9 @@ export default function EditEventScreen() {
       formData.append('startTime', eventForm.startTime.toISOString());
       formData.append('endTime', eventForm.endTime.toISOString());
       formData.append('entryFee', String(minimumPrice));
-      formData.append('ticketTypes', JSON.stringify(serializedTicketTypes));
+      if (shouldUpdateTicketTypes) {
+        formData.append('ticketTypes', JSON.stringify(serializedTicketTypes));
+      }
       formData.append(
         'checkInOpensAtOffsetMin',
         String(checkInOpensAtOffsetMin),
@@ -595,8 +651,11 @@ export default function EditEventScreen() {
         pathname: '/event/[id]',
         params: { id: eventId },
       });
-    } catch {
-      Alert.alert(t('commonErrorTitle'), t('eventEditSaveFailed'));
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('eventEditSaveFailed')),
+      );
     } finally {
       setSaving(false);
     }

@@ -345,6 +345,63 @@ export class EventsService {
     return normalized;
   }
 
+  private normalizeTicketTypesForCompare(
+    ticketTypes: Array<{
+      name: string;
+      price: number | string | Prisma.Decimal;
+      quantity: number | string;
+    }>,
+  ) {
+    return ticketTypes
+      .map((ticketType) => ({
+        name: (ticketType.name || '').trim().toLowerCase(),
+        price: Number(ticketType.price || 0),
+        quantity: Number(ticketType.quantity || 0),
+      }))
+      .sort((left, right) => {
+        const byName = left.name.localeCompare(right.name);
+        if (byName !== 0) {
+          return byName;
+        }
+
+        if (left.price !== right.price) {
+          return left.price - right.price;
+        }
+
+        return left.quantity - right.quantity;
+      });
+  }
+
+  private areTicketTypesEquivalent(
+    left: Array<{
+      name: string;
+      price: number | string | Prisma.Decimal;
+      quantity: number | string;
+    }>,
+    right: Array<{
+      name: string;
+      price: number | string | Prisma.Decimal;
+      quantity: number | string;
+    }>,
+  ) {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    const normalizedLeft = this.normalizeTicketTypesForCompare(left);
+    const normalizedRight = this.normalizeTicketTypesForCompare(right);
+
+    return normalizedLeft.every((ticketType, index) => {
+      const candidate = normalizedRight[index];
+      return (
+        candidate !== undefined &&
+        candidate.name === ticketType.name &&
+        candidate.price === ticketType.price &&
+        candidate.quantity === ticketType.quantity
+      );
+    });
+  }
+
   private async getEventAuthorizationContext(eventId: string, userId: string) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -1225,6 +1282,13 @@ export class EventsService {
         },
         coverUrl: true,
         images: true,
+        TicketType: {
+          select: {
+            name: true,
+            price: true,
+            quantity: true,
+          },
+        },
         Place: {
           select: {
             ownerId: true,
@@ -1369,7 +1433,11 @@ export class EventsService {
       nextImages = [...baseImages, ...uploadedGalleryUrls];
     }
 
-    if (payload.ticketTypes !== undefined) {
+    const shouldReplaceTicketTypes =
+      payload.ticketTypes !== undefined &&
+      !this.areTicketTypesEquivalent(ticketTypes, event.TicketType || []);
+
+    if (shouldReplaceTicketTypes) {
       const existingTicketBookings = await this.prisma.booking.count({
         where: {
           eventId,
@@ -1428,7 +1496,7 @@ export class EventsService {
           ...(payload.placeId !== undefined ? { placeId: payload.placeId } : {}),
           ...(nextCoverUrl !== undefined ? { coverUrl: nextCoverUrl } : {}),
           ...(nextImages !== undefined ? { images: nextImages } : {}),
-          ...(payload.ticketTypes !== undefined
+          ...(shouldReplaceTicketTypes
             ? {
                 TicketType: {
                   create: ticketTypes.map((ticketType) => ({

@@ -119,8 +119,10 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const data = error.response?.data;
     const originalRequest = error.config as RetryableRequestConfig | undefined;
+    const isOrganizerUnreadCountEndpoint =
+      (error.config?.url || '').includes('/notifications/organizer/unread-count');
 
-    if (status) {
+    if (status && !(status === 401 && isOrganizerUnreadCountEndpoint)) {
       console.error(`[API ${status}] ${method} ${requestUrl}`, data);
     }
 
