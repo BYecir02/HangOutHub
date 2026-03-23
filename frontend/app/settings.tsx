@@ -211,13 +211,19 @@ export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50 dark:bg-black">
       <View className="p-5">
-        <View className="mb-4 pt-16">
-          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            {t('settingsLabel')}
-          </Text>
-          <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-            {t('settingsTitle')}
-          </Text>
+        {/* Header avec bouton retour */}
+        <View className="flex-row items-center mb-4 pt-10">
+          <TouchableOpacity onPress={() => router.back()} className="mr-4">
+            <Ionicons name="arrow-back" size={24} color={iconColor} />
+          </TouchableOpacity>
+          <View>
+            <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('settingsLabel')}
+            </Text>
+            <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
+              {t('settingsTitle')}
+            </Text>
+          </View>
         </View>
 
         {loading ? (

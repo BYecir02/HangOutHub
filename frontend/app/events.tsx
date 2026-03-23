@@ -68,7 +68,9 @@ const FILTERS: EventFilter[] = ['all', 'upcoming', 'free', 'week'];
 
 export default function EventsScreen() {
   const router = useRouter();
-  const { locale, t } = useI18n();
+  const { locale, t, language } = useI18n();
+    // DEBUG: log la langue courante pour debug i18n
+    console.log('LANGUE COURANTE EVENTS:', language);
   const cachedEvents = getCache<EventItem[]>('events');
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
   const [loading, setLoading] = useState(!cachedEvents);
@@ -215,7 +217,8 @@ export default function EventsScreen() {
                     : 'text-gray-700 dark:text-gray-200'
                 }`}
               >
-                {filterLabels[item]}
+                {/* Fallback si la trad est manquante */}
+                {filterLabels[item] || item}
               </Text>
             </TouchableOpacity>
           );
