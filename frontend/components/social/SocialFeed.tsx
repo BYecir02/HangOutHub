@@ -134,6 +134,7 @@ export default function SocialFeed() {
   const handleEditPost = (post: {
     id: string;
     content?: string | null;
+    images?: string[];
     visibility?: 'public' | 'friends' | 'private';
   }) => {
     router.push({
@@ -141,6 +142,7 @@ export default function SocialFeed() {
       params: {
         postId: post.id,
         content: post.content || '',
+        images: JSON.stringify(post.images || []),
         visibility: post.visibility || 'public',
       },
     });

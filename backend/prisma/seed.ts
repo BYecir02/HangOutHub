@@ -132,18 +132,91 @@ async function seedCities() {
     Zou: ['Abomey', 'Bohicon'],
   };
 
+  const cityCoordinates: Record<
+    string,
+    { latitude: number; longitude: number }
+  > = {
+    Cotonou: { latitude: 6.37, longitude: 2.39 },
+    'Porto-Novo': { latitude: 6.49, longitude: 2.62 },
+    'Abomey-Calavi': { latitude: 6.45, longitude: 2.35 },
+    Ouidah: { latitude: 6.36, longitude: 2.08 },
+    Parakou: { latitude: 9.34, longitude: 2.63 },
+    Natitingou: { latitude: 10.3, longitude: 1.38 },
+    Lome: { latitude: 6.17, longitude: 1.23 },
+    Accra: { latitude: 5.6, longitude: -0.19 },
+    Lagos: { latitude: 6.52, longitude: 3.38 },
+    Abidjan: { latitude: 5.35, longitude: -4.02 },
+  };
+
+  const extraCountries: Array<{
+    country: string;
+    cities: Array<{ name: string; region?: string | null }>;
+  }> = [
+    {
+      country: 'Togo',
+      cities: [{ name: 'Lome', region: 'Maritime' }],
+    },
+    {
+      country: 'Ghana',
+      cities: [{ name: 'Accra', region: 'Greater Accra' }],
+    },
+    {
+      country: 'Nigeria',
+      cities: [{ name: 'Lagos', region: 'Lagos' }],
+    },
+    {
+      country: "Cote d'Ivoire",
+      cities: [{ name: 'Abidjan', region: 'Abidjan' }],
+    },
+  ];
+
   for (const [department, cities] of Object.entries(beninData)) {
     for (const cityName of cities) {
       const slug = slugify(cityName);
+      const coordinates = cityCoordinates[cityName];
 
       await prisma.city.upsert({
         where: { slug },
-        update: { region: department },
+        update: {
+          region: department,
+          country: 'Benin',
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+        },
         create: {
           name: cityName,
           slug,
           region: department,
+          country: 'Benin',
           imageUrl: null,
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+        },
+      });
+    }
+  }
+
+  for (const entry of extraCountries) {
+    for (const city of entry.cities) {
+      const slug = slugify(city.name);
+      const coordinates = cityCoordinates[city.name];
+
+      await prisma.city.upsert({
+        where: { slug },
+        update: {
+          region: city.region ?? null,
+          country: entry.country,
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+        },
+        create: {
+          name: city.name,
+          slug,
+          region: city.region ?? null,
+          country: entry.country,
+          imageUrl: null,
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
         },
       });
     }
@@ -363,6 +436,9 @@ async function main() {
   const seededEventIds = seededEvents.map((event) => event.id);
 
   if (seededEventIds.length > 0) {
+    await prisma.ticketType.deleteMany({
+      where: { eventId: { in: seededEventIds } },
+    });
     await prisma.eventTag.deleteMany({
       where: { eventId: { in: seededEventIds } },
     });
@@ -541,6 +617,54 @@ async function main() {
       entryFee: '5000',
       address: 'Seme City, Cotonou',
     },
+  });
+
+  await prisma.ticketType.createMany({
+    data: [
+      {
+        eventId: eventOne.id,
+        name: 'Standard',
+        description: 'Acces general + welcome drink.',
+        price: 3500,
+        quantity: 180,
+      },
+      {
+        eventId: eventOne.id,
+        name: 'VIP Rooftop',
+        description: 'Acces rooftop prive + cocktail signature + fast line.',
+        price: 8000,
+        quantity: 60,
+      },
+      {
+        eventId: eventOne.id,
+        name: 'Table Crew',
+        description: 'Table reservee pour 4 personnes + bouteille.',
+        price: 15000,
+        quantity: 15,
+      },
+      {
+        eventId: eventTwo.id,
+        name: 'Acces libre',
+        description: 'Acces plage + live band. Places limitees.',
+        price: 0,
+        quantity: 220,
+      },
+      {
+        eventId: eventThree.id,
+        name: 'Pass creatif',
+        description: 'Acces showcase + drink soft inclus.',
+        price: 5000,
+        quantity: 140,
+      },
+      {
+        eventId: eventThree.id,
+        name: 'Pass premium',
+        description: 'Acces showcase + zone front + 2 boissons.',
+        price: 9000,
+        quantity: 60,
+      },
+    ],
+    skipDuplicates: true,
   });
 
   const outingOne = await prisma.outing.create({

@@ -16,6 +16,7 @@ import { OutingsModule } from './outings/outings.module';
 import { FriendshipsModule } from './friendships/friendships.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizerScannerModule } from './organizer-scanner/organizer-scanner.module';
+import { CitiesModule } from './cities/cities.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { OrganizerScannerModule } from './organizer-scanner/organizer-scanner.mo
     EventsModule,
     PlacesModule,
     PostsModule,
+    CitiesModule,
     CommentsModule,
     OutingsModule,
     FriendshipsModule,

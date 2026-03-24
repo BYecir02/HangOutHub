@@ -1,4 +1,10 @@
-type CacheKey = 'events' | 'places' | 'discover' | 'explore' | 'categories';
+type CacheKey =
+  | 'events'
+  | 'places'
+  | 'discover'
+  | 'explore'
+  | 'categories'
+  | 'cities';
 
 const cache = new Map<CacheKey, unknown>();
 const categoryCache = new Map<string, unknown>();

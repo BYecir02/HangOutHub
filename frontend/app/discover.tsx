@@ -15,6 +15,7 @@ import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getStoredLocation, type StoredLocation } from '@/services/location-preferences';
 
 interface DiscoverEvent {
   id: string;
@@ -25,6 +26,10 @@ interface DiscoverEvent {
   Place?: {
     id?: string;
     name?: string | null;
+    City?: {
+      name?: string | null;
+      country?: string | null;
+    } | null;
   } | null;
   address?: string | null;
 }
@@ -36,6 +41,7 @@ interface DiscoverPlace {
   avgRating?: number | null;
   City?: {
     name?: string | null;
+    country?: string | null;
   } | null;
   address?: string | null;
 }
@@ -99,6 +105,8 @@ export default function DiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<DiscoverFilter>('all');
+  const [selectedLocation, setSelectedLocation] =
+    useState<StoredLocation | null>(null);
 
   const fetchDiscoverData = useCallback(async (forceRefresh = false) => {
     const isRefresh = forceRefresh || getCache('discover') !== null;
@@ -137,14 +145,109 @@ export default function DiscoverScreen() {
     }, [fetchDiscoverData]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const hydrateLocation = async () => {
+        const storedLocation = await getStoredLocation();
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedLocation(storedLocation);
+      };
+
+      void hydrateLocation();
+
+      return () => {
+        isMounted = false;
+      };
+    }, []),
+  );
+
   const filterLabels: Record<DiscoverFilter, string> = {
     all: t('discoverFilterAll'),
     events: t('discoverFilterEvents'),
     places: t('discoverFilterPlaces'),
   };
 
+  const activeCityName =
+    (selectedLocation?.mode === 'city' ||
+      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
+    selectedLocation.cityName
+      ? selectedLocation.cityName.trim().toLowerCase()
+      : '';
+  const activeCountry =
+    selectedLocation?.country?.trim().toLowerCase() || '';
+  const defaultCountry = t('homeLocationCountry').trim().toLowerCase();
+
+  const locationFilteredEvents = useMemo(() => {
+    if (!activeCityName) {
+      if (!activeCountry) {
+        return events;
+      }
+
+      return events.filter((event) => {
+        const eventCountry =
+          event.Place?.City?.country?.trim().toLowerCase() ||
+          defaultCountry;
+        return eventCountry === activeCountry;
+      });
+    }
+
+    return events.filter((event) => {
+      if (activeCountry) {
+        const eventCountry =
+          event.Place?.City?.country?.trim().toLowerCase() ||
+          defaultCountry;
+        if (eventCountry !== activeCountry) {
+          return false;
+        }
+      }
+
+      const cityName = event.Place?.City?.name?.trim().toLowerCase();
+      const address = event.address?.trim().toLowerCase();
+      return (
+        cityName === activeCityName ||
+        (!!address && address.includes(activeCityName))
+      );
+    });
+  }, [activeCityName, activeCountry, defaultCountry, events]);
+
+  const locationFilteredPlaces = useMemo(() => {
+    if (!activeCityName) {
+      if (!activeCountry) {
+        return places;
+      }
+
+      return places.filter((place) => {
+        const placeCountry =
+          place.City?.country?.trim().toLowerCase() || defaultCountry;
+        return placeCountry === activeCountry;
+      });
+    }
+
+    return places.filter((place) => {
+      if (activeCountry) {
+        const placeCountry =
+          place.City?.country?.trim().toLowerCase() || defaultCountry;
+        if (placeCountry !== activeCountry) {
+          return false;
+        }
+      }
+
+      const cityName = place.City?.name?.trim().toLowerCase();
+      const address = place.address?.trim().toLowerCase();
+      return (
+        cityName === activeCityName ||
+        (!!address && address.includes(activeCityName))
+      );
+    });
+  }, [activeCityName, activeCountry, defaultCountry, places]);
+
   const discoverItems = useMemo<DiscoverItem[]>(() => {
-    const topEvents = events.slice(0, 6).map((event) => ({
+    const topEvents = locationFilteredEvents.slice(0, 6).map((event) => ({
       id: `event-${event.id}`,
       type: 'event' as const,
       title: event.title,
@@ -159,7 +262,7 @@ export default function DiscoverScreen() {
       targetId: event.id,
     }));
 
-    const topPlaces = [...places]
+    const topPlaces = [...locationFilteredPlaces]
       .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0))
       .slice(0, 6)
       .map((place) => ({
@@ -178,7 +281,17 @@ export default function DiscoverScreen() {
       }));
 
     return [...topEvents, ...topPlaces];
-  }, [events, locale, places, t]);
+  }, [locationFilteredEvents, locale, locationFilteredPlaces, t]);
+
+  const activeLocationLabel = activeCityName
+    ? `${t('homeLocationCurrentLabel')}: ${selectedLocation?.cityName}, ${
+        selectedLocation?.country || t('homeLocationCountry')
+      }`
+    : selectedLocation?.country
+      ? `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCities')} • ${
+          selectedLocation.country
+        }`
+      : `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCountries')}`;
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -221,6 +334,22 @@ export default function DiscoverScreen() {
             </Text>
           </View>
         </View>
+      </View>
+
+      <View className="flex-row items-center justify-between px-5 pb-2">
+        <View className="rounded-full bg-white px-3 py-1.5 dark:bg-gray-800">
+          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-100">
+            {activeLocationLabel}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/location')}
+          className="rounded-full border border-gray-200 px-3 py-1.5 dark:border-gray-700"
+        >
+          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+            {t('homeLocationChangeCta')}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <SearchBar

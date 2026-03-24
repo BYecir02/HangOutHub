@@ -6,6 +6,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface HeaderProps {
   location?: string;
+  locationLabel?: string;
   onNotificationPress?: () => void;
   onLocationPress?: () => void;
   onSearchPress?: () => void;
@@ -14,6 +15,7 @@ interface HeaderProps {
 
 export default function Header({ 
   location = "Cotonou, Benin",
+  locationLabel = 'Ma position',
   onNotificationPress,
   onLocationPress,
   onSearchPress,
@@ -33,7 +35,7 @@ export default function Header({
       <TouchableOpacity className="flex-row items-center" onPress={onLocationPress}>
         <View className="items-center">
           <Text className="text-gray-400 dark:text-gray-500 text-[10px] font-medium uppercase tracking-widest">
-            Ma Position
+            {locationLabel}
           </Text>
           <View className="flex-row items-center">
             <Text className="text-gray-800 dark:text-white font-bold text-base mr-1">{location}</Text>

@@ -48,6 +48,7 @@ interface CategoryOption {
 interface DraftTicketType {
   id: string;
   name: string;
+  description: string;
   price: string;
   quantity: string;
 }
@@ -123,6 +124,7 @@ export default function CreateEventScreen() {
     {
       id: `ticket-${Date.now()}`,
       name: 'Standard',
+      description: '',
       price: '0',
       quantity: '100',
     },
@@ -268,13 +270,19 @@ export default function CreateEventScreen() {
     );
     setSelectedTagIds((draft.selectedTagIds || []).filter((tagId) => allowedTagIds.has(tagId)));
 
+    const normalizedDraftTickets = (draft.ticketTypes || []).map((ticketType) => ({
+      ...ticketType,
+      description: ticketType.description || '',
+    }));
+
     setTicketTypes(
-      draft.ticketTypes && draft.ticketTypes.length > 0
-        ? draft.ticketTypes
+      normalizedDraftTickets.length > 0
+        ? normalizedDraftTickets
         : [
             {
               id: `ticket-${Date.now()}`,
               name: 'Standard',
+              description: '',
               price: '0',
               quantity: '100',
             },
@@ -706,6 +714,7 @@ export default function CreateEventScreen() {
 
     const serializedTicketTypes = ticketTypes.map((ticketType) => ({
       name: ticketType.name.trim(),
+      description: ticketType.description.trim(),
       price: Number(ticketType.price || 0),
       quantity: Number(ticketType.quantity || 0),
     }));
@@ -1050,6 +1059,7 @@ export default function CreateEventScreen() {
       {
         id: `ticket-${Date.now()}-${current.length}`,
         name: '',
+        description: '',
         price: '0',
         quantity: '50',
       },
@@ -1058,7 +1068,7 @@ export default function CreateEventScreen() {
 
   const updateTicketType = (
     id: string,
-    field: 'name' | 'price' | 'quantity',
+    field: 'name' | 'description' | 'price' | 'quantity',
     value: string,
   ) => {
     setTicketTypes((current) =>
@@ -1777,6 +1787,18 @@ export default function CreateEventScreen() {
                   className="mt-2 rounded-xl bg-gray-50 p-3 text-gray-800 dark:bg-gray-900 dark:text-white"
                   value={ticketType.name}
                   onChangeText={(value) => updateTicketType(ticketType.id, 'name', value)}
+                />
+                <TextInput
+                  placeholder={t('createEventTicketTypeDescriptionPlaceholder')}
+                  placeholderTextColor={isDark ? '#666' : '#999'}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  className="mt-2 rounded-xl bg-gray-50 p-3 text-gray-800 dark:bg-gray-900 dark:text-white"
+                  value={ticketType.description}
+                  onChangeText={(value) =>
+                    updateTicketType(ticketType.id, 'description', value)
+                  }
                 />
 
                 <View className="mt-2 flex-row gap-2">

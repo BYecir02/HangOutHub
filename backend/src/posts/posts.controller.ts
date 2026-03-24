@@ -78,12 +78,27 @@ export class PostsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
+  @UseInterceptors(
+    FilesInterceptor('images', 5, {
+      storage: memoryStorage(),
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(
+            new BadRequestException('Seules les images sont autorisees.'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
   update(
     @Param('id') id: string,
     @Request() req: AuthenticatedRequest,
     @Body() updatePostDto: UpdatePostDto,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
-    return this.postsService.update(id, req.user.userId, updatePostDto);
+    return this.postsService.update(id, req.user.userId, updatePostDto, files);
   }
 
   @UseGuards(AuthGuard('jwt'))

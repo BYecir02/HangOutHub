@@ -18,6 +18,11 @@ import SuggestionCard from '@/components/ui/SuggestionCard';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
+import {
+  getStoredLocation,
+  setStoredLocation,
+  type StoredLocation,
+} from '@/services/location-preferences';
 import { Category } from '@/types';
 
 interface HomeEvent {
@@ -28,6 +33,11 @@ interface HomeEvent {
   entryFee: number | string | null;
   Place?: {
     name?: string | null;
+    City?: {
+      id?: number;
+      name?: string | null;
+      country?: string | null;
+    } | null;
   } | null;
   address?: string | null;
 }
@@ -38,7 +48,9 @@ interface HomePlace {
   coverUrl: string | null;
   avgRating?: number | null;
   City?: {
+    id?: number;
     name?: string | null;
+    country?: string | null;
   } | null;
   address?: string | null;
 }
@@ -92,6 +104,9 @@ export default function HomeScreen() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [locationLoaded, setLocationLoaded] = useState(false);
+  const [selectedLocation, setSelectedLocation] =
+    useState<StoredLocation | null>(null);
 
   const isUnauthorized = useCallback((error: unknown) => {
     if (!error || typeof error !== 'object') {
@@ -126,6 +141,28 @@ export default function HomeScreen() {
     useCallback(() => {
       void loadNotificationCount();
     }, [loadNotificationCount]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const hydrateLocation = async () => {
+        const storedLocation = await getStoredLocation();
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedLocation(storedLocation);
+        setLocationLoaded(true);
+      };
+
+      void hydrateLocation();
+
+      return () => {
+        isMounted = false;
+      };
+    }, []),
   );
 
   const loadHomeData = useCallback(async () => {
@@ -199,6 +236,26 @@ export default function HomeScreen() {
     }, [loadHomeData]),
   );
 
+  useEffect(() => {
+    if (!locationLoaded) {
+      return;
+    }
+
+    if (selectedLocation) {
+      return;
+    }
+
+    const nextLocation: StoredLocation = {
+      mode: 'city',
+      cityName: 'Cotonou',
+      region: null,
+      country: t('homeLocationCountry'),
+    };
+
+    setSelectedLocation(nextLocation);
+    void setStoredLocation(nextLocation);
+  }, [locationLoaded, selectedLocation, t]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
 
@@ -209,8 +266,75 @@ export default function HomeScreen() {
     }
   }, [loadHomeData]);
 
-  const featuredEvents = useMemo(() => events.slice(0, 5), [events]);
-  const popularPlaces = useMemo(() => places.slice(0, 6), [places]);
+  const defaultCountry = t('homeLocationCountry');
+  const selectedCountry = selectedLocation?.country;
+  const normalizedSelectedCountry = selectedCountry?.trim().toLowerCase() || '';
+  const normalizedDefaultCountry = defaultCountry.trim().toLowerCase();
+  const effectiveCountry =
+    selectedCountry || (selectedLocation?.cityName ? defaultCountry : undefined);
+
+  const activeCityName =
+    (selectedLocation?.mode === 'city' ||
+      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
+    selectedLocation.cityName
+      ? selectedLocation.cityName.trim().toLowerCase()
+      : '';
+
+  const locationFilteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      if (normalizedSelectedCountry) {
+        const eventCountry =
+          event.Place?.City?.country?.trim().toLowerCase() ||
+          normalizedDefaultCountry;
+        if (eventCountry !== normalizedSelectedCountry) {
+          return false;
+        }
+      }
+
+      if (!activeCityName) {
+        return true;
+      }
+
+      const cityName = event.Place?.City?.name?.trim().toLowerCase();
+      const address = event.address?.trim().toLowerCase();
+      return (
+        cityName === activeCityName ||
+        (!!address && address.includes(activeCityName))
+      );
+    });
+  }, [activeCityName, events, normalizedDefaultCountry, normalizedSelectedCountry]);
+
+  const locationFilteredPlaces = useMemo(() => {
+    return places.filter((place) => {
+      if (normalizedSelectedCountry) {
+        const placeCountry =
+          place.City?.country?.trim().toLowerCase() || normalizedDefaultCountry;
+        if (placeCountry !== normalizedSelectedCountry) {
+          return false;
+        }
+      }
+
+      if (!activeCityName) {
+        return true;
+      }
+
+      const cityName = place.City?.name?.trim().toLowerCase();
+      const address = place.address?.trim().toLowerCase();
+      return (
+        cityName === activeCityName ||
+        (!!address && address.includes(activeCityName))
+      );
+    });
+  }, [activeCityName, normalizedDefaultCountry, normalizedSelectedCountry, places]);
+
+  const featuredEvents = useMemo(
+    () => locationFilteredEvents.slice(0, 5),
+    [locationFilteredEvents],
+  );
+  const popularPlaces = useMemo(
+    () => locationFilteredPlaces.slice(0, 6),
+    [locationFilteredPlaces],
+  );
   const suggestions = useMemo(
     () =>
       featuredEvents.slice(0, 3).map((event, index) => ({
@@ -228,6 +352,15 @@ export default function HomeScreen() {
       })),
     [featuredEvents, locale, t],
   );
+
+  const locationLabel =
+    (selectedLocation?.mode === 'city' ||
+      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
+    selectedLocation.cityName
+      ? `${selectedLocation.cityName}, ${effectiveCountry || defaultCountry}`
+    : effectiveCountry
+        ? effectiveCountry
+        : t('homeLocationAllCountries');
 
   const handleCategoryPress = (categoryId: number) => {
     const id = String(categoryId);
@@ -247,27 +380,75 @@ export default function HomeScreen() {
     });
   };
 
+
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-black"
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            void onRefresh();
-          }}
-          tintColor="#4c669f"
-        />
-      }
-    >
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void onRefresh();
+            }}
+            tintColor="#4c669f"
+          />
+        }
+      >
       <Header
         notificationCount={notificationCount}
+        location={locationLabel}
+        locationLabel={t('homeLocationLabel')}
+        onLocationPress={() => router.push('/location')}
         onNotificationPress={() => router.push('/notifications')}
         onSearchPress={() => router.push('/search')}
       />
 
       <View className="mt-6">
+        <View className="mb-4 flex-row items-end justify-between px-5">
+          <Text className="text-lg font-bold text-gray-800 dark:text-white">
+            {t('homeFeatured')}
+          </Text>
+          <TouchableOpacity onPress={() => router.push(eventsRoute)}>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
+        ) : featuredEvents.length > 0 ? (
+          <FlatList
+            data={featuredEvents}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={276}
+            decelerationRate="fast"
+            snapToAlignment="start"
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+            renderItem={({ item }) => (
+              <EventCard
+                title={item.title}
+                date={formatEventDate(item.startTime, locale)}
+                location={item.Place?.name || item.address || t('homeLocationToConfirm')}
+                imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
+                price={formatEventPrice(item.entryFee, locale, t('homePriceFree'))}
+                onPress={() =>
+                  router.push({
+                    pathname: '/event/[id]',
+                    params: { id: item.id },
+                  })
+                }
+              />
+            )}
+          />
+        ) : (
+          <SectionPlaceholder message={t('homeNoEvents')} />
+        )}
+      </View>
+
+      <View className="mt-8">
         <Text className="ml-5 mb-4 text-lg font-bold text-gray-800 dark:text-white">
           {t('homeCategories')}
         </Text>
@@ -289,46 +470,6 @@ export default function HomeScreen() {
           />
         ) : (
           <SectionPlaceholder message={t('homeNoCategories')} />
-        )}
-      </View>
-
-      <View className="mt-8">
-        <View className="mb-4 flex-row items-end justify-between px-5">
-          <Text className="text-lg font-bold text-gray-800 dark:text-white">
-            {t('homeFeatured')}
-          </Text>
-          <TouchableOpacity onPress={() => router.push(eventsRoute)}>
-            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
-        ) : featuredEvents.length > 0 ? (
-          <FlatList
-            data={featuredEvents}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <EventCard
-                title={item.title}
-                date={formatEventDate(item.startTime, locale)}
-                location={item.Place?.name || item.address || t('homeLocationToConfirm')}
-                imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                price={formatEventPrice(item.entryFee, locale, t('homePriceFree'))}
-                onPress={() =>
-                  router.push({
-                    pathname: '/event/[id]',
-                    params: { id: item.id },
-                  })
-                }
-              />
-            )}
-          />
-        ) : (
-          <SectionPlaceholder message={t('homeNoEvents')} />
         )}
       </View>
 
@@ -406,5 +547,7 @@ export default function HomeScreen() {
         )}
       </View>
     </ScrollView>
+
+  </View>
   );
 }

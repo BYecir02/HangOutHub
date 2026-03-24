@@ -136,7 +136,12 @@ export class PostsService {
     });
   }
 
-  async update(id: string, userId: string, updatePostDto: UpdatePostDto) {
+  async update(
+    id: string,
+    userId: string,
+    updatePostDto: UpdatePostDto,
+    files: Express.Multer.File[],
+  ) {
     const post = await this.prisma.post.findUnique({
       where: { id },
     });
@@ -149,9 +154,34 @@ export class PostsService {
       throw new ForbiddenException('You are not allowed to update this post');
     }
 
+    const { existingImages, ...rest } = updatePostDto;
+
+    let retainedImages: string[] = [];
+    if (existingImages) {
+      try {
+        const parsed = JSON.parse(existingImages);
+        if (Array.isArray(parsed)) {
+          retainedImages = parsed.filter((image) => typeof image === 'string');
+        }
+      } catch {
+        // If parsing fails, treat as no retained images.
+      }
+    }
+
+    const newImages =
+      files && files.length > 0
+        ? await this.storageService.uploadFiles('posts', files)
+        : [];
+
+    const data: UpdatePostDto & { images?: string[] } = { ...rest };
+
+    if (existingImages !== undefined || newImages.length > 0) {
+      data.images = [...retainedImages, ...newImages];
+    }
+
     return this.prisma.post.update({
       where: { id },
-      data: updatePostDto,
+      data,
     });
   }
 

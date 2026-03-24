@@ -98,6 +98,7 @@ export class EventsService {
           select: {
             id: true,
             name: true,
+            description: true,
             price: true,
             quantity: true,
           },
@@ -175,6 +176,7 @@ export class EventsService {
       ticketTypes: event.TicketType.map((ticketType) => ({
         id: ticketType.id,
         name: ticketType.name,
+        description: ticketType.description,
         price: Number(ticketType.price || 0),
         quantity: ticketType.quantity,
       })),
@@ -293,7 +295,12 @@ export class EventsService {
 
   private parseTicketTypesPayload(raw?: string) {
     if (!raw) {
-      return [] as Array<{ name: string; price: number; quantity: number }>;
+      return [] as Array<{
+        name: string;
+        description: string | null;
+        price: number;
+        quantity: number;
+      }>;
     }
 
     let parsed: unknown;
@@ -310,11 +317,15 @@ export class EventsService {
     const normalized = parsed.map((item) => {
       const candidate = item as {
         name?: string;
+        description?: string;
         price?: number | string;
         quantity?: number | string;
       };
 
       const name = (candidate.name || '').trim();
+      const description = typeof candidate.description === 'string'
+        ? candidate.description.trim()
+        : '';
       const price = Number(candidate.price || 0);
       const quantity = Number(candidate.quantity || 0);
 
@@ -330,7 +341,12 @@ export class EventsService {
         throw new BadRequestException('Quantite de tarif invalide.');
       }
 
-      return { name, price, quantity };
+      return {
+        name,
+        description: description ? description : null,
+        price,
+        quantity,
+      };
     });
 
     const dedup = new Set<string>();
@@ -348,6 +364,7 @@ export class EventsService {
   private normalizeTicketTypesForCompare(
     ticketTypes: Array<{
       name: string;
+      description?: string | null;
       price: number | string | Prisma.Decimal;
       quantity: number | string;
     }>,
@@ -355,6 +372,7 @@ export class EventsService {
     return ticketTypes
       .map((ticketType) => ({
         name: (ticketType.name || '').trim().toLowerCase(),
+        description: (ticketType.description || '').trim().toLowerCase(),
         price: Number(ticketType.price || 0),
         quantity: Number(ticketType.quantity || 0),
       }))
@@ -375,11 +393,13 @@ export class EventsService {
   private areTicketTypesEquivalent(
     left: Array<{
       name: string;
+      description?: string | null;
       price: number | string | Prisma.Decimal;
       quantity: number | string;
     }>,
     right: Array<{
       name: string;
+      description?: string | null;
       price: number | string | Prisma.Decimal;
       quantity: number | string;
     }>,
@@ -396,6 +416,7 @@ export class EventsService {
       return (
         candidate !== undefined &&
         candidate.name === ticketType.name &&
+        candidate.description === ticketType.description &&
         candidate.price === ticketType.price &&
         candidate.quantity === ticketType.quantity
       );
@@ -881,6 +902,7 @@ export class EventsService {
                 TicketType: {
                   create: ticketTypes.map((ticketType) => ({
                     name: ticketType.name,
+                    description: ticketType.description,
                     price: ticketType.price,
                     quantity: ticketType.quantity,
                   })),
@@ -916,7 +938,19 @@ export class EventsService {
     return this.prisma.event.findMany({
       include: {
         User: { select: { username: true, avatarUrl: true } },
-        Place: true,
+        Place: {
+          include: {
+            City: {
+              select: {
+                id: true,
+                name: true,
+                country: true,
+                latitude: true,
+                longitude: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { startTime: 'asc' },
     });
@@ -1285,6 +1319,7 @@ export class EventsService {
         TicketType: {
           select: {
             name: true,
+            description: true,
             price: true,
             quantity: true,
           },
@@ -1501,6 +1536,7 @@ export class EventsService {
                 TicketType: {
                   create: ticketTypes.map((ticketType) => ({
                     name: ticketType.name,
+                    description: ticketType.description,
                     price: ticketType.price,
                     quantity: ticketType.quantity,
                   })),
@@ -1590,6 +1626,7 @@ export class EventsService {
           select: {
             id: true,
             name: true,
+            description: true,
             price: true,
             quantity: true,
           },
@@ -2206,6 +2243,9 @@ export class EventsService {
               select: {
                 id: true,
                 name: true,
+                country: true,
+                latitude: true,
+                longitude: true,
               },
             },
           },
@@ -2214,6 +2254,7 @@ export class EventsService {
           select: {
             id: true,
             name: true,
+            description: true,
             price: true,
             quantity: true,
           },

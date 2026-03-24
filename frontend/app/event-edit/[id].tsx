@@ -34,12 +34,14 @@ type EventPlaceSource = 'owned' | 'all';
 interface DraftTicketType {
   id: string;
   name: string;
+  description: string;
   price: string;
   quantity: string;
 }
 
 interface NormalizedTicketTypePayload {
   name: string;
+  description: string;
   price: number;
   quantity: number;
 }
@@ -69,6 +71,7 @@ interface EventPayload {
   TicketType?: Array<{
     id: string;
     name: string;
+    description?: string | null;
     price: number | string;
     quantity: number;
   }>;
@@ -136,12 +139,14 @@ export default function EditEventScreen() {
   const normalizeTicketTypes = (
     items: Array<{
       name: string;
+      description?: string | null;
       price: number | string;
       quantity: number | string;
     }>,
   ): NormalizedTicketTypePayload[] =>
     items.map((ticketType) => ({
       name: ticketType.name.trim(),
+      description: (ticketType.description || '').trim(),
       price: Number(ticketType.price || 0),
       quantity: Number(ticketType.quantity || 0),
     }));
@@ -159,6 +164,7 @@ export default function EditEventScreen() {
       return (
         candidate !== undefined &&
         candidate.name === item.name &&
+        candidate.description === item.description &&
         candidate.price === item.price &&
         candidate.quantity === item.quantity
       );
@@ -202,6 +208,7 @@ export default function EditEventScreen() {
         const eventTicketTypes = (event.TicketType || []).map((ticketType) => ({
           id: ticketType.id,
           name: ticketType.name,
+          description: ticketType.description || '',
           price: String(Number(ticketType.price || 0)),
           quantity: String(ticketType.quantity || 1),
         }));
@@ -268,6 +275,7 @@ export default function EditEventScreen() {
                 {
                   id: `ticket-${Date.now()}`,
                   name: 'Standard',
+                  description: '',
                   price: String(Number(event.entryFee || 0)),
                   quantity: '100',
                 },
@@ -280,6 +288,7 @@ export default function EditEventScreen() {
               : [
                   {
                     name: 'Standard',
+                    description: '',
                     price: String(Number(event.entryFee || 0)),
                     quantity: '100',
                   },
@@ -667,6 +676,7 @@ export default function EditEventScreen() {
       {
         id: `ticket-${Date.now()}-${current.length}`,
         name: '',
+        description: '',
         price: '0',
         quantity: '50',
       },
@@ -675,7 +685,7 @@ export default function EditEventScreen() {
 
   const updateTicketType = (
     id: string,
-    field: 'name' | 'price' | 'quantity',
+    field: 'name' | 'description' | 'price' | 'quantity',
     value: string,
   ) => {
     setTicketTypes((current) =>
@@ -1168,6 +1178,18 @@ export default function EditEventScreen() {
                   className="mt-2 rounded-xl bg-gray-50 p-3 text-gray-800 dark:bg-gray-900 dark:text-white"
                   value={ticketType.name}
                   onChangeText={(value) => updateTicketType(ticketType.id, 'name', value)}
+                />
+                <TextInput
+                  placeholder={t('createEventTicketTypeDescriptionPlaceholder')}
+                  placeholderTextColor={isDark ? '#666' : '#999'}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  className="mt-2 rounded-xl bg-gray-50 p-3 text-gray-800 dark:bg-gray-900 dark:text-white"
+                  value={ticketType.description}
+                  onChangeText={(value) =>
+                    updateTicketType(ticketType.id, 'description', value)
+                  }
                 />
 
                 <View className="mt-2 flex-row gap-2">

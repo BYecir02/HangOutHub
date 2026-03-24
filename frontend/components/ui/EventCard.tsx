@@ -24,8 +24,8 @@ export default function EventCard({ title, date, location, imageUrl, price, onPr
           className="w-full h-36"
           resizeMode="cover"
         />
-        <View className="absolute top-3 right-3 bg-white/90 dark:bg-black/60 px-2 py-1 rounded-lg">
-          <Text className="text-xs font-bold text-[#4c669f]">{price}</Text>
+        <View className="absolute top-3 right-3 rounded-lg bg-[#4c669f] px-2 py-1">
+          <Text className="text-xs font-bold text-white">{price}</Text>
         </View>
       </View>
 

@@ -124,6 +124,11 @@ export default function RootLayout() {
           />
           <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="event-booking/[id]" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="location"
+            options={{ headerShown: false, presentation: 'fullScreenModal' }}
+          />
           <Stack.Screen
             name="outing"
             options={{ headerShown: false, presentation: 'fullScreenModal' }}

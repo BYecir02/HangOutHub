@@ -15,6 +15,7 @@ import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getStoredLocation, type StoredLocation } from '@/services/location-preferences';
 
 interface EventItem {
   id: string;
@@ -27,6 +28,7 @@ interface EventItem {
     name?: string | null;
     City?: {
       name?: string | null;
+      country?: string | null;
     } | null;
   } | null;
   address?: string | null;
@@ -57,26 +59,42 @@ function formatPrice(
 }
 
 function isWithinNextWeek(value: string) {
-  const eventDate = new Date(value).getTime();
-  const now = Date.now();
-  const oneWeekLater = now + 7 * 24 * 60 * 60 * 1000;
+  const eventDate = new Date(value);
+  if (Number.isNaN(eventDate.getTime())) {
+    return false;
+  }
 
-  return eventDate >= now && eventDate <= oneWeekLater;
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diffToMonday = (dayOfWeek + 6) % 7;
+
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(endOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const eventTime = eventDate.getTime();
+  const nowTime = now.getTime();
+
+  return eventTime >= nowTime && eventTime <= endOfWeek.getTime();
 }
 
 const FILTERS: EventFilter[] = ['all', 'upcoming', 'free', 'week'];
 
 export default function EventsScreen() {
   const router = useRouter();
-  const { locale, t, language } = useI18n();
-    // DEBUG: log la langue courante pour debug i18n
-    console.log('LANGUE COURANTE EVENTS:', language);
+  const { locale, t } = useI18n();
   const cachedEvents = getCache<EventItem[]>('events');
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
   const [loading, setLoading] = useState(!cachedEvents);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<EventFilter>('upcoming');
+  const [selectedLocation, setSelectedLocation] =
+    useState<StoredLocation | null>(null);
 
   const fetchEvents = useCallback(async (forceRefresh = false) => {
     const isRefresh = forceRefresh || getCache('events') !== null;
@@ -111,6 +129,27 @@ export default function EventsScreen() {
     }, [fetchEvents]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const hydrateLocation = async () => {
+        const storedLocation = await getStoredLocation();
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedLocation(storedLocation);
+      };
+
+      void hydrateLocation();
+
+      return () => {
+        isMounted = false;
+      };
+    }, []),
+  );
+
   const filterLabels: Record<EventFilter, string> = {
     all: t('eventsFilterAll'),
     upcoming: t('eventsFilterUpcoming'),
@@ -118,11 +157,41 @@ export default function EventsScreen() {
     week: t('eventsFilterWeek'),
   };
 
+  const activeCityName =
+    (selectedLocation?.mode === 'city' ||
+      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
+    selectedLocation.cityName
+      ? selectedLocation.cityName.trim().toLowerCase()
+      : '';
+  const activeCountry =
+    selectedLocation?.country?.trim().toLowerCase() || '';
+  const defaultCountry = t('homeLocationCountry').trim().toLowerCase();
+
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     return events
       .filter((event) => {
+        if (activeCountry) {
+          const eventCountry =
+            event.Place?.City?.country?.trim().toLowerCase() ||
+            defaultCountry;
+          if (eventCountry !== activeCountry) {
+            return false;
+          }
+        }
+
+        if (activeCityName) {
+          const cityName = event.Place?.City?.name?.trim().toLowerCase();
+          const address = event.address?.trim().toLowerCase();
+          const matchesCity =
+            cityName === activeCityName ||
+            (!!address && address.includes(activeCityName));
+          if (!matchesCity) {
+            return false;
+          }
+        }
+
         if (activeFilter === 'free' && Number(event.entryFee || 0) > 0) {
           return false;
         }
@@ -158,7 +227,17 @@ export default function EventsScreen() {
         (left, right) =>
           new Date(left.startTime).getTime() - new Date(right.startTime).getTime(),
       );
-  }, [activeFilter, events, query]);
+  }, [activeCityName, activeCountry, activeFilter, defaultCountry, events, query]);
+
+  const activeLocationLabel = activeCityName
+    ? `${t('homeLocationCurrentLabel')}: ${selectedLocation?.cityName}, ${
+        selectedLocation?.country || t('homeLocationCountry')
+      }`
+    : selectedLocation?.country
+      ? `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCities')} • ${
+          selectedLocation.country
+        }`
+      : `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCountries')}`;
 
   return (
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
@@ -185,6 +264,22 @@ export default function EventsScreen() {
         </View>
       </View>
 
+      <View className="flex-row items-center justify-between px-5 pb-2">
+        <View className="rounded-full bg-white px-3 py-1.5 dark:bg-gray-800">
+          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-100">
+            {activeLocationLabel}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/location')}
+          className="rounded-full border border-gray-200 px-3 py-1.5 dark:border-gray-700"
+        >
+          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+            {t('homeLocationChangeCta')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <SearchBar
         placeholder={t('eventsSearchPlaceholder')}
         value={query}
@@ -207,8 +302,9 @@ export default function EventsScreen() {
           return (
             <TouchableOpacity
               onPress={() => setActiveFilter(item)}
-              className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
-              style={active ? { backgroundColor: '#4c669f' } : undefined}
+              className={`mr-3 rounded-full px-4 py-2.5 ${
+                active ? 'bg-[#4c669f]' : 'bg-white dark:bg-gray-900'
+              }`}
             >
               <Text
                 className={`text-sm font-semibold ${

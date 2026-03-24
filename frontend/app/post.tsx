@@ -16,12 +16,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { getMySettings } from '@/services/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private';
+
+const MAX_IMAGES = 5;
+const MAX_CHARS = 500;
 
 const VISIBILITY_OPTIONS: {
   id: PostVisibility;
@@ -61,14 +64,30 @@ export default function CreatePostScreen() {
     postId?: string;
     content?: string;
     visibility?: PostVisibility;
+    images?: string;
   }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
   const isEditing = !!params.postId;
 
+  const parseImagesParam = (value?: string | string[]) => {
+    if (!value) {
+      return [];
+    }
+    const rawValue = Array.isArray(value) ? value[0] : value;
+    try {
+      const parsed = JSON.parse(String(rawValue));
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  };
+
   const [content, setContent] = useState(params.content ? String(params.content) : '');
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>(() => parseImagesParam(params.images));
   const [visibility, setVisibility] = useState<PostVisibility>(
     params.visibility || 'public',
   );
@@ -120,7 +139,28 @@ export default function CreatePostScreen() {
     return isEditing ? t('postHeaderEditTitle') : t('postHeaderCreateTitle');
   }, [isEditing, t]);
 
+  const isLocalImage = (uri: string) =>
+    uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
+
+  const resolveImageUri = (uri: string) => {
+    if (!uri) {
+      return uri;
+    }
+    if (isLocalImage(uri) || uri.startsWith('http://') || uri.startsWith('https://')) {
+      return uri;
+    }
+    return getImageUrl(uri) || uri;
+  };
+
   const pickImage = async (source: 'camera' | 'gallery') => {
+    if (images.length >= MAX_IMAGES) {
+      Alert.alert(
+        t('postImageLimitTitle'),
+        t('postImageLimitMessage', { count: MAX_IMAGES }),
+      );
+      return;
+    }
+
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: 'images',
       allowsEditing: true,
@@ -138,7 +178,12 @@ export default function CreatePostScreen() {
     }
 
     if (!result.canceled) {
-      setImages((currentImages) => [...currentImages, result.assets[0].uri]);
+      setImages((currentImages) => {
+        if (currentImages.length >= MAX_IMAGES) {
+          return currentImages;
+        }
+        return [...currentImages, result.assets[0].uri];
+      });
     }
   };
 
@@ -152,9 +197,25 @@ export default function CreatePostScreen() {
 
     try {
       if (isEditing) {
-        await api.patch(`/posts/${params.postId}`, {
-          content,
-          visibility,
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('visibility', visibility);
+
+        const existingImages = images.filter((uri) => !isLocalImage(uri));
+        formData.append('existingImages', JSON.stringify(existingImages));
+
+        images
+          .filter((uri) => isLocalImage(uri))
+          .forEach((uri, index) => {
+            formData.append('images', {
+              uri,
+              name: `image_${index}.jpg`,
+              type: 'image/jpeg',
+            } as never);
+          });
+
+        await api.patch(`/posts/${params.postId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
         });
         Alert.alert(t('outingCreateSuccessTitle'), t('postEditSuccessMessage'));
       } else {
@@ -188,7 +249,7 @@ export default function CreatePostScreen() {
 
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">
-      <View className="flex-row items-center justify-between border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
+      <View className="flex-row items-center justify-between border-b border-gray-100 px-5 pb-2 dark:border-gray-800">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
           <Ionicons name="close" size={28} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
@@ -196,9 +257,6 @@ export default function CreatePostScreen() {
         <View className="items-center">
           <Text className="text-lg font-semibold text-gray-900 dark:text-white">
             {headerTitle}
-          </Text>
-          <Text className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-            {visibilityLabel}
           </Text>
         </View>
 
@@ -241,6 +299,7 @@ export default function CreatePostScreen() {
             autoFocus
             value={content}
             onChangeText={setContent}
+            maxLength={MAX_CHARS}
           />
 
           {images.length > 0 ? (
@@ -252,7 +311,7 @@ export default function CreatePostScreen() {
               {images.map((uri, index) => (
                 <View key={index} className="relative mr-3">
                   <Image
-                    source={{ uri }}
+                    source={{ uri: resolveImageUri(uri) }}
                     className="h-40 w-40 rounded-2xl bg-gray-100"
                     resizeMode="cover"
                   />
@@ -296,27 +355,29 @@ export default function CreatePostScreen() {
         </ScrollView>
 
         <View className="mb-5 flex-row items-center border-t border-gray-100 bg-white px-5 py-3 dark:border-gray-800 dark:bg-black">
-          {!isEditing ? (
-            <>
-              <TouchableOpacity
-                onPress={() => void pickImage('gallery')}
-                className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-              >
-                <Ionicons name="image" size={24} color="#4c669f" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => void pickImage('camera')}
-                className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-              >
-                <Ionicons name="camera" size={24} color="#4c669f" />
-              </TouchableOpacity>
-            </>
-          ) : null}
+          <TouchableOpacity
+            onPress={() => void pickImage('gallery')}
+            className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+          >
+            <Ionicons name="image" size={24} color="#4c669f" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => void pickImage('camera')}
+            className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+          >
+            <Ionicons name="camera" size={24} color="#4c669f" />
+          </TouchableOpacity>
 
           <View className="flex-1" />
 
-          <Text className="text-xs font-medium text-gray-300 dark:text-gray-600">
-            {content.length}/500
+          <Text
+            className={`text-xs font-medium ${
+              content.length >= MAX_CHARS
+                ? 'text-red-500 dark:text-red-400'
+                : 'text-gray-300 dark:text-gray-600'
+            }`}
+          >
+            {content.length}/{MAX_CHARS}
           </Text>
         </View>
       </KeyboardAvoidingView>

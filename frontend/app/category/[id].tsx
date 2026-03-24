@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import EventCard from '@/components/ui/EventCard';
 import PlaceCard from '@/components/ui/PlaceCard';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
@@ -104,6 +105,8 @@ export default function CategoryDiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const { locale, t } = useI18n();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [data, setData] = useState<CategoryResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -269,9 +272,9 @@ export default function CategoryDiscoverScreen() {
           >
             <TouchableOpacity
               onPress={() => router.back()}
-              className="mb-6 h-11 w-11 items-center justify-center rounded-full bg-white/80 dark:bg-black/30"
+              className="mb-6 h-11 w-11 items-center justify-center rounded-full bg-white/90 dark:bg-gray-900/80"
             >
-              <Ionicons name="arrow-back" size={22} color="#111827" />
+              <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#111827'} />
             </TouchableOpacity>
 
             <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">

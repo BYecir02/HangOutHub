@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useI18n } from '@/hooks/use-i18n';
@@ -16,6 +16,7 @@ import SearchBar from '@/components/ui/SearchBar';
 import api, { getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getStoredLocation, type StoredLocation } from '@/services/location-preferences';
 
 interface PlaceItem {
   id: string;
@@ -25,6 +26,7 @@ interface PlaceItem {
   priceLevel?: number | null;
   City?: {
     name?: string | null;
+    country?: string | null;
   } | null;
   address?: string | null;
 }
@@ -45,6 +47,8 @@ export default function PlacesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<PlaceFilter>('all');
+  const [selectedLocation, setSelectedLocation] =
+    useState<StoredLocation | null>(null);
 
   const fetchPlaces = useCallback(async (forceRefresh = false) => {
     const isRefresh = forceRefresh || getCache('places') !== null;
@@ -73,17 +77,67 @@ export default function PlacesScreen() {
     void fetchPlaces();
   }, [fetchPlaces]);
 
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const hydrateLocation = async () => {
+        const storedLocation = await getStoredLocation();
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedLocation(storedLocation);
+      };
+
+      void hydrateLocation();
+
+      return () => {
+        isMounted = false;
+      };
+    }, []),
+  );
+
   const filterLabels: Record<PlaceFilter, string> = {
     all: t('placesFilterAll'),
     top: t('placesFilterTop'),
     budget: t('placesFilterBudget'),
   };
 
+  const activeCityName =
+    (selectedLocation?.mode === 'city' ||
+      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
+    selectedLocation.cityName
+      ? selectedLocation.cityName.trim().toLowerCase()
+      : '';
+  const activeCountry =
+    selectedLocation?.country?.trim().toLowerCase() || '';
+  const defaultCountry = t('homeLocationCountry').trim().toLowerCase();
+
   const filteredPlaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     return places
       .filter((place) => {
+        if (activeCountry) {
+          const placeCountry =
+            place.City?.country?.trim().toLowerCase() || defaultCountry;
+          if (placeCountry !== activeCountry) {
+            return false;
+          }
+        }
+
+        if (activeCityName) {
+          const cityName = place.City?.name?.trim().toLowerCase();
+          const address = place.address?.trim().toLowerCase();
+          const matchesCity =
+            cityName === activeCityName ||
+            (!!address && address.includes(activeCityName));
+          if (!matchesCity) {
+            return false;
+          }
+        }
+
         if (activeFilter === 'top' && (place.avgRating || 0) < 4) {
           return false;
         }
@@ -104,7 +158,17 @@ export default function PlacesScreen() {
         return searchableText.includes(normalizedQuery);
       })
       .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0));
-  }, [activeFilter, places, query]);
+  }, [activeCityName, activeCountry, activeFilter, defaultCountry, places, query]);
+
+  const activeLocationLabel = activeCityName
+    ? `${t('homeLocationCurrentLabel')}: ${selectedLocation?.cityName}, ${
+        selectedLocation?.country || t('homeLocationCountry')
+      }`
+    : selectedLocation?.country
+      ? `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCities')} • ${
+          selectedLocation.country
+        }`
+      : `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCountries')}`;
 
   return (
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
@@ -128,6 +192,22 @@ export default function PlacesScreen() {
             </Text>
           </View>
         </View>
+      </View>
+
+      <View className="flex-row items-center justify-between px-5 pb-2">
+        <View className="rounded-full bg-white px-3 py-1.5 dark:bg-gray-800">
+          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-100">
+            {activeLocationLabel}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/location')}
+          className="rounded-full border border-gray-200 px-3 py-1.5 dark:border-gray-700"
+        >
+          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+            {t('homeLocationChangeCta')}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <SearchBar
