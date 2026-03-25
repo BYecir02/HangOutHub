@@ -46,7 +46,7 @@ interface PostItemData {
   } | null;
   isLiked?: boolean;
   isOwner?: boolean;
-  visibility?: 'public' | 'friends' | 'private';
+  visibility?: 'public' | 'friends' | 'private' | 'custom';
   createdAt?: string;
   User?: PostAuthor;
   _count?: {
@@ -60,6 +60,7 @@ interface PostItemProps {
   onDelete?: (id: string) => void;
   onEdit?: (post: PostItemData) => void;
   onComment?: (post: PostItemData) => void;
+  showDateColumn?: boolean;
 }
 
 export default function PostItem({
@@ -67,6 +68,7 @@ export default function PostItem({
   onDelete,
   onEdit,
   onComment,
+  showDateColumn = true,
 }: PostItemProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -79,7 +81,40 @@ export default function PostItem({
   const [isLiked, setIsLiked] = useState(Boolean(item.isLiked));
   const [likesCount, setLikesCount] = useState(item._count?.likes || 0);
   const [commentsCount, setCommentsCount] = useState(item._count?.comments || 0);
-  const isPlan = item.postType === 'plan';
+  const isConnections = item.visibility === 'friends';
+  const isPlanPost = item.postType === 'plan' || isConnections;
+  const visibilityLabel =
+    item.visibility === 'friends'
+      ? t('postVisibilityFriendsLabel')
+      : item.visibility === 'private'
+      ? t('postVisibilityPrivateLabel')
+      : item.visibility === 'custom'
+      ? t('postVisibilityCustomLabel')
+      : t('postVisibilityPublicLabel');
+  const visibilityTone =
+    item.visibility === 'friends'
+      ? {
+          column: 'bg-[#ff4757]/10 dark:bg-[#ff4757]/20',
+          label: 'text-[#ff4757]',
+          accent: '#ff4757',
+        }
+      : item.visibility === 'custom'
+      ? {
+          column: 'bg-[#f39c12]/10 dark:bg-[#f39c12]/20',
+          label: 'text-[#f39c12]',
+          accent: '#f39c12',
+        }
+      : item.visibility === 'private'
+      ? {
+          column: 'bg-gray-200/70 dark:bg-gray-800',
+          label: 'text-gray-600 dark:text-gray-300',
+          accent: '#9ca3af',
+        }
+      : {
+          column: 'bg-[#4c669f]/10 dark:bg-[#4c669f]/20',
+          label: 'text-[#4c669f]',
+          accent: '#4c669f',
+        };
 
   const createdAtDate = item.createdAt ? new Date(item.createdAt) : new Date();
   const dayLabel = createdAtDate.toLocaleDateString(locale, { day: '2-digit' });
@@ -90,6 +125,29 @@ export default function PostItem({
     hour: '2-digit',
     minute: '2-digit',
   });
+  const relativeDateLabel = (() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const createdDay = new Date(
+      createdAtDate.getFullYear(),
+      createdAtDate.getMonth(),
+      createdAtDate.getDate(),
+    );
+    const diffDays = Math.round(
+      (today.getTime() - createdDay.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (diffDays === 0) {
+      return t('postDateToday');
+    }
+    if (diffDays === 1) {
+      return t('postDateYesterday');
+    }
+    return createdAtDate.toLocaleDateString(locale, {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+    });
+  })();
 
   const rawContent = (item.content || '').trim();
   const firstLine = rawContent.split('\n')[0] || '';
@@ -214,33 +272,31 @@ export default function PostItem({
 
   return (
     <View className="mx-5 mb-5 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <View className="flex-row">
-        <View
-          className={`w-20 items-center justify-center px-2 py-6 ${
-            isPlan
-              ? 'bg-[#ff4757]/10 dark:bg-[#ff4757]/20'
-              : 'bg-[#4c669f]/10 dark:bg-[#4c669f]/20'
-          }`}
-        >
-          <Text
-            className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${
-              isPlan ? 'text-[#ff4757]' : 'text-[#4c669f]'
-            }`}
+      <View className={showDateColumn ? 'flex-row' : ''}>
+        {showDateColumn ? (
+          <View
+            className={`w-20 items-center justify-center px-2 py-6 ${visibilityTone.column}`}
           >
-            {isPlan ? t('postTypePlanLabel') : t('postTypePostLabel')}
-          </Text>
-          <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            {dayLabel}
-          </Text>
-          <Text className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-300">
-            {monthLabel}
-          </Text>
-          <View className="mt-2 rounded-full bg-white/70 px-2 py-1 dark:bg-gray-900/40">
-            <Text className="text-[10px] font-semibold text-gray-600 dark:text-gray-200">
-              {timeLabel}
+            {item.visibility !== 'public' ? (
+              <Text
+                className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${visibilityTone.label}`}
+              >
+                {visibilityLabel}
+              </Text>
+            ) : null}
+            <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
+              {dayLabel}
             </Text>
+            <Text className="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-300">
+              {monthLabel}
+            </Text>
+            <View className="mt-2 rounded-full bg-white/70 px-2 py-1 dark:bg-gray-900/40">
+              <Text className="text-[10px] font-semibold text-gray-600 dark:text-gray-200">
+                {timeLabel}
+              </Text>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View className="flex-1 px-4 pt-5">
           <View className="flex-row items-center justify-between">
@@ -255,6 +311,11 @@ export default function PostItem({
                     item.User?.username ||
                     t('postItemUserFallback')}
                 </Text>
+                {!showDateColumn ? (
+                  <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {relativeDateLabel} · {timeLabel}
+                  </Text>
+                ) : null}
               </View>
             </View>
 
@@ -286,7 +347,7 @@ export default function PostItem({
               <Ionicons
                 name="location-outline"
                 size={14}
-                color={isPlan ? '#ff4757' : '#4c669f'}
+                color={visibilityTone.accent}
               />
               <Text className="ml-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
                 {locationLabel}
@@ -295,16 +356,8 @@ export default function PostItem({
           ) : null}
 
           {categoryLabel ? (
-            <View
-              className={`mt-2 self-start rounded-full px-2.5 py-1 ${
-                isPlan ? 'bg-[#ff4757]/10' : 'bg-[#4c669f]/10'
-              }`}
-            >
-              <Text
-                className={`text-[10px] font-semibold ${
-                  isPlan ? 'text-[#ff4757]' : 'text-[#4c669f]'
-                }`}
-              >
+            <View className={`mt-2 self-start rounded-full px-2.5 py-1 ${visibilityTone.column}`}>
+              <Text className={`text-[10px] font-semibold ${visibilityTone.label}`}>
                 {categoryLabel}
               </Text>
             </View>
@@ -319,7 +372,8 @@ export default function PostItem({
           {item.images && item.images.length > 0 && postImageUri ? (
             <Image
               source={{ uri: postImageUri }}
-              className="mt-4 h-52 w-full rounded-2xl bg-gray-200 dark:bg-gray-800"
+              className="mt-4 w-full rounded-2xl bg-gray-200 dark:bg-gray-800"
+              style={{ aspectRatio: 4 / 3 }}
               resizeMode="cover"
             />
           ) : null}
@@ -358,7 +412,7 @@ export default function PostItem({
               </TouchableOpacity>
             </View>
 
-            {isPlan && (item.placeId || item.eventId || item.Event) ? (
+            {isPlanPost && (item.placeId || item.eventId || item.Event) ? (
               <TouchableOpacity
                 onPress={handleCreateOuting}
                 className="rounded-full bg-[#4c669f] px-3 py-2"

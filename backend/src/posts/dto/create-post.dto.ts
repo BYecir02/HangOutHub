@@ -6,7 +6,7 @@ export class CreatePostDto {
   content?: string;
 
   @IsOptional()
-  @IsIn(['public', 'friends', 'private'])
+  @IsIn(['public', 'friends', 'private', 'custom'])
   visibility?: string;
 
   @IsOptional()
@@ -32,4 +32,8 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   ambiance?: string;
+
+  @IsOptional()
+  @IsString()
+  visibilityUserIds?: string;
 }

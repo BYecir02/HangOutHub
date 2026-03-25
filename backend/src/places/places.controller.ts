@@ -16,6 +16,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
 import { CreatePlaceDto } from './dto/create-place.dto';
+import { CreatePlaceReviewDto } from './dto/create-place-review.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { PlacesService } from './places.service';
 
@@ -112,6 +113,21 @@ export class PlacesController {
   @Post(':id/save')
   toggleSave(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     return this.placesService.toggleSave(id, req.user.userId);
+  }
+
+  @Get(':id/reviews')
+  getReviews(@Param('id') id: string) {
+    return this.placesService.getReviews(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/reviews')
+  createReview(
+    @Param('id') id: string,
+    @Body() payload: CreatePlaceReviewDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.placesService.upsertReview(id, req.user.userId, payload);
   }
 
   @Get(':id')

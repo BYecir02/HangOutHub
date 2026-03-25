@@ -2,10 +2,17 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +20,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl, storage } from '@/services/api';
+import { resolveStoredUserSession } from '@/services/user-session';
 
 interface RelatedEvent {
   id: string;
@@ -41,6 +49,19 @@ interface PlaceDetail {
   Event?: RelatedEvent[];
 }
 
+interface PlaceReview {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  createdAt?: string | null;
+  User?: {
+    id?: string;
+    username?: string | null;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+}
+
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
@@ -64,6 +85,18 @@ function formatEventDate(value: string, locale: string) {
   });
 }
 
+function formatReviewDate(value: string | null | undefined, locale: string) {
+  if (!value) {
+    return '';
+  }
+
+  return new Date(value).toLocaleDateString(locale, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export default function PlaceDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -73,6 +106,15 @@ export default function PlaceDetailScreen() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [canSave, setCanSave] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [reviews, setReviews] = useState<PlaceReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -136,6 +178,57 @@ export default function PlaceDetailScreen() {
     };
   }, [params.id]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const resolveUser = async () => {
+      const session = await resolveStoredUserSession();
+      if (!isMounted) {
+        return;
+      }
+
+      setCurrentUserId(session?.id ?? null);
+    };
+
+    void resolveUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchReviews = async () => {
+      if (!params.id) {
+        return;
+      }
+
+      setReviewsLoading(true);
+      try {
+        const response = await api.get<PlaceReview[]>(`/places/${params.id}/reviews`);
+        if (isMounted) {
+          setReviews(response.data || []);
+        }
+      } catch {
+        if (isMounted) {
+          setReviews([]);
+        }
+      } finally {
+        if (isMounted) {
+          setReviewsLoading(false);
+        }
+      }
+    };
+
+    void fetchReviews();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.id]);
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
@@ -165,14 +258,20 @@ export default function PlaceDetailScreen() {
     place.images?.length > 0
       ? place.images.map((image) => getImageUrl(image) || PLACE_PLACEHOLDER)
       : [heroImage];
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const myReview = currentUserId
+    ? reviews.find((review) => review.User?.id === currentUserId)
+    : undefined;
 
-  const handleCreateOuting = () => {
+  const handleOpenCreateModal = () => {
     router.push({
-      pathname: '/outing',
+      pathname: '/create-modal',
       params: {
-        title: t('placeDetailOutingTitle', { name: place.name }),
         placeId: place.id,
+        placeName: place.name,
+        cityName: place.City?.name || '',
         sourceLabel: place.name,
+        outingTitle: t('placeDetailOutingTitle', { name: place.name }),
       },
     });
   };
@@ -201,11 +300,53 @@ export default function PlaceDetailScreen() {
     }
   };
 
+  const handleSubmitReview = async () => {
+    if (!place) {
+      return;
+    }
+
+    const token = await storage.getItem('userToken');
+    if (!token) {
+      Alert.alert(t('placeDetailReviewLoginTitle'), t('placeDetailReviewLoginMessage'));
+      return;
+    }
+
+    if (reviewRating < 1) {
+      Alert.alert(t('commonErrorTitle'), t('placeDetailReviewRatingRequired'));
+      return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      await api.post(`/places/${place.id}/reviews`, {
+        rating: reviewRating,
+        comment: reviewComment.trim() || undefined,
+      });
+
+      const [updatedPlace, updatedReviews] = await Promise.all([
+        api.get<PlaceDetail>(`/places/${place.id}`),
+        api.get<PlaceReview[]>(`/places/${place.id}/reviews`),
+      ]);
+
+      setPlace(updatedPlace.data);
+      setReviews(updatedReviews.data || []);
+      setShowReviewModal(false);
+      setReviewRating(0);
+      setReviewComment('');
+      Alert.alert(t('placeDetailReviewSuccessTitle'), t('placeDetailReviewSuccessMessage'));
+    } catch {
+      Alert.alert(t('commonErrorTitle'), t('placeDetailReviewFailed'));
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-black"
-      showsVerticalScrollIndicator={false}
-    >
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+      >
       <View className="relative">
         <Image source={{ uri: heroImage }} className="h-80 w-full" resizeMode="cover" />
         <View className="absolute inset-x-0 top-0 flex-row items-center justify-between px-5 pt-14">
@@ -257,19 +398,11 @@ export default function PlaceDetailScreen() {
             {t('placeDetailActionDescription')}
           </Text>
 
-          <View className="mt-4 flex-row gap-3">
-            <TouchableOpacity
-              onPress={handleCreateOuting}
-              className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-4"
-            >
-              <Text className="text-sm font-semibold text-white">
-                {t('profileOrganizeOutingCta')}
-              </Text>
-            </TouchableOpacity>
+          <View className="mt-4 flex-row items-center gap-3">
             <TouchableOpacity
               onPress={handleToggleSave}
               disabled={saveLoading}
-              className={`flex-1 items-center rounded-2xl border px-4 py-4 ${
+              className={`h-12 w-12 items-center justify-center rounded-2xl border ${
                 isSaved
                   ? 'border-[#2ecc71] bg-green-50 dark:bg-green-900/20'
                   : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
@@ -278,16 +411,21 @@ export default function PlaceDetailScreen() {
               {saveLoading ? (
                 <ActivityIndicator color={isSaved ? '#2ecc71' : '#4c669f'} />
               ) : (
-                <Text
-                  className={`text-sm font-semibold ${
-                    isSaved
-                      ? 'text-[#2ecc71]'
-                      : 'text-gray-700 dark:text-gray-200'
-                  }`}
-                >
-                  {isSaved ? t('placeDetailSaveActive') : t('placeDetailSaveIdle')}
-                </Text>
+                <Ionicons
+                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={22}
+                  color={isSaved ? '#2ecc71' : '#4c669f'}
+                />
               )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleOpenCreateModal}
+              className="flex-1 flex-row items-center justify-center rounded-2xl bg-[#4c669f] px-4 py-4"
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text className="ml-2 text-sm font-semibold text-white">
+                {t('placeDetailCreateCta')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -339,17 +477,26 @@ export default function PlaceDetailScreen() {
             contentContainerStyle={{ paddingTop: 16, paddingBottom: 8 }}
           >
             {gallery.map((image, index) => (
-              <Image
+              <TouchableOpacity
                 key={`${place.id}-gallery-${index}`}
-                source={{ uri: image }}
-                className="mr-3 h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
-              />
+                onPress={() => {
+                  setGalleryIndex(index);
+                  setGalleryOpen(true);
+                }}
+                className="mr-3"
+                activeOpacity={0.9}
+              >
+                <Image
+                  source={{ uri: image }}
+                  className="h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
-        <View className="mt-6 pb-24">
+        <View className="mt-6">
           <Text className="text-lg font-bold text-gray-900 dark:text-white">
             {t('placeDetailRelatedEvents')}
           </Text>
@@ -392,7 +539,196 @@ export default function PlaceDetailScreen() {
             </Text>
           )}
         </View>
+
+        <View className="mt-6 pb-24">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-gray-900 dark:text-white">
+              {t('placeDetailReviewsTitle')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (myReview) {
+                  setReviewRating(myReview.rating || 0);
+                  setReviewComment(myReview.comment ?? '');
+                } else {
+                  setReviewRating(0);
+                  setReviewComment('');
+                }
+                setShowReviewModal(true);
+              }}
+              className="rounded-full bg-[#2ecc71] px-4 py-2"
+            >
+              <Text className="text-xs font-semibold text-white">
+                {myReview ? t('placeDetailEditReview') : t('placeDetailAddReview')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {reviewsLoading ? (
+            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              {t('placeDetailReviewsLoading')}
+            </Text>
+          ) : reviews.length > 0 ? (
+            <View className="mt-4 gap-3">
+              {reviews.map((review) => (
+                <View
+                  key={review.id}
+                  className="rounded-3xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+                >
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {review.User?.displayName ||
+                        review.User?.username ||
+                        t('placeDetailReviewAnonymous')}
+                    </Text>
+                    <Text className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatReviewDate(review.createdAt, locale)}
+                    </Text>
+                  </View>
+                  <View className="mt-2 flex-row items-center">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <Ionicons
+                        key={`${review.id}-star-${index}`}
+                        name={index < (review.rating || 0) ? 'star' : 'star-outline'}
+                        size={14}
+                        color={index < (review.rating || 0) ? '#f59e0b' : '#9ca3af'}
+                        style={{ marginRight: 2 }}
+                      />
+                    ))}
+                  </View>
+                  {review.comment ? (
+                    <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                      {review.comment}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              {t('placeDetailReviewsEmpty')}
+            </Text>
+          )}
+        </View>
       </View>
     </ScrollView>
+
+    <Modal
+      visible={galleryOpen}
+      transparent={false}
+      animationType="fade"
+      onRequestClose={() => setGalleryOpen(false)}
+    >
+      <View className="flex-1 bg-black">
+        <TouchableOpacity
+          onPress={() => setGalleryOpen(false)}
+          className="absolute right-5 top-12 z-10 rounded-full bg-black/60 p-3"
+        >
+          <Ionicons name="close" size={22} color="#fff" />
+        </TouchableOpacity>
+
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: screenWidth * galleryIndex, y: 0 }}
+        >
+          {gallery.map((image, index) => (
+            <View
+              key={`${place.id}-preview-${index}`}
+              style={{ width: screenWidth, height: screenHeight }}
+              className="items-center justify-center"
+            >
+              <Image
+                source={{ uri: image }}
+                style={{ width: screenWidth, height: screenHeight }}
+                resizeMode="contain"
+              />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
+
+    <Modal
+      visible={showReviewModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowReviewModal(false)}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1"
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View className="flex-1 items-center justify-center bg-black/60 px-6">
+            <View className="w-full max-w-lg rounded-3xl bg-white p-6 dark:bg-gray-900">
+              <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                {t('placeDetailReviewModalTitle')}
+              </Text>
+              <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {t('placeDetailReviewModalSubtitle')}
+              </Text>
+
+              <View className="mt-4 flex-row items-center justify-center">
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const value = index + 1;
+                  return (
+                    <TouchableOpacity
+                      key={`rating-${value}`}
+                      onPress={() => setReviewRating(value)}
+                      className="mx-1"
+                    >
+                      <Ionicons
+                        name={value <= reviewRating ? 'star' : 'star-outline'}
+                        size={28}
+                        color={value <= reviewRating ? '#f59e0b' : '#9ca3af'}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TextInput
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                placeholder={t('placeDetailReviewPlaceholder')}
+                placeholderTextColor="#9ca3af"
+                className="mt-4 min-h-[90px] rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                multiline
+                textAlignVertical="top"
+              />
+
+              <View className="mt-5 flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => setShowReviewModal(false)}
+                  className="flex-1 items-center rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700"
+                >
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    {t('genericCancel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSubmitReview}
+                  disabled={reviewSubmitting}
+                  className="flex-1 items-center rounded-2xl bg-[#2ecc71] px-4 py-3"
+                >
+                  {reviewSubmitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text className="text-sm font-semibold text-white">
+                      {myReview
+                        ? t('placeDetailReviewUpdate')
+                        : t('placeDetailReviewSubmit')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  </View>
   );
 }

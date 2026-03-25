@@ -299,6 +299,7 @@ model Post {
   images     String[]  @default([])
   visibility String?   @default("public") @db.VarChar(20)
   postType   String?   @default("post") @db.VarChar(20)
+  visibilityUserIds String[] @default([])
   placeId    String?   @db.Uuid
   eventId    String?   @db.Uuid
   placeName  String?   @db.VarChar(120)
@@ -311,6 +312,8 @@ model Post {
   Event      Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments   PostComment[]
   likes      PostLike[]
+
+  @@index([visibilityUserIds], type: Gin)
 }
 
 model Report {

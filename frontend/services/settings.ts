@@ -1,6 +1,6 @@
 import api from './api';
 
-export type PostVisibility = 'public' | 'friends' | 'private';
+export type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 export type OutingInviteScope = 'everyone' | 'connections' | 'nobody';
 export type AppTheme = 'light' | 'dark' | 'system';
 export type AppLanguage = 'fr' | 'en';

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -28,12 +28,51 @@ type ActionItem = {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   path: string;
+  params?: Record<string, string>;
+};
+
+type CreateContext = {
+  placeId?: string;
+  placeName?: string;
+  cityName?: string;
+  sourceLabel?: string;
+  outingTitle?: string;
+  eventId?: string;
+  eventTitle?: string;
 };
 
 function getActionsForUser(
   user: StoredUserSession | null,
   t: (key: TranslationKey) => string,
+  context?: CreateContext,
 ): ActionItem[] {
+  const postParams: Record<string, string> = {};
+  const outingParams: Record<string, string> = {};
+
+  if (context?.placeId) {
+    postParams.placeId = context.placeId;
+    outingParams.placeId = context.placeId;
+  }
+  if (context?.placeName) {
+    postParams.placeName = context.placeName;
+  }
+  if (context?.cityName) {
+    postParams.cityName = context.cityName;
+  }
+  if (context?.eventId) {
+    postParams.eventId = context.eventId;
+    outingParams.eventId = context.eventId;
+  }
+  if (context?.eventTitle) {
+    postParams.eventTitle = context.eventTitle;
+  }
+  if (context?.sourceLabel) {
+    outingParams.sourceLabel = context.sourceLabel;
+  }
+  if (context?.outingTitle) {
+    outingParams.title = context.outingTitle;
+  }
+
   const role = user?.role || 'USER';
 
   if (role === 'ORGANIZER') {
@@ -51,6 +90,7 @@ function getActionsForUser(
         icon: 'create-outline',
         color: '#f39c12',
         path: '/post',
+        params: Object.keys(postParams).length ? postParams : undefined,
       },
     ];
   }
@@ -65,15 +105,16 @@ function getActionsForUser(
           color: '#2ecc71',
           path: '/organizer/create-place',
         },
-        {
-          label: t('createActionPostLabel'),
-          description: t('createActionPostQuickDesc'),
-          icon: 'create-outline',
-          color: '#f39c12',
-          path: '/post',
-        },
-      ];
-    }
+      {
+        label: t('createActionPostLabel'),
+        description: t('createActionPostQuickDesc'),
+        icon: 'create-outline',
+        color: '#f39c12',
+        path: '/post',
+        params: Object.keys(postParams).length ? postParams : undefined,
+      },
+    ];
+  }
 
     return [
       {
@@ -96,6 +137,7 @@ function getActionsForUser(
         icon: 'create-outline',
         color: '#f39c12',
         path: '/post',
+        params: Object.keys(postParams).length ? postParams : undefined,
       },
     ];
   }
@@ -107,6 +149,7 @@ function getActionsForUser(
       icon: 'people-outline',
       color: '#4c669f',
       path: '/outing',
+      params: Object.keys(outingParams).length ? outingParams : undefined,
     },
     {
       label: t('createActionPostLabel'),
@@ -114,6 +157,7 @@ function getActionsForUser(
       icon: 'create-outline',
       color: '#f39c12',
       path: '/post',
+      params: Object.keys(postParams).length ? postParams : undefined,
     },
   ];
 }
@@ -121,6 +165,15 @@ function getActionsForUser(
 export default function CreateModalScreen() {
   const router = useRouter();
   const { t } = useI18n();
+  const params = useLocalSearchParams<{
+    placeId?: string;
+    placeName?: string;
+    cityName?: string;
+    sourceLabel?: string;
+    outingTitle?: string;
+    eventId?: string;
+    eventTitle?: string;
+  }>();
   const translateY = useSharedValue(0);
   const [currentUser, setCurrentUser] = useState<StoredUserSession | null>(null);
 
@@ -151,7 +204,15 @@ export default function CreateModalScreen() {
     }, []),
   );
 
-  const actions = getActionsForUser(currentUser, t);
+  const actions = getActionsForUser(currentUser, t, {
+    placeId: typeof params.placeId === 'string' ? params.placeId : undefined,
+    placeName: typeof params.placeName === 'string' ? params.placeName : undefined,
+    cityName: typeof params.cityName === 'string' ? params.cityName : undefined,
+    sourceLabel: typeof params.sourceLabel === 'string' ? params.sourceLabel : undefined,
+    outingTitle: typeof params.outingTitle === 'string' ? params.outingTitle : undefined,
+    eventId: typeof params.eventId === 'string' ? params.eventId : undefined,
+    eventTitle: typeof params.eventTitle === 'string' ? params.eventTitle : undefined,
+  });
 
   const handleClose = () => router.back();
 
@@ -169,10 +230,13 @@ export default function CreateModalScreen() {
       }
     });
 
-  const navigateTo = (path: string) => {
+  const navigateTo = (path: string, pathParams?: Record<string, string>) => {
     translateY.value = withTiming(1000, { duration: 200 }, (finished) => {
       if (finished) {
-        runOnJS(router.replace)(path as never);
+        runOnJS(router.replace)({
+          pathname: path as never,
+          params: pathParams,
+        });
       }
     });
   };
@@ -217,7 +281,7 @@ export default function CreateModalScreen() {
             {actions.map((action) => (
               <TouchableOpacity
                 key={action.label}
-                onPress={() => navigateTo(action.path)}
+                onPress={() => navigateTo(action.path, action.params)}
                 className="mb-4 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
               >
                 <View

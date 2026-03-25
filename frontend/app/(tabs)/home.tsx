@@ -18,12 +18,14 @@ import SuggestionCard from '@/components/ui/SuggestionCard';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
+import { getFriendshipOverview } from '@/services/friendships';
 import {
   getStoredLocation,
   setStoredLocation,
   type StoredLocation,
 } from '@/services/location-preferences';
 import { Category } from '@/types';
+import type { OutingInvitation } from '@/types/social';
 
 interface HomeEvent {
   id: string;
@@ -126,10 +128,29 @@ export default function HomeScreen() {
     }
 
     try {
-      const response = await api.get<NotificationCountResponse>(
-        '/notifications/unread-count',
-      );
-      setNotificationCount(Number(response.data.unreadCount || 0));
+      const [unreadResult, friendshipsResult, invitationsResult] =
+        await Promise.allSettled([
+          api.get<NotificationCountResponse>('/notifications/unread-count'),
+          getFriendshipOverview(),
+          api.get<OutingInvitation[]>('/outings/invitations'),
+        ]);
+
+      const unreadCount =
+        unreadResult.status === 'fulfilled'
+          ? Number(unreadResult.value.data.unreadCount || 0)
+          : 0;
+      const incomingRequests =
+        friendshipsResult.status === 'fulfilled'
+          ? friendshipsResult.value.counts.incomingRequests || 0
+          : 0;
+      const outingInvites =
+        invitationsResult.status === 'fulfilled'
+          ? invitationsResult.value.data?.length || 0
+          : 0;
+
+      const computedCount = Math.max(unreadCount, incomingRequests + outingInvites);
+
+      setNotificationCount(computedCount);
     } catch (error) {
       if (!isUnauthorized(error)) {
         console.error('Erreur chargement notifications:', error);

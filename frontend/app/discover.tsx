@@ -374,14 +374,15 @@ export default function DiscoverScreen() {
           return (
             <TouchableOpacity
               onPress={() => setActiveFilter(item)}
-              className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
-              style={active ? { backgroundColor: '#f39c12' } : undefined}
+              className={`mr-3 rounded-full border px-4 py-2.5 ${
+                active
+                  ? 'border-[#f39c12] bg-[#f39c12]'
+                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
+              }`}
             >
               <Text
-                className={`text-sm font-semibold ${
-                  active
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-200'
+                className={`text-xs font-semibold ${
+                  active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
                 }`}
               >
                 {filterLabels[item]}

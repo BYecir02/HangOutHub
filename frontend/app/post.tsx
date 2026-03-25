@@ -19,9 +19,11 @@ import * as ImagePicker from 'expo-image-picker';
 import api, { getImageUrl } from '../services/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import { getFriendshipOverview } from '@/services/friendships';
+import type { FriendshipItem } from '@/types/social';
 import { getMySettings } from '@/services/settings';
 
-type PostVisibility = 'public' | 'friends' | 'private';
+type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 type PostType = 'post' | 'plan';
 
 const MAX_IMAGES = 5;
@@ -63,12 +65,14 @@ const VISIBILITY_OPTIONS: {
   labelKey:
     | 'postVisibilityPublicLabel'
     | 'postVisibilityFriendsLabel'
-    | 'postVisibilityPrivateLabel';
+    | 'postVisibilityPrivateLabel'
+    | 'postVisibilityCustomLabel';
   icon: keyof typeof Ionicons.glyphMap;
   descriptionKey:
     | 'postVisibilityPublicDescription'
     | 'postVisibilityFriendsDescription'
-    | 'postVisibilityPrivateDescription';
+    | 'postVisibilityPrivateDescription'
+    | 'postVisibilityCustomDescription';
 }[] = [
   {
     id: 'public',
@@ -81,6 +85,12 @@ const VISIBILITY_OPTIONS: {
     labelKey: 'postVisibilityFriendsLabel',
     icon: 'people-outline',
     descriptionKey: 'postVisibilityFriendsDescription',
+  },
+  {
+    id: 'custom',
+    labelKey: 'postVisibilityCustomLabel',
+    icon: 'people-circle-outline',
+    descriptionKey: 'postVisibilityCustomDescription',
   },
   {
     id: 'private',
@@ -104,6 +114,7 @@ export default function CreatePostScreen() {
     cityName?: string;
     ambiance?: string;
     images?: string;
+    visibilityUserIds?: string;
   }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -124,14 +135,26 @@ export default function CreatePostScreen() {
       return [];
     }
   };
+  const parseIdArrayParam = (value?: string | string[]) => {
+    if (!value) {
+      return [];
+    }
+    const rawValue = Array.isArray(value) ? value[0] : value;
+    try {
+      const parsed = JSON.parse(String(rawValue));
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  };
 
   const [content, setContent] = useState(params.content ? String(params.content) : '');
   const [images, setImages] = useState<string[]>(() => parseImagesParam(params.images));
   const [visibility, setVisibility] = useState<PostVisibility>(
-    params.visibility || 'public',
-  );
-  const [postType, setPostType] = useState<PostType>(
-    params.postType === 'plan' ? 'plan' : 'post',
+    params.visibility ||
+      (params.postType === 'plan' ? 'friends' : 'public'),
   );
   const [placeId, setPlaceId] = useState(
     params.placeId ? String(params.placeId) : '',
@@ -151,6 +174,13 @@ export default function CreatePostScreen() {
   const [ambiance, setAmbiance] = useState(
     params.ambiance ? String(params.ambiance) : '',
   );
+  const [selectedVisibilityUserIds, setSelectedVisibilityUserIds] = useState<string[]>(
+    () => parseIdArrayParam(params.visibilityUserIds),
+  );
+  const [showCustomAudienceModal, setShowCustomAudienceModal] = useState(false);
+  const [audienceSearch, setAudienceSearch] = useState('');
+  const [audienceLoading, setAudienceLoading] = useState(false);
+  const [audienceConnections, setAudienceConnections] = useState<FriendshipItem[]>([]);
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -204,6 +234,39 @@ export default function CreatePostScreen() {
       isMounted = false;
     };
   }, [isEditing, params.visibility]);
+
+  useEffect(() => {
+    if (!showCustomAudienceModal) {
+      return;
+    }
+
+    let isMounted = true;
+    setAudienceLoading(true);
+
+    const loadConnections = async () => {
+      try {
+        const data = await getFriendshipOverview();
+        if (isMounted) {
+          setAudienceConnections(data.connections || []);
+        }
+      } catch {
+        if (isMounted) {
+          setAudienceConnections([]);
+        }
+      } finally {
+        if (isMounted) {
+          setAudienceLoading(false);
+        }
+      }
+    };
+
+    void loadConnections();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showCustomAudienceModal]);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -291,13 +354,46 @@ export default function CreatePostScreen() {
     };
   }, [showPlanModal]);
 
+  const derivedPostType: PostType = visibility === 'friends' ? 'plan' : 'post';
   const canSubmit = content.trim().length > 0 || images.length > 0;
   const visibilityLabel =
     visibilityOptions.find((option) => option.id === visibility)?.label ||
     t('postVisibilityPublicLabel');
+  const visibilityBadgeLabel =
+    visibility === 'custom' && selectedVisibilityUserIds.length > 0
+      ? t('postVisibilityCustomBadge', { count: selectedVisibilityUserIds.length })
+      : visibilityLabel;
   const visibilityIcon =
     visibilityOptions.find((option) => option.id === visibility)?.icon ||
     'globe-outline';
+  const visibilityTone = useMemo(() => {
+    if (visibility === 'friends') {
+      return {
+        column: 'bg-[#ff4757]/10 dark:bg-[#ff4757]/20',
+        label: 'text-[#ff4757]',
+        accent: '#ff4757',
+      };
+    }
+    if (visibility === 'custom') {
+      return {
+        column: 'bg-[#f39c12]/10 dark:bg-[#f39c12]/20',
+        label: 'text-[#f39c12]',
+        accent: '#f39c12',
+      };
+    }
+    if (visibility === 'private') {
+      return {
+        column: 'bg-gray-200/70 dark:bg-gray-800',
+        label: 'text-gray-600 dark:text-gray-300',
+        accent: '#9ca3af',
+      };
+    }
+    return {
+      column: 'bg-[#4c669f]/10 dark:bg-[#4c669f]/20',
+      label: 'text-[#4c669f]',
+      accent: '#4c669f',
+    };
+  }, [visibility]);
   const selectedCategoryLabel = ambiance;
   const trimmedContent = content.trim();
   const previewTitle = trimmedContent
@@ -323,6 +419,9 @@ export default function CreatePostScreen() {
   const previewLocation = [placeName.trim(), cityName.trim()]
     .filter(Boolean)
     .join(' · ');
+  const hasContextDetails = Boolean(
+    ambiance || placeName.trim() || cityName.trim() || eventTitle,
+  );
   const filteredPlaces = useMemo(() => {
     if (!placeSearch.trim()) {
       return places;
@@ -339,13 +438,32 @@ export default function CreatePostScreen() {
       eventItem.title.toLowerCase().includes(query),
     );
   }, [eventSearch, events]);
+  const filteredAudienceConnections = useMemo(() => {
+    if (!audienceSearch.trim()) {
+      return audienceConnections;
+    }
+    const query = audienceSearch.trim().toLowerCase();
+    return audienceConnections.filter((item) => {
+      const name =
+        item.user.displayName ||
+        item.user.username ||
+        '';
+      return name.toLowerCase().includes(query);
+    });
+  }, [audienceSearch, audienceConnections]);
+  const selectedAudienceUsers = useMemo(() => {
+    if (selectedVisibilityUserIds.length === 0) {
+      return [];
+    }
+    const selectedSet = new Set(selectedVisibilityUserIds);
+    return audienceConnections.filter((item) => selectedSet.has(item.user.id));
+  }, [audienceConnections, selectedVisibilityUserIds]);
 
   const headerTitle = useMemo(() => {
     return isEditing ? t('postHeaderEditTitle') : t('postHeaderCreateTitle');
   }, [isEditing, t]);
-  const isTypeStep = currentStep === 1;
-  const isEditStep = currentStep === 2;
-  const isPreviewStep = currentStep === 3;
+  const isEditStep = currentStep === 1;
+  const isPreviewStep = currentStep === 2;
 
   const isLocalImage = (uri: string) =>
     uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
@@ -360,6 +478,7 @@ export default function CreatePostScreen() {
     return getImageUrl(uri) || uri;
   };
 
+
   const pickImage = async (source: 'camera' | 'gallery') => {
     if (images.length >= MAX_IMAGES) {
       Alert.alert(
@@ -371,8 +490,8 @@ export default function CreatePostScreen() {
 
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: 'images',
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
+      allowsMultipleSelection: source === 'gallery',
       quality: 0.7,
     };
 
@@ -390,7 +509,12 @@ export default function CreatePostScreen() {
         if (currentImages.length >= MAX_IMAGES) {
           return currentImages;
         }
-        return [...currentImages, result.assets[0].uri];
+        const remaining = MAX_IMAGES - currentImages.length;
+        const pickedUris = result.assets
+          .map((asset) => asset.uri)
+          .filter(Boolean)
+          .slice(0, remaining);
+        return [...currentImages, ...pickedUris];
       });
     }
   };
@@ -400,31 +524,47 @@ export default function CreatePostScreen() {
       Alert.alert(t('postEmptyAlertTitle'), t('postEmptyAlertMessage'));
       return;
     }
+    if (visibility === 'custom' && selectedVisibilityUserIds.length === 0) {
+      Alert.alert(
+        t('postVisibilityCustomRequiredTitle'),
+        t('postVisibilityCustomRequiredMessage'),
+      );
+      setShowCustomAudienceModal(true);
+      return;
+    }
 
     setLoading(true);
 
     try {
+      const effectiveVisibility =
+        derivedPostType === 'plan' ? 'friends' : visibility;
       if (isEditing) {
         const formData = new FormData();
         formData.append('content', content);
-        formData.append('visibility', visibility);
-        formData.append('postType', postType);
-        if (postType === 'plan') {
-          if (placeId) {
-            formData.append('placeId', placeId);
-          }
-          if (eventId) {
-            formData.append('eventId', eventId);
-          }
-          if (placeName.trim()) {
-            formData.append('placeName', placeName.trim());
-          }
-          if (cityName.trim()) {
-            formData.append('cityName', cityName.trim());
-          }
-          if (ambiance) {
-            formData.append('ambiance', ambiance);
-          }
+        formData.append('visibility', effectiveVisibility);
+        formData.append('postType', derivedPostType);
+        if (visibility === 'custom') {
+          formData.append(
+            'visibilityUserIds',
+            JSON.stringify(selectedVisibilityUserIds),
+          );
+        } else if (selectedVisibilityUserIds.length > 0) {
+          formData.append('visibilityUserIds', JSON.stringify([]));
+        }
+        if (placeId) {
+          formData.append('placeId', placeId);
+        }
+        if (eventId) {
+          formData.append('eventId', eventId);
+        }
+        if (placeName.trim()) {
+          formData.append('placeName', placeName.trim());
+        }
+        if (cityName.trim()) {
+          formData.append('cityName', cityName.trim());
+        }
+        if (ambiance) {
+          formData.append('ambiance', ambiance);
         }
 
         const existingImages = images.filter((uri) => !isLocalImage(uri));
@@ -447,24 +587,28 @@ export default function CreatePostScreen() {
       } else {
         const formData = new FormData();
         formData.append('content', content);
-        formData.append('visibility', visibility);
-        formData.append('postType', postType);
-        if (postType === 'plan') {
-          if (placeId) {
-            formData.append('placeId', placeId);
-          }
-          if (eventId) {
-            formData.append('eventId', eventId);
-          }
-          if (placeName.trim()) {
-            formData.append('placeName', placeName.trim());
-          }
-          if (cityName.trim()) {
-            formData.append('cityName', cityName.trim());
-          }
-          if (ambiance) {
-            formData.append('ambiance', ambiance);
-          }
+        formData.append('visibility', effectiveVisibility);
+        formData.append('postType', derivedPostType);
+        if (visibility === 'custom') {
+          formData.append(
+            'visibilityUserIds',
+            JSON.stringify(selectedVisibilityUserIds),
+          );
+        }
+        if (placeId) {
+          formData.append('placeId', placeId);
+        }
+        if (eventId) {
+          formData.append('eventId', eventId);
+        }
+        if (placeName.trim()) {
+          formData.append('placeName', placeName.trim());
+        }
+        if (cityName.trim()) {
+          formData.append('cityName', cityName.trim());
+        }
+        if (ambiance) {
+          formData.append('ambiance', ambiance);
         }
 
         images.forEach((uri, index) => {
@@ -492,17 +636,12 @@ export default function CreatePostScreen() {
   };
 
   const handlePrimaryAction = () => {
-    if (isTypeStep) {
-      setCurrentStep(2);
-      return;
-    }
-
     if (isEditStep) {
       if (!canSubmit) {
         Alert.alert(t('postEmptyAlertTitle'), t('postEmptyAlertMessage'));
         return;
       }
-      setCurrentStep(3);
+      setCurrentStep(2);
       return;
     }
 
@@ -554,9 +693,7 @@ export default function CreatePostScreen() {
                   : 'text-white'
               }`}
             >
-              {isTypeStep
-                ? t('postContinue')
-                : isEditStep
+              {isEditStep
                 ? t('postNextStep')
                 : isEditing
                 ? t('postSubmitEdit')
@@ -575,51 +712,7 @@ export default function CreatePostScreen() {
           contentContainerStyle={{ paddingBottom: 20 }}
           keyboardShouldPersistTaps="handled"
         >
-          {isTypeStep ? (
-            <View className="mx-5 mt-6 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
-              <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {t('postTypeSectionTitle')}
-              </Text>
-              <View className="mt-4 flex-row gap-3">
-                <TouchableOpacity
-                  onPress={() => setPostType('plan')}
-                  className={`flex-1 items-center rounded-2xl px-3 py-4 ${
-                    postType === 'plan'
-                      ? 'bg-[#ff4757]'
-                      : 'bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-base font-semibold ${
-                      postType === 'plan'
-                        ? 'text-white'
-                        : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {t('postTypePlanLabel')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setPostType('post')}
-                  className={`flex-1 items-center rounded-2xl px-3 py-4 ${
-                    postType === 'post'
-                      ? 'bg-[#4c669f]'
-                      : 'bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-base font-semibold ${
-                      postType === 'post'
-                        ? 'text-white'
-                        : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {t('postTypePostLabel')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : isEditStep ? (
+          {isEditStep ? (
             <>
               <TextInput
                 className="min-h-[170px] px-5 pt-5 text-xl leading-7 text-gray-800 dark:text-white"
@@ -633,38 +726,69 @@ export default function CreatePostScreen() {
                 maxLength={MAX_CHARS}
               />
 
-              {postType === 'plan' ? (
-                <View className="mx-5 mt-3">
-              {(ambiance || placeName || cityName || eventTitle) ? (
-                <View className="flex-row flex-wrap gap-2">
-                      {eventTitle ? (
-                        <View className="rounded-full bg-[#ff4757]/10 px-3 py-1.5">
-                          <Text className="text-[11px] font-semibold text-[#ff4757]">
-                            {eventTitle}
+              <View className="mx-5 mt-3">
+                {hasContextDetails ? (
+                  <View className="flex-row flex-wrap gap-2">
+                    {eventTitle ? (
+                      <View className="rounded-full bg-[#ff4757]/10 px-3 py-1.5">
+                        <Text className="text-[11px] font-semibold text-[#ff4757]">
+                          {eventTitle}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {ambiance ? (
+                      <View className="rounded-full bg-[#4c669f]/10 px-3 py-1.5">
+                        <Text className="text-[11px] font-semibold text-[#4c669f]">
+                          {ambiance}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {(placeName.trim() || cityName.trim()) ? (
+                      <View className="flex-row items-center rounded-full bg-[#ff4757]/10 px-3 py-1.5">
+                        <Ionicons name="location-outline" size={14} color="#ff4757" />
+                        <Text className="ml-1 text-[11px] font-semibold text-[#ff4757]">
+                          {previewLocation}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text className="text-sm text-gray-500 dark:text-gray-400">
+                    {t('postPlanShortcutHint')}
+                  </Text>
+                )}
+              </View>
+
+              {visibility === 'custom' ? (
+                <View className="mx-5 mt-2">
+                  <Text className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('postVisibilityCustomSummary', {
+                      count: selectedVisibilityUserIds.length,
+                    })}
+                  </Text>
+                  {selectedAudienceUsers.length > 0 ? (
+                    <View className="mt-2 flex-row flex-wrap gap-2">
+                      {selectedAudienceUsers.slice(0, 3).map((item) => (
+                        <View
+                          key={item.user.id}
+                          className="rounded-full bg-[#f39c12]/10 px-2 py-1"
+                        >
+                          <Text className="text-[11px] font-semibold text-[#f39c12]">
+                            {item.user.displayName || item.user.username}
                           </Text>
                         </View>
-                      ) : null}
-                      {ambiance ? (
-                        <View className="rounded-full bg-[#4c669f]/10 px-3 py-1.5">
-                          <Text className="text-[11px] font-semibold text-[#4c669f]">
-                            {ambiance}
-                          </Text>
-                        </View>
-                      ) : null}
-                      {(placeName.trim() || cityName.trim()) ? (
-                        <View className="flex-row items-center rounded-full bg-[#ff4757]/10 px-3 py-1.5">
-                          <Ionicons name="location-outline" size={14} color="#ff4757" />
-                          <Text className="ml-1 text-[11px] font-semibold text-[#ff4757]">
-                            {previewLocation}
+                      ))}
+                      {selectedVisibilityUserIds.length > 3 ? (
+                        <View className="rounded-full bg-gray-100 px-2 py-1 dark:bg-gray-800">
+                          <Text className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                            {t('postVisibilityCustomMore', {
+                              count: selectedVisibilityUserIds.length - 3,
+                            })}
                           </Text>
                         </View>
                       ) : null}
                     </View>
-                  ) : (
-                    <Text className="text-sm text-gray-500 dark:text-gray-400">
-                      {t('postPlanShortcutHint')}
-                    </Text>
-                  )}
+                  ) : null}
                 </View>
               ) : null}
 
@@ -678,7 +802,8 @@ export default function CreatePostScreen() {
                     <View key={index} className="relative mr-3">
                       <Image
                         source={{ uri: resolveImageUri(uri) }}
-                        className="h-40 w-40 rounded-2xl bg-gray-100"
+                        className="w-48 rounded-2xl bg-gray-100"
+                        style={{ aspectRatio: 4 / 3 }}
                         resizeMode="cover"
                       />
                       <TouchableOpacity
@@ -709,12 +834,16 @@ export default function CreatePostScreen() {
               </Text>
               <View className="mt-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800">
                 <View className="flex-row">
-                  <View className="w-16 items-center justify-center bg-[#ff4757]/10 px-2 py-4 dark:bg-[#ff4757]/20">
-                    <Text className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ff4757]">
-                      {postType === 'plan'
-                        ? t('postTypePlanLabel')
-                        : t('postTypePostLabel')}
-                    </Text>
+                  <View
+                    className={`w-16 items-center justify-center px-2 py-4 ${visibilityTone.column}`}
+                  >
+                    {visibility !== 'public' ? (
+                      <Text
+                        className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${visibilityTone.label}`}
+                      >
+                        {visibilityLabel}
+                      </Text>
+                    ) : null}
                     <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
                       {previewDay}
                     </Text>
@@ -736,7 +865,7 @@ export default function CreatePostScreen() {
                         {previewBody}
                       </Text>
                     ) : null}
-                  {postType === 'plan' && previewLocation ? (
+                  {previewLocation ? (
                     <View className="mt-3 flex-row items-center">
                       <Ionicons name="location-outline" size={14} color="#ff4757" />
                       <Text className="ml-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -744,14 +873,14 @@ export default function CreatePostScreen() {
                       </Text>
                     </View>
                   ) : null}
-                  {postType === 'plan' && eventTitle ? (
+                  {eventTitle ? (
                     <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2 py-1">
                       <Text className="text-[10px] font-semibold text-[#ff4757]">
                         {eventTitle}
                       </Text>
                     </View>
                   ) : null}
-                  {postType === 'plan' && selectedCategoryLabel ? (
+                  {selectedCategoryLabel ? (
                     <View className="mt-2 self-start rounded-full bg-[#4c669f]/10 px-2 py-1">
                       <Text className="text-[10px] font-semibold text-[#4c669f]">
                         {selectedCategoryLabel}
@@ -780,16 +909,7 @@ export default function CreatePostScreen() {
               <Ionicons name="camera" size={24} color="#4c669f" />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => {
-                if (postType !== 'plan') {
-                  Alert.alert(
-                    t('postPlanRequiredTitle'),
-                    t('postPlanRequiredMessage'),
-                  );
-                  return;
-                }
-                setShowPlanModal(true);
-              }}
+              onPress={() => setShowPlanModal(true)}
               className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
             >
               <Ionicons name="location-outline" size={24} color="#4c669f" />
@@ -798,7 +918,7 @@ export default function CreatePostScreen() {
               onPress={() => setShowVisibilityModal(true)}
               className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
             >
-              <Ionicons name={visibilityIcon} size={22} color="#4c669f" />
+              <Ionicons name={visibilityIcon} size={22} color={visibilityTone.accent} />
             </TouchableOpacity>
 
             <View className="flex-1" />
@@ -807,9 +927,9 @@ export default function CreatePostScreen() {
               onPress={() => setShowVisibilityModal(true)}
               className="mr-3 flex-row items-center rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800"
             >
-              <Ionicons name={visibilityIcon} size={14} color="#4c669f" />
-              <Text className="ml-1 text-xs font-semibold text-[#4c669f]">
-                {visibilityLabel}
+              <Ionicons name={visibilityIcon} size={14} color={visibilityTone.accent} />
+              <Text className="ml-1 text-xs font-semibold" style={{ color: visibilityTone.accent }}>
+                {visibilityBadgeLabel}
               </Text>
             </TouchableOpacity>
 
@@ -827,7 +947,7 @@ export default function CreatePostScreen() {
           <View className="mb-5 border-t border-gray-100 bg-white px-5 py-3 dark:border-gray-800 dark:bg-black">
             <View className="flex-row items-center justify-between">
               <TouchableOpacity
-                onPress={() => setCurrentStep(2)}
+                onPress={() => setCurrentStep(1)}
                 className="flex-row items-center"
               >
                 <Ionicons name="arrow-back" size={18} color="#4c669f" />
@@ -839,9 +959,9 @@ export default function CreatePostScreen() {
                 onPress={() => setShowVisibilityModal(true)}
                 className="flex-row items-center rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800"
               >
-                <Ionicons name={visibilityIcon} size={14} color="#4c669f" />
-                <Text className="ml-1 text-xs font-semibold text-[#4c669f]">
-                  {visibilityLabel}
+                <Ionicons name={visibilityIcon} size={14} color={visibilityTone.accent} />
+                <Text className="ml-1 text-xs font-semibold" style={{ color: visibilityTone.accent }}>
+                  {visibilityBadgeLabel}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -877,6 +997,11 @@ export default function CreatePostScreen() {
                 key={option.id}
                 onPress={() => {
                   setVisibility(option.id);
+                  if (option.id === 'custom') {
+                    setShowVisibilityModal(false);
+                    setShowCustomAudienceModal(true);
+                    return;
+                  }
                   setShowVisibilityModal(false);
                 }}
                 className="flex-row items-center border-b border-gray-100 p-4 dark:border-gray-800"
@@ -902,7 +1027,12 @@ export default function CreatePostScreen() {
                         : 'text-gray-800 dark:text-white'
                     }`}
                   >
-                    {option.label}
+                    {option.id === 'custom' && selectedVisibilityUserIds.length > 0
+                      ? t('postVisibilityCustomOptionLabel', {
+                          label: option.label,
+                          count: selectedVisibilityUserIds.length,
+                        })
+                      : option.label}
                   </Text>
                   <Text className="mt-0.5 text-xs text-gray-500">
                     {option.description}
@@ -919,6 +1049,137 @@ export default function CreatePostScreen() {
             ))}
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showCustomAudienceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCustomAudienceModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowCustomAudienceModal(false)}
+            className="flex-1 justify-end bg-black/50"
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              className="rounded-t-3xl bg-white p-5 pb-6 dark:bg-gray-900"
+            >
+              <View className="mb-4 items-center">
+                <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+              </View>
+
+            <Text className="mb-1 text-center text-lg font-bold text-gray-800 dark:text-white">
+              {t('postVisibilityCustomTitle')}
+            </Text>
+            <Text className="mb-4 text-center text-xs text-gray-500 dark:text-gray-400">
+              {t('postVisibilityCustomSubtitle')}
+            </Text>
+
+            <TextInput
+              value={audienceSearch}
+              onChangeText={setAudienceSearch}
+              placeholder={t('postVisibilityCustomSearchPlaceholder')}
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              className="rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+            />
+
+            <ScrollView
+              style={{ maxHeight: 320 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 8 }}
+            >
+              {audienceLoading ? (
+                <View className="mt-4 items-center">
+                  <ActivityIndicator color="#f39c12" />
+                </View>
+              ) : filteredAudienceConnections.length > 0 ? (
+                <View className="mt-4 gap-2">
+                  {filteredAudienceConnections.map((connection) => {
+                    const isSelected = selectedVisibilityUserIds.includes(
+                      connection.user.id,
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={connection.user.id}
+                        onPress={() => {
+                          setSelectedVisibilityUserIds((current) =>
+                            current.includes(connection.user.id)
+                              ? current.filter((id) => id !== connection.user.id)
+                              : [...current, connection.user.id],
+                          );
+                        }}
+                        className={`flex-row items-center rounded-2xl border px-4 py-3 ${
+                          isSelected
+                            ? 'border-[#f39c12] bg-[#f39c12]/10'
+                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                        }`}
+                      >
+                        <Image
+                          source={{
+                            uri:
+                              getImageUrl(connection.user.avatarUrl) ||
+                              'https://i.pravatar.cc/150',
+                          }}
+                          className="h-10 w-10 rounded-full mr-3"
+                        />
+                        <View className="flex-1">
+                          <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {connection.user.displayName || connection.user.username}
+                          </Text>
+                          {connection.user.username ? (
+                            <Text className="text-xs text-gray-500 dark:text-gray-400">
+                              @{connection.user.username}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {isSelected ? (
+                          <Ionicons name="checkmark-circle" size={22} color="#f39c12" />
+                        ) : (
+                          <Ionicons
+                            name="ellipse-outline"
+                            size={22}
+                            color={isDark ? '#666' : '#ccc'}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  {t('postVisibilityCustomEmpty')}
+                </Text>
+              )}
+            </ScrollView>
+
+              <View className="mt-4 flex-row items-center justify-between">
+                <TouchableOpacity
+                  onPress={() => setSelectedVisibilityUserIds([])}
+                  className="rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-800"
+                >
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    {t('postVisibilityCustomClear')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowCustomAudienceModal(false)}
+                  className="rounded-full bg-[#f39c12] px-5 py-2"
+                >
+                  <Text className="text-sm font-semibold text-white">
+                    {t('postVisibilityCustomConfirm')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal

@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
+import { CreatePlaceReviewDto } from './dto/create-place-review.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 
 @Injectable()
@@ -183,5 +184,85 @@ export class PlacesService {
         },
       },
     });
+  }
+
+  async getReviews(placeId: string) {
+    return this.prisma.review.findMany({
+      where: { placeId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async upsertReview(placeId: string, userId: string, dto: CreatePlaceReviewDto) {
+    const place = await this.prisma.place.findUnique({ where: { id: placeId } });
+
+    if (!place) {
+      throw new NotFoundException('Lieu introuvable');
+    }
+
+    const rating = Math.max(1, Math.min(5, Number(dto.rating || 0)));
+    const comment = dto.comment?.trim() || null;
+
+    const existing = await this.prisma.review.findFirst({
+      where: { placeId, userId },
+    });
+
+    const review = existing
+      ? await this.prisma.review.update({
+          where: { id: existing.id },
+          data: { rating, comment },
+          include: {
+            User: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        })
+      : await this.prisma.review.create({
+          data: {
+            placeId,
+            userId,
+            rating,
+            comment,
+          },
+          include: {
+            User: {
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        });
+
+    const aggregate = await this.prisma.review.aggregate({
+      where: { placeId },
+      _avg: { rating: true },
+    });
+
+    await this.prisma.place.update({
+      where: { id: placeId },
+      data: {
+        avgRating: aggregate._avg.rating || 0,
+      },
+    });
+
+    return review;
   }
 }

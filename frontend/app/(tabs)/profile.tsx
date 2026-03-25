@@ -163,7 +163,7 @@ export default function ProfileScreen() {
   const handleEditPost = (post: {
     id: string;
     content?: string | null;
-    visibility?: 'public' | 'friends' | 'private';
+    visibility?: 'public' | 'friends' | 'private' | 'custom';
   }) => {
     router.push({
       pathname: '/post',

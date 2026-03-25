@@ -48,7 +48,7 @@ interface UserPost {
   content: string;
   images: string[];
   isLiked: boolean;
-  visibility?: 'public' | 'friends' | 'private';
+  visibility?: 'public' | 'friends' | 'private' | 'custom';
   createdAt?: string;
   User?: {
     username?: string;

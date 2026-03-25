@@ -10,30 +10,76 @@ import { StorageService } from '../storage/storage.service';
 import { CreateCommentDto } from '../comments/dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { PostsGateway } from './posts.gateway';
 
 @Injectable()
 export class PostsService {
   constructor(
     private prisma: PrismaService,
     private storageService: StorageService,
+    private postsGateway: PostsGateway,
   ) {}
 
   private serializePost(
     post: {
       id: string;
       userId: string;
-      likes: { userId: string }[];
-      _count: { likes: number; comments: number };
+      likes?: { userId: string }[];
+      _count?: { likes: number; comments: number };
       [key: string]: unknown;
     },
     currentUserId: string,
   ) {
+    const likes = post.likes ?? [];
+    const count = post._count ?? { likes: 0, comments: 0 };
     return {
       ...post,
-      isLiked: post.likes.length > 0,
+      isLiked: likes.length > 0,
       isOwner: post.userId === currentUserId,
       likes: undefined,
+      _count: count,
     };
+  }
+
+  private async getConnectionIds(userId: string) {
+    const acceptedConnections = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ requesterId: userId }, { receiverId: userId }],
+      },
+      select: {
+        requesterId: true,
+        receiverId: true,
+      },
+    });
+
+    return acceptedConnections.map((connection) =>
+      connection.requesterId === userId
+        ? connection.receiverId
+        : connection.requesterId,
+    );
+  }
+
+  private async getPostAudienceUserIds(post: {
+    userId: string;
+    visibility?: string | null;
+    visibilityUserIds?: string[] | null;
+  }) {
+    if (post.visibility === 'private') {
+      return [post.userId];
+    }
+
+    if (post.visibility === 'friends') {
+      const connections = await this.getConnectionIds(post.userId);
+      return [post.userId, ...connections];
+    }
+
+    if (post.visibility === 'custom') {
+      const customIds = post.visibilityUserIds || [];
+      return [post.userId, ...customIds];
+    }
+
+    return [];
   }
 
   async create(
@@ -54,42 +100,134 @@ export class PostsService {
       const trimmed = value?.trim();
       return trimmed ? trimmed : null;
     };
+    const parseVisibilityUsers = (value?: string) => {
+      if (!value) {
+        return [];
+      }
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed)
+          ? parsed.filter((item): item is string => typeof item === 'string')
+          : [];
+      } catch {
+        return [];
+      }
+    };
+    const computedPostType =
+      createPostDto.postType ||
+      (createPostDto.visibility === 'friends' ? 'plan' : 'post');
+    const effectiveVisibility =
+      computedPostType === 'plan'
+        ? 'friends'
+        : createPostDto.visibility || 'public';
+    const visibilityUsers = parseVisibilityUsers(
+      createPostDto.visibilityUserIds,
+    );
+    const connectionIds =
+      effectiveVisibility === 'custom'
+        ? await this.getConnectionIds(userId)
+        : [];
+    const filteredVisibilityUsers =
+      effectiveVisibility === 'custom'
+        ? visibilityUsers.filter((id) => connectionIds.includes(id))
+        : [];
 
-    return this.prisma.post.create({
+    const created = await this.prisma.post.create({
       data: {
         userId,
         content: createPostDto.content,
-        visibility: createPostDto.visibility || 'public',
-        postType: createPostDto.postType || 'post',
-        placeId:
-          createPostDto.postType === 'plan'
-            ? normalizeId(createPostDto.placeId) || undefined
-            : undefined,
-        eventId:
-          createPostDto.postType === 'plan'
-            ? normalizeId(createPostDto.eventId) || undefined
-            : undefined,
-        placeName:
-          createPostDto.postType === 'plan'
-            ? normalizeText(createPostDto.placeName) || undefined
-            : undefined,
-        cityName:
-          createPostDto.postType === 'plan'
-            ? normalizeText(createPostDto.cityName) || undefined
-            : undefined,
-        ambiance:
-          createPostDto.postType === 'plan'
-            ? normalizeText(createPostDto.ambiance) || undefined
-            : undefined,
+        visibility: effectiveVisibility,
+        postType: computedPostType,
+        visibilityUserIds:
+          effectiveVisibility === 'custom' ? filteredVisibilityUsers : [],
+        placeId: normalizeId(createPostDto.placeId) || undefined,
+        eventId: normalizeId(createPostDto.eventId) || undefined,
+        placeName: normalizeText(createPostDto.placeName) || undefined,
+        cityName: normalizeText(createPostDto.cityName) || undefined,
+        ambiance: normalizeText(createPostDto.ambiance) || undefined,
         images: imageUrls,
       },
     });
+
+    const postForFeed = await this.prisma.post.findUnique({
+      where: { id: created.id },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            City: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            placeId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+                City: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    if (postForFeed) {
+      const audience =
+        postForFeed.visibility === 'public'
+          ? { type: 'public' as const }
+          : {
+              type: 'users' as const,
+              userIds: await this.getPostAudienceUserIds(postForFeed),
+            };
+
+      this.postsGateway.emitNewPost(postForFeed, audience);
+    }
+
+    return created;
   }
 
   async findFeed(currentUserId: string) {
+    const connectionIds = await this.getConnectionIds(currentUserId);
+    const orFilters: Prisma.PostWhereInput[] = [
+      { userId: currentUserId },
+      { visibility: 'public' },
+      { visibility: 'custom', visibilityUserIds: { has: currentUserId } },
+    ];
+    if (connectionIds.length > 0) {
+      orFilters.push({ visibility: 'friends', userId: { in: connectionIds } });
+    }
+
     const posts = await this.prisma.post.findMany({
       where: {
-        OR: [{ userId: currentUserId }, { visibility: 'public' }],
+        OR: orFilters,
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -148,10 +286,88 @@ export class PostsService {
   }
 
   async findAllByUser(userId: string, currentUserId: string) {
+    if (userId === currentUserId) {
+      const ownPosts = await this.prisma.post.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          User: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
+          Place: {
+            select: {
+              id: true,
+              name: true,
+              City: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          Event: {
+            select: {
+              id: true,
+              title: true,
+              startTime: true,
+              placeId: true,
+              Place: {
+                select: {
+                  id: true,
+                  name: true,
+                  City: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              likes: true,
+              comments: true,
+            },
+          },
+          likes: {
+            where: { userId: currentUserId },
+            select: { userId: true },
+          },
+        },
+      });
+
+      return ownPosts.map((post) => this.serializePost(post, currentUserId));
+    }
+
+    const friendship = await this.prisma.friendship.findFirst({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          { requesterId: userId, receiverId: currentUserId },
+          { receiverId: userId, requesterId: currentUserId },
+        ],
+      },
+      select: { id: true },
+    });
+    const isConnection = Boolean(friendship);
+    const orFilters: Prisma.PostWhereInput[] = [
+      { visibility: 'public' },
+      { visibility: 'custom', visibilityUserIds: { has: currentUserId } },
+    ];
+    if (isConnection) {
+      orFilters.push({ visibility: 'friends' });
+    }
+
     const posts = await this.prisma.post.findMany({
       where: {
         userId,
-        ...(userId !== currentUserId ? { visibility: 'public' } : {}),
+        OR: orFilters,
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -253,7 +469,20 @@ export class PostsService {
       const trimmed = value?.trim();
       return trimmed ? trimmed : null;
     };
-    const { existingImages, ...rest } = updatePostDto;
+    const parseVisibilityUsers = (value?: string) => {
+      if (!value) {
+        return [];
+      }
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed)
+          ? parsed.filter((item): item is string => typeof item === 'string')
+          : [];
+      } catch {
+        return [];
+      }
+    };
+    const { existingImages, visibilityUserIds, ...rest } = updatePostDto;
 
     let retainedImages: string[] = [];
     if (existingImages) {
@@ -289,17 +518,32 @@ export class PostsService {
     if (rest.ambiance !== undefined) {
       data.ambiance = normalizeText(rest.ambiance);
     }
-    if (rest.postType !== undefined) {
-      if (!rest.postType) {
-        data.postType = 'post';
+    if (rest.postType !== undefined && !rest.postType) {
+      data.postType = 'post';
+    }
+    if (rest.visibility) {
+      data.postType = rest.visibility === 'friends' ? 'plan' : 'post';
+    }
+    if (visibilityUserIds !== undefined) {
+      const nextVisibility = rest.visibility ?? post.visibility;
+      const parsed = parseVisibilityUsers(visibilityUserIds);
+      if (nextVisibility === 'custom') {
+        const connectionIds = await this.getConnectionIds(userId);
+        data.visibilityUserIds = parsed.filter((id) =>
+          connectionIds.includes(id),
+        );
+      } else {
+        data.visibilityUserIds = [];
       }
-      if (rest.postType === 'post') {
-        data.placeId = null;
-        data.eventId = null;
-        data.placeName = null;
-        data.cityName = null;
-        data.ambiance = null;
-      }
+    }
+
+    const isPlanPost =
+      (data.postType ?? rest.postType ?? post.postType) === 'plan';
+    if (isPlanPost) {
+      data.visibility = 'friends';
+    }
+    if (rest.visibility && rest.visibility !== 'custom') {
+      data.visibilityUserIds = [];
     }
 
     if (existingImages !== undefined || newImages.length > 0) {

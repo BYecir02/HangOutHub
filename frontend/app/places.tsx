@@ -233,14 +233,10 @@ export default function PlacesScreen() {
             <TouchableOpacity
               key={filter}
               onPress={() => setActiveFilter(filter)}
-              className="mr-3 rounded-full bg-white px-4 py-2.5 dark:bg-gray-900"
-              style={active ? { backgroundColor: '#2ecc71' } : undefined}
+              className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900"
+              style={active ? { backgroundColor: '#2ecc71', borderColor: '#2ecc71' } : undefined}
             >
-              <Text
-                className={`text-sm font-semibold ${
-                  active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                }`}
-              >
+              <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
                 {filterLabels[filter]}
               </Text>
             </TouchableOpacity>

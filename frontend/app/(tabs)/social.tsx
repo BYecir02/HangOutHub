@@ -1,12 +1,12 @@
 import React from 'react';
-import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SocialFeed from '../../components/social/SocialFeed';
 
 export default function SocialScreen() {
   return (
-    <View className="flex-1 bg-gray-50 pt-12 dark:bg-black">
+    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-black" edges={['top']}>
       <SocialFeed />
-    </View>
+    </SafeAreaView>
   );
 }
