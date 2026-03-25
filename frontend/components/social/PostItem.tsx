@@ -26,9 +26,24 @@ interface PostItemData {
   content?: string | null;
   images?: string[];
   postType?: 'post' | 'plan';
+  placeId?: string | null;
+  eventId?: string | null;
   placeName?: string | null;
   cityName?: string | null;
   ambiance?: string | null;
+  Event?: {
+    id: string;
+    title: string;
+    startTime: string;
+    placeId?: string | null;
+    Place?: {
+      id?: string;
+      name?: string | null;
+      City?: {
+        name?: string | null;
+      } | null;
+    } | null;
+  } | null;
   isLiked?: boolean;
   isOwner?: boolean;
   visibility?: 'public' | 'friends' | 'private';
@@ -88,21 +103,23 @@ export default function PostItem({
     : '';
   const bodyExcerpt =
     bodyText.length > 160 ? `${bodyText.slice(0, 157)}...` : bodyText;
-  const locationLabel = [item.placeName, item.cityName]
-    .map((value) => (value || '').trim())
-    .filter(Boolean)
-    .join(' · ');
-  const ambianceLabel = item.ambiance
-    ? t(
-        ({
-          chill: 'postAmbianceChill',
-          festif: 'postAmbianceFestif',
-          food: 'postAmbianceFood',
-          afterwork: 'postAmbianceAfterwork',
-          sport: 'postAmbianceSport',
-        } as const)[item.ambiance] || 'postAmbianceChill',
-      )
-    : '';
+  const locationLabel = (() => {
+    const primary = [item.placeName, item.cityName]
+      .map((value) => (value || '').trim())
+      .filter(Boolean)
+      .join(' · ');
+    if (primary) {
+      return primary;
+    }
+    if (item.Event?.Place?.name) {
+      return [item.Event.Place.name, item.Event.Place.City?.name]
+        .filter(Boolean)
+        .join(' · ');
+    }
+    return '';
+  })();
+  const categoryLabel = (item.ambiance || '').trim();
+  const eventLabel = item.Event?.title?.trim() || '';
 
   useEffect(() => {
     setIsLiked(Boolean(item.isLiked));
@@ -160,6 +177,32 @@ export default function PostItem({
 
   const handleCreateOuting = () => {
     const sourceTitle = firstLine.trim();
+    if (item.Event) {
+      router.push({
+        pathname: '/outing',
+        params: {
+          title: item.Event.title,
+          eventId: item.Event.id,
+          placeId: item.Event.Place?.id || item.Event.placeId || undefined,
+          scheduledDate: item.Event.startTime,
+          sourceLabel: item.Event.title,
+        },
+      });
+      return;
+    }
+
+    if (item.placeId) {
+      router.push({
+        pathname: '/outing',
+        params: {
+          title: sourceTitle || undefined,
+          placeId: item.placeId,
+          sourceLabel: sourceTitle || undefined,
+        },
+      });
+      return;
+    }
+
     router.push({
       pathname: '/outing',
       params: {
@@ -230,6 +273,14 @@ export default function PostItem({
             {titleText}
           </Text>
 
+          {eventLabel ? (
+            <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2.5 py-1">
+              <Text className="text-[10px] font-semibold text-[#ff4757]">
+                {eventLabel}
+              </Text>
+            </View>
+          ) : null}
+
           {locationLabel ? (
             <View className="mt-2 flex-row items-center">
               <Ionicons
@@ -243,7 +294,7 @@ export default function PostItem({
             </View>
           ) : null}
 
-          {ambianceLabel ? (
+          {categoryLabel ? (
             <View
               className={`mt-2 self-start rounded-full px-2.5 py-1 ${
                 isPlan ? 'bg-[#ff4757]/10' : 'bg-[#4c669f]/10'
@@ -254,7 +305,7 @@ export default function PostItem({
                   isPlan ? 'text-[#ff4757]' : 'text-[#4c669f]'
                 }`}
               >
-                {ambianceLabel}
+                {categoryLabel}
               </Text>
             </View>
           ) : null}
@@ -307,14 +358,16 @@ export default function PostItem({
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              onPress={handleCreateOuting}
-              className="rounded-full bg-[#4c669f] px-3 py-2"
-            >
-              <Text className="text-xs font-semibold text-white">
-                {t('profileOrganizeOutingCta')}
-              </Text>
-            </TouchableOpacity>
+            {isPlan && (item.placeId || item.eventId || item.Event) ? (
+              <TouchableOpacity
+                onPress={handleCreateOuting}
+                className="rounded-full bg-[#4c669f] px-3 py-2"
+              >
+                <Text className="text-xs font-semibold text-white">
+                  {t('profileOrganizeOutingCta')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
       </View>

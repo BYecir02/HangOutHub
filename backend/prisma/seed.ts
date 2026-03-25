@@ -799,11 +799,16 @@ async function main() {
     data: {
       userId: user.id,
       content:
-        'Je cherche un spot cool pour vendredi soir. Vous conseillez quoi entre rooftop et live band ?',
+        'Plan vendredi soir: afterwork rooftop avec vue sur la ville. Qui est chaud ?',
       images: [
         'https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=1200',
       ],
       visibility: 'public',
+      postType: 'plan',
+      placeId: placeOne.id,
+      placeName: 'Code District Rooftop',
+      cityName: 'Cotonou',
+      ambiance: 'Bar & Lounge',
     },
   });
 
@@ -811,11 +816,17 @@ async function main() {
     data: {
       userId: organizer.id,
       content:
-        'Le line-up de notre prochain afterwork est pret. Ambiance house, cocktails et dress code minimal chic.',
+        'Dimanche sunset + live band + tapas. Le spot parfait pour chiller.',
       images: [
         'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1200',
       ],
       visibility: 'public',
+      postType: 'plan',
+      eventId: eventTwo.id,
+      placeId: placeTwo.id,
+      placeName: 'Blue Garden Beach Club',
+      cityName: 'Abomey-Calavi',
+      ambiance: 'Plage',
     },
   });
 
@@ -828,6 +839,84 @@ async function main() {
         'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=1200',
       ],
       visibility: 'public',
+      postType: 'post',
+    },
+  });
+
+  const postFour = await prisma.post.create({
+    data: {
+      userId: user.id,
+      content: 'Foot a 5 ce soir vers 20h ? Je cherche une team motivee.',
+      visibility: 'public',
+      postType: 'plan',
+      placeId: placeOne.id,
+      placeName: 'Five Etoiles',
+      cityName: 'Cotonou',
+      ambiance: 'Sport',
+    },
+  });
+
+  const postFive = await prisma.post.create({
+    data: {
+      userId: organizer.id,
+      content: 'Soiree DJ set special Amapiano vendredi. On se cale ?',
+      visibility: 'public',
+      postType: 'plan',
+      eventId: eventOne.id,
+      placeId: placeOne.id,
+      placeName: placeOne.name,
+      cityName: 'Cotonou',
+      ambiance: 'Boite de nuit',
+    },
+  });
+
+  const postSix = await prisma.post.create({
+    data: {
+      userId: owner.id,
+      content: 'Brunch du dimanche + live band. Qui partant ?',
+      visibility: 'public',
+      postType: 'plan',
+      placeId: placeTwo.id,
+      placeName: placeTwo.name,
+      cityName: 'Abomey-Calavi',
+      ambiance: 'Restaurant',
+    },
+  });
+
+  const postSeven = await prisma.post.create({
+    data: {
+      userId: user.id,
+      content: 'Ce soir je veux juste sortir mais sans programme. Des idees ?',
+      visibility: 'public',
+      postType: 'plan',
+      ambiance: 'Festival',
+    },
+  });
+
+  const postEight = await prisma.post.create({
+    data: {
+      userId: organizer.id,
+      content:
+        'Nouveau line up annonce pour Cotonou Creative Night. On se retrouve la bas.',
+      visibility: 'public',
+      postType: 'plan',
+      eventId: eventThree.id,
+      placeName: 'Seme City',
+      cityName: 'Cotonou',
+      ambiance: 'Art & Culture',
+    },
+  });
+
+  const postNine = await prisma.post.create({
+    data: {
+      userId: owner.id,
+      content:
+        'Update: notre rooftop passe en mode sunset lounge tous les jeudis.',
+      images: [
+        'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200',
+      ],
+      visibility: 'public',
+      postType: 'post',
     },
   });
 
@@ -837,6 +926,13 @@ async function main() {
       { userId: owner.id, postId: postOne.id },
       { userId: user.id, postId: postTwo.id },
       { userId: user.id, postId: postThree.id },
+      { userId: organizer.id, postId: postFour.id },
+      { userId: owner.id, postId: postFive.id },
+      { userId: user.id, postId: postFive.id },
+      { userId: organizer.id, postId: postSix.id },
+      { userId: owner.id, postId: postSeven.id },
+      { userId: user.id, postId: postEight.id },
+      { userId: organizer.id, postId: postNine.id },
     ],
     skipDuplicates: true,
   });
@@ -859,6 +955,36 @@ async function main() {
         postId: postThree.id,
         content: 'Le nouvel espace est canon. Hate de faire une date chez vous.',
       },
+      {
+        userId: organizer.id,
+        postId: postFour.id,
+        content: 'Chaud pour un petit match. Tu joues ou ?',
+      },
+      {
+        userId: owner.id,
+        postId: postFive.id,
+        content: 'Le line up est chaud, je viens avec la team.',
+      },
+      {
+        userId: user.id,
+        postId: postSix.id,
+        content: 'Brunch + live band = parfait.',
+      },
+      {
+        userId: organizer.id,
+        postId: postSeven.id,
+        content: 'Si tu veux, on peut brainstormer un plan chill.',
+      },
+      {
+        userId: owner.id,
+        postId: postEight.id,
+        content: 'On se retrouve a l entree vers 19h30 ?',
+      },
+      {
+        userId: user.id,
+        postId: postNine.id,
+        content: 'Le jeudi soir devient mon nouveau rituel.',
+      },
     ],
   });
 
@@ -873,7 +999,9 @@ async function main() {
     `- 3 evenements (${eventOne.title}, ${eventTwo.title}, ${eventThree.title})`,
   );
   console.log(`- 2 sorties (${outingOne.title}, ${outingTwo.title})`);
-  console.log(`- 3 posts (${postOne.id}, ${postTwo.id}, ${postThree.id})`);
+  console.log(
+    `- 9 posts (${postOne.id}, ${postTwo.id}, ${postThree.id}, ${postFour.id}, ${postFive.id}, ${postSix.id}, ${postSeven.id}, ${postEight.id}, ${postNine.id})`,
+  );
 }
 
 main()

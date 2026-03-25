@@ -88,6 +88,7 @@ model Event {
   EventRevision EventRevision[]
   Promotion   Promotion[]
   TicketType  TicketType[]
+  Post        Post[]
 }
 
 model EventRevision {
@@ -252,6 +253,7 @@ model Place {
   SavedPlace   SavedPlace[]
   Story        Story[]
   Subscription Subscription[]
+  Post         Post[]
 }
 
 model PlaceClaim {
@@ -297,12 +299,16 @@ model Post {
   images     String[]  @default([])
   visibility String?   @default("public") @db.VarChar(20)
   postType   String?   @default("post") @db.VarChar(20)
+  placeId    String?   @db.Uuid
+  eventId    String?   @db.Uuid
   placeName  String?   @db.VarChar(120)
   cityName   String?   @db.VarChar(120)
   ambiance   String?   @db.VarChar(50)
   createdAt  DateTime? @default(now()) @db.Timestamp(6)
   updatedAt  DateTime? @updatedAt @db.Timestamp(6)
   User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Place      Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Event      Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments   PostComment[]
   likes      PostLike[]
 }

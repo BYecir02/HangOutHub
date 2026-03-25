@@ -234,6 +234,7 @@ export default function EventDetailScreen() {
       pathname: '/outing',
       params: {
         title: t('eventDetailOutingTitle', { title: event.title }),
+        eventId: event.id,
         placeId: event.Place?.id || undefined,
         scheduledDate: event.startTime,
         sourceLabel: event.title,

@@ -68,6 +68,7 @@ export default function CreateOutingScreen() {
     placeId?: string;
     scheduledDate?: string;
     sourceLabel?: string;
+    eventId?: string;
   }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -92,7 +93,12 @@ export default function CreateOutingScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+  const isEventFlow = Boolean(params.eventId);
+  const hasSourcePlace =
+    typeof params.placeId === 'string' && params.placeId.trim().length > 0;
+  const hasSourceEvent =
+    typeof params.eventId === 'string' && params.eventId.trim().length > 0;
+  const totalSteps = isEventFlow ? 2 : 3;
   const isDraftHydratedRef = useRef(false);
   const lastSavedDraftRef = useRef<string | null>(null);
   const OUTING_DRAFT_KEY = 'outing-draft-v1';
@@ -121,7 +127,11 @@ export default function CreateOutingScreen() {
               ? params.placeId
               : null;
 
-          setSelectedPlaceId(preselectedPlaceId || response.data[0]?.id || null);
+          if (isEventFlow) {
+            setSelectedPlaceId(preselectedPlaceId || null);
+          } else {
+            setSelectedPlaceId(preselectedPlaceId || response.data[0]?.id || null);
+          }
         }
       } catch {
         if (isMounted) {
@@ -140,7 +150,7 @@ export default function CreateOutingScreen() {
     return () => {
       isMounted = false;
     };
-  }, [params.placeId]);
+  }, [isEventFlow, params.placeId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -269,7 +279,7 @@ export default function CreateOutingScreen() {
         return false;
       }
 
-      if (scheduledDate.getTime() < Date.now()) {
+      if (!isEventFlow && scheduledDate.getTime() < Date.now()) {
         Alert.alert(t('commonErrorTitle'), t('outingCreateDateInvalid'));
         return false;
       }
@@ -291,6 +301,9 @@ export default function CreateOutingScreen() {
   };
 
   const handleSkipPlace = () => {
+    if (isEventFlow) {
+      return;
+    }
     setSelectedPlaceId(null);
     setCurrentStep(3);
   };
@@ -301,7 +314,7 @@ export default function CreateOutingScreen() {
       return;
     }
 
-    if (scheduledDate.getTime() < Date.now()) {
+    if (!isEventFlow && scheduledDate.getTime() < Date.now()) {
       Alert.alert(t('commonErrorTitle'), t('outingCreateDateInvalid'));
       return;
     }
@@ -329,6 +342,10 @@ export default function CreateOutingScreen() {
     }
   };
 
+  const selectedPlaceName =
+    places.find((place) => place.id === selectedPlaceId)?.name ||
+    (hasSourcePlace ? t('homeAddressToConfirm') : '');
+
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">
       <View className="flex-row items-center border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
@@ -348,11 +365,6 @@ export default function CreateOutingScreen() {
           <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-[#4c669f]">
             {t('outingCreateLabel')}
           </Text>
-          {typeof params.sourceLabel === 'string' && params.sourceLabel ? (
-            <Text className="mt-3 text-sm font-semibold text-[#4c669f]">
-              {t('outingCreateFromSource', { source: params.sourceLabel })}
-            </Text>
-          ) : null}
           <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
             {t('outingCreateHeroTitle')}
           </Text>
@@ -383,46 +395,76 @@ export default function CreateOutingScreen() {
                 onChangeText={setTitle}
               />
 
-              <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-                <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                  {t('outingCreateDateTimeLabel')}
-                </Text>
-
-                <View className="flex-row gap-3">
-                  <TouchableOpacity
-                    onPress={() => {
-                      setPickerMode('date');
-                      setShowPicker(true);
-                    }}
-                    className="flex-1 items-center rounded-xl bg-white p-3 dark:bg-gray-800"
-                  >
-                    <Text className="text-gray-800 dark:text-white">
-                      {scheduledDate.toLocaleDateString(locale)}
+              {isEventFlow ? (
+                <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
+                  <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    {t('outingCreateEventSummaryTitle')}
+                  </Text>
+                  <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                    {params.sourceLabel || title}
+                  </Text>
+                  <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    {t('outingCreateEventDateFixed')}
+                  </Text>
+                  <Text className="mt-1 text-base text-gray-800 dark:text-white">
+                    {scheduledDate.toLocaleDateString(locale)} ·{' '}
+                    {scheduledDate.toLocaleTimeString(locale, {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                  {selectedPlaceId ? (
+                    <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      {t('outingCreateEventPlaceLabel')}:{' '}
+                      {places.find((place) => place.id === selectedPlaceId)?.name ||
+                        t('homeAddressToConfirm')}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setPickerMode('time');
-                      setShowPicker(true);
-                    }}
-                    className="flex-1 items-center rounded-xl bg-white p-3 dark:bg-gray-800"
-                  >
-                    <Text className="text-gray-800 dark:text-white">
-                      {scheduledDate.toLocaleTimeString(locale, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                  </TouchableOpacity>
+                  ) : null}
                 </View>
-              </View>
+              ) : (
+                <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
+                  <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    {t('outingCreateDateTimeLabel')}
+                  </Text>
+
+                  <View className="flex-row gap-3">
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPickerMode('date');
+                        setShowPicker(true);
+                      }}
+                      className="flex-1 items-center rounded-xl bg-white p-3 dark:bg-gray-800"
+                    >
+                      <Text className="text-gray-800 dark:text-white">
+                        {scheduledDate.toLocaleDateString(locale)}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPickerMode('time');
+                        setShowPicker(true);
+                      }}
+                      className="flex-1 items-center rounded-xl bg-white p-3 dark:bg-gray-800"
+                    >
+                      <Text className="text-gray-800 dark:text-white">
+                        {scheduledDate.toLocaleTimeString(locale, {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </>
           ) : null}
 
-          {currentStep === 2 ? (
+          {currentStep === 2 && !isEventFlow ? (
             <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
               <Text className="mb-3 text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                {t('outingCreateSuggestedPlaceLabel')}
+                {selectedPlaceId
+                  ? t('outingCreateSelectedPlaceLabel')
+                  : t('outingCreateSuggestedPlaceLabel')}
               </Text>
 
               {placesLoading ? (
@@ -473,7 +515,7 @@ export default function CreateOutingScreen() {
             </View>
           ) : null}
 
-          {currentStep === 3 ? (
+          {currentStep === (isEventFlow ? 2 : 3) ? (
             <View className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
               <View className="mb-3 flex-row items-center justify-between">
                 <Text className="text-sm font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -574,7 +616,7 @@ export default function CreateOutingScreen() {
         </View>
 
         <View className="mb-10 mt-8">
-          {currentStep === 2 ? (
+          {currentStep === 2 && !isEventFlow ? (
             <TouchableOpacity onPress={handleSkipPlace} className="mb-3 self-end">
               <Text className="text-sm font-semibold text-[#4c669f]">
                 {t('outingCreateStepSkipPlace')}

@@ -26,21 +26,37 @@ type PostType = 'post' | 'plan';
 
 const MAX_IMAGES = 5;
 const MAX_CHARS = 500;
-const AMBIANCE_OPTIONS: {
+
+type CategoryOption = {
+  id: number;
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+};
+
+type PlaceOption = {
   id: string;
-  labelKey:
-    | 'postAmbianceChill'
-    | 'postAmbianceFestif'
-    | 'postAmbianceFood'
-    | 'postAmbianceAfterwork'
-    | 'postAmbianceSport';
-}[] = [
-  { id: 'chill', labelKey: 'postAmbianceChill' },
-  { id: 'festif', labelKey: 'postAmbianceFestif' },
-  { id: 'food', labelKey: 'postAmbianceFood' },
-  { id: 'afterwork', labelKey: 'postAmbianceAfterwork' },
-  { id: 'sport', labelKey: 'postAmbianceSport' },
-];
+  name: string;
+  address?: string | null;
+  City?: {
+    name?: string | null;
+  } | null;
+};
+
+type EventOption = {
+  id: string;
+  title: string;
+  startTime: string;
+  placeId?: string | null;
+  Place?: {
+    id?: string;
+    name?: string | null;
+    City?: {
+      name?: string | null;
+    } | null;
+  } | null;
+  address?: string | null;
+};
 
 const VISIBILITY_OPTIONS: {
   id: PostVisibility;
@@ -81,6 +97,9 @@ export default function CreatePostScreen() {
     content?: string;
     visibility?: PostVisibility;
     postType?: PostType;
+    placeId?: string;
+    eventId?: string;
+    eventTitle?: string;
     placeName?: string;
     cityName?: string;
     ambiance?: string;
@@ -114,6 +133,15 @@ export default function CreatePostScreen() {
   const [postType, setPostType] = useState<PostType>(
     params.postType === 'plan' ? 'plan' : 'post',
   );
+  const [placeId, setPlaceId] = useState(
+    params.placeId ? String(params.placeId) : '',
+  );
+  const [eventId, setEventId] = useState(
+    params.eventId ? String(params.eventId) : '',
+  );
+  const [eventTitle, setEventTitle] = useState(
+    params.eventTitle ? String(params.eventTitle) : '',
+  );
   const [placeName, setPlaceName] = useState(
     params.placeName ? String(params.placeName) : '',
   );
@@ -124,7 +152,22 @@ export default function CreatePostScreen() {
     params.ambiance ? String(params.ambiance) : '',
   );
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const [showPlanModal, setShowPlanModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [places, setPlaces] = useState<PlaceOption[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placeSearch, setPlaceSearch] = useState('');
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [events, setEvents] = useState<EventOption[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventSearch, setEventSearch] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [planTarget, setPlanTarget] = useState<'place' | 'event'>(
+    params.eventId ? 'event' : 'place',
+  );
 
   const visibilityOptions = useMemo(
     () =>
@@ -132,14 +175,6 @@ export default function CreatePostScreen() {
         ...option,
         label: t(option.labelKey),
         description: t(option.descriptionKey),
-      })),
-    [t],
-  );
-  const ambianceOptions = useMemo(
-    () =>
-      AMBIANCE_OPTIONS.map((option) => ({
-        ...option,
-        label: t(option.labelKey),
       })),
     [t],
   );
@@ -170,12 +205,100 @@ export default function CreatePostScreen() {
     };
   }, [isEditing, params.visibility]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCategories = async () => {
+      setCategoriesLoading(true);
+      try {
+        const response = await api.get<CategoryOption[]>('/categories');
+        if (isMounted) {
+          setCategories(response.data || []);
+        }
+      } catch {
+        if (isMounted) {
+          setCategories([]);
+        }
+      } finally {
+        if (isMounted) {
+          setCategoriesLoading(false);
+        }
+      }
+    };
+
+    void loadCategories();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showPlanModal) {
+      return;
+    }
+
+    if (placeId) {
+      setSelectedPlaceId(placeId);
+    }
+    if (eventId) {
+      setSelectedEventId(eventId);
+    }
+
+    let isMounted = true;
+
+    const loadPlaces = async () => {
+      setPlacesLoading(true);
+      try {
+        const response = await api.get<PlaceOption[]>('/places');
+        if (isMounted) {
+          setPlaces(response.data || []);
+        }
+      } catch {
+        if (isMounted) {
+          setPlaces([]);
+        }
+      } finally {
+        if (isMounted) {
+          setPlacesLoading(false);
+        }
+      }
+    };
+
+    const loadEvents = async () => {
+      setEventsLoading(true);
+      try {
+        const response = await api.get<EventOption[]>('/events');
+        if (isMounted) {
+          setEvents(response.data || []);
+        }
+      } catch {
+        if (isMounted) {
+          setEvents([]);
+        }
+      } finally {
+        if (isMounted) {
+          setEventsLoading(false);
+        }
+      }
+    };
+
+    void loadPlaces();
+    void loadEvents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showPlanModal]);
+
   const canSubmit = content.trim().length > 0 || images.length > 0;
   const visibilityLabel =
     visibilityOptions.find((option) => option.id === visibility)?.label ||
     t('postVisibilityPublicLabel');
-  const selectedAmbianceLabel =
-    ambianceOptions.find((option) => option.id === ambiance)?.label || '';
+  const visibilityIcon =
+    visibilityOptions.find((option) => option.id === visibility)?.icon ||
+    'globe-outline';
+  const selectedCategoryLabel = ambiance;
   const trimmedContent = content.trim();
   const previewTitle = trimmedContent
     ? trimmedContent.split('\n')[0].slice(0, 72)
@@ -200,10 +323,29 @@ export default function CreatePostScreen() {
   const previewLocation = [placeName.trim(), cityName.trim()]
     .filter(Boolean)
     .join(' · ');
+  const filteredPlaces = useMemo(() => {
+    if (!placeSearch.trim()) {
+      return places;
+    }
+    const query = placeSearch.trim().toLowerCase();
+    return places.filter((place) => place.name.toLowerCase().includes(query));
+  }, [placeSearch, places]);
+  const filteredEvents = useMemo(() => {
+    if (!eventSearch.trim()) {
+      return events;
+    }
+    const query = eventSearch.trim().toLowerCase();
+    return events.filter((eventItem) =>
+      eventItem.title.toLowerCase().includes(query),
+    );
+  }, [eventSearch, events]);
 
   const headerTitle = useMemo(() => {
     return isEditing ? t('postHeaderEditTitle') : t('postHeaderCreateTitle');
   }, [isEditing, t]);
+  const isTypeStep = currentStep === 1;
+  const isEditStep = currentStep === 2;
+  const isPreviewStep = currentStep === 3;
 
   const isLocalImage = (uri: string) =>
     uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
@@ -268,6 +410,12 @@ export default function CreatePostScreen() {
         formData.append('visibility', visibility);
         formData.append('postType', postType);
         if (postType === 'plan') {
+          if (placeId) {
+            formData.append('placeId', placeId);
+          }
+          if (eventId) {
+            formData.append('eventId', eventId);
+          }
           if (placeName.trim()) {
             formData.append('placeName', placeName.trim());
           }
@@ -302,6 +450,12 @@ export default function CreatePostScreen() {
         formData.append('visibility', visibility);
         formData.append('postType', postType);
         if (postType === 'plan') {
+          if (placeId) {
+            formData.append('placeId', placeId);
+          }
+          if (eventId) {
+            formData.append('eventId', eventId);
+          }
           if (placeName.trim()) {
             formData.append('placeName', placeName.trim());
           }
@@ -337,11 +491,42 @@ export default function CreatePostScreen() {
     }
   };
 
+  const handlePrimaryAction = () => {
+    if (isTypeStep) {
+      setCurrentStep(2);
+      return;
+    }
+
+    if (isEditStep) {
+      if (!canSubmit) {
+        Alert.alert(t('postEmptyAlertTitle'), t('postEmptyAlertMessage'));
+        return;
+      }
+      setCurrentStep(3);
+      return;
+    }
+
+    void handlePost();
+  };
+
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">
       <View className="flex-row items-center justify-between border-b border-gray-100 px-5 pb-2 dark:border-gray-800">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <Ionicons name="close" size={28} color={isDark ? '#fff' : '#333'} />
+        <TouchableOpacity
+          onPress={() => {
+            if (currentStep > 1) {
+              setCurrentStep((step) => Math.max(1, step - 1));
+              return;
+            }
+            router.back();
+          }}
+          className="p-2 -ml-2"
+        >
+          <Ionicons
+            name={currentStep > 1 ? 'arrow-back' : 'close'}
+            size={28}
+            color={isDark ? '#fff' : '#333'}
+          />
         </TouchableOpacity>
 
         <View className="items-center">
@@ -351,10 +536,12 @@ export default function CreatePostScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={handlePost}
-          disabled={!canSubmit || loading}
+          onPress={handlePrimaryAction}
+          disabled={(isEditStep && !canSubmit) || loading}
           className={`rounded-full px-5 py-2 ${
-            canSubmit ? 'bg-[#f39c12]' : 'bg-gray-200 dark:bg-gray-800'
+            isEditStep && !canSubmit
+              ? 'bg-gray-200 dark:bg-gray-800'
+              : 'bg-[#f39c12]'
           }`}
         >
           {loading ? (
@@ -362,10 +549,18 @@ export default function CreatePostScreen() {
           ) : (
             <Text
               className={`font-bold ${
-                canSubmit ? 'text-white' : 'text-gray-400 dark:text-gray-500'
+                isEditStep && !canSubmit
+                  ? 'text-gray-400 dark:text-gray-500'
+                  : 'text-white'
               }`}
             >
-              {isEditing ? t('postSubmitEdit') : t('postSubmitCreate')}
+              {isTypeStep
+                ? t('postContinue')
+                : isEditStep
+                ? t('postNextStep')
+                : isEditing
+                ? t('postSubmitEdit')
+                : t('postSubmitCreate')}
             </Text>
           )}
         </TouchableOpacity>
@@ -380,200 +575,167 @@ export default function CreatePostScreen() {
           contentContainerStyle={{ paddingBottom: 20 }}
           keyboardShouldPersistTaps="handled"
         >
-          <TextInput
-            className="min-h-[170px] px-5 pt-5 text-xl leading-7 text-gray-800 dark:text-white"
-            placeholder={t('postContentPlaceholder')}
-            placeholderTextColor={isDark ? '#666' : '#999'}
-            multiline
-            textAlignVertical="top"
-            autoFocus
-            value={content}
-            onChangeText={setContent}
-            maxLength={MAX_CHARS}
-          />
-
-          <View className="mx-5 mt-4 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
-            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-              {t('postTypeSectionTitle')}
-            </Text>
-            <View className="mt-3 flex-row gap-3">
-              <TouchableOpacity
-                onPress={() => setPostType('plan')}
-                className={`flex-1 items-center rounded-2xl px-3 py-3 ${
-                  postType === 'plan'
-                    ? 'bg-[#ff4757]'
-                    : 'bg-white dark:bg-gray-800'
-                }`}
-              >
-                <Text
-                  className={`text-sm font-semibold ${
-                    postType === 'plan'
-                      ? 'text-white'
-                      : 'text-gray-700 dark:text-gray-200'
-                  }`}
-                >
-                  {t('postTypePlanLabel')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setPostType('post')}
-                className={`flex-1 items-center rounded-2xl px-3 py-3 ${
-                  postType === 'post'
-                    ? 'bg-[#4c669f]'
-                    : 'bg-white dark:bg-gray-800'
-                }`}
-              >
-                <Text
-                  className={`text-sm font-semibold ${
-                    postType === 'post'
-                      ? 'text-white'
-                      : 'text-gray-700 dark:text-gray-200'
-                  }`}
-                >
-                  {t('postTypePostLabel')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {postType === 'plan' ? (
-            <View className="mx-5 mt-4 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
+          {isTypeStep ? (
+            <View className="mx-5 mt-6 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
               <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {t('postPlanSectionTitle')}
+                {t('postTypeSectionTitle')}
               </Text>
-              <TextInput
-                placeholder={t('postPlacePlaceholder')}
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
-                value={placeName}
-                onChangeText={setPlaceName}
-              />
-              <TextInput
-                placeholder={t('postCityPlaceholder')}
-                placeholderTextColor={isDark ? '#666' : '#999'}
-                className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
-                value={cityName}
-                onChangeText={setCityName}
-              />
-
-              <Text className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {t('postAmbianceLabel')}
-              </Text>
-              <View className="mt-3 flex-row flex-wrap gap-2">
-                {ambianceOptions.map((option) => {
-                  const isSelected = option.id === ambiance;
-                  return (
-                    <TouchableOpacity
-                      key={option.id}
-                      onPress={() =>
-                        setAmbiance((current) =>
-                          current === option.id ? '' : option.id,
-                        )
-                      }
-                      className={`rounded-full px-3 py-2 ${
-                        isSelected
-                          ? 'bg-[#ff4757]'
-                          : 'bg-gray-100 dark:bg-gray-800'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-semibold ${
-                          isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                        }`}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <View className="mt-4 flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => setPostType('plan')}
+                  className={`flex-1 items-center rounded-2xl px-3 py-4 ${
+                    postType === 'plan'
+                      ? 'bg-[#ff4757]'
+                      : 'bg-white dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-base font-semibold ${
+                      postType === 'plan'
+                        ? 'text-white'
+                        : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {t('postTypePlanLabel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setPostType('post')}
+                  className={`flex-1 items-center rounded-2xl px-3 py-4 ${
+                    postType === 'post'
+                      ? 'bg-[#4c669f]'
+                      : 'bg-white dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-base font-semibold ${
+                      postType === 'post'
+                        ? 'text-white'
+                        : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {t('postTypePostLabel')}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
-          ) : null}
+          ) : isEditStep ? (
+            <>
+              <TextInput
+                className="min-h-[170px] px-5 pt-5 text-xl leading-7 text-gray-800 dark:text-white"
+                placeholder={t('postContentPlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                multiline
+                textAlignVertical="top"
+                autoFocus
+                value={content}
+                onChangeText={setContent}
+                maxLength={MAX_CHARS}
+              />
 
-          {images.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="px-5"
-            >
-              {images.map((uri, index) => (
-                <View key={index} className="relative mr-3">
-                  <Image
-                    source={{ uri: resolveImageUri(uri) }}
-                    className="h-40 w-40 rounded-2xl bg-gray-100"
-                    resizeMode="cover"
-                  />
-                  <TouchableOpacity
-                    onPress={() =>
-                      setImages((currentImages) =>
-                        currentImages.filter((_, currentIndex) => currentIndex !== index),
-                      )
-                    }
-                    className="absolute right-2 top-2 rounded-full bg-black/50 p-1"
-                  >
-                    <Ionicons name="close" size={16} color="white" />
-                  </TouchableOpacity>
+              {postType === 'plan' ? (
+                <View className="mx-5 mt-3">
+              {(ambiance || placeName || cityName || eventTitle) ? (
+                <View className="flex-row flex-wrap gap-2">
+                      {eventTitle ? (
+                        <View className="rounded-full bg-[#ff4757]/10 px-3 py-1.5">
+                          <Text className="text-[11px] font-semibold text-[#ff4757]">
+                            {eventTitle}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {ambiance ? (
+                        <View className="rounded-full bg-[#4c669f]/10 px-3 py-1.5">
+                          <Text className="text-[11px] font-semibold text-[#4c669f]">
+                            {ambiance}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {(placeName.trim() || cityName.trim()) ? (
+                        <View className="flex-row items-center rounded-full bg-[#ff4757]/10 px-3 py-1.5">
+                          <Ionicons name="location-outline" size={14} color="#ff4757" />
+                          <Text className="ml-1 text-[11px] font-semibold text-[#ff4757]">
+                            {previewLocation}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <Text className="text-sm text-gray-500 dark:text-gray-400">
+                      {t('postPlanShortcutHint')}
+                    </Text>
+                  )}
                 </View>
-              ))}
-            </ScrollView>
-          ) : null}
+              ) : null}
 
-          <View className="mx-5 mt-5 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {t('postVisibilitySection')}
+              {images.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="px-5"
+                >
+                  {images.map((uri, index) => (
+                    <View key={index} className="relative mr-3">
+                      <Image
+                        source={{ uri: resolveImageUri(uri) }}
+                        className="h-40 w-40 rounded-2xl bg-gray-100"
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        onPress={() =>
+                          setImages((currentImages) =>
+                            currentImages.filter((_, currentIndex) => currentIndex !== index),
+                          )
+                        }
+                        className="absolute right-2 top-2 rounded-full bg-black/50 p-1"
+                      >
+                        <Ionicons name="close" size={16} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : null}
+
+              <Text className="mx-5 mt-5 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                {isEditing
+                  ? t('postEditHint')
+                  : t('postCreateHint')}
               </Text>
-              <TouchableOpacity
-                onPress={() => setShowVisibilityModal(true)}
-                className="flex-row items-center rounded-full bg-white px-3 py-2 dark:bg-gray-800"
-              >
-                <Text className="mr-1 text-sm font-semibold text-[#4c669f]">
-                  {visibilityLabel}
-                </Text>
-                <Ionicons name="chevron-down" size={14} color="#4c669f" />
-              </TouchableOpacity>
-            </View>
-
-            <Text className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
-              {isEditing
-                ? t('postEditHint')
-                : t('postCreateHint')}
-            </Text>
-          </View>
-
-          <View className="mx-5 mt-6 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
-            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-              {t('postPreviewTitle')}
-            </Text>
-            <View className="mt-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800">
-              <View className="flex-row">
-                <View className="w-16 items-center justify-center bg-[#ff4757]/10 px-2 py-4 dark:bg-[#ff4757]/20">
-                  <Text className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ff4757]">
-                    {postType === 'plan'
-                      ? t('postTypePlanLabel')
-                      : t('postTypePostLabel')}
-                  </Text>
-                  <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-                    {previewDay}
-                  </Text>
-                  <Text className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-300">
-                    {previewMonth}
-                  </Text>
-                  <View className="mt-2 rounded-full bg-white/70 px-2 py-1 dark:bg-gray-900/40">
-                    <Text className="text-[10px] font-semibold text-gray-600 dark:text-gray-200">
-                      {previewTime}
+            </>
+          ) : (
+            <View className="mx-5 mt-6 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
+              <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                {t('postPreviewTitle')}
+              </Text>
+              <View className="mt-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800">
+                <View className="flex-row">
+                  <View className="w-16 items-center justify-center bg-[#ff4757]/10 px-2 py-4 dark:bg-[#ff4757]/20">
+                    <Text className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ff4757]">
+                      {postType === 'plan'
+                        ? t('postTypePlanLabel')
+                        : t('postTypePostLabel')}
                     </Text>
+                    <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
+                      {previewDay}
+                    </Text>
+                    <Text className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-300">
+                      {previewMonth}
+                    </Text>
+                    <View className="mt-2 rounded-full bg-white/70 px-2 py-1 dark:bg-gray-900/40">
+                      <Text className="text-[10px] font-semibold text-gray-600 dark:text-gray-200">
+                        {previewTime}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <View className="flex-1 px-4 py-4">
-                  <Text className="text-base font-bold text-gray-900 dark:text-white">
-                    {previewTitle}
-                  </Text>
-                  {previewBody ? (
-                    <Text className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                      {previewBody}
+                  <View className="flex-1 px-4 py-4">
+                    <Text className="text-base font-bold text-gray-900 dark:text-white">
+                      {previewTitle}
                     </Text>
-                  ) : null}
+                    {previewBody ? (
+                      <Text className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                        {previewBody}
+                      </Text>
+                    ) : null}
                   {postType === 'plan' && previewLocation ? (
                     <View className="mt-3 flex-row items-center">
                       <Ionicons name="location-outline" size={14} color="#ff4757" />
@@ -582,45 +744,109 @@ export default function CreatePostScreen() {
                       </Text>
                     </View>
                   ) : null}
-                  {postType === 'plan' && selectedAmbianceLabel ? (
-                    <View className="mt-2 self-start rounded-full bg-[#4c669f]/10 px-2 py-1">
-                      <Text className="text-[10px] font-semibold text-[#4c669f]">
-                        {selectedAmbianceLabel}
+                  {postType === 'plan' && eventTitle ? (
+                    <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2 py-1">
+                      <Text className="text-[10px] font-semibold text-[#ff4757]">
+                        {eventTitle}
                       </Text>
                     </View>
                   ) : null}
+                  {postType === 'plan' && selectedCategoryLabel ? (
+                    <View className="mt-2 self-start rounded-full bg-[#4c669f]/10 px-2 py-1">
+                      <Text className="text-[10px] font-semibold text-[#4c669f]">
+                        {selectedCategoryLabel}
+                      </Text>
+                    </View>
+                    ) : null}
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          )}
         </ScrollView>
 
-        <View className="mb-5 flex-row items-center border-t border-gray-100 bg-white px-5 py-3 dark:border-gray-800 dark:bg-black">
-          <TouchableOpacity
-            onPress={() => void pickImage('gallery')}
-            className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-          >
-            <Ionicons name="image" size={24} color="#4c669f" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => void pickImage('camera')}
-            className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-          >
-            <Ionicons name="camera" size={24} color="#4c669f" />
-          </TouchableOpacity>
+        {isEditStep ? (
+          <View className="mb-5 flex-row items-center border-t border-gray-100 bg-white px-5 py-3 dark:border-gray-800 dark:bg-black">
+            <TouchableOpacity
+              onPress={() => void pickImage('gallery')}
+              className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+            >
+              <Ionicons name="image" size={24} color="#4c669f" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => void pickImage('camera')}
+              className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+            >
+              <Ionicons name="camera" size={24} color="#4c669f" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (postType !== 'plan') {
+                  Alert.alert(
+                    t('postPlanRequiredTitle'),
+                    t('postPlanRequiredMessage'),
+                  );
+                  return;
+                }
+                setShowPlanModal(true);
+              }}
+              className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+            >
+              <Ionicons name="location-outline" size={24} color="#4c669f" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowVisibilityModal(true)}
+              className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
+            >
+              <Ionicons name={visibilityIcon} size={22} color="#4c669f" />
+            </TouchableOpacity>
 
-          <View className="flex-1" />
+            <View className="flex-1" />
 
-          <Text
-            className={`text-xs font-medium ${
-              content.length >= MAX_CHARS
-                ? 'text-red-500 dark:text-red-400'
-                : 'text-gray-300 dark:text-gray-600'
-            }`}
-          >
-            {content.length}/{MAX_CHARS}
-          </Text>
-        </View>
+            <TouchableOpacity
+              onPress={() => setShowVisibilityModal(true)}
+              className="mr-3 flex-row items-center rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800"
+            >
+              <Ionicons name={visibilityIcon} size={14} color="#4c669f" />
+              <Text className="ml-1 text-xs font-semibold text-[#4c669f]">
+                {visibilityLabel}
+              </Text>
+            </TouchableOpacity>
+
+            <Text
+              className={`text-xs font-medium ${
+                content.length >= MAX_CHARS
+                  ? 'text-red-500 dark:text-red-400'
+                  : 'text-gray-300 dark:text-gray-600'
+              }`}
+            >
+              {content.length}/{MAX_CHARS}
+            </Text>
+          </View>
+        ) : isPreviewStep ? (
+          <View className="mb-5 border-t border-gray-100 bg-white px-5 py-3 dark:border-gray-800 dark:bg-black">
+            <View className="flex-row items-center justify-between">
+              <TouchableOpacity
+                onPress={() => setCurrentStep(2)}
+                className="flex-row items-center"
+              >
+                <Ionicons name="arrow-back" size={18} color="#4c669f" />
+                <Text className="ml-2 text-sm font-semibold text-[#4c669f]">
+                  {t('postBackToEdit')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowVisibilityModal(true)}
+                className="flex-row items-center rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800"
+              >
+                <Ionicons name={visibilityIcon} size={14} color="#4c669f" />
+                <Text className="ml-1 text-xs font-semibold text-[#4c669f]">
+                  {visibilityLabel}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
 
       <Modal
@@ -691,6 +917,271 @@ export default function CreatePostScreen() {
                 ) : null}
               </TouchableOpacity>
             ))}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showPlanModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPlanModal(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShowPlanModal(false)}
+          className="flex-1 justify-end bg-black/50"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            className="rounded-t-3xl bg-white p-5 pb-6 dark:bg-gray-900"
+          >
+            <View className="mb-4 items-center">
+              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+            </View>
+
+            <Text className="mb-4 text-center text-lg font-bold text-gray-800 dark:text-white">
+              {t('postPlanModalTitle')}
+            </Text>
+
+            <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
+              <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                {t('postPlanModalTargetTitle')}
+              </Text>
+              <View className="mt-3 flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => {
+                    setPlanTarget('place');
+                    setSelectedEventId(null);
+                    setEventId('');
+                    setEventTitle('');
+                  }}
+                  className={`flex-1 items-center rounded-2xl px-3 py-3 ${
+                    planTarget === 'place'
+                      ? 'bg-[#4c669f]'
+                      : 'bg-gray-100 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-semibold ${
+                      planTarget === 'place'
+                        ? 'text-white'
+                        : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {t('postPlanModalTargetPlace')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setPlanTarget('event');
+                    setSelectedPlaceId(null);
+                    setPlaceId('');
+                    setPlaceName('');
+                    setCityName('');
+                  }}
+                  className={`flex-1 items-center rounded-2xl px-3 py-3 ${
+                    planTarget === 'event'
+                      ? 'bg-[#ff4757]'
+                      : 'bg-gray-100 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-semibold ${
+                      planTarget === 'event'
+                        ? 'text-white'
+                        : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {t('postPlanModalTargetEvent')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                {t('postPlanModalCategoryTitle')}
+              </Text>
+
+              {categoriesLoading ? (
+                <View className="mt-3">
+                  <ActivityIndicator color="#ff4757" />
+                </View>
+              ) : categories.length > 0 ? (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  {categories.map((category) => {
+                    const isSelected = category.name === ambiance;
+                    return (
+                      <TouchableOpacity
+                        key={category.id}
+                        onPress={() =>
+                          setAmbiance((current) =>
+                            current === category.name ? '' : category.name,
+                          )
+                        }
+                        className={`rounded-full px-3 py-2 ${
+                          isSelected
+                            ? ''
+                            : 'bg-gray-100 dark:bg-gray-800'
+                        }`}
+                        style={
+                          isSelected
+                            ? { backgroundColor: category.color || '#ff4757' }
+                            : undefined
+                        }
+                      >
+                        <Text
+                          className={`text-xs font-semibold ${
+                            isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                          }`}
+                        >
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  {t('postCategoryEmpty')}
+                </Text>
+              )}
+
+              {planTarget === 'place' ? (
+                <>
+                  <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                    {t('postPlanModalPlaceTitle')}
+                  </Text>
+                  <TextInput
+                    value={placeSearch}
+                    onChangeText={setPlaceSearch}
+                    placeholder={t('postPlanModalSearchPlaceholder')}
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+                  />
+
+                  {placesLoading ? (
+                    <View className="mt-4">
+                      <ActivityIndicator color="#4c669f" />
+                    </View>
+                  ) : filteredPlaces.length > 0 ? (
+                    <View className="mt-4 gap-3">
+                      {filteredPlaces.map((place) => {
+                        const isSelected = selectedPlaceId === place.id;
+                        return (
+                          <TouchableOpacity
+                            key={place.id}
+                            onPress={() => {
+                              setSelectedPlaceId(place.id);
+                              setSelectedEventId(null);
+                              setEventId('');
+                              setEventTitle('');
+                              setPlaceId(place.id);
+                              setPlaceName(place.name);
+                              setCityName(place.City?.name || '');
+                            }}
+                            className={`rounded-2xl border px-4 py-3 ${
+                              isSelected
+                                ? 'border-[#4c669f] bg-blue-50 dark:bg-blue-900/20'
+                                : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                            }`}
+                          >
+                            <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                              {place.name}
+                            </Text>
+                            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              {place.City?.name || place.address || t('homeAddressToConfirm')}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                      {t('postPlanModalEmptyPlaces')}
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                    {t('postPlanModalEventTitle')}
+                  </Text>
+                  <TextInput
+                    value={eventSearch}
+                    onChangeText={setEventSearch}
+                    placeholder={t('postPlanModalSearchEventPlaceholder')}
+                    placeholderTextColor={isDark ? '#666' : '#999'}
+                    className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+                  />
+
+                  {eventsLoading ? (
+                    <View className="mt-4">
+                      <ActivityIndicator color="#ff4757" />
+                    </View>
+                  ) : filteredEvents.length > 0 ? (
+                    <View className="mt-4 gap-3">
+                      {filteredEvents.map((eventItem) => {
+                        const isSelected = selectedEventId === eventItem.id;
+                        return (
+                          <TouchableOpacity
+                            key={eventItem.id}
+                            onPress={() => {
+                              setSelectedEventId(eventItem.id);
+                              setSelectedPlaceId(null);
+                              setEventId(eventItem.id);
+                              setEventTitle(eventItem.title);
+                              setPlaceId(eventItem.Place?.id || eventItem.placeId || '');
+                              setPlaceName(eventItem.Place?.name || eventItem.address || '');
+                              setCityName(eventItem.Place?.City?.name || '');
+                            }}
+                            className={`rounded-2xl border px-4 py-3 ${
+                              isSelected
+                                ? 'border-[#ff4757] bg-red-50 dark:bg-red-900/20'
+                                : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                            }`}
+                          >
+                            <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                              {eventItem.title}
+                            </Text>
+                            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              {eventItem.Place?.name || eventItem.address || t('homeAddressToConfirm')}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                      {t('postPlanModalEmptyEvents')}
+                    </Text>
+                  )}
+                </>
+              )}
+
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedPlaceId(null);
+                  setSelectedEventId(null);
+                  setPlaceId('');
+                  setEventId('');
+                  setEventTitle('');
+                  setPlaceName('');
+                  setCityName('');
+                }}
+                className="mt-4 self-start rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-800"
+              >
+                <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  {t('postPlanModalClearPlace')}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <TouchableOpacity
+              className="mt-5 items-center rounded-xl bg-[#ff4757] px-4 py-3"
+              onPress={() => setShowPlanModal(false)}
+            >
+              <Text className="text-white font-semibold">{t('genericClose')}</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>

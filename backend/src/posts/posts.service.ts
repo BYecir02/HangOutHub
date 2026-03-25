@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -49,15 +50,37 @@ export class PostsService {
         ? await this.storageService.uploadFiles('posts', files)
         : [];
 
+    const normalizeId = (value?: string) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : null;
+    };
+
     return this.prisma.post.create({
       data: {
         userId,
         content: createPostDto.content,
         visibility: createPostDto.visibility || 'public',
         postType: createPostDto.postType || 'post',
-        placeName: normalizeText(createPostDto.placeName) || undefined,
-        cityName: normalizeText(createPostDto.cityName) || undefined,
-        ambiance: normalizeText(createPostDto.ambiance) || undefined,
+        placeId:
+          createPostDto.postType === 'plan'
+            ? normalizeId(createPostDto.placeId) || undefined
+            : undefined,
+        eventId:
+          createPostDto.postType === 'plan'
+            ? normalizeId(createPostDto.eventId) || undefined
+            : undefined,
+        placeName:
+          createPostDto.postType === 'plan'
+            ? normalizeText(createPostDto.placeName) || undefined
+            : undefined,
+        cityName:
+          createPostDto.postType === 'plan'
+            ? normalizeText(createPostDto.cityName) || undefined
+            : undefined,
+        ambiance:
+          createPostDto.postType === 'plan'
+            ? normalizeText(createPostDto.ambiance) || undefined
+            : undefined,
         images: imageUrls,
       },
     });
@@ -76,6 +99,36 @@ export class PostsService {
             username: true,
             displayName: true,
             avatarUrl: true,
+          },
+        },
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            City: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            placeId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+                City: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         _count: {
@@ -108,6 +161,36 @@ export class PostsService {
             username: true,
             displayName: true,
             avatarUrl: true,
+          },
+        },
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            City: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            placeId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+                City: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         _count: {
@@ -166,6 +249,10 @@ export class PostsService {
       const trimmed = value?.trim();
       return trimmed ? trimmed : null;
     };
+    const normalizeId = (value?: string) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : null;
+    };
     const { existingImages, ...rest } = updatePostDto;
 
     let retainedImages: string[] = [];
@@ -185,8 +272,14 @@ export class PostsService {
         ? await this.storageService.uploadFiles('posts', files)
         : [];
 
-    const data: UpdatePostDto & { images?: string[] } = { ...rest };
+    const data: Prisma.PostUncheckedUpdateInput = { ...rest };
 
+    if (rest.placeId !== undefined) {
+      data.placeId = normalizeId(rest.placeId);
+    }
+    if (rest.eventId !== undefined) {
+      data.eventId = normalizeId(rest.eventId);
+    }
     if (rest.placeName !== undefined) {
       data.placeName = normalizeText(rest.placeName);
     }
@@ -201,6 +294,8 @@ export class PostsService {
         data.postType = 'post';
       }
       if (rest.postType === 'post') {
+        data.placeId = null;
+        data.eventId = null;
         data.placeName = null;
         data.cityName = null;
         data.ambiance = null;

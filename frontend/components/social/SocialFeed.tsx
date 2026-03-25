@@ -28,9 +28,24 @@ interface FeedPost {
   content?: string | null;
   images?: string[];
   postType?: 'post' | 'plan';
+  placeId?: string | null;
+  eventId?: string | null;
   placeName?: string | null;
   cityName?: string | null;
   ambiance?: string | null;
+  Event?: {
+    id: string;
+    title: string;
+    startTime: string;
+    placeId?: string | null;
+    Place?: {
+      id?: string;
+      name?: string | null;
+      City?: {
+        name?: string | null;
+      } | null;
+    } | null;
+  } | null;
   visibility?: 'public' | 'friends' | 'private';
   createdAt?: string;
   isLiked?: boolean;
@@ -140,6 +155,11 @@ export default function SocialFeed() {
     content?: string | null;
     images?: string[];
     postType?: 'post' | 'plan';
+    placeId?: string | null;
+    eventId?: string | null;
+    Event?: {
+      title?: string | null;
+    } | null;
     placeName?: string | null;
     cityName?: string | null;
     ambiance?: string | null;
@@ -152,6 +172,9 @@ export default function SocialFeed() {
         content: post.content || '',
         images: JSON.stringify(post.images || []),
         postType: post.postType || 'post',
+        placeId: post.placeId || '',
+        eventId: post.eventId || '',
+        eventTitle: post.Event?.title || '',
         placeName: post.placeName || '',
         cityName: post.cityName || '',
         ambiance: post.ambiance || '',

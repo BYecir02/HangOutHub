@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsIn, IsUUID } from 'class-validator';
 
 export class CreatePostDto {
   @IsOptional()
@@ -12,6 +12,14 @@ export class CreatePostDto {
   @IsOptional()
   @IsIn(['post', 'plan'])
   postType?: string;
+
+  @IsOptional()
+  @IsUUID()
+  placeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  eventId?: string;
 
   @IsOptional()
   @IsString()
