@@ -764,9 +764,23 @@ const fr = {
   postSubmitEdit: 'Enregistrer',
   postContentPlaceholder:
     'Partage une ambiance, une bonne adresse ou un plan pour ce soir...',
+  postTypeSectionTitle: 'Type de post',
+  postTypePlanLabel: 'Plan',
+  postTypePostLabel: 'Publication',
+  postPlanSectionTitle: 'Infos du plan',
+  postPlacePlaceholder: 'Lieu (ex: Rooftop Sky)',
+  postCityPlaceholder: 'Ville (ex: Cotonou)',
+  postAmbianceLabel: 'Ambiance',
+  postAmbianceChill: 'Chill',
+  postAmbianceFestif: 'Festif',
+  postAmbianceFood: 'Food',
+  postAmbianceAfterwork: 'Afterwork',
+  postAmbianceSport: 'Sport',
+  postPreviewTitle: 'Apercu',
+  postPreviewEmptyTitle: 'Ton plan ici',
   postVisibilitySection: 'Visibilite',
   postEditHint:
-    'Tu peux modifier le texte, la visibilite et les images de ce post.',
+    'Tu peux modifier le texte, la visibilite, les images et les infos du plan.',
   postCreateHint:
     'Ajoute une ou plusieurs images et choisis qui peut voir ta publication.',
   postVisibilityModalTitle: 'Qui peut voir ce post ?',
@@ -1175,6 +1189,7 @@ const fr = {
   socialFeedHeaderTitle: 'Vibes locales',
   socialFeedHeaderSubtitle:
     'Suis les dernieres publications, reponds et fais vivre la communaute.',
+  socialFeedPlanLabel: 'Plan',
   postItemEdit: 'Modifier',
   postItemDelete: 'Supprimer',
   postItemDeleteConfirmTitle: 'Confirmer',
@@ -1183,6 +1198,7 @@ const fr = {
   postItemOptionsTitle: 'Options',
   postItemUserFallback: 'Utilisateur',
   postItemJustNow: 'A l instant',
+  postItemPlanFallback: 'Plan visuel',
   genericCancel: 'Annuler',
 } as const;
 
@@ -1938,9 +1954,23 @@ const en: Record<keyof typeof fr, string> = {
   postSubmitEdit: 'Save',
   postContentPlaceholder:
     'Share a mood, a good address, or a plan for tonight...',
+  postTypeSectionTitle: 'Post type',
+  postTypePlanLabel: 'Plan',
+  postTypePostLabel: 'Post',
+  postPlanSectionTitle: 'Plan details',
+  postPlacePlaceholder: 'Place (ex: Rooftop Sky)',
+  postCityPlaceholder: 'City (ex: Cotonou)',
+  postAmbianceLabel: 'Ambience',
+  postAmbianceChill: 'Chill',
+  postAmbianceFestif: 'Party',
+  postAmbianceFood: 'Food',
+  postAmbianceAfterwork: 'Afterwork',
+  postAmbianceSport: 'Sport',
+  postPreviewTitle: 'Preview',
+  postPreviewEmptyTitle: 'Your plan here',
   postVisibilitySection: 'Visibility',
   postEditHint:
-    'You can edit the text, visibility, and images of this post.',
+    'You can edit the text, visibility, images, and plan details.',
   postCreateHint:
     'Add one or more images and choose who can see your post.',
   postVisibilityModalTitle: 'Who can see this post?',
@@ -2347,6 +2377,7 @@ const en: Record<keyof typeof fr, string> = {
   socialFeedHeaderTitle: 'Local vibes',
   socialFeedHeaderSubtitle:
     'Follow latest posts, react, and keep the community alive.',
+  socialFeedPlanLabel: 'Plan',
   postItemEdit: 'Edit',
   postItemDelete: 'Delete',
   postItemDeleteConfirmTitle: 'Confirm',
@@ -2355,6 +2386,7 @@ const en: Record<keyof typeof fr, string> = {
   postItemOptionsTitle: 'Options',
   postItemUserFallback: 'User',
   postItemJustNow: 'Just now',
+  postItemPlanFallback: 'Visual plan',
   genericCancel: 'Cancel',
 };
 

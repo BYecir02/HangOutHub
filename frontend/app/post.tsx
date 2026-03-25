@@ -22,9 +22,25 @@ import { useI18n } from '@/hooks/use-i18n';
 import { getMySettings } from '@/services/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private';
+type PostType = 'post' | 'plan';
 
 const MAX_IMAGES = 5;
 const MAX_CHARS = 500;
+const AMBIANCE_OPTIONS: {
+  id: string;
+  labelKey:
+    | 'postAmbianceChill'
+    | 'postAmbianceFestif'
+    | 'postAmbianceFood'
+    | 'postAmbianceAfterwork'
+    | 'postAmbianceSport';
+}[] = [
+  { id: 'chill', labelKey: 'postAmbianceChill' },
+  { id: 'festif', labelKey: 'postAmbianceFestif' },
+  { id: 'food', labelKey: 'postAmbianceFood' },
+  { id: 'afterwork', labelKey: 'postAmbianceAfterwork' },
+  { id: 'sport', labelKey: 'postAmbianceSport' },
+];
 
 const VISIBILITY_OPTIONS: {
   id: PostVisibility;
@@ -64,11 +80,15 @@ export default function CreatePostScreen() {
     postId?: string;
     content?: string;
     visibility?: PostVisibility;
+    postType?: PostType;
+    placeName?: string;
+    cityName?: string;
+    ambiance?: string;
     images?: string;
   }>();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const isEditing = !!params.postId;
 
   const parseImagesParam = (value?: string | string[]) => {
@@ -91,6 +111,18 @@ export default function CreatePostScreen() {
   const [visibility, setVisibility] = useState<PostVisibility>(
     params.visibility || 'public',
   );
+  const [postType, setPostType] = useState<PostType>(
+    params.postType === 'plan' ? 'plan' : 'post',
+  );
+  const [placeName, setPlaceName] = useState(
+    params.placeName ? String(params.placeName) : '',
+  );
+  const [cityName, setCityName] = useState(
+    params.cityName ? String(params.cityName) : '',
+  );
+  const [ambiance, setAmbiance] = useState(
+    params.ambiance ? String(params.ambiance) : '',
+  );
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -100,6 +132,14 @@ export default function CreatePostScreen() {
         ...option,
         label: t(option.labelKey),
         description: t(option.descriptionKey),
+      })),
+    [t],
+  );
+  const ambianceOptions = useMemo(
+    () =>
+      AMBIANCE_OPTIONS.map((option) => ({
+        ...option,
+        label: t(option.labelKey),
       })),
     [t],
   );
@@ -134,6 +174,32 @@ export default function CreatePostScreen() {
   const visibilityLabel =
     visibilityOptions.find((option) => option.id === visibility)?.label ||
     t('postVisibilityPublicLabel');
+  const selectedAmbianceLabel =
+    ambianceOptions.find((option) => option.id === ambiance)?.label || '';
+  const trimmedContent = content.trim();
+  const previewTitle = trimmedContent
+    ? trimmedContent.split('\n')[0].slice(0, 72)
+    : t('postPreviewEmptyTitle');
+  const previewBody = trimmedContent
+    ? trimmedContent
+        .split('\n')
+        .slice(1)
+        .join('\n')
+        .trim()
+        .slice(0, 140)
+    : '';
+  const previewDate = new Date();
+  const previewDay = previewDate.toLocaleDateString(locale, { day: '2-digit' });
+  const previewMonth = previewDate
+    .toLocaleDateString(locale, { month: 'short' })
+    .toUpperCase();
+  const previewTime = previewDate.toLocaleTimeString(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const previewLocation = [placeName.trim(), cityName.trim()]
+    .filter(Boolean)
+    .join(' · ');
 
   const headerTitle = useMemo(() => {
     return isEditing ? t('postHeaderEditTitle') : t('postHeaderCreateTitle');
@@ -200,6 +266,18 @@ export default function CreatePostScreen() {
         const formData = new FormData();
         formData.append('content', content);
         formData.append('visibility', visibility);
+        formData.append('postType', postType);
+        if (postType === 'plan') {
+          if (placeName.trim()) {
+            formData.append('placeName', placeName.trim());
+          }
+          if (cityName.trim()) {
+            formData.append('cityName', cityName.trim());
+          }
+          if (ambiance) {
+            formData.append('ambiance', ambiance);
+          }
+        }
 
         const existingImages = images.filter((uri) => !isLocalImage(uri));
         formData.append('existingImages', JSON.stringify(existingImages));
@@ -222,6 +300,18 @@ export default function CreatePostScreen() {
         const formData = new FormData();
         formData.append('content', content);
         formData.append('visibility', visibility);
+        formData.append('postType', postType);
+        if (postType === 'plan') {
+          if (placeName.trim()) {
+            formData.append('placeName', placeName.trim());
+          }
+          if (cityName.trim()) {
+            formData.append('cityName', cityName.trim());
+          }
+          if (ambiance) {
+            formData.append('ambiance', ambiance);
+          }
+        }
 
         images.forEach((uri, index) => {
           formData.append('images', {
@@ -302,6 +392,104 @@ export default function CreatePostScreen() {
             maxLength={MAX_CHARS}
           />
 
+          <View className="mx-5 mt-4 rounded-2xl bg-gray-50 px-4 py-4 dark:bg-gray-900">
+            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+              {t('postTypeSectionTitle')}
+            </Text>
+            <View className="mt-3 flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setPostType('plan')}
+                className={`flex-1 items-center rounded-2xl px-3 py-3 ${
+                  postType === 'plan'
+                    ? 'bg-[#ff4757]'
+                    : 'bg-white dark:bg-gray-800'
+                }`}
+              >
+                <Text
+                  className={`text-sm font-semibold ${
+                    postType === 'plan'
+                      ? 'text-white'
+                      : 'text-gray-700 dark:text-gray-200'
+                  }`}
+                >
+                  {t('postTypePlanLabel')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setPostType('post')}
+                className={`flex-1 items-center rounded-2xl px-3 py-3 ${
+                  postType === 'post'
+                    ? 'bg-[#4c669f]'
+                    : 'bg-white dark:bg-gray-800'
+                }`}
+              >
+                <Text
+                  className={`text-sm font-semibold ${
+                    postType === 'post'
+                      ? 'text-white'
+                      : 'text-gray-700 dark:text-gray-200'
+                  }`}
+                >
+                  {t('postTypePostLabel')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {postType === 'plan' ? (
+            <View className="mx-5 mt-4 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
+              <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                {t('postPlanSectionTitle')}
+              </Text>
+              <TextInput
+                placeholder={t('postPlacePlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+                value={placeName}
+                onChangeText={setPlaceName}
+              />
+              <TextInput
+                placeholder={t('postCityPlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+                value={cityName}
+                onChangeText={setCityName}
+              />
+
+              <Text className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                {t('postAmbianceLabel')}
+              </Text>
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {ambianceOptions.map((option) => {
+                  const isSelected = option.id === ambiance;
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      onPress={() =>
+                        setAmbiance((current) =>
+                          current === option.id ? '' : option.id,
+                        )
+                      }
+                      className={`rounded-full px-3 py-2 ${
+                        isSelected
+                          ? 'bg-[#ff4757]'
+                          : 'bg-gray-100 dark:bg-gray-800'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-semibold ${
+                          isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                        }`}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+
           {images.length > 0 ? (
             <ScrollView
               horizontal
@@ -351,6 +539,59 @@ export default function CreatePostScreen() {
                 ? t('postEditHint')
                 : t('postCreateHint')}
             </Text>
+          </View>
+
+          <View className="mx-5 mt-6 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
+            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+              {t('postPreviewTitle')}
+            </Text>
+            <View className="mt-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800">
+              <View className="flex-row">
+                <View className="w-16 items-center justify-center bg-[#ff4757]/10 px-2 py-4 dark:bg-[#ff4757]/20">
+                  <Text className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ff4757]">
+                    {postType === 'plan'
+                      ? t('postTypePlanLabel')
+                      : t('postTypePostLabel')}
+                  </Text>
+                  <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
+                    {previewDay}
+                  </Text>
+                  <Text className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-300">
+                    {previewMonth}
+                  </Text>
+                  <View className="mt-2 rounded-full bg-white/70 px-2 py-1 dark:bg-gray-900/40">
+                    <Text className="text-[10px] font-semibold text-gray-600 dark:text-gray-200">
+                      {previewTime}
+                    </Text>
+                  </View>
+                </View>
+                <View className="flex-1 px-4 py-4">
+                  <Text className="text-base font-bold text-gray-900 dark:text-white">
+                    {previewTitle}
+                  </Text>
+                  {previewBody ? (
+                    <Text className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                      {previewBody}
+                    </Text>
+                  ) : null}
+                  {postType === 'plan' && previewLocation ? (
+                    <View className="mt-3 flex-row items-center">
+                      <Ionicons name="location-outline" size={14} color="#ff4757" />
+                      <Text className="ml-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                        {previewLocation}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {postType === 'plan' && selectedAmbianceLabel ? (
+                    <View className="mt-2 self-start rounded-full bg-[#4c669f]/10 px-2 py-1">
+                      <Text className="text-[10px] font-semibold text-[#4c669f]">
+                        {selectedAmbianceLabel}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </View>
           </View>
         </ScrollView>
 

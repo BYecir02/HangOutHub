@@ -27,6 +27,10 @@ interface FeedPost {
   userId: string;
   content?: string | null;
   images?: string[];
+  postType?: 'post' | 'plan';
+  placeName?: string | null;
+  cityName?: string | null;
+  ambiance?: string | null;
   visibility?: 'public' | 'friends' | 'private';
   createdAt?: string;
   isLiked?: boolean;
@@ -135,6 +139,10 @@ export default function SocialFeed() {
     id: string;
     content?: string | null;
     images?: string[];
+    postType?: 'post' | 'plan';
+    placeName?: string | null;
+    cityName?: string | null;
+    ambiance?: string | null;
     visibility?: 'public' | 'friends' | 'private';
   }) => {
     router.push({
@@ -143,6 +151,10 @@ export default function SocialFeed() {
         postId: post.id,
         content: post.content || '',
         images: JSON.stringify(post.images || []),
+        postType: post.postType || 'post',
+        placeName: post.placeName || '',
+        cityName: post.cityName || '',
+        ambiance: post.ambiance || '',
         visibility: post.visibility || 'public',
       },
     });
@@ -160,7 +172,7 @@ export default function SocialFeed() {
   };
 
   const renderHeader = () => (
-    <View className="border-b border-gray-100 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-black">
+    <View className="mb-4 border-b border-gray-100 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-black">
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-4">
           <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">

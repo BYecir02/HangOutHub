@@ -296,6 +296,10 @@ model Post {
   content    String?
   images     String[]  @default([])
   visibility String?   @default("public") @db.VarChar(20)
+  postType   String?   @default("post") @db.VarChar(20)
+  placeName  String?   @db.VarChar(120)
+  cityName   String?   @db.VarChar(120)
+  ambiance   String?   @db.VarChar(50)
   createdAt  DateTime? @default(now()) @db.Timestamp(6)
   updatedAt  DateTime? @updatedAt @db.Timestamp(6)
   User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)

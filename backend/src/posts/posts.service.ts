@@ -40,6 +40,10 @@ export class PostsService {
     createPostDto: CreatePostDto,
     files: Express.Multer.File[],
   ) {
+    const normalizeText = (value?: string) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : null;
+    };
     const imageUrls =
       files && files.length > 0
         ? await this.storageService.uploadFiles('posts', files)
@@ -50,6 +54,10 @@ export class PostsService {
         userId,
         content: createPostDto.content,
         visibility: createPostDto.visibility || 'public',
+        postType: createPostDto.postType || 'post',
+        placeName: normalizeText(createPostDto.placeName) || undefined,
+        cityName: normalizeText(createPostDto.cityName) || undefined,
+        ambiance: normalizeText(createPostDto.ambiance) || undefined,
         images: imageUrls,
       },
     });
@@ -154,6 +162,10 @@ export class PostsService {
       throw new ForbiddenException('You are not allowed to update this post');
     }
 
+    const normalizeText = (value?: string) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : null;
+    };
     const { existingImages, ...rest } = updatePostDto;
 
     let retainedImages: string[] = [];
@@ -174,6 +186,26 @@ export class PostsService {
         : [];
 
     const data: UpdatePostDto & { images?: string[] } = { ...rest };
+
+    if (rest.placeName !== undefined) {
+      data.placeName = normalizeText(rest.placeName);
+    }
+    if (rest.cityName !== undefined) {
+      data.cityName = normalizeText(rest.cityName);
+    }
+    if (rest.ambiance !== undefined) {
+      data.ambiance = normalizeText(rest.ambiance);
+    }
+    if (rest.postType !== undefined) {
+      if (!rest.postType) {
+        data.postType = 'post';
+      }
+      if (rest.postType === 'post') {
+        data.placeName = null;
+        data.cityName = null;
+        data.ambiance = null;
+      }
+    }
 
     if (existingImages !== undefined || newImages.length > 0) {
       data.images = [...retainedImages, ...newImages];
