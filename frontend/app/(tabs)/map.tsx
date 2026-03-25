@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, { Callout, Marker, type Region } from 'react-native-maps';
 
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
@@ -212,7 +212,28 @@ export default function MapScreen() {
             onPress={() => setSelectedPlace(place)}
             title={place.name}
             description={place.address || place.City?.name || undefined}
-          />
+          >
+            <Callout
+              onPress={() =>
+                router.push({
+                  pathname: '/place/[id]',
+                  params: { id: place.id },
+                })
+              }
+            >
+              <View className="w-48">
+                <Text className="text-sm font-semibold text-gray-900">
+                  {place.name}
+                </Text>
+                <Text className="mt-1 text-xs text-gray-500">
+                  {place.address || place.City?.name || t('homeAddressToConfirm')}
+                </Text>
+                <Text className="mt-2 text-xs font-semibold text-[#4c669f]">
+                  {t('mapOpenPlaceCta')}
+                </Text>
+              </View>
+            </Callout>
+          </Marker>
         ))}
       </MapView>
 
