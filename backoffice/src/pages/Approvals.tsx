@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { apiGet, apiPatch } from '../lib/api';
 import Pagination from '../components/Pagination';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
-import Card from '../components/Card';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import ActionButtons from '../components/ActionButtons';
@@ -169,7 +170,8 @@ export default function ApprovalsPage() {
         }
       />
 
-      <Card>
+      <SectionCard>
+        <SectionTitle label="Validations" subtitle="Demandes a traiter." />
         {loading ? (
           <LoadingState />
         ) : (
@@ -244,7 +246,8 @@ export default function ApprovalsPage() {
             />
           </>
         )}
-      </Card>
+      </SectionCard>
     </div>
   );
 }
+

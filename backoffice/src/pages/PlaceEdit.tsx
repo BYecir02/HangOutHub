@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { apiGet, apiPatch, apiPost, apiUpload } from '../lib/api';
@@ -569,3 +569,4 @@ export default function PlaceEditPage() {
     </div>
   );
 }
+

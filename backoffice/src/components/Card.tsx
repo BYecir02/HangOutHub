@@ -1,7 +1,8 @@
-import React from 'react';
+
+import type { ReactNode } from 'react';
 
 interface CardProps {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }
 
@@ -12,3 +13,4 @@ export default function Card({ children, className = '' }: CardProps) {
     </div>
   );
 }
+

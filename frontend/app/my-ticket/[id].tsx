@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -75,7 +75,7 @@ export default function MyTicketDetailScreen() {
 
   const bookingId = typeof params.id === 'string' ? params.id : null;
 
-  const loadTicket = async (isRefresh = false) => {
+  const loadTicket = useCallback(async (isRefresh = false) => {
     if (!bookingId) {
       setLoading(false);
       setTicket(null);
@@ -100,11 +100,11 @@ export default function MyTicketDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [bookingId, t]);
 
   useEffect(() => {
     void loadTicket();
-  }, [bookingId]);
+  }, [loadTicket]);
 
   const status = (ticket?.status || 'PENDING').toUpperCase();
   const statusClass =

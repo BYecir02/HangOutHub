@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UploadedFiles,
   UseGuards,
@@ -65,8 +66,18 @@ export class PostsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('feed')
-  findFeed(@Request() req: AuthenticatedRequest) {
-    return this.postsService.findFeed(req.user.userId);
+  findFeed(
+    @Request() req: AuthenticatedRequest,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+    @Query('after') after?: string,
+  ) {
+    const parsedLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+    return this.postsService.findFeed(req.user.userId, {
+      cursor,
+      limit: parsedLimit,
+      after,
+    });
   }
 
   @UseGuards(AuthGuard('jwt'))

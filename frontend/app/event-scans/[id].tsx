@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -61,7 +61,7 @@ export default function EventScansScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [data, setData] = useState<EventScansResponse | null>(null);
 
-  const loadScans = async (isRefresh = false) => {
+  const loadScans = useCallback(async (isRefresh = false) => {
     if (!eventId) {
       setErrorMessage(t('organizerEventScansLoadFailed'));
       setLoading(false);
@@ -88,11 +88,11 @@ export default function EventScansScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [eventId, t]);
 
   useEffect(() => {
     void loadScans();
-  }, [eventId]);
+  }, [loadScans]);
 
   const eventTitle = data?.event.title || '-';
 
@@ -207,7 +207,7 @@ export default function EventScansScreen() {
         </View>
       </>
     );
-  }, [data, errorMessage, loading, t]);
+  }, [data, errorMessage, loading, loadScans, t]);
 
   return (
     <ScrollView

@@ -33,11 +33,11 @@ interface HomeEvent {
   startTime: string;
   coverUrl: string | null;
   entryFee: number | string | null;
-  TicketType?: Array<{
+  TicketType?: {
     id: string;
     price: number | string;
     quantity: number;
-  }>;
+  }[];
   Place?: {
     name?: string | null;
     City?: {

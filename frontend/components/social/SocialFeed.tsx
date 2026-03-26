@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -14,7 +15,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useI18n } from '@/hooks/use-i18n';
 import PostItem from './PostItem';
 import { SkeletonBlock } from '../ui/Skeleton';
-import api from '../../services/api';
+import api, { storage } from '../../services/api';
+
+const FEED_CACHE_KEY = 'socialFeedCache:v2';
+const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt:v2';
+const FEED_CACHE_CURSOR_KEY = 'socialFeedCacheCursor:v2';
+const FEED_CACHE_TTL_MS = 60 * 1000;
+const FEED_PAGE_SIZE = 20;
+const FEED_TOP_THRESHOLD = 12;
 
 type FilterType = 'all' | 'plan' | 'post';
 
@@ -117,7 +125,15 @@ export default function SocialFeed() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [fetchingMore, setFetchingMore] = useState(false);
+  const [cacheHydrated, setCacheHydrated] = useState(false);
+  const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [pendingPosts, setPendingPosts] = useState<FeedPost[]>([]);
+  const postsRef = useRef<FeedPost[]>([]);
+  const nextCursorRef = useRef<string | null>(null);
+  const latestFetchedAtRef = useRef<string | null>(null);
+  const isAtTopRef = useRef(true);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'category' | 'type' | 'location'>(
@@ -127,35 +143,294 @@ export default function SocialFeed() {
   const [selectedType, setSelectedType] = useState<FilterType>('all');
   const [selectedLocation, setSelectedLocation] = useState('');
 
-  const fetchFeed = useCallback(async (isRefreshing = false) => {
-    const isRefresh = isRefreshing || hasLoaded;
+  const persistFeedCache = useCallback(
+    async (nextPosts: FeedPost[], nextCursorValue: string | null) => {
+    const timestamp = Date.now();
+    try {
+      await storage.setItem(FEED_CACHE_KEY, JSON.stringify(nextPosts));
+      await storage.setItem(FEED_CACHE_TIME_KEY, String(timestamp));
+      if (nextCursorValue) {
+        await storage.setItem(FEED_CACHE_CURSOR_KEY, nextCursorValue);
+      } else {
+        await storage.removeItem(FEED_CACHE_CURSOR_KEY);
+      }
+      setLastFetchedAt(timestamp);
+    } catch (error) {
+      console.warn('Social feed cache save failed', error);
+    }
+  },
+    [],
+  );
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+  const getMaxCreatedAt = useCallback((items: FeedPost[]) => {
+    let maxTime = 0;
+    let maxValue: string | null = null;
+    items.forEach((post) => {
+      if (!post.createdAt) {
+        return;
+      }
+      const time = new Date(post.createdAt).getTime();
+      if (time > maxTime) {
+        maxTime = time;
+        maxValue = new Date(post.createdAt).toISOString();
+      }
+    });
+    return maxValue;
+  }, []);
+
+  const hydrateFeedCache = useCallback(async () => {
+    if (cacheHydrated) {
+      return false;
     }
 
     try {
-      const response = await api.get<FeedPost[]>('/posts/feed');
-      setPosts(response.data);
-    } catch (error) {
-      console.error(t('socialFeedLoadError'), error);
-      if (!isRefresh) {
-        setPosts([]);
+      const cached = await storage.getItem(FEED_CACHE_KEY);
+      const cachedAt = await storage.getItem(FEED_CACHE_TIME_KEY);
+      const cachedCursor = await storage.getItem(FEED_CACHE_CURSOR_KEY);
+
+      if (cached) {
+        const parsed = JSON.parse(cached) as FeedPost[];
+        setPosts(parsed);
+        setLoading(false);
+        const cachedLatest = getMaxCreatedAt(parsed);
+        if (cachedLatest) {
+          latestFetchedAtRef.current = cachedLatest;
+        }
       }
+
+      if (cachedAt) {
+        const parsedTime = Number(cachedAt);
+        if (!Number.isNaN(parsedTime)) {
+          setLastFetchedAt(parsedTime);
+        }
+      }
+
+      if (cachedCursor) {
+        setNextCursor(cachedCursor);
+      }
+    } catch (error) {
+      console.warn('Social feed cache read failed', error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setHasLoaded(true);
+      setCacheHydrated(true);
     }
-  }, [hasLoaded, t]);
+
+    return true;
+  }, [cacheHydrated, getMaxCreatedAt]);
+
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
+
+  useEffect(() => {
+    nextCursorRef.current = nextCursor;
+  }, [nextCursor]);
+
+  const getLatestPostCreatedAt = useCallback(() => {
+    return latestFetchedAtRef.current;
+  }, []);
+
+  const updateLatestFetchedAt = useCallback((items: FeedPost[]) => {
+    const maxCreatedAt = getMaxCreatedAt(items);
+    if (!maxCreatedAt) {
+      return;
+    }
+    const current = latestFetchedAtRef.current;
+    if (!current) {
+      latestFetchedAtRef.current = maxCreatedAt;
+      return;
+    }
+    if (new Date(maxCreatedAt).getTime() > new Date(current).getTime()) {
+      latestFetchedAtRef.current = maxCreatedAt;
+    }
+  }, [getMaxCreatedAt]);
+
+  const mergePosts = useCallback((incoming: FeedPost[], current: FeedPost[]) => {
+    const map = new Map<string, FeedPost>();
+    [...current, ...incoming].forEach((post) => {
+      map.set(post.id, post);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (aTime === bTime) {
+        return b.id.localeCompare(a.id);
+      }
+      return bTime - aTime;
+    });
+  }, []);
+
+  const fetchFeed = useCallback(
+    async (mode: 'initial' | 'refresh' | 'background' | 'more' = 'initial') => {
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      }
+      if (mode === 'initial') {
+        setLoading(true);
+      }
+      if (mode === 'more') {
+        setFetchingMore(true);
+      }
+
+      try {
+        const params: Record<string, string | number> = {
+          limit: FEED_PAGE_SIZE,
+        };
+
+        if (mode === 'more' && nextCursor) {
+          params.cursor = nextCursor;
+        }
+
+        if (mode === 'background') {
+          const latestPostCreatedAt = getLatestPostCreatedAt();
+          if (latestPostCreatedAt) {
+            params.after = latestPostCreatedAt;
+          }
+        }
+
+        const response = await api.get<{
+          items: FeedPost[];
+          nextCursor: string | null;
+        }>('/posts/feed', { params });
+
+        if (mode === 'more') {
+          setPosts((current) => mergePosts(response.data.items, current));
+        } else if (mode === 'background') {
+          if (response.data.items.length > 0) {
+            if (isAtTopRef.current) {
+              setPosts((current) => mergePosts(response.data.items, current));
+            } else {
+              setPendingPosts((current) => mergePosts(response.data.items, current));
+            }
+          }
+        } else {
+          setPosts(response.data.items);
+          setPendingPosts([]);
+        }
+
+        if (mode !== 'more') {
+          updateLatestFetchedAt(response.data.items);
+        }
+
+        if (mode !== 'background') {
+          setNextCursor(response.data.nextCursor);
+        }
+
+        const nextForCache =
+          mode === 'background' || mode === 'more'
+            ? nextCursorRef.current
+            : response.data.nextCursor;
+        const postsForCache =
+          mode === 'initial' || mode === 'refresh'
+            ? response.data.items
+            : mergePosts(response.data.items, postsRef.current);
+        await persistFeedCache(postsForCache, nextForCache || null);
+      } catch (error) {
+        console.error(t('socialFeedLoadError'), error);
+      } finally {
+        if (mode === 'initial') {
+          setLoading(false);
+        }
+        if (mode === 'refresh') {
+          setRefreshing(false);
+        }
+        if (mode === 'more') {
+          setFetchingMore(false);
+        }
+      }
+    },
+    [
+      getLatestPostCreatedAt,
+      mergePosts,
+      persistFeedCache,
+      t,
+      updateLatestFetchedAt,
+    ],
+  );
+
+  const shouldRefreshFeed = useCallback(async () => {
+    if (lastFetchedAt) {
+      return Date.now() - lastFetchedAt > FEED_CACHE_TTL_MS;
+    }
+
+    try {
+      const cachedAt = await storage.getItem(FEED_CACHE_TIME_KEY);
+      if (!cachedAt) {
+        return true;
+      }
+      const parsedTime = Number(cachedAt);
+      if (Number.isNaN(parsedTime)) {
+        return true;
+      }
+      return Date.now() - parsedTime > FEED_CACHE_TTL_MS;
+    } catch {
+      return true;
+    }
+  }, [lastFetchedAt]);
 
   useFocusEffect(
     useCallback(() => {
-      void fetchFeed();
-    }, [fetchFeed]),
+      let isActive = true;
+
+      const run = async () => {
+        await hydrateFeedCache();
+        const shouldRefresh = await shouldRefreshFeed();
+
+        if (!isActive) {
+          return;
+        }
+
+        if (shouldRefresh) {
+          const latestPostCreatedAt = getLatestPostCreatedAt();
+          if (postsRef.current.length > 0 && latestPostCreatedAt) {
+            await fetchFeed('background');
+          } else {
+            await fetchFeed('initial');
+          }
+        }
+      };
+
+      void run();
+
+      return () => {
+        isActive = false;
+      };
+    }, [
+      fetchFeed,
+      getLatestPostCreatedAt,
+      hydrateFeedCache,
+      shouldRefreshFeed,
+    ]),
   );
+
+  const applyPendingPosts = useCallback(async () => {
+    if (pendingPosts.length === 0) {
+      return;
+    }
+    const nextPosts = mergePosts(pendingPosts, postsRef.current);
+    setPosts(nextPosts);
+    setPendingPosts([]);
+    await persistFeedCache(nextPosts, nextCursorRef.current || null);
+  }, [mergePosts, pendingPosts, persistFeedCache]);
+
+  const handleScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const offsetY = event.nativeEvent.contentOffset.y;
+      const isAtTop = offsetY <= FEED_TOP_THRESHOLD;
+      isAtTopRef.current = isAtTop;
+      if (isAtTop && pendingPosts.length > 0) {
+        void applyPendingPosts();
+      }
+    },
+    [applyPendingPosts, pendingPosts.length],
+  );
+
+  const pendingLabel = useMemo(() => {
+    const label = t('socialFeedNewPosts', { count: pendingPosts.length });
+    if (!label || label === 'socialFeedNewPosts') {
+      return `${pendingPosts.length} nouveau(x) post(s)`;
+    }
+    return label;
+  }, [pendingPosts.length, t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -371,6 +646,16 @@ export default function SocialFeed() {
           </TouchableOpacity>
         ) : null}
       </ScrollView>
+      {pendingPosts.length > 0 ? (
+        <TouchableOpacity
+          onPress={() => void applyPendingPosts()}
+          className="mt-4 rounded-2xl border border-[#4c669f]/20 bg-[#4c669f]/10 px-4 py-2"
+        >
+          <Text className="text-xs font-semibold text-[#4c669f]">
+            {pendingLabel}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 
@@ -413,9 +698,24 @@ export default function SocialFeed() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void fetchFeed(true)}
+            onRefresh={() => void fetchFeed('refresh')}
             tintColor="#4c669f"
           />
+        }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onEndReached={() => {
+          if (!fetchingMore && nextCursor) {
+            void fetchFeed('more');
+          }
+        }}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          fetchingMore ? (
+            <View className="items-center py-6">
+              <ActivityIndicator color="#4c669f" />
+            </View>
+          ) : null
         }
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}

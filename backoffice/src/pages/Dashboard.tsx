@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiGet } from '../lib/api';
-import Card from '../components/Card';
+import PageHeader from '../components/PageHeader';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
 import KpiCard from '../components/KpiCard';
 import MiniStat from '../components/MiniStat';
 import EmptyState from '../components/EmptyState';
@@ -75,19 +77,19 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div>
-      <Card className="p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-          Vue d ensemble
-        </p>
-        <h2 className="mt-3 text-3xl font-bold text-slate-900">
-          Tableau de bord
-        </h2>
-        <p className="mt-2 text-sm text-slate-500">
-          Suis en direct les donnees clefs de l application.
-        </p>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Vue d ensemble"
+        title="Tableau de bord"
+        subtitle="Suis en direct les donnees clefs de l application."
+      />
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <SectionCard>
+        <SectionTitle
+          label="Indicateurs"
+          subtitle="Suivi des evenements, lieux et signalements."
+        />
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
           <KpiCard
             label="Evenements"
             value={loading ? '...' : eventsCount}
@@ -107,21 +109,20 @@ export default function Dashboard() {
             tone="rose"
           />
         </div>
+      </SectionCard>
 
-        <div className="mt-8 rounded-2xl bg-slate-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-            Signalements par type
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(reportsByType).map(([type, count]) => (
-              <MiniStat key={type} label={type} value={loading ? '...' : count} />
-            ))}
-            {!loading && Object.keys(reportsByType).length === 0 ? (
-              <EmptyState title="Aucun signalement." />
-            ) : null}
-          </div>
+      <SectionCard className="bg-slate-50 dark:bg-gray-900">
+        <SectionTitle label="Signalements par type" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(reportsByType).map(([type, count]) => (
+            <MiniStat key={type} label={type} value={loading ? '...' : count} />
+          ))}
+          {!loading && Object.keys(reportsByType).length === 0 ? (
+            <EmptyState title="Aucun signalement." />
+          ) : null}
         </div>
-      </Card>
+      </SectionCard>
     </div>
   );
 }
+

@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface ActionButtonsProps {
   onApprove: () => void;
@@ -39,3 +38,4 @@ export default function ActionButtons({
     </div>
   );
 }
+

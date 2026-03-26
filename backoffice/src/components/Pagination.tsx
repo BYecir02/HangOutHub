@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface PaginationProps {
   currentPage: number;
@@ -66,3 +65,4 @@ export default function Pagination({
     </div>
   );
 }
+

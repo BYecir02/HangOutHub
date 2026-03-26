@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface SectionTitleProps {
   label: string;
@@ -17,3 +16,4 @@ export default function SectionTitle({ label, subtitle }: SectionTitleProps) {
     </div>
   );
 }
+

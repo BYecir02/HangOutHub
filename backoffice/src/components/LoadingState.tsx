@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface LoadingStateProps {
   label?: string;
@@ -7,3 +6,4 @@ interface LoadingStateProps {
 export default function LoadingState({ label = 'Chargement...' }: LoadingStateProps) {
   return <p className="text-sm text-slate-500">{label}</p>;
 }
+

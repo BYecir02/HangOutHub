@@ -214,7 +214,14 @@ export class PostsService {
     return created;
   }
 
-  async findFeed(currentUserId: string) {
+  async findFeed(
+    currentUserId: string,
+    options?: {
+      cursor?: string;
+      limit?: number;
+      after?: string;
+    },
+  ) {
     const connectionIds = await this.getConnectionIds(currentUserId);
     const orFilters: Prisma.PostWhereInput[] = [
       { userId: currentUserId },
@@ -225,11 +232,46 @@ export class PostsService {
       orFilters.push({ visibility: 'friends', userId: { in: connectionIds } });
     }
 
+    const limit = options?.limit ?? 20;
+    const cursorPayload = options?.cursor
+      ? decodeURIComponent(options.cursor).split('::')
+      : [];
+    const cursorDate =
+      cursorPayload.length === 2 ? new Date(cursorPayload[0]) : null;
+    const cursorId = cursorPayload.length === 2 ? cursorPayload[1] : null;
+    const isCursorValid =
+      cursorDate instanceof Date &&
+      !Number.isNaN(cursorDate.getTime()) &&
+      Boolean(cursorId);
+    const afterDate = options?.after ? new Date(options.after) : null;
+    const isAfterValid =
+      afterDate instanceof Date && !Number.isNaN(afterDate.getTime());
+    const filters: Prisma.PostWhereInput[] = [{ OR: orFilters }];
+
+    if (isAfterValid && afterDate) {
+      filters.push({ createdAt: { gt: afterDate } });
+    }
+
+    if (isCursorValid && cursorDate && cursorId) {
+      filters.push({
+        OR: [
+          { createdAt: { lt: cursorDate } },
+          { createdAt: cursorDate, id: { lt: cursorId } },
+        ],
+      });
+    }
+
+    const where =
+      filters.length > 1
+        ? {
+            AND: filters,
+          }
+        : filters[0];
+
     const posts = await this.prisma.post.findMany({
-      where: {
-        OR: orFilters,
-      },
-      orderBy: { createdAt: 'desc' },
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
       include: {
         User: {
           select: {
@@ -282,7 +324,18 @@ export class PostsService {
       },
     });
 
-    return posts.map((post) => this.serializePost(post, currentUserId));
+    const hasMore = posts.length > limit;
+    const items = hasMore ? posts.slice(0, limit) : posts;
+    const lastItem = items[items.length - 1];
+    const nextCursor =
+      hasMore && lastItem?.createdAt
+        ? `${lastItem.createdAt.toISOString()}::${lastItem.id}`
+        : null;
+
+    return {
+      items: items.map((post) => this.serializePost(post, currentUserId)),
+      nextCursor,
+    };
   }
 
   async findOneAdmin(id: string) {

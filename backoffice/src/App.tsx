@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import RequireAuth from './components/RequireAuth';
@@ -38,3 +37,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

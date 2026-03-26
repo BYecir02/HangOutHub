@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { apiGet, apiPatch, apiPost } from '../lib/api';
 import PageHeader from '../components/PageHeader';
@@ -628,3 +628,4 @@ export default function CategoriesTagsPage() {
     </div>
   );
 }
+

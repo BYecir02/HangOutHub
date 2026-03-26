@@ -119,7 +119,7 @@ export default function LoginScreen() {
     };
 
     void checkLogin();
-  }, [router]);
+  }, [router, t]);
 
   const handleLogin = async () => {
     if (!email || !password) {

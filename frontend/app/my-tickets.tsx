@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -76,7 +76,7 @@ export default function MyTicketsScreen() {
     'all' | 'confirmed' | 'pending' | 'cancelled' | 'scanned'
   >('all');
 
-  const loadTickets = async (isRefresh = false) => {
+  const loadTickets = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -96,11 +96,11 @@ export default function MyTicketsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     void loadTickets();
-  }, []);
+  }, [loadTickets]);
 
   const now = Date.now();
   const tabItems = useMemo(
@@ -173,10 +173,10 @@ export default function MyTicketsScreen() {
     [baseTickets, statusFilter],
   );
   const nextTicket = upcomingTickets[0] || null;
-  const statusFilterItems: Array<{
+  const statusFilterItems: {
     id: 'all' | 'confirmed' | 'pending' | 'cancelled' | 'scanned';
     label: string;
-  }> = [
+  }[] = [
     { id: 'all', label: t('myTicketsFilterAll') },
     { id: 'confirmed', label: t('myTicketsFilterConfirmed') },
     { id: 'pending', label: t('myTicketsFilterPending') },
@@ -307,6 +307,7 @@ export default function MyTicketsScreen() {
     displayedTickets,
     errorMessage,
     loading,
+    loadTickets,
     locale,
     router,
     t,

@@ -1,11 +1,12 @@
-import React from 'react';
+import type { ReactNode } from 'react';
+
 import Card from './Card';
 
 interface PageHeaderProps {
   eyebrow?: string;
   title: string;
   subtitle?: string;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
   className?: string;
 }
 
@@ -35,3 +36,4 @@ export default function PageHeader({
     </Card>
   );
 }
+

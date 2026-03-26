@@ -1,13 +1,14 @@
-import React from 'react';
 
 interface Column {
   label: string;
   className?: string;
 }
 
+import type { ReactNode } from 'react';
+
 interface DataTableProps {
   columns: Column[];
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export default function DataTable({ columns, children }: DataTableProps) {
@@ -28,3 +29,4 @@ export default function DataTable({ columns, children }: DataTableProps) {
     </div>
   );
 }
+

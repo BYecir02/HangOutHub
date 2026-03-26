@@ -94,10 +94,6 @@ export default function CreateOutingScreen() {
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [currentStep, setCurrentStep] = useState(1);
   const isEventFlow = Boolean(params.eventId);
-  const hasSourcePlace =
-    typeof params.placeId === 'string' && params.placeId.trim().length > 0;
-  const hasSourceEvent =
-    typeof params.eventId === 'string' && params.eventId.trim().length > 0;
   const totalSteps = isEventFlow ? 2 : 3;
   const isDraftHydratedRef = useRef(false);
   const lastSavedDraftRef = useRef<string | null>(null);
@@ -341,10 +337,6 @@ export default function CreateOutingScreen() {
       setLoading(false);
     }
   };
-
-  const selectedPlaceName =
-    places.find((place) => place.id === selectedPlaceId)?.name ||
-    (hasSourcePlace ? t('homeAddressToConfirm') : '');
 
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">

@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiGet } from '../lib/api';
 import Pagination from '../components/Pagination';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
-import Card from '../components/Card';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
 import DataTable from '../components/DataTable';
 import SelectField from '../components/SelectField';
 import SearchInput from '../components/SearchInput';
@@ -149,7 +150,8 @@ export default function EventsPage() {
         }
       />
 
-      <Card>
+      <SectionCard>
+        <SectionTitle label="Evenements" subtitle="Liste des evenements." />
         {loading ? (
           <LoadingState />
         ) : (
@@ -203,8 +205,9 @@ export default function EventsPage() {
             />
           </>
         )}
-      </Card>
+      </SectionCard>
 
     </div>
   );
 }
+

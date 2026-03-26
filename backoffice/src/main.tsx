@@ -1,4 +1,4 @@
-import React from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './style.css';
@@ -17,7 +17,8 @@ const initialTheme = storedTheme || (prefersDark ? 'dark' : 'light');
 document.documentElement.classList.toggle('dark', initialTheme === 'dark');
 
 createRoot(rootElement).render(
-  <React.StrictMode>
+  <StrictMode>
     <App />
-  </React.StrictMode>,
+  </StrictMode>,
 );
+

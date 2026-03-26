@@ -1,9 +1,10 @@
-import React from 'react';
+
+import type { ReactNode } from 'react';
 
 interface EmptyStateProps {
   title: string;
   subtitle?: string;
-  action?: React.ReactNode;
+  action?: ReactNode;
 }
 
 export default function EmptyState({ title, subtitle, action }: EmptyStateProps) {
@@ -17,3 +18,4 @@ export default function EmptyState({ title, subtitle, action }: EmptyStateProps)
     </div>
   );
 }
+

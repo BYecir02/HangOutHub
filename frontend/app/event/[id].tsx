@@ -47,14 +47,14 @@ interface EventDetail {
       name?: string | null;
     } | null;
   } | null;
-  TicketType?: Array<{
+  TicketType?: {
     id: string;
     name: string;
     description?: string | null;
     price: number | string;
     quantity: number;
-  }>;
-  Promotion?: Array<{
+  }[];
+  Promotion?: {
     id: string;
     code?: string | null;
     discountType?: string | null;
@@ -62,7 +62,7 @@ interface EventDetail {
     maxRedemptions?: number | null;
     redeemedCount?: number | null;
     endDate?: string | null;
-  }>;
+  }[];
 }
 
 const EVENT_PLACEHOLDER =

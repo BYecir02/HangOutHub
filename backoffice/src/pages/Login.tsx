@@ -1,6 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import Card from '../components/Card';
+import FormField from '../components/FormField';
 import { setSession } from '../lib/auth';
 import { apiPost } from '../lib/api';
 
@@ -35,7 +38,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError('');
     setLoading(true);
@@ -75,7 +78,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-soft">
+      <Card className="w-full max-w-md p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
           HangOutHub
         </p>
@@ -87,30 +90,26 @@ export default function LoginPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Email</label>
+          <FormField label="Email">
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-brand-500"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-brand-500"
               placeholder="admin@hangouthub.dev"
               required
             />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Mot de passe
-            </label>
+          </FormField>
+          <FormField label="Mot de passe">
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-brand-500"
-              placeholder="••••••••"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-brand-500"
+              placeholder="********"
               required
             />
-          </div>
+          </FormField>
 
           {error ? (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -133,7 +132,9 @@ export default function LoginPage() {
         >
           {toggleLabel}
         </button>
-      </div>
+      </Card>
     </div>
   );
 }
+
+

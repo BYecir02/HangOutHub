@@ -1,10 +1,11 @@
-import React from 'react';
+
+import type { ReactNode } from 'react';
 
 interface FormFieldProps {
   label: string;
   hint?: string;
   error?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export default function FormField({ label, hint, error, children }: FormFieldProps) {
@@ -17,3 +18,4 @@ export default function FormField({ label, hint, error, children }: FormFieldPro
     </div>
   );
 }
+

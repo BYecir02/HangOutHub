@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -72,11 +72,11 @@ interface EventDraftPayload {
   selectedCategoryId: number | null;
   selectedTagIds: number[];
   ticketTypes: DraftTicketType[];
-  images: Array<{
+  images: {
     uri: string;
     fileName?: string;
     mimeType?: string;
-  }>;
+  }[];
   coverIndex: number;
 }
 
@@ -144,6 +144,7 @@ export default function CreateEventScreen() {
   const [stepError, setStepError] = useState<string | null>(null);
   const [stepErrorField, setStepErrorField] = useState<string | null>(null);
   const lastSavedDraftRef = useRef<string | null>(null);
+  const serializedDraftRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const fieldOffsetsRef = useRef<Record<string, number>>({});
 
@@ -192,7 +193,7 @@ export default function CreateEventScreen() {
     return `${minutes}min`;
   };
 
-  const buildDraftPayload = (): EventDraftPayload => ({
+  const buildDraftPayload = useCallback((): EventDraftPayload => ({
     title: eventForm.title,
     description: eventForm.description,
     cancellationPolicy: eventForm.cancellationPolicy,
@@ -217,11 +218,7 @@ export default function CreateEventScreen() {
       mimeType: item.mimeType || undefined,
     })),
     coverIndex,
-  });
-
-  const serializedDraft = useMemo(() => {
-    return JSON.stringify(buildDraftPayload());
-  }, [
+  }), [
     eventForm,
     selectedPlaceId,
     selectedCategoryId,
@@ -231,11 +228,20 @@ export default function CreateEventScreen() {
     coverIndex,
   ]);
 
-  const applyDraft = (
-    draft: EventDraftPayload,
-    availablePlaces: OwnedPlaceOption[],
-    availableCategories: CategoryOption[],
-  ) => {
+  const serializedDraft = useMemo(() => {
+    return JSON.stringify(buildDraftPayload());
+  }, [buildDraftPayload]);
+
+  useEffect(() => {
+    serializedDraftRef.current = serializedDraft;
+  }, [serializedDraft]);
+
+  const applyDraft = useCallback(
+    (
+      draft: EventDraftPayload,
+      availablePlaces: OwnedPlaceOption[],
+      availableCategories: CategoryOption[],
+    ) => {
     setEventForm({
       title: draft.title || '',
       description: draft.description || '',
@@ -309,9 +315,10 @@ export default function CreateEventScreen() {
       );
       setCoverIndex(normalizedCoverIndex);
     }
-  };
+  },
+  []);
 
-  const handleSaveDraft = async (options?: { silent?: boolean }) => {
+  const handleSaveDraft = useCallback(async (options?: { silent?: boolean }) => {
     const payload = buildDraftPayload();
 
     try {
@@ -326,7 +333,7 @@ export default function CreateEventScreen() {
         Alert.alert(t('commonErrorTitle'), t('createEventDraftSaveFailed'));
       }
     }
-  };
+  }, [buildDraftPayload, t]);
 
   const handleExitPress = () => {
     if (loading || !hasUnsavedChanges) {
@@ -447,7 +454,7 @@ export default function CreateEventScreen() {
           setCategoriesLoading(false);
 
           if (lastSavedDraftRef.current === null) {
-            lastSavedDraftRef.current = serializedDraft;
+            lastSavedDraftRef.current = serializedDraftRef.current;
             setHasUnsavedChanges(false);
           }
         }
@@ -459,7 +466,7 @@ export default function CreateEventScreen() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [applyDraft, t]);
 
   useEffect(() => {
     if (lastSavedDraftRef.current === null) {
@@ -504,7 +511,7 @@ export default function CreateEventScreen() {
     }, AUTO_SAVE_INTERVAL_MS);
 
     return () => clearInterval(timer);
-  }, [hasUnsavedChanges, loading, serializedDraft]);
+  }, [hasUnsavedChanges, loading, handleSaveDraft]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

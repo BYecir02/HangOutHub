@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface SearchInputProps {
   value: string;
@@ -39,3 +38,4 @@ export default function SearchInput({
     </div>
   );
 }
+

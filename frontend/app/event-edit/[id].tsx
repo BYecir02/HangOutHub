@@ -68,21 +68,21 @@ interface EventPayload {
   coverUrl?: string | null;
   images?: string[];
   placeId?: string | null;
-  TicketType?: Array<{
+  TicketType?: {
     id: string;
     name: string;
     description?: string | null;
     price: number | string;
     quantity: number;
-  }>;
-  Promotion?: Array<{
+  }[];
+  Promotion?: {
     id: string;
     code?: string | null;
     discountType?: string | null;
     discountValue?: number | string | null;
     maxRedemptions?: number | null;
     endDate?: string | null;
-  }>;
+  }[];
 }
 
 export default function EditEventScreen() {
@@ -137,12 +137,12 @@ export default function EditEventScreen() {
   const [checkInPickerValue, setCheckInPickerValue] = useState(new Date());
 
   const normalizeTicketTypes = (
-    items: Array<{
+    items: {
       name: string;
       description?: string | null;
       price: number | string;
       quantity: number | string;
-    }>,
+    }[],
   ): NormalizedTicketTypePayload[] =>
     items.map((ticketType) => ({
       name: ticketType.name.trim(),

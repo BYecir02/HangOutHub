@@ -1,4 +1,3 @@
-import React from 'react';
 
 type Tone = 'brand' | 'slate' | 'rose';
 
@@ -42,3 +41,4 @@ export default function KpiCard({ label, value, hint, tone = 'slate' }: KpiCardP
     </div>
   );
 }
+

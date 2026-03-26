@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiGet, apiPatch } from '../lib/api';
 import Pagination from '../components/Pagination';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
-import Card from '../components/Card';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import SelectField from '../components/SelectField';
@@ -195,7 +196,8 @@ export default function ReportsPage() {
         }
       />
 
-      <Card>
+      <SectionCard>
+        <SectionTitle label="Signalements" subtitle="Liste des signalements." />
         {loading ? (
           <LoadingState />
         ) : (
@@ -344,7 +346,8 @@ export default function ReportsPage() {
             />
           </>
         )}
-      </Card>
+      </SectionCard>
     </div>
   );
 }
+

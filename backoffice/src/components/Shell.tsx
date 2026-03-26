@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearSession, getSession } from '../lib/auth';
 
@@ -102,3 +102,4 @@ export default function Shell() {
     </div>
   );
 }
+

@@ -1,4 +1,3 @@
-import React from 'react';
 
 const statusLabels: Record<string, string> = {
   PENDING: 'En attente',
@@ -32,3 +31,4 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     </span>
   );
 }
+

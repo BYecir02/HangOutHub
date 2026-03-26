@@ -1,7 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { apiGet } from '../lib/api';
+import PageHeader from '../components/PageHeader';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 
 interface PostDetail {
   id: string;
@@ -68,42 +73,33 @@ export default function PostViewPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-          Post
-        </p>
-        <h2 className="mt-2 text-2xl font-bold text-slate-900">
-          Details du contenu
-        </h2>
-      </div>
+      <PageHeader
+        eyebrow="Post"
+        title="Details du contenu"
+        subtitle="Verifie le contexte et les medias."
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
+      <SectionCard>
         {loading ? (
-          <p className="text-sm text-slate-500">Chargement...</p>
-        ) : post ? (
+          <LoadingState />
+        ) : !post ? (
+          <EmptyState title="Post introuvable." />
+        ) : (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Auteur
-                </p>
+                <SectionTitle label="Auteur" />
                 <p className="mt-2 text-lg font-semibold text-slate-900">
-                  {post.User?.displayName ||
-                    post.User?.username ||
-                    'Utilisateur'}
+                  {post.User?.displayName || post.User?.username || 'Utilisateur'}
                 </p>
               </div>
               <div className="text-sm text-slate-500">
-                {post.createdAt
-                  ? new Date(post.createdAt).toLocaleString()
-                  : '-'}
+                {post.createdAt ? new Date(post.createdAt).toLocaleString() : '-'}
               </div>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                Contenu
-              </p>
+              <SectionTitle label="Contenu" />
               <p className="mt-2 text-base text-slate-700">
                 {post.content || 'Aucun texte.'}
               </p>
@@ -111,54 +107,41 @@ export default function PostViewPage() {
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-2xl border border-slate-100 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Type
-                </p>
+                <SectionTitle label="Type" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
                   {post.postType || 'post'}
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-100 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Visibilite
-                </p>
+                <SectionTitle label="Visibilite" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
                   {post.visibility || 'public'}
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-100 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Interactions
-                </p>
+                <SectionTitle label="Interactions" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
-                  {post._count?.likes || 0} likes · {post._count?.comments || 0}{' '}
+                  {post._count?.likes || 0} likes - {post._count?.comments || 0}{' '}
                   commentaires
                 </p>
               </div>
             </div>
 
-            {(post.Event || post.Place || post.placeName) && (
+            {(post.Event || post.Place || post.placeName) ? (
               <div className="rounded-2xl border border-slate-100 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Contexte
-                </p>
+                <SectionTitle label="Contexte" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
-                  {post.Event?.title ||
-                    post.Place?.name ||
-                    post.placeName ||
-                    '-'}
+                  {post.Event?.title || post.Place?.name || post.placeName || '-'}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   {post.Place?.City?.name || post.cityName || ''}
                 </p>
               </div>
-            )}
+            ) : null}
 
             {post.images && post.images.length > 0 ? (
               <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                  Images
-                </p>
+                <SectionTitle label="Images" />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {post.images.map((url, index) => (
                     <div
@@ -176,10 +159,8 @@ export default function PostViewPage() {
               </div>
             ) : null}
           </div>
-        ) : (
-          <p className="text-sm text-slate-500">Post introuvable.</p>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface MiniStatProps {
   label: string;
@@ -13,3 +12,4 @@ export default function MiniStat({ label, value }: MiniStatProps) {
     </div>
   );
 }
+

@@ -352,7 +352,7 @@ export default function CreatePostScreen() {
     return () => {
       isMounted = false;
     };
-  }, [showPlanModal]);
+  }, [eventId, placeId, showPlanModal]);
 
   const derivedPostType: PostType = visibility === 'friends' ? 'plan' : 'post';
   const canSubmit = content.trim().length > 0 || images.length > 0;

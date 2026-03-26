@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,7 +52,7 @@ export default function OrganizerEventTeamScreen() {
     [items],
   );
 
-  const loadCollaborators = async () => {
+  const loadCollaborators = useCallback(async () => {
     if (!eventId) {
       setLoading(false);
       return;
@@ -69,11 +69,11 @@ export default function OrganizerEventTeamScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, t]);
 
   useEffect(() => {
     void loadCollaborators();
-  }, [eventId]);
+  }, [loadCollaborators]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {

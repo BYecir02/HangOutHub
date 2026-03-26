@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface Option<T extends string | number> {
   label: string;
@@ -32,3 +31,4 @@ export default function SelectField<T extends string | number>({
     </select>
   );
 }
+

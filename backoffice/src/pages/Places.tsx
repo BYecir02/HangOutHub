@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiGet } from '../lib/api';
 import Pagination from '../components/Pagination';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
-import Card from '../components/Card';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
 import DataTable from '../components/DataTable';
 import SelectField from '../components/SelectField';
 import SearchInput from '../components/SearchInput';
@@ -28,11 +29,11 @@ interface PlaceItem {
   longitude?: number | null;
   priceLevel?: number | null;
   City?: CityOption | null;
-  PlaceTag?: Array<{
+  PlaceTag?: {
     Tag?: {
       name?: string | null;
     } | null;
-  }>;
+  }[];
 }
 
 export default function PlacesPage() {
@@ -153,7 +154,8 @@ export default function PlacesPage() {
         }
       />
 
-      <Card>
+      <SectionCard>
+        <SectionTitle label="Lieux" subtitle="Liste des lieux disponibles." />
         {loading ? (
           <LoadingState />
         ) : (
@@ -205,8 +207,9 @@ export default function PlacesPage() {
             />
           </>
         )}
-      </Card>
+      </SectionCard>
 
     </div>
   );
 }
+

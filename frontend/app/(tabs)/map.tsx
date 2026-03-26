@@ -19,13 +19,13 @@ interface PlacePin {
   latitude?: number | null;
   longitude?: number | null;
   avgRating?: number | null;
-  PlaceTag?: Array<{
+  PlaceTag?: {
     Tag?: {
       id: number;
       name: string;
       categoryId?: number | null;
     } | null;
-  }>;
+  }[];
   City?: {
     name?: string | null;
     country?: string | null;
