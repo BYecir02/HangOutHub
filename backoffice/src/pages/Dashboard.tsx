@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { apiGet } from '../lib/api';
+import Card from '../components/Card';
+import KpiCard from '../components/KpiCard';
+import MiniStat from '../components/MiniStat';
+import EmptyState from '../components/EmptyState';
 
 interface EventSummary {
   id: string;
@@ -72,7 +76,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="rounded-2xl bg-white p-8 shadow-soft">
+      <Card className="p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
           Vue d ensemble
         </p>
@@ -84,39 +88,24 @@ export default function Dashboard() {
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl bg-brand-50 p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-400">
-              Evenements
-            </p>
-            <p className="mt-3 text-4xl font-bold text-brand-700">
-              {loading ? '...' : eventsCount}
-            </p>
-            <p className="mt-2 text-sm text-brand-500">
-              Publies sur la plateforme
-            </p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-              Lieux
-            </p>
-            <p className="mt-3 text-4xl font-bold text-slate-700">
-              {loading ? '...' : placesCount}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Repertories dans l application
-            </p>
-          </div>
-          <div className="rounded-2xl bg-rose-50 p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-400">
-              Signalements
-            </p>
-            <p className="mt-3 text-4xl font-bold text-rose-700">
-              {loading ? '...' : reportsCount}
-            </p>
-            <p className="mt-2 text-sm text-rose-500">
-              {loading ? '...' : `${pendingReports} en attente`}
-            </p>
-          </div>
+          <KpiCard
+            label="Evenements"
+            value={loading ? '...' : eventsCount}
+            hint="Publies sur la plateforme"
+            tone="brand"
+          />
+          <KpiCard
+            label="Lieux"
+            value={loading ? '...' : placesCount}
+            hint="Repertories dans l application"
+            tone="slate"
+          />
+          <KpiCard
+            label="Signalements"
+            value={loading ? '...' : reportsCount}
+            hint={loading ? '...' : `${pendingReports} en attente`}
+            tone="rose"
+          />
         </div>
 
         <div className="mt-8 rounded-2xl bg-slate-50 p-6">
@@ -125,24 +114,14 @@ export default function Dashboard() {
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(reportsByType).map(([type, count]) => (
-              <div
-                key={type}
-                className="rounded-xl border border-slate-100 bg-white px-4 py-3"
-              >
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  {type}
-                </p>
-                <p className="mt-2 text-xl font-bold text-slate-700">
-                  {loading ? '...' : count}
-                </p>
-              </div>
+              <MiniStat key={type} label={type} value={loading ? '...' : count} />
             ))}
             {!loading && Object.keys(reportsByType).length === 0 ? (
-              <p className="text-sm text-slate-400">Aucun signalement.</p>
+              <EmptyState title="Aucun signalement." />
             ) : null}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

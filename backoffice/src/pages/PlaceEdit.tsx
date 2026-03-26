@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { apiGet, apiUpload } from '../lib/api';
+import { apiGet, apiPatch, apiPost, apiUpload } from '../lib/api';
+import PageHeader from '../components/PageHeader';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
+import FormField from '../components/FormField';
+import LoadingState from '../components/LoadingState';
+import SelectField from '../components/SelectField';
+import Card from '../components/Card';
 
 interface CityOption {
   id: number;
@@ -53,6 +60,12 @@ export default function PlaceEditPage() {
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [openCategoryId, setOpenCategoryId] = useState<number | null>(null);
+  const [tagSearch, setTagSearch] = useState('');
+  const [tagCreationError, setTagCreationError] = useState('');
+  const [tagCreationCategoryId, setTagCreationCategoryId] = useState<number | null>(
+    null,
+  );
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -111,15 +124,64 @@ export default function PlaceEditPage() {
       return;
     }
 
-    const previewUrls = galleryFiles.map((file) =>
-      URL.createObjectURL(file),
-    );
+    const previewUrls = galleryFiles.map((file) => URL.createObjectURL(file));
     setGalleryPreviews(previewUrls);
 
     return () => {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [galleryFiles]);
+
+  useEffect(() => {
+    setTagSearch('');
+    setTagCreationError('');
+  }, [openCategoryId]);
+
+  const handleCreateTag = async (categoryId: number, name: string) => {
+    setTagCreationError('');
+    setTagCreationCategoryId(categoryId);
+    try {
+      const created = await apiPost<{
+        id: number;
+        name: string;
+        status?: string | null;
+      }>(`/categories/${categoryId}/tags`, { name });
+
+      let finalTag = created;
+      if (created.status && created.status !== 'APPROVED') {
+        try {
+          finalTag = await apiPatch<{
+            id: number;
+            name: string;
+            status?: string | null;
+          }>(`/categories/tags/${created.id}`, { status: 'APPROVED' });
+        } catch {
+          // Si l'approbation echoue, on garde le tag cree.
+        }
+      }
+
+      setCategories((current) =>
+        current.map((category) => {
+          if (category.id !== categoryId) {
+            return category;
+          }
+          const existing = (category.Tag || []).some((tag) => tag.id === finalTag.id);
+          return {
+            ...category,
+            Tag: existing ? category.Tag : [...(category.Tag || []), finalTag],
+          };
+        }),
+      );
+      setSelectedTagIds((current) =>
+        current.includes(finalTag.id) ? current : [...current, finalTag.id],
+      );
+      setTagSearch('');
+    } catch {
+      setTagCreationError("Impossible d'ajouter ce tag.");
+    } finally {
+      setTagCreationCategoryId(null);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!place) {
@@ -164,81 +226,68 @@ export default function PlaceEditPage() {
 
   if (loading || !place) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <p className="text-sm text-slate-500">Chargement...</p>
-      </div>
+      <Card>
+        <LoadingState />
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Lieu
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Modifier {place.name}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Ville: {place.City?.name || 'Non definie'}
-            </p>
-          </div>
+      <PageHeader
+        eyebrow="Lieu"
+        title={`Modifier ${place.name}`}
+        subtitle={`Ville: ${place.City?.name || 'Non definie'}`}
+        actions={
           <button
             onClick={() => navigate('/places')}
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
           >
             Retour
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="grid gap-4 md:grid-cols-2">
+      <SectionCard>
+        <SectionTitle label="Informations" subtitle="Modifie les infos du lieu." />
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-600">Nom</label>
-            <input
-              value={place.name}
-              onChange={(evt) => setPlace({ ...place, name: evt.target.value })}
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-            />
+            <FormField label="Nom">
+              <input
+                value={place.name}
+                onChange={(evt) => setPlace({ ...place, name: evt.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              />
+            </FormField>
           </div>
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-600">
-              Adresse
-            </label>
-            <input
-              value={place.address ?? ''}
-              onChange={(evt) =>
-                setPlace({ ...place, address: evt.target.value })
-              }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-            />
+            <FormField label="Adresse">
+              <input
+                value={place.address ?? ''}
+                onChange={(evt) => setPlace({ ...place, address: evt.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              />
+            </FormField>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Ville</label>
-            <select
+          <FormField label="Ville">
+            <SelectField
               value={place.City?.id ?? ''}
-              onChange={(evt) => {
-                const cityId = Number(evt.target.value || 0);
+              onChange={(value) => {
+                const cityId = Number(value || 0);
                 const city = cities.find((item) => item.id === cityId) || null;
-                setPlace({ ...place, City: city || null });
+                setPlace({ ...place, City: city });
               }}
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-            >
-              <option value="">Selectionner</option>
-              {cities.map((city) => (
-                <option key={city.id} value={city.id}>
-                  {city.name} - {city.country}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Niveau de prix
-            </label>
+              className="w-full"
+              options={[
+                { label: 'Selectionner', value: '' },
+                ...cities.map((city) => ({
+                  label: `${city.name} - ${city.country}`,
+                  value: city.id,
+                })),
+              ]}
+            />
+          </FormField>
+          <FormField label="Niveau de prix">
             <input
               type="number"
               value={place.priceLevel ?? 1}
@@ -248,13 +297,10 @@ export default function PlaceEditPage() {
                   priceLevel: Number(evt.target.value || 1),
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Latitude
-            </label>
+          </FormField>
+          <FormField label="Latitude">
             <input
               type="number"
               value={place.latitude ?? ''}
@@ -264,13 +310,10 @@ export default function PlaceEditPage() {
                   latitude: evt.target.value ? Number(evt.target.value) : null,
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Longitude
-            </label>
+          </FormField>
+          <FormField label="Longitude">
             <input
               type="number"
               value={place.longitude ?? ''}
@@ -280,65 +323,139 @@ export default function PlaceEditPage() {
                   longitude: evt.target.value ? Number(evt.target.value) : null,
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
+          </FormField>
         </div>
 
         <div className="mt-4">
-          <label className="text-xs font-semibold text-slate-600">
-            Description
-          </label>
-          <textarea
-            rows={4}
-            value={place.description ?? ''}
-            onChange={(evt) =>
-              setPlace({ ...place, description: evt.target.value })
-            }
-            className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-          />
+          <FormField label="Description">
+            <textarea
+              rows={4}
+              value={place.description ?? ''}
+              onChange={(evt) => setPlace({ ...place, description: evt.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+            />
+          </FormField>
         </div>
+      </SectionCard>
 
-        <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-            Tags
-          </p>
-          <div className="mt-3 space-y-4">
-            {categories.map((category) => (
-              <div key={category.id}>
-                <p className="text-xs font-semibold text-slate-600">
-                  {category.name}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(category.Tag || []).map((tag) => {
-                    const active = selectedTagIds.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        onClick={() => {
-                          setSelectedTagIds((current) =>
-                            active
-                              ? current.filter((id) => id !== tag.id)
-                              : [...current, tag.id],
-                          );
-                        }}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                          active
-                            ? 'border-brand-500 bg-brand-500 text-white'
-                            : 'border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                </div>
+      <SectionCard>
+        <SectionTitle label="Tags" subtitle="Associe les tags utilises." />
+        <div className="mt-4 space-y-4">
+          {categories.map((category) => (
+            <div key={category.id}>
+              <p className="text-xs font-semibold text-slate-600">{category.name}</p>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenCategoryId((current) =>
+                      current === category.id ? null : category.id,
+                    )
+                  }
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left text-sm text-slate-700"
+                >
+                  <span>
+                    {(category.Tag || []).filter((tag) =>
+                      selectedTagIds.includes(tag.id),
+                    ).length > 0
+                      ? `${(category.Tag || []).filter((tag) =>
+                          selectedTagIds.includes(tag.id),
+                        ).length} tag(s) selectionne(s)`
+                      : 'Selectionner des tags'}
+                  </span>
+                  <span className="text-slate-400">v</span>
+                </button>
+
+                {openCategoryId === category.id ? (
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
+                    <input
+                      value={tagSearch}
+                      onChange={(event) => setTagSearch(event.target.value)}
+                      placeholder="Rechercher un tag"
+                      className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                    />
+                    {(() => {
+                      const query = tagSearch.trim().toLowerCase();
+                      const availableTags = (category.Tag || []).filter((tag) =>
+                        query ? tag.name.toLowerCase().includes(query) : true,
+                      );
+                      const hasExact = (category.Tag || []).some(
+                        (tag) => tag.name.toLowerCase() === query,
+                      );
+                      const canAdd = query.length >= 2 && !hasExact;
+                      return (
+                        <div className="grid gap-2">
+                          {availableTags.map((tag) => {
+                            const active = selectedTagIds.includes(tag.id);
+                            return (
+                              <label
+                                key={tag.id}
+                                className="flex items-center gap-2 text-sm text-slate-700"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={active}
+                                  onChange={() =>
+                                    setSelectedTagIds((current) =>
+                                      active
+                                        ? current.filter((id) => id !== tag.id)
+                                        : [...current, tag.id],
+                                    )
+                                  }
+                                />
+                                <span>{tag.name}</span>
+                              </label>
+                            );
+                          })}
+
+                          {canAdd ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCreateTag(category.id, tagSearch.trim())
+                              }
+                              disabled={tagCreationCategoryId === category.id}
+                              className="mt-2 rounded-lg border border-brand-500 px-3 py-2 text-xs font-semibold text-brand-600 disabled:opacity-60"
+                            >
+                              {tagCreationCategoryId === category.id
+                                ? 'Ajout...'
+                                : `Ajouter "${tagSearch.trim()}"`}
+                            </button>
+                          ) : null}
+
+                          {tagCreationError ? (
+                            <p className="text-xs text-red-500">
+                              {tagCreationError}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(category.Tag || [])
+                  .filter((tag) => selectedTagIds.includes(tag.id))
+                  .map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full border border-brand-500 bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-600"
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          ))}
         </div>
+      </SectionCard>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <SectionCard>
+        <SectionTitle label="Medias" subtitle="Gere la couverture et la galerie." />
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-xs font-semibold text-slate-600">
               Couverture actuelle
@@ -362,16 +479,12 @@ export default function PlaceEditPage() {
             <input
               type="file"
               accept="image/*"
-              onChange={(evt) =>
-                setCoverFile(evt.target.files?.[0] || null)
-              }
+              onChange={(evt) => setCoverFile(evt.target.files?.[0] || null)}
               className="mt-3 text-sm text-slate-600"
             />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-600">
-              Galerie actuelle
-            </p>
+            <p className="text-xs font-semibold text-slate-600">Galerie actuelle</p>
             {galleryPreviews.length > 0 ? (
               <>
                 <p className="mt-2 text-xs text-emerald-600">
@@ -430,28 +543,28 @@ export default function PlaceEditPage() {
             </p>
           </div>
         </div>
+      </SectionCard>
 
-        {error ? (
-          <div className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={() => navigate('/places')}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
-          >
-            {saving ? 'Sauvegarde...' : 'Enregistrer'}
-          </button>
+      {error ? (
+        <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">
+          {error}
         </div>
+      ) : null}
+
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={() => navigate('/places')}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+        >
+          Annuler
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={saving}
+          className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        >
+          {saving ? 'Sauvegarde...' : 'Enregistrer'}
+        </button>
       </div>
     </div>
   );

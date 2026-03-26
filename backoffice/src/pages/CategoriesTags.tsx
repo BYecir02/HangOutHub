@@ -1,6 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { apiGet, apiPatch, apiPost } from '../lib/api';
+import PageHeader from '../components/PageHeader';
+import FilterBar from '../components/FilterBar';
+import SearchInput from '../components/SearchInput';
+import SelectField from '../components/SelectField';
+import Card from '../components/Card';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
+import FormField from '../components/FormField';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import DataTable from '../components/DataTable';
+import TableRowActions from '../components/TableRowActions';
+import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
 
 interface TagItem {
@@ -237,53 +250,43 @@ export default function CategoriesTagsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Taxonomie
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Categories & tags
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Cree, edite et valide les tags proposes.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
+      <PageHeader
+        eyebrow="Taxonomie"
+        title="Categories & tags"
+        subtitle="Cree, edite et valide les tags proposes."
+        actions={
+          <FilterBar>
+            <SearchInput
               value={searchTag}
-              onChange={(event) => setSearchTag(event.target.value)}
+              onChange={setSearchTag}
               placeholder="Rechercher un tag..."
-              className="w-64 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
             />
-            <select
+            <SelectField
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Tous les statuts</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+              onChange={(value) => setStatusFilter(value)}
+              options={[
+                { label: 'Tous les statuts', value: 'all' },
+                ...statusOptions.map((status) => ({
+                  label: status,
+                  value: status,
+                })),
+              ]}
+            />
+          </FilterBar>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <div className="space-y-6">
-          <div className="rounded-2xl bg-white p-6 shadow-soft">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Categories
-            </p>
+          <SectionCard>
+            <SectionTitle label="Categories" subtitle="Choisis une categorie." />
             <div className="mt-4 space-y-2">
               {loading ? (
-                <p className="text-sm text-slate-500">Chargement...</p>
+                <LoadingState />
               ) : loadError ? (
                 <p className="text-sm text-rose-500">{loadError}</p>
+              ) : categories.length === 0 ? (
+                <EmptyState title="Aucune categorie." />
               ) : (
                 categories.map((category) => (
                   <button
@@ -302,49 +305,51 @@ export default function CategoriesTagsPage() {
                   </button>
                 ))
               )}
-              {!loading && !loadError && categories.length === 0 ? (
-                <p className="text-sm text-slate-400">Aucune categorie.</p>
-              ) : null}
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="rounded-2xl bg-white p-6 shadow-soft">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Nouvelle categorie
-            </p>
+          <SectionCard>
+            <SectionTitle
+              label="Nouvelle categorie"
+              subtitle="Ajoute une categorie et sa couleur."
+            />
             <div className="mt-4 space-y-3">
-              <input
-                value={newCategory.name}
-                onChange={(event) =>
-                  setNewCategory((prev) => ({ ...prev, name: event.target.value }))
-                }
-                placeholder="Nom"
-                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-              />
-              <div className="flex items-center gap-3">
+              <FormField label="Nom">
                 <input
-                  type="color"
-                  value={newCategory.color || '#FF5C8A'}
+                  value={newCategory.name}
                   onChange={(event) =>
-                    setNewCategory((prev) => ({
-                      ...prev,
-                      color: event.target.value,
-                    }))
+                    setNewCategory((prev) => ({ ...prev, name: event.target.value }))
                   }
-                  className="h-10 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                  placeholder="Nom"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                 />
-                <input
-                  value={newCategory.color}
-                  onChange={(event) =>
-                    setNewCategory((prev) => ({
-                      ...prev,
-                      color: event.target.value,
-                    }))
-                  }
-                  placeholder="Couleur (#FF5C8A)"
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                />
-              </div>
+              </FormField>
+              <FormField label="Couleur">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={newCategory.color || '#FF5C8A'}
+                    onChange={(event) =>
+                      setNewCategory((prev) => ({
+                        ...prev,
+                        color: event.target.value,
+                      }))
+                    }
+                    className="h-10 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                  />
+                  <input
+                    value={newCategory.color}
+                    onChange={(event) =>
+                      setNewCategory((prev) => ({
+                        ...prev,
+                        color: event.target.value,
+                      }))
+                    }
+                    placeholder="Couleur (#FF5C8A)"
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  />
+                </div>
+              </FormField>
               <div className="flex flex-wrap gap-2">
                 {colorPresets.map((color) => (
                   <button
@@ -359,80 +364,95 @@ export default function CategoriesTagsPage() {
                   />
                 ))}
               </div>
-              <input
-                value={newCategory.icon}
-                onChange={(event) =>
-                  setNewCategory((prev) => ({ ...prev, icon: event.target.value }))
-                }
-                placeholder="Icone (ex: sparkles)"
-                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-              />
+              <FormField label="Icone">
+                <input
+                  value={newCategory.icon}
+                  onChange={(event) =>
+                    setNewCategory((prev) => ({ ...prev, icon: event.target.value }))
+                  }
+                  placeholder="Icone (ex: sparkles)"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                />
+              </FormField>
               <button
                 onClick={handleCreateCategory}
                 disabled={saving}
-                className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="btn-primary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
               >
                 Ajouter la categorie
               </button>
             </div>
-          </div>
+          </SectionCard>
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl bg-white p-6 shadow-soft">
+          <SectionCard>
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                  Edition
-                </p>
-                <h3 className="mt-2 text-xl font-bold text-slate-900">
-                  {selectedCategory?.name || 'Categorie'}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Mets a jour le style et les tags associes.
-                </p>
-              </div>
+              <SectionTitle
+                label="Edition"
+                subtitle="Mets a jour la categorie et ses tags."
+              />
               <button
                 onClick={handleUpdateCategory}
                 disabled={saving || !selectedCategory}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
               >
                 Enregistrer
               </button>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <input
-                value={categoryDraft.name}
-                onChange={(event) =>
-                  setCategoryDraft((prev) => ({ ...prev, name: event.target.value }))
-                }
-                placeholder="Nom"
-                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-              />
-              <div className="flex items-center gap-3">
+              <FormField label="Nom">
                 <input
-                  type="color"
-                  value={categoryDraft.color || '#FF5C8A'}
+                  value={categoryDraft.name}
                   onChange={(event) =>
                     setCategoryDraft((prev) => ({
                       ...prev,
-                      color: event.target.value,
+                      name: event.target.value,
                     }))
                   }
-                  className="h-10 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                  placeholder="Nom"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                 />
+              </FormField>
+              <FormField label="Couleur">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={categoryDraft.color || '#FF5C8A'}
+                    onChange={(event) =>
+                      setCategoryDraft((prev) => ({
+                        ...prev,
+                        color: event.target.value,
+                      }))
+                    }
+                    className="h-10 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                  />
+                  <input
+                    value={categoryDraft.color}
+                    onChange={(event) =>
+                      setCategoryDraft((prev) => ({
+                        ...prev,
+                        color: event.target.value,
+                      }))
+                    }
+                    placeholder="Couleur"
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  />
+                </div>
+              </FormField>
+              <FormField label="Icone">
                 <input
-                  value={categoryDraft.color}
+                  value={categoryDraft.icon}
                   onChange={(event) =>
                     setCategoryDraft((prev) => ({
                       ...prev,
-                      color: event.target.value,
+                      icon: event.target.value,
                     }))
                   }
-                  placeholder="Couleur"
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  placeholder="Icone"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                 />
-              </div>
+              </FormField>
               <div className="flex flex-wrap gap-2 sm:col-span-3">
                 {colorPresets.map((color) => (
                   <button
@@ -447,63 +467,56 @@ export default function CategoriesTagsPage() {
                   />
                 ))}
               </div>
-              <input
-                value={categoryDraft.icon}
-                onChange={(event) =>
-                  setCategoryDraft((prev) => ({ ...prev, icon: event.target.value }))
-                }
-                placeholder="Icone"
-                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-              />
             </div>
 
             <div className="mt-6 rounded-xl border border-slate-200 p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  value={newTag}
-                  onChange={(event) => setNewTag(event.target.value)}
-                  placeholder="Ajouter un tag..."
-                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                />
-                <button
-                  onClick={handleAddTag}
-                  disabled={saving || !selectedCategory}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  Ajouter
-                </button>
-              </div>
+              <FormField label="Ajouter un tag">
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    value={newTag}
+                    onChange={(event) => setNewTag(event.target.value)}
+                    placeholder="Ajouter un tag..."
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  />
+                  <button
+                    onClick={handleAddTag}
+                    disabled={saving || !selectedCategory}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    Ajouter
+                  </button>
+                </div>
+              </FormField>
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="rounded-2xl bg-white p-6 shadow-soft">
+          <Card>
             {loading ? (
-              <p className="text-sm text-slate-500">Chargement...</p>
+              <LoadingState />
             ) : loadError ? (
               <p className="text-sm text-rose-500">{loadError}</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs uppercase text-slate-400">
-                    <tr>
-                      <th className="pb-3">Tag</th>
-                      <th className="pb-3">Statut</th>
-                      <th className="pb-3">Propose par</th>
-                      <th className="pb-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
+              <>
+                <DataTable
+                  columns={[
+                    { label: 'Tag' },
+                    { label: 'Statut' },
+                    { label: 'Propose par' },
+                    { label: 'Actions', className: 'text-right' },
+                  ]}
+                >
                   <tbody className="text-slate-700">
                     {pagedTags.map((tag) => (
                       <tr key={tag.id} className="border-t border-slate-100">
                         <td className="py-4 font-semibold">{tag.name}</td>
-                        <td className="py-4 text-xs font-semibold text-slate-500">
-                          {normalizeStatus(tag.status)}
+                        <td className="py-4">
+                          <StatusBadge status={tag.status} />
                         </td>
                         <td className="py-4 text-xs text-slate-400">
                           {tag.submittedByUserId || 'Systeme'}
                         </td>
                         <td className="py-4 text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
+                          <TableRowActions>
                             <button
                               onClick={() => handleSelectTag(tag.id)}
                               className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
@@ -524,40 +537,33 @@ export default function CategoriesTagsPage() {
                             >
                               Refuser
                             </button>
-                          </div>
+                          </TableRowActions>
                         </td>
                       </tr>
                     ))}
                     {visibleTags.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-slate-400">
-                          Aucun tag a afficher.
+                        <td colSpan={4}>
+                          <EmptyState title="Aucun tag a afficher." />
                         </td>
                       </tr>
                     ) : null}
                   </tbody>
-                </table>
+                </DataTable>
                 <Pagination
                   currentPage={page}
                   pageSize={pageSize}
                   totalItems={visibleTags.length}
                   onPageChange={setPage}
                 />
-              </div>
+              </>
             )}
-          </div>
+          </Card>
 
           {selectedTagId ? (
-            <div className="rounded-2xl bg-white p-6 shadow-soft">
+            <SectionCard>
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                    Tag selectionne
-                  </p>
-                  <h3 className="mt-2 text-xl font-bold text-slate-900">
-                    Modifier le tag
-                  </h3>
-                </div>
+                <SectionTitle label="Tag selectionne" subtitle="Modifier ce tag." />
                 <button
                   onClick={() => setSelectedTagId(null)}
                   className="text-xs font-semibold text-slate-400 hover:text-slate-600"
@@ -566,54 +572,56 @@ export default function CategoriesTagsPage() {
                 </button>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <input
-                  value={tagDraft.name}
-                  onChange={(event) =>
-                    setTagDraft((prev) => ({ ...prev, name: event.target.value }))
-                  }
-                  placeholder="Nom du tag"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                />
-                <select
-                  value={tagDraft.status}
-                  onChange={(event) =>
-                    setTagDraft((prev) => ({ ...prev, status: event.target.value }))
-                  }
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                >
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={tagDraft.categoryId}
-                  onChange={(event) =>
-                    setTagDraft((prev) => ({
-                      ...prev,
-                      categoryId: Number(event.target.value),
-                    }))
-                  }
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                <FormField label="Nom du tag">
+                  <input
+                    value={tagDraft.name}
+                    onChange={(event) =>
+                      setTagDraft((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Nom du tag"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  />
+                </FormField>
+                <FormField label="Statut">
+                  <SelectField
+                    value={tagDraft.status}
+                    onChange={(value) =>
+                      setTagDraft((prev) => ({ ...prev, status: value }))
+                    }
+                    options={statusOptions.map((status) => ({
+                      label: status,
+                      value: status,
+                    }))}
+                    className="w-full"
+                  />
+                </FormField>
+                <FormField label="Categorie">
+                  <SelectField
+                    value={tagDraft.categoryId}
+                    onChange={(value) =>
+                      setTagDraft((prev) => ({
+                        ...prev,
+                        categoryId: Number(value),
+                      }))
+                    }
+                    options={categories.map((category) => ({
+                      label: category.name,
+                      value: category.id,
+                    }))}
+                    className="w-full"
+                  />
+                </FormField>
               </div>
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={handleUpdateTag}
                   disabled={saving}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
                 >
                   Enregistrer
                 </button>
               </div>
-            </div>
+            </SectionCard>
           ) : null}
         </div>
       </div>

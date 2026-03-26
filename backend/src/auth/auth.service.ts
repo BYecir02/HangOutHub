@@ -65,6 +65,11 @@ export class AuthService {
       ifuNumber,
       payoutInfo,
       jobTitle,
+      instagramUrl,
+      tiktokUrl,
+      facebookUrl,
+      xUrl,
+      websiteUrl,
       ...userDto
     } = registerOrganizerDto;
 
@@ -79,6 +84,11 @@ export class AuthService {
       ifuNumber,
       payoutInfo,
       jobTitle,
+      instagramUrl,
+      tiktokUrl,
+      facebookUrl,
+      xUrl,
+      websiteUrl,
     };
 
     return this.usersService.create(userDto, roleName, organizerDetails);

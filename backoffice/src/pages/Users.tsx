@@ -2,6 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { apiDelete, apiGet } from '../lib/api';
 import Pagination from '../components/Pagination';
+import PageHeader from '../components/PageHeader';
+import FilterBar from '../components/FilterBar';
+import Card from '../components/Card';
+import DataTable from '../components/DataTable';
+import SelectField from '../components/SelectField';
+import SearchInput from '../components/SearchInput';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import TableRowActions from '../components/TableRowActions';
 
 interface UserItem {
   id: string;
@@ -91,57 +100,43 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Gestion
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Utilisateurs
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Consulte et gere les comptes de la plateforme.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
+      <PageHeader
+        eyebrow="Gestion"
+        title="Utilisateurs"
+        subtitle="Consulte et gere les comptes de la plateforme."
+        actions={
+          <FilterBar>
+            <SelectField
               value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Tous les roles</option>
-              {availableRoles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Rechercher un utilisateur..."
-              className="w-64 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              onChange={(value) => setRoleFilter(value)}
+              options={[
+                { label: 'Tous les roles', value: 'all' },
+                ...availableRoles.map((role) => ({ label: role, value: role })),
+              ]}
             />
-          </div>
-        </div>
-      </div>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Rechercher un utilisateur..."
+            />
+          </FilterBar>
+        }
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
+      <Card>
         {loading ? (
-          <p className="text-sm text-slate-500">Chargement...</p>
+          <LoadingState />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-400">
-                <tr>
-                  <th className="pb-3">Utilisateur</th>
-                  <th className="pb-3">Role</th>
-                  <th className="pb-3">Organisateur</th>
-                  <th className="pb-3">Cree le</th>
-                  <th className="pb-3 text-right">Actions</th>
-                </tr>
-              </thead>
+          <>
+            <DataTable
+              columns={[
+                { label: 'Utilisateur' },
+                { label: 'Role' },
+                { label: 'Organisateur' },
+                { label: 'Cree le' },
+                { label: 'Actions', className: 'text-right' },
+              ]}
+            >
               <tbody className="text-slate-700">
                 {paged.map((user) => (
                   <tr key={user.id} className="border-t border-slate-100">
@@ -156,7 +151,7 @@ export default function UsersPage() {
                     <td className="py-4 text-sm">{formatRole(user.role)}</td>
                     <td className="py-4 text-sm">
                       {user.organizerStatus
-                        ? `${user.organizerAccountType || 'PRO'} • ${
+                        ? `${user.organizerAccountType || 'PRO'} - ${
                             user.organizerStatus
                           }`
                         : 'Non'}
@@ -172,34 +167,36 @@ export default function UsersPage() {
                         : '-'}
                     </td>
                     <td className="py-4 text-right">
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        disabled={deletingId === user.id}
-                        className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                      >
-                        Supprimer
-                      </button>
+                      <TableRowActions>
+                        <button
+                          onClick={() => handleDelete(user.id)}
+                          disabled={deletingId === user.id}
+                          className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                        >
+                          Supprimer
+                        </button>
+                      </TableRowActions>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400">
-                      Aucun utilisateur trouve.
+                    <td colSpan={5}>
+                      <EmptyState title="Aucun utilisateur trouve." />
                     </td>
                   </tr>
                 ) : null}
               </tbody>
-            </table>
+            </DataTable>
             <Pagination
               currentPage={page}
               pageSize={pageSize}
               totalItems={filtered.length}
               onPageChange={setPage}
             />
-          </div>
+          </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

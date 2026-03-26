@@ -2,6 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { apiGet, apiPatch } from '../lib/api';
 import Pagination from '../components/Pagination';
+import PageHeader from '../components/PageHeader';
+import FilterBar from '../components/FilterBar';
+import Card from '../components/Card';
+import DataTable from '../components/DataTable';
+import StatusBadge from '../components/StatusBadge';
+import ActionButtons from '../components/ActionButtons';
+import SelectField from '../components/SelectField';
+import SearchInput from '../components/SearchInput';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 
 interface OrganizerItem {
   id: string;
@@ -18,20 +28,6 @@ interface OrganizerItem {
     createdAt?: string | null;
   } | null;
 }
-
-const statusLabels: Record<string, string> = {
-  PENDING: 'En attente',
-  APPROVED: 'Approuve',
-  REJECTED: 'Refuse',
-  SUSPENDED: 'Suspendu',
-};
-
-const statusStyles: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  APPROVED: 'bg-emerald-100 text-emerald-700',
-  REJECTED: 'bg-rose-100 text-rose-700',
-  SUSPENDED: 'bg-slate-200 text-slate-700',
-};
 
 function normalizeStatus(value?: string | null) {
   return (value || 'PENDING').toUpperCase();
@@ -138,76 +134,69 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Validation
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Organisateurs & lieux
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Approuve, refuse ou suspend les comptes professionnels.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
+      <PageHeader
+        eyebrow="Validation"
+        title="Organisateurs & lieux"
+        subtitle="Approuve, refuse ou suspend les comptes professionnels."
+        actions={
+          <FilterBar>
+            <SelectField
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="PENDING">En attente</option>
-              <option value="APPROVED">Approuve</option>
-              <option value="REJECTED">Refuse</option>
-              <option value="SUSPENDED">Suspendu</option>
-            </select>
-            <select
-              value={typeFilter}
-              onChange={(event) =>
-                setTypeFilter(event.target.value as 'all' | 'PLACE' | 'NOMAD')
-              }
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Tous les types</option>
-              <option value="PLACE">Lieux</option>
-              <option value="NOMAD">Promoteurs</option>
-            </select>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Rechercher un compte..."
-              className="w-64 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              onChange={(value) => setStatusFilter(value)}
+              options={[
+                { label: 'Tous les statuts', value: 'all' },
+                { label: 'En attente', value: 'PENDING' },
+                { label: 'Approuve', value: 'APPROVED' },
+                { label: 'Refuse', value: 'REJECTED' },
+                { label: 'Suspendu', value: 'SUSPENDED' },
+              ]}
             />
-          </div>
-        </div>
-      </div>
+            <SelectField
+              value={typeFilter}
+              onChange={(value) => setTypeFilter(value as 'all' | 'PLACE' | 'NOMAD')}
+              options={[
+                { label: 'Tous les types', value: 'all' },
+                { label: 'Lieux', value: 'PLACE' },
+                { label: 'Promoteurs', value: 'NOMAD' },
+              ]}
+            />
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Rechercher un compte..."
+            />
+          </FilterBar>
+        }
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
+      <Card>
         {loading ? (
-          <p className="text-sm text-slate-500">Chargement...</p>
+          <LoadingState />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-400">
-                <tr>
-                  <th className="pb-3">Compte</th>
-                  <th className="pb-3">Type</th>
-                  <th className="pb-3">Entreprise</th>
-                  <th className="pb-3">Statut</th>
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
+          <>
+            <DataTable
+              columns={[
+                { label: 'Compte' },
+                { label: 'Type' },
+                { label: 'Entreprise' },
+                { label: 'Statut' },
+                { label: 'Action', className: 'text-right' },
+              ]}
+            >
               <tbody className="text-slate-700">
                 {paged.map((item) => {
                   const status = normalizeStatus(item.organizer?.status);
                   const label =
                     item.displayName || item.username || item.email || 'Compte';
                   const company = item.organizer?.companyName || '-';
-                  const typeLabel = formatAccountType(
-                    item.organizer?.accountType,
-                  );
+                  const accountType = (item.organizer?.accountType || '').toUpperCase();
+                  const typeLabel = formatAccountType(item.organizer?.accountType);
+                  const placesLabel =
+                    accountType === 'PLACE'
+                      ? item.placesCount
+                        ? `${item.placesCount} lieux revendiques`
+                        : 'Aucun lieu revendique'
+                      : 'N/A';
 
                   return (
                     <tr key={item.id} className="border-t border-slate-100">
@@ -221,66 +210,41 @@ export default function ApprovalsPage() {
                       <td className="py-4 text-sm">
                         <div>{company}</div>
                         <div className="text-xs text-slate-400">
-                          {item.placesCount
-                            ? `${item.placesCount} lieux`
-                            : 'Aucun lieu'}
+                          {placesLabel}
                         </div>
                       </td>
                       <td className="py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            statusStyles[status] || 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {statusLabels[status] || status}
-                        </span>
+                        <StatusBadge status={status} />
                       </td>
                       <td className="py-4">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            onClick={() => updateStatus(item.id, 'APPROVED')}
-                            disabled={updatingId === item.id}
-                            className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                          >
-                            Approuver
-                          </button>
-                          <button
-                            onClick={() => updateStatus(item.id, 'REJECTED')}
-                            disabled={updatingId === item.id}
-                            className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                          >
-                            Refuser
-                          </button>
-                          <button
-                            onClick={() => updateStatus(item.id, 'SUSPENDED')}
-                            disabled={updatingId === item.id}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-                          >
-                            Suspendre
-                          </button>
-                        </div>
+                        <ActionButtons
+                          onApprove={() => updateStatus(item.id, 'APPROVED')}
+                          onReject={() => updateStatus(item.id, 'REJECTED')}
+                          onSuspend={() => updateStatus(item.id, 'SUSPENDED')}
+                          disabled={updatingId === item.id}
+                        />
                       </td>
                     </tr>
                   );
                 })}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400">
-                      Aucun compte a valider.
+                    <td colSpan={5}>
+                      <EmptyState title="Aucun compte a valider." />
                     </td>
                   </tr>
                 ) : null}
               </tbody>
-            </table>
+            </DataTable>
             <Pagination
               currentPage={page}
               pageSize={pageSize}
               totalItems={filtered.length}
               onPageChange={setPage}
             />
-          </div>
+          </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

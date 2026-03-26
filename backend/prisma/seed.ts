@@ -987,7 +987,6 @@ async function main() {
   await prisma.place.createMany({
     data: ouidahPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
       cityId: ouidah.id,
     })),
   });
@@ -1075,7 +1074,6 @@ async function main() {
   await prisma.place.createMany({
     data: portoNovoPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
       cityId: portoNovo.id,
     })),
   });
@@ -1133,7 +1131,6 @@ async function main() {
   await prisma.place.createMany({
     data: ketouPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
       cityId: ketou.id,
     })),
   });
@@ -1254,7 +1251,6 @@ async function main() {
   await prisma.place.createMany({
     data: atacoraPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -1346,7 +1342,6 @@ async function main() {
   await prisma.place.createMany({
     data: beachPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -1643,7 +1638,6 @@ async function main() {
   await prisma.place.createMany({
     data: cotonouPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -1805,7 +1799,6 @@ async function main() {
   await prisma.place.createMany({
     data: portoNovoExtraPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -1952,7 +1945,6 @@ async function main() {
   await prisma.place.createMany({
     data: abomeyPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -2084,7 +2076,6 @@ async function main() {
   await prisma.place.createMany({
     data: collinesPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -2231,7 +2222,6 @@ async function main() {
   await prisma.place.createMany({
     data: monoPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -2288,7 +2278,6 @@ async function main() {
   await prisma.place.createMany({
     data: ouemePlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -2420,7 +2409,6 @@ async function main() {
   await prisma.place.createMany({
     data: atacoraExtraPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -2492,7 +2480,6 @@ async function main() {
   await prisma.place.createMany({
     data: borgouPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
@@ -2594,14 +2581,12 @@ async function main() {
   await prisma.place.createMany({
     data: aliboriPlacesData.map((place) => ({
       ...place,
-      ownerId: owner.id,
     })),
   });
 
   const aliboriPlacesCount = aliboriPlacesData.length;
 
   const seededPlacesForTags = await prisma.place.findMany({
-    where: { ownerId: owner.id },
     select: { id: true, name: true },
   });
 

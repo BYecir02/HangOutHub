@@ -17,6 +17,11 @@ interface OrganizerDetailsInput {
   ifuNumber: string;
   payoutInfo: string;
   jobTitle: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
+  facebookUrl?: string;
+  xUrl?: string;
+  websiteUrl?: string;
 }
 
 type SanitizedUser<T extends { passwordHash?: string | null }> = Omit<

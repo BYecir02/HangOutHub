@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { apiGet, apiUpload } from '../lib/api';
+import { apiGet, apiPatch, apiPost, apiUpload } from '../lib/api';
+import PageHeader from '../components/PageHeader';
+import SectionCard from '../components/SectionCard';
+import SectionTitle from '../components/SectionTitle';
+import FormField from '../components/FormField';
+import LoadingState from '../components/LoadingState';
+import SelectField from '../components/SelectField';
+import Card from '../components/Card';
 
 interface EventDetails {
   id: string;
@@ -90,6 +97,12 @@ export default function EventEditPage() {
     }>
   >([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [openCategoryId, setOpenCategoryId] = useState<number | null>(null);
+  const [tagSearch, setTagSearch] = useState('');
+  const [tagCreationError, setTagCreationError] = useState('');
+  const [tagCreationCategoryId, setTagCreationCategoryId] = useState<number | null>(
+    null,
+  );
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [places, setPlaces] = useState<PlaceOption[]>([]);
   const [placeId, setPlaceId] = useState<string>('');
@@ -128,9 +141,7 @@ export default function EventEditPage() {
               quantity: Number(ticket.quantity || 0),
             })) || [],
           );
-          setSelectedTagIds(
-            data.EventTag?.map((item) => item.tagId) || [],
-          );
+          setSelectedTagIds(data.EventTag?.map((item) => item.tagId) || []);
           setPlaceId(data.placeId || data.Place?.id || '');
 
           const promo = data.Promotion?.[0];
@@ -180,6 +191,59 @@ export default function EventEditPage() {
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [galleryFiles]);
+
+  useEffect(() => {
+    setTagSearch('');
+    setTagCreationError('');
+  }, [openCategoryId]);
+
+  const handleCreateTag = async (categoryId: number, name: string) => {
+    setTagCreationError('');
+    setTagCreationCategoryId(categoryId);
+    try {
+      const created = await apiPost<{
+        id: number;
+        name: string;
+        status?: string | null;
+      }>(`/categories/${categoryId}/tags`, { name });
+
+      let finalTag = created;
+      if (created.status && created.status !== 'APPROVED') {
+        try {
+          finalTag = await apiPatch<{
+            id: number;
+            name: string;
+            status?: string | null;
+          }>(`/categories/tags/${created.id}`, { status: 'APPROVED' });
+        } catch {
+          // Si l'approbation echoue, on garde le tag cree.
+        }
+      }
+
+      setCategories((current) =>
+        current.map((category) => {
+          if (category.id !== categoryId) {
+            return category;
+          }
+          const existing = (category.Tag || []).some(
+            (tag) => tag.id === finalTag.id,
+          );
+          return {
+            ...category,
+            Tag: existing ? category.Tag : [...(category.Tag || []), finalTag],
+          };
+        }),
+      );
+      setSelectedTagIds((current) =>
+        current.includes(finalTag.id) ? current : [...current, finalTag.id],
+      );
+      setTagSearch('');
+    } catch {
+      setTagCreationError("Impossible d'ajouter ce tag.");
+    } finally {
+      setTagCreationCategoryId(null);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!event) {
@@ -233,7 +297,10 @@ export default function EventEditPage() {
           formData.append('promoValue', String(Number(promoValue)));
         }
         if (promoMaxRedemptions) {
-          formData.append('promoMaxRedemptions', String(Number(promoMaxRedemptions)));
+          formData.append(
+            'promoMaxRedemptions',
+            String(Number(promoMaxRedemptions)),
+          );
         }
         if (promoEndsAt) {
           formData.append('promoEndsAt', new Date(promoEndsAt).toISOString());
@@ -252,9 +319,7 @@ export default function EventEditPage() {
       await apiUpload(`/events/${event.id}`, formData, 'PATCH');
       navigate('/events');
     } catch {
-      setError(
-        'Impossible de sauvegarder. Verifie les tarifs ou la promo.',
-      );
+      setError('Impossible de sauvegarder. Verifie les tarifs ou la promo.');
     } finally {
       setSaving(false);
     }
@@ -262,50 +327,46 @@ export default function EventEditPage() {
 
   if (loading || !event) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <p className="text-sm text-slate-500">Chargement...</p>
-      </div>
+      <Card>
+        <LoadingState />
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Evenement
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Modifier {event.title}
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Lieu: {event.Place?.name || 'Non rattache'}
-            </p>
-          </div>
+      <PageHeader
+        eyebrow="Evenement"
+        title={`Modifier ${event.title}`}
+        subtitle={`Lieu: ${event.Place?.name || 'Non rattache'}`}
+        actions={
           <button
             onClick={() => navigate('/events')}
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
           >
             Retour
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="grid gap-4 md:grid-cols-2">
+      <SectionCard>
+        <SectionTitle
+          label="Informations"
+          subtitle="Modifie les informations principales."
+        />
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-600">Titre</label>
-            <input
-              value={event.title}
-              onChange={(evt) =>
-                setEvent({ ...event, title: evt.target.value })
-              }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-            />
+            <FormField label="Titre">
+              <input
+                value={event.title}
+                onChange={(evt) =>
+                  setEvent({ ...event, title: evt.target.value })
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              />
+            </FormField>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Debut</label>
+          <FormField label="Debut">
             <input
               type="datetime-local"
               value={toDateTimeLocal(event.startTime)}
@@ -315,11 +376,10 @@ export default function EventEditPage() {
                   startTime: new Date(evt.target.value).toISOString(),
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Fin</label>
+          </FormField>
+          <FormField label="Fin">
             <input
               type="datetime-local"
               value={toDateTimeLocal(event.endTime)}
@@ -331,13 +391,10 @@ export default function EventEditPage() {
                     : null,
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Prix (FCFA)
-            </label>
+          </FormField>
+          <FormField label="Prix (FCFA)">
             <input
               type="number"
               value={event.entryFee ?? 0}
@@ -347,47 +404,40 @@ export default function EventEditPage() {
                   entryFee: Number(evt.target.value || 0),
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-600">
-              Lieu rattache
-            </label>
-            <select
+          </FormField>
+          <FormField label="Lieu rattache">
+            <SelectField
               value={placeId}
-              onChange={(evt) => setPlaceId(evt.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-            >
-              <option value="">Aucun</option>
-              {places.map((place) => (
-                <option key={place.id} value={place.id}>
-                  {place.name || place.id}
-                </option>
-              ))}
-            </select>
-          </div>
+              onChange={setPlaceId}
+              className="w-full"
+              options={[
+                { label: 'Aucun', value: '' },
+                ...places.map((place) => ({
+                  label: place.name || place.id,
+                  value: place.id,
+                })),
+              ]}
+            />
+          </FormField>
         </div>
 
         <div className="mt-4">
-          <label className="text-xs font-semibold text-slate-600">
-            Description
-          </label>
-          <textarea
-            rows={4}
-            value={event.description ?? ''}
-            onChange={(evt) =>
-              setEvent({ ...event, description: evt.target.value })
-            }
-            className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-          />
+          <FormField label="Description">
+            <textarea
+              rows={4}
+              value={event.description ?? ''}
+              onChange={(evt) =>
+                setEvent({ ...event, description: evt.target.value })
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+            />
+          </FormField>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Politique d annulation
-            </label>
+          <FormField label="Politique d'annulation">
             <textarea
               rows={3}
               value={event.cancellationPolicy ?? ''}
@@ -397,13 +447,10 @@ export default function EventEditPage() {
                   cancellationPolicy: evt.target.value,
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600">
-              Politique de remboursement
-            </label>
+          </FormField>
+          <FormField label="Politique de remboursement">
             <textarea
               rows={3}
               value={event.refundPolicy ?? ''}
@@ -413,39 +460,36 @@ export default function EventEditPage() {
                   refundPolicy: evt.target.value,
                 })
               }
-              className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
-          </div>
+          </FormField>
         </div>
+      </SectionCard>
 
-        <div className="mt-6">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Tarifs
-            </p>
-            <button
-              onClick={() =>
-                setTicketTypes((current) => [
-                  ...current,
-                  { name: '', description: '', price: 0, quantity: 1 },
-                ])
-              }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
+      <SectionCard>
+        <div className="flex items-center justify-between">
+          <SectionTitle label="Tarifs" subtitle="Definis les options de prix." />
+          <button
+            onClick={() =>
+              setTicketTypes((current) => [
+                ...current,
+                { name: '', description: '', price: 0, quantity: 1 },
+              ])
+            }
+            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
+          >
+            Ajouter un tarif
+          </button>
+        </div>
+        <div className="mt-4 space-y-3">
+          {ticketTypes.map((ticket, index) => (
+            <div
+              key={`${ticket.id || index}`}
+              className="rounded-xl border border-slate-200 p-4"
             >
-              Ajouter un tarif
-            </button>
-          </div>
-          <div className="mt-4 space-y-3">
-            {ticketTypes.map((ticket, index) => (
-              <div
-                key={`${ticket.id || index}`}
-                className="rounded-xl border border-slate-200 p-4"
-              >
-                <div className="grid gap-3 md:grid-cols-4">
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-semibold text-slate-600">
-                      Nom
-                    </label>
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="md:col-span-2">
+                  <FormField label="Nom">
                     <input
                       value={ticket.name}
                       onChange={(evt) => {
@@ -453,47 +497,43 @@ export default function EventEditPage() {
                         next[index] = { ...ticket, name: evt.target.value };
                         setTicketTypes(next);
                       }}
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                     />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600">
-                      Prix
-                    </label>
-                    <input
-                      type="number"
-                      value={ticket.price}
-                      onChange={(evt) => {
-                        const next = [...ticketTypes];
-                        next[index] = {
-                          ...ticket,
-                          price: Number(evt.target.value || 0),
-                        };
-                        setTicketTypes(next);
-                      }}
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600">
-                      Quantite
-                    </label>
-                    <input
-                      type="number"
-                      value={ticket.quantity}
-                      onChange={(evt) => {
-                        const next = [...ticketTypes];
-                        next[index] = {
-                          ...ticket,
-                          quantity: Number(evt.target.value || 1),
-                        };
-                        setTicketTypes(next);
-                      }}
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                    />
-                  </div>
+                  </FormField>
                 </div>
-                <div className="mt-3 flex items-center gap-3">
+                <FormField label="Prix">
+                  <input
+                    type="number"
+                    value={ticket.price}
+                    onChange={(evt) => {
+                      const next = [...ticketTypes];
+                      next[index] = {
+                        ...ticket,
+                        price: Number(evt.target.value || 0),
+                      };
+                      setTicketTypes(next);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  />
+                </FormField>
+                <FormField label="Quantite">
+                  <input
+                    type="number"
+                    value={ticket.quantity}
+                    onChange={(evt) => {
+                      const next = [...ticketTypes];
+                      next[index] = {
+                        ...ticket,
+                        quantity: Number(evt.target.value || 1),
+                      };
+                      setTicketTypes(next);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  />
+                </FormField>
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+                <FormField label="Description">
                   <input
                     value={ticket.description ?? ''}
                     onChange={(evt) => {
@@ -502,8 +542,10 @@ export default function EventEditPage() {
                       setTicketTypes(next);
                     }}
                     placeholder="Description (avantages, acces...)"
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                   />
+                </FormField>
+                <div className="flex items-end">
                   <button
                     onClick={() =>
                       setTicketTypes((current) =>
@@ -516,133 +558,196 @@ export default function EventEditPage() {
                   </button>
                 </div>
               </div>
-            ))}
-            {ticketTypes.length === 0 ? (
-              <p className="text-sm text-slate-400">
-                Aucun tarif. Le prix principal sera utilise.
+            </div>
+          ))}
+          {ticketTypes.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              Aucun tarif. Le prix principal sera utilise.
+            </p>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionTitle label="Tags" subtitle="Associe les tags utiles." />
+        <div className="mt-4 space-y-4">
+          {categories.map((category) => (
+            <div key={category.id}>
+              <p className="text-xs font-semibold text-slate-600">
+                {category.name}
               </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-            Tags
-          </p>
-          <div className="mt-3 space-y-4">
-            {categories.map((category) => (
-              <div key={category.id}>
-                <p className="text-xs font-semibold text-slate-600">
-                  {category.name}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(category.Tag || []).map((tag) => {
-                    const active = selectedTagIds.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        onClick={() => {
-                          setSelectedTagIds((current) =>
-                            active
-                              ? current.filter((id) => id !== tag.id)
-                              : [...current, tag.id],
-                          );
-                        }}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                          active
-                            ? 'border-brand-500 bg-brand-500 text-white'
-                            : 'border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-700">Promo</p>
-            <button
-              onClick={() => setPromoEnabled((prev) => !prev)}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
-            >
-              {promoEnabled ? 'Desactiver' : 'Activer'}
-            </button>
-          </div>
-          {promoEnabled ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-slate-600">
-                  Code
-                </label>
-                <input
-                  value={promoCode}
-                  onChange={(evt) => setPromoCode(evt.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600">
-                  Type
-                </label>
-                <select
-                  value={promoType}
-                  onChange={(evt) =>
-                    setPromoType(evt.target.value as 'PERCENT' | 'FIXED')
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenCategoryId((current) =>
+                      current === category.id ? null : category.id,
+                    )
                   }
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left text-sm text-slate-700"
                 >
-                  <option value="PERCENT">%</option>
-                  <option value="FIXED">FCFA</option>
-                </select>
+                  <span>
+                    {(category.Tag || []).filter((tag) =>
+                      selectedTagIds.includes(tag.id),
+                    ).length > 0
+                      ? `${(category.Tag || []).filter((tag) =>
+                          selectedTagIds.includes(tag.id),
+                        ).length} tag(s) selectionne(s)`
+                      : 'Selectionner des tags'}
+                  </span>
+                  <span className="text-slate-400">v</span>
+                </button>
+
+                {openCategoryId === category.id ? (
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
+                    <input
+                      value={tagSearch}
+                      onChange={(event) => setTagSearch(event.target.value)}
+                      placeholder="Rechercher un tag"
+                      className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                    />
+                    {(() => {
+                      const query = tagSearch.trim().toLowerCase();
+                      const availableTags = (category.Tag || []).filter((tag) =>
+                        query ? tag.name.toLowerCase().includes(query) : true,
+                      );
+                      const hasExact = (category.Tag || []).some(
+                        (tag) => tag.name.toLowerCase() === query,
+                      );
+                      const canAdd = query.length >= 2 && !hasExact;
+                      return (
+                        <div className="grid gap-2">
+                          {availableTags.map((tag) => {
+                            const active = selectedTagIds.includes(tag.id);
+                            return (
+                              <label
+                                key={tag.id}
+                                className="flex items-center gap-2 text-sm text-slate-700"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={active}
+                                  onChange={() =>
+                                    setSelectedTagIds((current) =>
+                                      active
+                                        ? current.filter((id) => id !== tag.id)
+                                        : [...current, tag.id],
+                                    )
+                                  }
+                                />
+                                <span>{tag.name}</span>
+                              </label>
+                            );
+                          })}
+
+                          {canAdd ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCreateTag(category.id, tagSearch.trim())
+                              }
+                              disabled={tagCreationCategoryId === category.id}
+                              className="mt-2 rounded-lg border border-brand-500 px-3 py-2 text-xs font-semibold text-brand-600 disabled:opacity-60"
+                            >
+                              {tagCreationCategoryId === category.id
+                                ? 'Ajout...'
+                                : `Ajouter "${tagSearch.trim()}"`}
+                            </button>
+                          ) : null}
+
+                          {tagCreationError ? (
+                            <p className="text-xs text-red-500">
+                              {tagCreationError}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : null}
               </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600">
-                  Valeur
-                </label>
-                <input
-                  type="number"
-                  value={promoValue}
-                  onChange={(evt) => setPromoValue(evt.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                />
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(category.Tag || [])
+                  .filter((tag) => selectedTagIds.includes(tag.id))
+                  .map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full border border-brand-500 bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-600"
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
               </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600">
-                  Quota (optionnel)
-                </label>
-                <input
-                  type="number"
-                  value={promoMaxRedemptions}
-                  onChange={(evt) => setPromoMaxRedemptions(evt.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="text-xs font-semibold text-slate-600">
-                  Fin promo
-                </label>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <div className="flex items-center justify-between">
+          <SectionTitle label="Promo" subtitle="Configure une remise si besoin." />
+          <button
+            onClick={() => setPromoEnabled((prev) => !prev)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600"
+          >
+            {promoEnabled ? 'Desactiver' : 'Activer'}
+          </button>
+        </div>
+        {promoEnabled ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <FormField label="Code">
+              <input
+                value={promoCode}
+                onChange={(evt) => setPromoCode(evt.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              />
+            </FormField>
+            <FormField label="Type">
+              <SelectField
+                value={promoType}
+                onChange={(value) => setPromoType(value as 'PERCENT' | 'FIXED')}
+                className="w-full"
+                options={[
+                  { label: '%', value: 'PERCENT' },
+                  { label: 'FCFA', value: 'FIXED' },
+                ]}
+              />
+            </FormField>
+            <FormField label="Valeur">
+              <input
+                type="number"
+                value={promoValue}
+                onChange={(evt) => setPromoValue(evt.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              />
+            </FormField>
+            <FormField label="Quota (optionnel)">
+              <input
+                type="number"
+                value={promoMaxRedemptions}
+                onChange={(evt) => setPromoMaxRedemptions(evt.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              />
+            </FormField>
+            <div className="md:col-span-2">
+              <FormField label="Fin promo">
                 <input
                   type="datetime-local"
                   value={promoEndsAt}
                   onChange={(evt) => setPromoEndsAt(evt.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                 />
-              </div>
+              </FormField>
             </div>
-          ) : (
-            <p className="mt-3 text-sm text-slate-400">
-              Aucun code promo actif.
-            </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-400">Aucun code promo actif.</p>
+        )}
+      </SectionCard>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <SectionCard>
+        <SectionTitle label="Medias" subtitle="Gere la couverture et la galerie." />
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-xs font-semibold text-slate-600">
               Couverture actuelle
@@ -661,9 +766,7 @@ export default function EventEditPage() {
             <input
               type="file"
               accept="image/*"
-              onChange={(evt) =>
-                setCoverFile(evt.target.files?.[0] || null)
-              }
+              onChange={(evt) => setCoverFile(evt.target.files?.[0] || null)}
               className="mt-3 text-sm text-slate-600"
             />
             {coverPreview ? (
@@ -672,18 +775,14 @@ export default function EventEditPage() {
               </p>
             ) : null}
             <button
-              onClick={() =>
-                setEvent({ ...event, coverUrl: null })
-              }
+              onClick={() => setEvent({ ...event, coverUrl: null })}
               className="mt-3 text-xs font-semibold text-red-500"
             >
               Supprimer la couverture
             </button>
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-600">
-              Galerie actuelle
-            </p>
+            <p className="text-xs font-semibold text-slate-600">Galerie actuelle</p>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {galleryImages.map((image) => (
                 <button
@@ -737,28 +836,28 @@ export default function EventEditPage() {
             </p>
           </div>
         </div>
+      </SectionCard>
 
-        {error ? (
-          <div className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={() => navigate('/events')}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
-          >
-            {saving ? 'Sauvegarde...' : 'Enregistrer'}
-          </button>
+      {error ? (
+        <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">
+          {error}
         </div>
+      ) : null}
+
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={() => navigate('/events')}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+        >
+          Annuler
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={saving}
+          className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        >
+          {saving ? 'Sauvegarde...' : 'Enregistrer'}
+        </button>
       </div>
     </div>
   );

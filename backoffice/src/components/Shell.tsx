@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearSession, getSession } from '../lib/auth';
 
@@ -15,10 +15,31 @@ const navItems = [
 export default function Shell() {
   const navigate = useNavigate();
   const session = getSession();
+  const themeKey = 'hangouthub_backoffice_theme';
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem(themeKey);
+    if (stored === 'dark' || stored === 'light') {
+      return stored;
+    }
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
+  });
+
+  const toggleLabel = useMemo(
+    () => (theme === 'dark' ? 'Mode clair' : 'Mode sombre'),
+    [theme],
+  );
 
   const handleLogout = () => {
     clearSession();
     navigate('/login');
+  };
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem(themeKey, next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
   };
 
   return (
@@ -33,6 +54,12 @@ export default function Shell() {
               <h1 className="mt-2 text-2xl font-bold text-slate-900">
                 Backoffice
               </h1>
+              <button
+                onClick={toggleTheme}
+                className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                {toggleLabel}
+              </button>
             </div>
 
             <nav className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:space-y-2 lg:gap-0">

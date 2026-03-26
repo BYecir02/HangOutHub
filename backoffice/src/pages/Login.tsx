@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { setSession } from '../lib/auth';
@@ -17,6 +17,19 @@ interface LoginResponse {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const themeKey = 'hangouthub_backoffice_theme';
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem(themeKey);
+    if (stored === 'dark' || stored === 'light') {
+      return stored;
+    }
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
+  });
+  const toggleLabel = useMemo(
+    () => (theme === 'dark' ? 'Mode clair' : 'Mode sombre'),
+    [theme],
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,6 +64,13 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    localStorage.setItem(themeKey, next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
   };
 
   return (
@@ -106,6 +126,13 @@ export default function LoginPage() {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
+        <button
+          onClick={toggleTheme}
+          type="button"
+          className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          {toggleLabel}
+        </button>
       </div>
     </div>
   );

@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 
 import { apiGet } from '../lib/api';
 import Pagination from '../components/Pagination';
+import PageHeader from '../components/PageHeader';
+import FilterBar from '../components/FilterBar';
+import Card from '../components/Card';
+import DataTable from '../components/DataTable';
+import SelectField from '../components/SelectField';
+import SearchInput from '../components/SearchInput';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import TableRowActions from '../components/TableRowActions';
 
 interface CityOption {
   id: number;
@@ -108,111 +117,95 @@ export default function PlacesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Gestion
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Lieux
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Edite les informations essentielles des lieux.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
+      <PageHeader
+        eyebrow="Gestion"
+        title="Lieux"
+        subtitle="Edite les informations essentielles des lieux."
+        actions={
+          <FilterBar>
+            <SelectField
               value={cityFilter}
-              onChange={(event) =>
-                setCityFilter(
-                  event.target.value === 'all' ? 'all' : Number(event.target.value),
-                )
+              onChange={(value) =>
+                setCityFilter(value === 'all' ? 'all' : Number(value))
               }
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Toutes les villes</option>
-              {cities.map((city) => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={sortOrder}
-              onChange={(event) =>
-                setSortOrder(
-                  event.target.value as 'name_asc' | 'name_desc' | 'city_asc',
-                )
-              }
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="name_asc">Nom A-Z</option>
-              <option value="name_desc">Nom Z-A</option>
-              <option value="city_asc">Ville A-Z</option>
-            </select>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Rechercher un lieu..."
-              className="w-64 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              options={[
+                { label: 'Toutes les villes', value: 'all' },
+                ...cities.map((city) => ({ label: city.name, value: city.id })),
+              ]}
             />
-          </div>
-        </div>
-      </div>
+            <SelectField
+              value={sortOrder}
+              onChange={(value) =>
+                setSortOrder(value as 'name_asc' | 'name_desc' | 'city_asc')
+              }
+              options={[
+                { label: 'Nom A-Z', value: 'name_asc' },
+                { label: 'Nom Z-A', value: 'name_desc' },
+                { label: 'Ville A-Z', value: 'city_asc' },
+              ]}
+            />
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Rechercher un lieu..."
+            />
+          </FilterBar>
+        }
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
+      <Card>
         {loading ? (
-          <p className="text-sm text-slate-500">Chargement...</p>
+          <LoadingState />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-400">
-                <tr>
-                  <th className="pb-3">Lieu</th>
-                  <th className="pb-3">Ville</th>
-                  <th className="pb-3">Tags</th>
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
+          <>
+            <DataTable
+              columns={[
+                { label: 'Lieu' },
+                { label: 'Ville' },
+                { label: 'Tags' },
+                { label: 'Action', className: 'text-right' },
+              ]}
+            >
               <tbody className="text-slate-700">
                 {paged.map((place) => (
                   <tr key={place.id} className="border-t border-slate-100">
                     <td className="py-4 font-semibold">{place.name}</td>
                     <td className="py-4">
-                      {place.City?.name || '—'}
+                      {place.City?.name || '-'}
                     </td>
                     <td className="py-4 text-xs text-slate-500">
                       {resolveTags(place) || '-'}
                     </td>
                     <td className="py-4 text-right">
-                      <button
-                        onClick={() => navigate(`/places/${place.id}`)}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                      >
-                        Modifier
-                      </button>
+                      <TableRowActions>
+                        <button
+                          onClick={() => navigate(`/places/${place.id}`)}
+                          className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                        >
+                          Modifier
+                        </button>
+                      </TableRowActions>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-slate-400">
-                      Aucun lieu trouve.
+                    <td colSpan={4}>
+                      <EmptyState title="Aucun lieu trouve." />
                     </td>
                   </tr>
                 ) : null}
               </tbody>
-            </table>
+            </DataTable>
             <Pagination
               currentPage={page}
               pageSize={pageSize}
               totalItems={filtered.length}
               onPageChange={setPage}
             />
-          </div>
+          </>
         )}
-      </div>
+      </Card>
 
     </div>
   );

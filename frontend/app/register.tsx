@@ -102,6 +102,11 @@ export default function RegisterScreen() {
   const [ifuNumber, setIfuNumber] = useState('');
   const [payoutInfo, setPayoutInfo] = useState('');
   const [jobTitle, setJobTitle] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [tiktokUrl, setTiktokUrl] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [xUrl, setXUrl] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -140,6 +145,11 @@ export default function RegisterScreen() {
           ifuNumber,
           payoutInfo,
           jobTitle,
+          instagramUrl: instagramUrl || undefined,
+          tiktokUrl: tiktokUrl || undefined,
+          facebookUrl: facebookUrl || undefined,
+          xUrl: xUrl || undefined,
+          websiteUrl: websiteUrl || undefined,
         });
 
         Alert.alert(
@@ -401,6 +411,50 @@ export default function RegisterScreen() {
                     onChangeText={setPayoutInfo}
                     placeholder={t('registerPayoutPlaceholder')}
                     hint={t('registerPayoutHint')}
+                  />
+                  <View className="mt-4">
+                    <Text
+                      className={`text-xs font-semibold uppercase tracking-[0.22em] ${
+                        isDark ? 'text-slate-400' : 'text-slate-500'
+                      }`}
+                    >
+                      {t('registerSocialSectionLabel')}
+                    </Text>
+                  </View>
+                  <AuthTextField
+                    label={t('registerInstagramLabel')}
+                    isDark={isDark}
+                    value={instagramUrl}
+                    onChangeText={setInstagramUrl}
+                    placeholder={t('registerInstagramPlaceholder')}
+                  />
+                  <AuthTextField
+                    label={t('registerTiktokLabel')}
+                    isDark={isDark}
+                    value={tiktokUrl}
+                    onChangeText={setTiktokUrl}
+                    placeholder={t('registerTiktokPlaceholder')}
+                  />
+                  <AuthTextField
+                    label={t('registerFacebookLabel')}
+                    isDark={isDark}
+                    value={facebookUrl}
+                    onChangeText={setFacebookUrl}
+                    placeholder={t('registerFacebookPlaceholder')}
+                  />
+                  <AuthTextField
+                    label={t('registerXLabel')}
+                    isDark={isDark}
+                    value={xUrl}
+                    onChangeText={setXUrl}
+                    placeholder={t('registerXPlaceholder')}
+                  />
+                  <AuthTextField
+                    label={t('registerWebsiteLabel')}
+                    isDark={isDark}
+                    value={websiteUrl}
+                    onChangeText={setWebsiteUrl}
+                    placeholder={t('registerWebsitePlaceholder')}
                   />
                 </View>
               ) : null}

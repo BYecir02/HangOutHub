@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom';
 
 import { apiGet, apiPatch } from '../lib/api';
 import Pagination from '../components/Pagination';
+import PageHeader from '../components/PageHeader';
+import FilterBar from '../components/FilterBar';
+import Card from '../components/Card';
+import DataTable from '../components/DataTable';
+import StatusBadge from '../components/StatusBadge';
+import SelectField from '../components/SelectField';
+import SearchInput from '../components/SearchInput';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import TableRowActions from '../components/TableRowActions';
 
 interface ReportItem {
   id: string;
@@ -28,14 +38,8 @@ function shortenId(value: string, head = 6, tail = 4) {
   if (!value || value.length <= head + tail + 1) {
     return value;
   }
-  return `${value.slice(0, head)}…${value.slice(-tail)}`;
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
 }
-
-const statusStyles: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  RESOLVED: 'bg-emerald-100 text-emerald-700',
-  REJECTED: 'bg-rose-100 text-rose-700',
-};
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -158,68 +162,54 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Moderation
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Signalements
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Traite les signalements envoyes par la communaute.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
+      <PageHeader
+        eyebrow="Moderation"
+        title="Signalements"
+        subtitle="Traite les signalements envoyes par la communaute."
+        actions={
+          <FilterBar>
+            <SelectField
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="PENDING">En attente</option>
-              <option value="RESOLVED">Traite</option>
-              <option value="REJECTED">Rejete</option>
-            </select>
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
-            >
-              <option value="all">Tous les types</option>
-              {types.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Rechercher..."
-              className="w-64 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+              onChange={(value) => setStatusFilter(value)}
+              options={[
+                { label: 'Tous les statuts', value: 'all' },
+                { label: 'En attente', value: 'PENDING' },
+                { label: 'Traite', value: 'RESOLVED' },
+                { label: 'Rejete', value: 'REJECTED' },
+              ]}
             />
-          </div>
-        </div>
-      </div>
+            <SelectField
+              value={typeFilter}
+              onChange={(value) => setTypeFilter(value)}
+              options={[
+                { label: 'Tous les types', value: 'all' },
+                ...types.map((type) => ({ label: type, value: type })),
+              ]}
+            />
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Rechercher..."
+            />
+          </FilterBar>
+        }
+      />
 
-      <div className="rounded-2xl bg-white p-6 shadow-soft">
+      <Card>
         {loading ? (
-          <p className="text-sm text-slate-500">Chargement...</p>
+          <LoadingState />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-400">
-                <tr>
-                  <th className="pb-3">Type</th>
-                  <th className="pb-3">Cible</th>
-                  <th className="pb-3">Raison</th>
-                  <th className="pb-3">Reporter</th>
-                  <th className="pb-3">Statut</th>
-                  <th className="pb-3 text-right">Actions</th>
-                </tr>
-              </thead>
+          <>
+            <DataTable
+              columns={[
+                { label: 'Type' },
+                { label: 'Cible' },
+                { label: 'Raison' },
+                { label: 'Reporter' },
+                { label: 'Statut' },
+                { label: 'Actions', className: 'text-right' },
+              ]}
+            >
               <tbody className="text-slate-700">
                 {paged.map((report) => {
                   const status = normalizeStatus(report.status);
@@ -247,16 +237,10 @@ export default function ReportsPage() {
                           '-'}
                       </td>
                       <td className="py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            statusStyles[status] || 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {status}
-                        </span>
+                        <StatusBadge status={status} />
                       </td>
                       <td className="py-4 text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
+                        <TableRowActions>
                           {targetPath ? (
                             <button
                               onClick={() => navigate(targetPath)}
@@ -338,29 +322,29 @@ export default function ReportsPage() {
                           >
                             Rejeter
                           </button>
-                        </div>
+                        </TableRowActions>
                       </td>
                     </tr>
                   );
                 })}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-400">
-                      Aucun signalement.
+                    <td colSpan={6}>
+                      <EmptyState title="Aucun signalement." />
                     </td>
                   </tr>
                 ) : null}
               </tbody>
-            </table>
+            </DataTable>
             <Pagination
               currentPage={page}
               pageSize={pageSize}
               totalItems={filtered.length}
               onPageChange={setPage}
             />
-          </div>
+          </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

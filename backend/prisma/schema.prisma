@@ -516,6 +516,11 @@ model OrganizerProfile {
   ifuNumber   String   @db.VarChar(50) // Identifiant Fiscal Unique
   payoutInfo  String   @db.VarChar(100) // Numéro Mobile Money ou IBAN
   jobTitle    String   @db.VarChar(50) // Patron, Manager, Chargé de Com'
+  instagramUrl String? @db.VarChar(255)
+  tiktokUrl    String? @db.VarChar(255)
+  facebookUrl  String? @db.VarChar(255)
+  xUrl         String? @db.VarChar(255)
+  websiteUrl   String? @db.VarChar(255)
   status      String   @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
   createdAt   DateTime @default(now()) @db.Timestamp(6)
   updatedAt   DateTime @updatedAt @db.Timestamp(6)
