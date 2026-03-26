@@ -37,7 +37,11 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   private ensureOrganizerRole(req: AuthenticatedRequest) {
-    if (req.user.role !== 'ORGANIZER' && req.user.role !== 'PLACE_OWNER') {
+    if (
+      req.user.role !== 'ORGANIZER' &&
+      req.user.role !== 'PLACE_OWNER' &&
+      req.user.role !== 'ADMIN'
+    ) {
       throw new ForbiddenException(
         'Acces reserve aux organisateurs et gerants de lieux.',
       );

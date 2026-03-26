@@ -33,6 +33,11 @@ interface HomeEvent {
   startTime: string;
   coverUrl: string | null;
   entryFee: number | string | null;
+  TicketType?: Array<{
+    id: string;
+    price: number | string;
+    quantity: number;
+  }>;
   Place?: {
     name?: string | null;
     City?: {
@@ -82,6 +87,34 @@ function formatEventPrice(
 ) {
   const amount = Number(value || 0);
   return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
+}
+
+function formatEventPriceLabel(
+  event: HomeEvent,
+  locale: 'fr-FR' | 'en-US',
+  t: (key: 'homePriceFree' | 'homePriceFrom' | 'homePriceSoldOut', params?: { price: string }) => string,
+) {
+  const ticketTypes = event.TicketType || [];
+  if (ticketTypes.length > 0) {
+    const available = ticketTypes.filter((ticket) => Number(ticket.quantity || 0) > 0);
+    if (available.length === 0) {
+      return t('homePriceSoldOut');
+    }
+
+    const minPrice = Math.min(
+      ...available.map((ticket) => Number(ticket.price || 0)),
+    );
+
+    if (minPrice <= 0) {
+      return t('homePriceFree');
+    }
+
+    return t('homePriceFrom', {
+      price: minPrice.toLocaleString(locale),
+    });
+  }
+
+  return formatEventPrice(event.entryFee, locale, t('homePriceFree'));
 }
 
 function SectionPlaceholder({ message }: { message: string }) {
@@ -454,7 +487,7 @@ export default function HomeScreen() {
                 date={formatEventDate(item.startTime, locale)}
                 location={item.Place?.name || item.address || t('homeLocationToConfirm')}
                 imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                price={formatEventPrice(item.entryFee, locale, t('homePriceFree'))}
+                price={formatEventPriceLabel(item, locale, t)}
                 onPress={() =>
                   router.push({
                     pathname: '/event/[id]',

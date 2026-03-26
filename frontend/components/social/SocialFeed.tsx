@@ -10,13 +10,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { io, Socket } from 'socket.io-client';
 
 import { useI18n } from '@/hooks/use-i18n';
 import PostItem from './PostItem';
 import { SkeletonBlock } from '../ui/Skeleton';
 import api from '../../services/api';
-import { BASE_URL, storage } from '@/services/api';
 
 type FilterType = 'all' | 'plan' | 'post';
 
@@ -374,41 +372,6 @@ export default function SocialFeed() {
         ) : null}
       </ScrollView>
     </View>
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-      let socket: Socket | null = null;
-
-      const connect = async () => {
-        const token = await storage.getItem('userToken');
-        if (!token || !isMounted) {
-          return;
-        }
-
-        socket = io(`${BASE_URL}/posts`, {
-          transports: ['websocket'],
-          auth: { token },
-        });
-
-        socket.on('post:new', (post: FeedPost) => {
-          setPosts((current) => {
-            if (current.some((item) => item.id === post.id)) {
-              return current;
-            }
-            return [post, ...current];
-          });
-        });
-      };
-
-      void connect();
-
-      return () => {
-        isMounted = false;
-        socket?.disconnect();
-      };
-    }, []),
   );
 
   if (loading && posts.length === 0) {

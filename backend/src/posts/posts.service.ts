@@ -285,6 +285,64 @@ export class PostsService {
     return posts.map((post) => this.serializePost(post, currentUserId));
   }
 
+  async findOneAdmin(id: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            City: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            placeId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+                City: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException(`Post with ID ${id} not found`);
+    }
+
+    return post;
+  }
+
   async findAllByUser(userId: string, currentUserId: string) {
     if (userId === currentUserId) {
       const ownPosts = await this.prisma.post.findMany({

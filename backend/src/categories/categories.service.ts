@@ -1,6 +1,9 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateTagDto } from './dto/update-tag.dto';
 
 @Injectable()
 export class CategoriesService {
@@ -24,6 +27,78 @@ export class CategoriesService {
         },
       },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  findAllAdmin() {
+    return this.prisma.category.findMany({
+      include: {
+        Tag: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            submittedByUserId: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createCategory(dto: CreateCategoryDto) {
+    const name = dto.name.trim();
+    if (!name) {
+      throw new ConflictException('Le nom de categorie est obligatoire.');
+    }
+
+    return this.prisma.category.create({
+      data: {
+        name,
+        color: dto.color?.trim() || undefined,
+        icon: dto.icon?.trim() || undefined,
+      },
+    });
+  }
+
+  async updateCategory(id: number, dto: UpdateCategoryDto) {
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.color !== undefined ? { color: dto.color.trim() } : {}),
+        ...(dto.icon !== undefined ? { icon: dto.icon.trim() } : {}),
+      },
+    });
+  }
+
+  async updateTag(tagId: number, dto: UpdateTagDto) {
+    const data: Prisma.TagUpdateInput = {};
+
+    if (dto.name !== undefined) {
+      const normalized = dto.name.trim();
+      if (!normalized) {
+        throw new ConflictException('Le nom du tag est obligatoire.');
+      }
+      data.name = normalized;
+    }
+
+    if (dto.status !== undefined) {
+      data.status = dto.status.toUpperCase();
+    }
+
+    if (dto.categoryId !== undefined) {
+      data.Category = {
+        connect: { id: dto.categoryId },
+      };
+    }
+
+    return this.prisma.tag.update({
+      where: { id: tagId },
+      data,
     });
   }
 

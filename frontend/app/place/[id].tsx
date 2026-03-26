@@ -19,8 +19,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl, storage } from '@/services/api';
+import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
+import { createReport } from '@/services/reports';
 import { resolveStoredUserSession } from '@/services/user-session';
+import { getOrCreateDirectChat } from '@/services/direct-chats';
 
 interface RelatedEvent {
   id: string;
@@ -43,6 +45,7 @@ interface PlaceDetail {
     name?: string | null;
   } | null;
   Owner?: {
+    id?: string;
     displayName?: string | null;
     username?: string | null;
   } | null;
@@ -300,6 +303,106 @@ export default function PlaceDetailScreen() {
     }
   };
 
+  const handleContactPlace = async () => {
+    const ownerId = place?.Owner?.id;
+    if (!ownerId) {
+      return;
+    }
+
+    try {
+      const chat = await getOrCreateDirectChat(ownerId);
+      router.push({
+        pathname: '/direct-chat/[id]',
+        params: { id: chat.id },
+      });
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('directChatStartFailed')),
+      );
+    }
+  };
+
+  const handleReportPlace = () => {
+    if (!place) {
+      return;
+    }
+
+    Alert.alert(t('reportTitle'), t('reportPrompt'), [
+      {
+        text: t('reportReasonSpam'),
+        onPress: () =>
+          void createReport(place.id, 'PLACE', t('reportReasonSpam'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonHarassment'),
+        onPress: () =>
+          void createReport(place.id, 'PLACE', t('reportReasonHarassment'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonInappropriate'),
+        onPress: () =>
+          void createReport(place.id, 'PLACE', t('reportReasonInappropriate'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonScam'),
+        onPress: () =>
+          void createReport(place.id, 'PLACE', t('reportReasonScam'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonOther'),
+        onPress: () =>
+          void createReport(place.id, 'PLACE', t('reportReasonOther'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      { text: t('genericCancel'), style: 'cancel' },
+    ]);
+  };
+
   const handleSubmitReview = async () => {
     if (!place) {
       return;
@@ -398,10 +501,10 @@ export default function PlaceDetailScreen() {
             {t('placeDetailActionDescription')}
           </Text>
 
-          <View className="mt-4 flex-row items-center gap-3">
-            <TouchableOpacity
-              onPress={handleToggleSave}
-              disabled={saveLoading}
+            <View className="mt-4 flex-row items-center gap-3">
+              <TouchableOpacity
+                onPress={handleToggleSave}
+                disabled={saveLoading}
               className={`h-12 w-12 items-center justify-center rounded-2xl border ${
                 isSaved
                   ? 'border-[#2ecc71] bg-green-50 dark:bg-green-900/20'
@@ -423,12 +526,22 @@ export default function PlaceDetailScreen() {
               className="flex-1 flex-row items-center justify-center rounded-2xl bg-[#4c669f] px-4 py-4"
             >
               <Ionicons name="add" size={20} color="#fff" />
-              <Text className="ml-2 text-sm font-semibold text-white">
-                {t('placeDetailCreateCta')}
+                <Text className="ml-2 text-sm font-semibold text-white">
+                  {t('placeDetailCreateCta')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleReportPlace}
+              className="mt-3 flex-row items-center self-start rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5"
+            >
+              <Ionicons name="flag-outline" size={14} color="#e11d48" />
+              <Text className="ml-2 text-xs font-semibold text-rose-600">
+                {t('reportAction')}
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
 
         <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <View className="flex-row items-start">
@@ -454,6 +567,16 @@ export default function PlaceDetailScreen() {
                   place.Owner?.username ||
                   t('placeDetailUnknownOrganizer')}
               </Text>
+              {place.Owner?.id ? (
+                <TouchableOpacity
+                  onPress={handleContactPlace}
+                  className="mt-2 self-start rounded-full bg-[#4c669f] px-3 py-1.5"
+                >
+                  <Text className="text-xs font-semibold text-white">
+                    {t('directChatContactPlace')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </View>

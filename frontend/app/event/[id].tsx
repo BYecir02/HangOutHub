@@ -14,6 +14,8 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import { createReport } from '@/services/reports';
+import { getOrCreateDirectChat } from '@/services/direct-chats';
 import {
   EventBookingTicket,
   cancelEventBooking,
@@ -33,6 +35,7 @@ interface EventDetail {
   entryFee?: number | string | null;
   address?: string | null;
   User?: {
+    id?: string;
     displayName?: string | null;
     username?: string | null;
   } | null;
@@ -242,6 +245,26 @@ export default function EventDetailScreen() {
     });
   };
 
+  const handleContactOrganizer = async () => {
+    const organizerId = event.User?.id;
+    if (!organizerId) {
+      return;
+    }
+
+    try {
+      const chat = await getOrCreateDirectChat(organizerId);
+      router.push({
+        pathname: '/direct-chat/[id]',
+        params: { id: chat.id },
+      });
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('directChatStartFailed')),
+      );
+    }
+  };
+
   const handlePrimaryAction = () => {
     if (!event) {
       return;
@@ -310,6 +333,86 @@ export default function EventDetailScreen() {
         },
       ],
     );
+  };
+
+  const handleReportEvent = () => {
+    if (!event) {
+      return;
+    }
+
+    Alert.alert(t('reportTitle'), t('reportPrompt'), [
+      {
+        text: t('reportReasonSpam'),
+        onPress: () =>
+          void createReport(event.id, 'EVENT', t('reportReasonSpam'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonHarassment'),
+        onPress: () =>
+          void createReport(event.id, 'EVENT', t('reportReasonHarassment'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonInappropriate'),
+        onPress: () =>
+          void createReport(event.id, 'EVENT', t('reportReasonInappropriate'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonScam'),
+        onPress: () =>
+          void createReport(event.id, 'EVENT', t('reportReasonScam'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      {
+        text: t('reportReasonOther'),
+        onPress: () =>
+          void createReport(event.id, 'EVENT', t('reportReasonOther'))
+            .then(() =>
+              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
+            )
+            .catch((error) =>
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('reportFailed')),
+              ),
+            ),
+      },
+      { text: t('genericCancel'), style: 'cancel' },
+    ]);
   };
 
   return (
@@ -395,6 +498,16 @@ export default function EventDetailScreen() {
                   event.User?.username ||
                   t('eventDetailUnknownOrganizer')}
               </Text>
+              {event.User?.id ? (
+                <TouchableOpacity
+                  onPress={handleContactOrganizer}
+                  className="mt-2 self-start rounded-full bg-[#4c669f] px-3 py-1.5"
+                >
+                  <Text className="text-xs font-semibold text-white">
+                    {t('directChatContactOrganizer')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
 
@@ -487,6 +600,15 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
+
+        <TouchableOpacity
+          onPress={handleReportEvent}
+          className="mt-3 items-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3"
+        >
+          <Text className="text-sm font-semibold text-rose-600">
+            {t('reportAction')}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

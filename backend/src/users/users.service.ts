@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -318,6 +319,24 @@ export class UsersService {
     return this.sanitizeUsers(users);
   }
 
+  async findAllAdmin() {
+    const users = await this.prisma.user.findMany({
+      include: {
+        UserRole: { include: { Role: true } },
+        OrganizerProfile: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map((user) => ({
+      ...this.sanitizeUser(user),
+      role: user.UserRole[0]?.Role?.name || 'USER',
+      organizerStatus: user.OrganizerProfile?.status || null,
+      organizerAccountType: user.OrganizerProfile?.accountType || null,
+      organizerCompanyName: user.OrganizerProfile?.companyName || null,
+    }));
+  }
+
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -447,6 +466,57 @@ export class UsersService {
     return this.prisma.organizerProfile.update({
       where: { userId },
       data: { status: 'APPROVED' },
+    });
+  }
+
+  async listOrganizerProfiles() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        OrganizerProfile: {
+          isNot: null,
+        },
+      },
+      include: {
+        OrganizerProfile: true,
+        UserRole: { include: { Role: true } },
+        OwnedPlaces: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.UserRole[0]?.Role?.name || 'USER',
+      organizer: user.OrganizerProfile
+        ? {
+            accountType: user.OrganizerProfile.accountType,
+            companyName: user.OrganizerProfile.companyName,
+            status: user.OrganizerProfile.status,
+            jobTitle: user.OrganizerProfile.jobTitle,
+            createdAt: user.OrganizerProfile.createdAt,
+          }
+        : null,
+      placesCount: user.OwnedPlaces.length,
+    }));
+  }
+
+  async updateOrganizerStatus(userId: string, status: string) {
+    const normalized = status.toUpperCase();
+    if (!['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'].includes(normalized)) {
+      throw new BadRequestException('Statut organisateur invalide.');
+    }
+
+    return this.prisma.organizerProfile.update({
+      where: { userId },
+      data: { status: normalized },
     });
   }
 

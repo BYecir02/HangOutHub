@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -101,6 +101,10 @@ export class AuthService {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
+    if (user.isSuspended) {
+      throw new ForbiddenException('Compte suspendu');
+    }
+
     const primaryRole = this.getPrimaryRole(user);
     const sessionToken = randomUUID();
 
@@ -125,6 +129,11 @@ export class AuthService {
     });
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
+    const normalizedDevice =
+      typeof device === 'string' && device.trim().length > 0
+        ? device.trim().slice(0, 100)
+        : 'Mobile';
+
     // 2. Sauvegarder la session active
     await this.prisma.session.create({
       data: {
@@ -133,7 +142,7 @@ export class AuthService {
         refreshTokenHash,
         expiresAt: this.getRefreshTokenExpiryDate(),
         lastUsedAt: new Date(),
-        device: device || 'Mobile',
+        device: normalizedDevice,
       },
     });
 
@@ -200,6 +209,10 @@ export class AuthService {
       (session.expiresAt && session.expiresAt < now)
     ) {
       throw new UnauthorizedException('Session expiree ou invalide');
+    }
+
+    if (session.User?.isSuspended) {
+      throw new ForbiddenException('Compte suspendu');
     }
 
     const refreshTokenMatches = await bcrypt.compare(

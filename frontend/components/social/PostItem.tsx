@@ -12,7 +12,8 @@ import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 
-import api, { getImageUrl } from '../../services/api';
+import api, { getApiErrorMessage, getImageUrl } from '../../services/api';
+import { createReport } from '../../services/reports';
 
 interface PostAuthor {
   username?: string;
@@ -221,6 +222,110 @@ export default function PostItem({
               style: 'destructive',
               onPress: () => onDelete(item.id),
             },
+          ]);
+        },
+      });
+    }
+
+    if (!item.isOwner) {
+      buttons.push({
+        text: t('reportAction'),
+        onPress: () => {
+          Alert.alert(t('reportTitle'), t('reportPrompt'), [
+            {
+              text: t('reportReasonSpam'),
+              onPress: () =>
+                void createReport(item.id, 'POST', t('reportReasonSpam'))
+                  .then(() =>
+                    Alert.alert(
+                      t('reportSuccessTitle'),
+                      t('reportSuccessMessage'),
+                    ),
+                  )
+                  .catch((error) =>
+                    Alert.alert(
+                      t('commonErrorTitle'),
+                      getApiErrorMessage(error, t('reportFailed')),
+                    ),
+                  ),
+            },
+            {
+              text: t('reportReasonHarassment'),
+              onPress: () =>
+                void createReport(
+                  item.id,
+                  'POST',
+                  t('reportReasonHarassment'),
+                )
+                  .then(() =>
+                    Alert.alert(
+                      t('reportSuccessTitle'),
+                      t('reportSuccessMessage'),
+                    ),
+                  )
+                  .catch((error) =>
+                    Alert.alert(
+                      t('commonErrorTitle'),
+                      getApiErrorMessage(error, t('reportFailed')),
+                    ),
+                  ),
+            },
+            {
+              text: t('reportReasonInappropriate'),
+              onPress: () =>
+                void createReport(
+                  item.id,
+                  'POST',
+                  t('reportReasonInappropriate'),
+                )
+                  .then(() =>
+                    Alert.alert(
+                      t('reportSuccessTitle'),
+                      t('reportSuccessMessage'),
+                    ),
+                  )
+                  .catch((error) =>
+                    Alert.alert(
+                      t('commonErrorTitle'),
+                      getApiErrorMessage(error, t('reportFailed')),
+                    ),
+                  ),
+            },
+            {
+              text: t('reportReasonScam'),
+              onPress: () =>
+                void createReport(item.id, 'POST', t('reportReasonScam'))
+                  .then(() =>
+                    Alert.alert(
+                      t('reportSuccessTitle'),
+                      t('reportSuccessMessage'),
+                    ),
+                  )
+                  .catch((error) =>
+                    Alert.alert(
+                      t('commonErrorTitle'),
+                      getApiErrorMessage(error, t('reportFailed')),
+                    ),
+                  ),
+            },
+            {
+              text: t('reportReasonOther'),
+              onPress: () =>
+                void createReport(item.id, 'POST', t('reportReasonOther'))
+                  .then(() =>
+                    Alert.alert(
+                      t('reportSuccessTitle'),
+                      t('reportSuccessMessage'),
+                    ),
+                  )
+                  .catch((error) =>
+                    Alert.alert(
+                      t('commonErrorTitle'),
+                      getApiErrorMessage(error, t('reportFailed')),
+                    ),
+                  ),
+            },
+            { text: t('postItemCancel'), style: 'cancel' },
           ]);
         },
       });

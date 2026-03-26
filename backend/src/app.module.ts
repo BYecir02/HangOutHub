@@ -17,6 +17,8 @@ import { FriendshipsModule } from './friendships/friendships.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizerScannerModule } from './organizer-scanner/organizer-scanner.module';
 import { CitiesModule } from './cities/cities.module';
+import { DirectChatsModule } from './direct-chats/direct-chats.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -36,8 +38,10 @@ import { CitiesModule } from './cities/cities.module';
     CommentsModule,
     OutingsModule,
     FriendshipsModule,
+    DirectChatsModule,
     NotificationsModule,
     OrganizerScannerModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

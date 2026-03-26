@@ -59,6 +59,10 @@ export class UpdateEventDto {
   existingCoverUrl?: string;
 
   @IsOptional()
+  @IsString()
+  tagIds?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   checkInOpensAtOffsetMin?: number;

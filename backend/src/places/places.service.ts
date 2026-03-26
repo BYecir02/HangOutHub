@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -59,6 +60,7 @@ export class PlacesService {
       gallery?: Express.Multer.File[];
     } = {},
     userId: string,
+    role: string,
   ) {
     const place = await this.prisma.place.findUnique({ where: { id } });
 
@@ -66,13 +68,23 @@ export class PlacesService {
       throw new NotFoundException('Lieu introuvable');
     }
 
-    if (place.ownerId !== userId) {
+    const normalizedRole = role.toUpperCase();
+
+    if (place.ownerId !== userId && normalizedRole !== 'ADMIN') {
       throw new ForbiddenException(
         "Vous n'etes pas le proprietaire de ce lieu",
       );
     }
 
-    const data: Prisma.PlaceUpdateInput = { ...updatePlaceDto };
+    const { tagIds: rawTagIds, existingImages: rawExistingImages, ...rest } =
+      updatePlaceDto as UpdatePlaceDto & {
+        tagIds?: string;
+        existingImages?: string;
+      };
+    const data: Prisma.PlaceUpdateInput = { ...rest };
+
+    const tagIds =
+      rawTagIds !== undefined ? this.parseTagIdsPayload(rawTagIds) : null;
 
     if (files?.cover?.[0]) {
       data.coverUrl = await this.storageService.uploadFile(
@@ -81,14 +93,83 @@ export class PlacesService {
       );
     }
 
-    if (files?.gallery && files.gallery.length > 0) {
-      data.images = await this.storageService.uploadFiles(
-        'places',
-        files.gallery,
-      );
+    const uploadedGalleryUrls =
+      files?.gallery && files.gallery.length > 0
+        ? await this.storageService.uploadFiles('places', files.gallery)
+        : [];
+
+    let existingImages: string[] | null = null;
+    if (rawExistingImages !== undefined) {
+      try {
+        const parsed = JSON.parse(rawExistingImages);
+        if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
+          throw new Error('invalid');
+        }
+        existingImages = parsed;
+      } catch {
+        throw new BadRequestException('existingImages invalide.');
+      }
     }
 
-    return this.prisma.place.update({ where: { id }, data });
+    if (existingImages !== null || uploadedGalleryUrls.length > 0) {
+      const baseImages = existingImages !== null ? existingImages : place.images;
+      data.images = [...baseImages, ...uploadedGalleryUrls];
+    }
+
+    if (tagIds !== null) {
+      if (tagIds.length > 0) {
+        const existingTags = await this.prisma.tag.count({
+          where: {
+            id: { in: tagIds },
+            status: 'APPROVED',
+          },
+        });
+
+        if (existingTags !== tagIds.length) {
+          throw new BadRequestException('Un ou plusieurs tags sont invalides.');
+        }
+      }
+    }
+
+    const updated = await this.prisma.place.update({ where: { id }, data });
+
+    if (tagIds !== null) {
+      await this.prisma.placeTag.deleteMany({ where: { placeId: id } });
+      if (tagIds.length > 0) {
+        await this.prisma.placeTag.createMany({
+          data: tagIds.map((tagId) => ({
+            placeId: id,
+            tagId,
+          })),
+        });
+      }
+    }
+
+    return updated;
+  }
+
+  private parseTagIdsPayload(raw?: string) {
+    if (!raw) {
+      return [] as number[];
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new BadRequestException('Format tagIds invalide.');
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new BadRequestException('tagIds doit etre une liste.');
+    }
+
+    const normalized = parsed.map((item) => Number(item));
+    if (normalized.some((id) => !Number.isInteger(id) || id <= 0)) {
+      throw new BadRequestException('Chaque tag doit etre un id entier positif.');
+    }
+
+    return Array.from(new Set(normalized));
   }
 
   findAll() {

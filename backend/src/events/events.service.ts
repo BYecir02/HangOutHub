@@ -938,6 +938,13 @@ export class EventsService {
     return this.prisma.event.findMany({
       include: {
         User: { select: { username: true, avatarUrl: true } },
+        TicketType: {
+          select: {
+            id: true,
+            price: true,
+            quantity: true,
+          },
+        },
         Place: {
           include: {
             City: {
@@ -974,6 +981,7 @@ export class EventsService {
 
   async remove(eventId: string, userId: string, role: string) {
     const normalizedRole = role.toUpperCase();
+    const isAdmin = normalizedRole === 'ADMIN';
     const { event } = await this.getEventAuthorizationContext(eventId, userId);
 
     const canDeleteAsOrganizer =
@@ -981,7 +989,7 @@ export class EventsService {
     const canDeleteAsPlaceOwner =
       normalizedRole === 'PLACE_OWNER' && event.Place?.ownerId === userId;
 
-    if (!canDeleteAsOrganizer && !canDeleteAsPlaceOwner) {
+    if (!isAdmin && !canDeleteAsOrganizer && !canDeleteAsPlaceOwner) {
       throw new ForbiddenException(
         'Vous ne pouvez pas supprimer cet evenement.',
       );
@@ -1346,6 +1354,7 @@ export class EventsService {
     }
 
     const normalizedRole = role.toUpperCase();
+    const isAdmin = normalizedRole === 'ADMIN';
     const canEditAsOrganizer =
       normalizedRole === 'ORGANIZER' && event.organizerId === userId;
     const canEditAsPlaceOwner =
@@ -1353,7 +1362,12 @@ export class EventsService {
     const canEditAsCollaborator =
       event.EventCollaborator[0]?.permission?.toUpperCase() === 'EDIT';
 
-    if (!canEditAsOrganizer && !canEditAsPlaceOwner && !canEditAsCollaborator) {
+    if (
+      !isAdmin &&
+      !canEditAsOrganizer &&
+      !canEditAsPlaceOwner &&
+      !canEditAsCollaborator
+    ) {
       throw new ForbiddenException(
         'Vous ne pouvez pas modifier cet evenement.',
       );
@@ -1402,6 +1416,10 @@ export class EventsService {
     }
 
     const ticketTypes = this.parseTicketTypesPayload(payload.ticketTypes);
+    const tagIds =
+      payload.tagIds !== undefined
+        ? this.parseTagIdsPayload(payload.tagIds)
+        : null;
     const shouldUpdatePromotion =
       payload.promoCode !== undefined ||
       payload.promoType !== undefined ||
@@ -1433,6 +1451,28 @@ export class EventsService {
               : event.Promotion[0]?.endDate?.toISOString(),
         })
       : null;
+    if (tagIds !== null) {
+      if (tagIds.length > 0) {
+        const existingTags = await this.prisma.tag.count({
+          where: {
+            id: { in: tagIds },
+            ...(isAdmin
+              ? {}
+              : {
+                  OR: [
+                    { status: 'APPROVED' },
+                    { submittedByUserId: userId },
+                  ],
+                }),
+          },
+        });
+
+        if (existingTags !== tagIds.length) {
+          throw new BadRequestException('Un ou plusieurs tags sont invalides.');
+        }
+      }
+    }
+
     const coverFile = files?.cover?.[0] ?? null;
     const uploadedCoverUrl = coverFile
       ? await this.storageService.uploadFile('events', coverFile)
@@ -1570,6 +1610,20 @@ export class EventsService {
           },
         },
       });
+
+      if (tagIds !== null) {
+        await tx.eventTag.deleteMany({
+          where: { eventId },
+        });
+        if (tagIds.length > 0) {
+          await tx.eventTag.createMany({
+            data: tagIds.map((tagId) => ({
+              eventId,
+              tagId,
+            })),
+          });
+        }
+      }
 
       await this.recordEventRevision(tx, eventId, userId, 'UPDATE');
 
@@ -2274,6 +2328,18 @@ export class EventsService {
           },
           orderBy: {
             id: 'desc',
+          },
+        },
+        EventTag: {
+          select: {
+            tagId: true,
+            Tag: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
           },
         },
       },

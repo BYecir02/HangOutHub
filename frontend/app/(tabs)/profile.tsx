@@ -344,6 +344,7 @@ export default function ProfileScreen() {
                 <PostItem
                   key={post.id}
                   item={post}
+                  showDateColumn={false}
                   onDelete={handleDeletePost}
                   onEdit={handleEditPost}
                   onComment={handleCommentPost}

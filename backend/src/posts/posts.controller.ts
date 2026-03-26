@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -24,12 +25,19 @@ import { PostsService } from './posts.service';
 interface AuthenticatedRequest {
   user: {
     userId: string;
+    role?: string;
   };
 }
 
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
+
+  private ensureAdmin(req: AuthenticatedRequest) {
+    if (req.user.role !== 'ADMIN') {
+      throw new ForbiddenException('Acces reserve aux administrateurs.');
+    }
+  }
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
@@ -59,6 +67,13 @@ export class PostsController {
   @Get('feed')
   findFeed(@Request() req: AuthenticatedRequest) {
     return this.postsService.findFeed(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('admin/:id')
+  findOneAdmin(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    this.ensureAdmin(req);
+    return this.postsService.findOneAdmin(id);
   }
 
   @UseGuards(AuthGuard('jwt'))

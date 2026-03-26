@@ -428,6 +428,37 @@ async function main() {
     },
   });
 
+  const admin = await prisma.user.upsert({
+    where: { phoneNumber: '+22997000000' },
+    update: {
+      email: 'admin@hangouthub.dev',
+      phoneNumber: '+22997000000',
+      displayName: 'HangOutHub Admin',
+      bio: 'Compte administrateur de la plateforme.',
+      avatarUrl: 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?w=1200',
+      residenceCityId: cotonou.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+    create: {
+      username: 'admin',
+      email: 'admin@hangouthub.dev',
+      phoneNumber: '+22997000000',
+      displayName: 'HangOutHub Admin',
+      bio: 'Compte administrateur de la plateforme.',
+      avatarUrl: 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?w=1200',
+      residenceCityId: cotonou.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+  });
+
   const organizer = await prisma.user.upsert({
     where: { phoneNumber: '+22997000002' },
     update: {
@@ -491,6 +522,7 @@ async function main() {
   });
 
   await assignRole(user.id, 'USER');
+  await assignRole(admin.id, 'ADMIN');
   await assignRole(organizer.id, 'ORGANIZER');
   await assignRole(owner.id, 'PLACE_OWNER');
 
@@ -537,6 +569,9 @@ async function main() {
   });
 
   const seededUserIds = [user.id, organizer.id, owner.id];
+  await prisma.report.deleteMany({
+    where: { reporterId: { in: seededUserIds } },
+  });
   const seededPosts = await prisma.post.findMany({
     where: { userId: { in: seededUserIds } },
     select: { id: true },
@@ -581,6 +616,9 @@ async function main() {
 
   if (seededPlaceIds.length > 0) {
     await prisma.placeTag.deleteMany({
+      where: { placeId: { in: seededPlaceIds } },
+    });
+    await prisma.review.deleteMany({
       where: { placeId: { in: seededPlaceIds } },
     });
   }
@@ -3275,8 +3313,43 @@ async function main() {
     ],
   });
 
+  const seededReports = await prisma.report.createMany({
+    data: [
+      {
+        reporterId: organizer.id,
+        targetId: postThree.id,
+        targetType: 'POST',
+        reason: 'Contenu inapproprie',
+        status: 'PENDING',
+      },
+      {
+        reporterId: user.id,
+        targetId: eventOne.id,
+        targetType: 'EVENT',
+        reason: 'Informations trompeuses',
+        status: 'PENDING',
+      },
+      {
+        reporterId: owner.id,
+        targetId: placeTwo.id,
+        targetType: 'PLACE',
+        reason: 'Lieu non conforme',
+        status: 'RESOLVED',
+      },
+      {
+        reporterId: user.id,
+        targetId: organizer.id,
+        targetType: 'USER',
+        reason: 'Comportement suspect',
+        status: 'PENDING',
+      },
+    ],
+    skipDuplicates: true,
+  });
+
   console.log('Seed demo termine.');
   console.log('Comptes de demo:');
+  console.log('ADMIN -> admin@hangouthub.dev / Demo12345!');
   console.log('USER -> amina@hangouthub.dev / Demo12345!');
   console.log('ORGANIZER -> nova@hangouthub.dev / Demo12345!');
   console.log('PLACE_OWNER -> district@hangouthub.dev / Demo12345!');
@@ -3307,6 +3380,7 @@ async function main() {
   console.log(
     `- 9 posts (${postOne.id}, ${postTwo.id}, ${postThree.id}, ${postFour.id}, ${postFive.id}, ${postSix.id}, ${postSeven.id}, ${postEight.id}, ${postNine.id})`,
   );
+  console.log(`- ${seededReports.count} signalements`);
 }
 
 main()

@@ -41,6 +41,37 @@ model ChatMessage {
   User     User      @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
+model DirectConversation {
+  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userOneId        String         @db.Uuid
+  userTwoId        String         @db.Uuid
+  lastMessageAt    DateTime?      @db.Timestamp(6)
+  userOneLastReadAt DateTime?     @db.Timestamp(6)
+  userTwoLastReadAt DateTime?     @db.Timestamp(6)
+  createdAt        DateTime?      @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime?      @updatedAt @db.Timestamp(6)
+  UserOne          User           @relation("DirectConversationUserOne", fields: [userOneId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  UserTwo          User           @relation("DirectConversationUserTwo", fields: [userTwoId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  DirectMessage    DirectMessage[]
+
+  @@unique([userOneId, userTwoId])
+  @@index([userOneId])
+  @@index([userTwoId])
+}
+
+model DirectMessage {
+  id             String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  conversationId String             @db.Uuid
+  senderId       String             @db.Uuid
+  content        String
+  sentAt         DateTime?          @default(now()) @db.Timestamp(6)
+  Conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User           User               @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversationId, sentAt])
+  @@index([senderId])
+}
+
 model City {
   id               Int                @id @default(autoincrement())
   name             String             @unique @db.VarChar(100)
@@ -317,13 +348,19 @@ model Post {
 }
 
 model Report {
-  id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  reporterId String  @db.Uuid
-  targetId   String  @db.Uuid
-  reason     String  @db.VarChar(255)
-  status     String? @default("PENDING") @db.VarChar(20)
-  User       User    @relation(fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
+    id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+    reporterId String  @db.Uuid
+    targetId   String  @db.Uuid
+    targetType String  @db.VarChar(30)
+    reason     String  @db.VarChar(255)
+    status     String? @default("PENDING") @db.VarChar(20)
+    createdAt  DateTime @default(now()) @db.Timestamp(6)
+    actionTaken String? @db.VarChar(40)
+    moderatorNote String? @db.VarChar(255)
+    resolvedByUserId String? @db.Uuid
+    resolvedAt DateTime? @db.Timestamp(6)
+    User       User    @relation(fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  }
 
 model Review {
   id            String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
@@ -543,6 +580,7 @@ model User {
   phoneNumber                             String               @unique @db.VarChar(20)
   email                                   String?              @unique @db.VarChar(255)
   displayName                             String?              @db.VarChar(100)
+  isSuspended                            Boolean              @default(false)
   passwordHash                            String?              @db.VarChar(255)
   isVerified                              Boolean?             @default(false)
   bio                                     String?
@@ -559,6 +597,9 @@ model User {
   updatedAt                               DateTime?            @updatedAt @db.Timestamp(6)
   Booking                                 Booking[]
   ChatMessage                             ChatMessage[]
+  DirectConversationAsUserOne             DirectConversation[] @relation("DirectConversationUserOne")
+  DirectConversationAsUserTwo             DirectConversation[] @relation("DirectConversationUserTwo")
+  DirectMessage                           DirectMessage[]
   DeviceToken                             DeviceToken[]
   Event                                   Event[]
   EventCollaborator                       EventCollaborator[]

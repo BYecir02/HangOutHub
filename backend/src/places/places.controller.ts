@@ -23,6 +23,7 @@ import { PlacesService } from './places.service';
 interface AuthenticatedRequest {
   user: {
     userId: string;
+    role?: string;
   };
 }
 
@@ -95,6 +96,7 @@ export class PlacesController {
       updatePlaceDto,
       files,
       req.user.userId,
+      req.user.role || 'USER',
     );
   }
 

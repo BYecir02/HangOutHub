@@ -25,6 +25,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UpdateUserTagPreferencesDto } from './dto/update-user-tag-preferences.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateOrganizerStatusDto } from './dto/update-organizer-status.dto';
 import { UserTagPreferencesResponse } from './users.service';
 
 interface AuthenticatedRequest {
@@ -187,6 +188,20 @@ export class UsersController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Get('admin')
+  findAllAdmin(@Request() req: AuthenticatedRequest) {
+    this.ensureAdmin(req);
+    return this.usersService.findAllAdmin();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('admin/organizers')
+  listOrganizers(@Request() req: AuthenticatedRequest) {
+    this.ensureAdmin(req);
+    return this.usersService.listOrganizerProfiles();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     this.ensureAdminOrSelf(req, id);
@@ -215,6 +230,17 @@ export class UsersController {
   approve(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     this.ensureAdmin(req);
     return this.usersService.approveOrganizer(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('organizers/:id/status')
+  updateOrganizerStatus(
+    @Param('id') id: string,
+    @Body() body: UpdateOrganizerStatusDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.ensureAdmin(req);
+    return this.usersService.updateOrganizerStatus(id, body.status);
   }
 
   @UseGuards(AuthGuard('jwt'))

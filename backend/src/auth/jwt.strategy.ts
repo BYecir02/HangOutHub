@@ -36,6 +36,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.sid) {
       const session = await this.prisma.session.findUnique({
         where: { token: payload.sid },
+        include: {
+          User: {
+            select: {
+              id: true,
+              isSuspended: true,
+            },
+          },
+        },
       });
 
       if (
@@ -45,6 +53,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         (session.expiresAt && session.expiresAt < now)
       ) {
         throw new UnauthorizedException('Session expiree ou invalide');
+      }
+
+      if (session.User?.isSuspended) {
+        throw new UnauthorizedException('Compte suspendu');
       }
 
       return {
@@ -57,10 +69,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Compatibilite legacy: anciennes sessions stockant l'access token brut.
     const legacySession = await this.prisma.session.findUnique({
       where: { token: bearerToken || '' },
+      include: {
+        User: {
+          select: {
+            id: true,
+            isSuspended: true,
+          },
+        },
+      },
     });
 
     if (!legacySession) {
       throw new UnauthorizedException('Session expirée ou invalide');
+    }
+
+    if (legacySession.User?.isSuspended) {
+      throw new UnauthorizedException('Compte suspendu');
     }
 
     return {
