@@ -1,9 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -21,6 +19,10 @@ import {
   type UserSettings,
   updateMySettings,
 } from '@/services/settings';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
+import SettingsSection from '@/components/settings/SettingsSection';
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
 
 const REMINDER_PRESETS = [1440, 180, 60] as const;
 
@@ -45,38 +47,6 @@ function normalizeReminderOffsets(offsets: number[]) {
     .filter((offset) => offset >= 15 && offset <= 10080)
     .sort((a, b) => b - a)
     .slice(0, 3);
-}
-
-function SectionTitle({ label }: { label: string }) {
-  return (
-    <Text className="mb-2 mt-5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-      {label}
-    </Text>
-  );
-}
-
-function ToggleRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (next: boolean) => void;
-}) {
-  return (
-    <View className="flex-row items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-      <Text className="mr-3 flex-1 text-sm text-gray-700 dark:text-gray-200">
-        {label}
-      </Text>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: '#d1d5db', true: '#4c669f' }}
-        thumbColor="#ffffff"
-      />
-    </View>
-  );
 }
 
 export default function OrganizerSettingsScreen() {
@@ -256,55 +226,44 @@ export default function OrganizerSettingsScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-      </View>
+      <ScreenState mode="loading" fullScreen containerClassName="bg-gray-50 dark:bg-black" />
     );
   }
 
   if (!settings) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 px-6 dark:bg-black">
-        <Text className="text-center text-base text-gray-700 dark:text-gray-200">
-          {t('organizerSettingsLoadError')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => {
-            void loadSettings();
-          }}
-          className="mt-4 rounded-xl bg-[#4c669f] px-4 py-3"
-        >
-          <Text className="font-semibold text-white">{t('commonRetry')}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerSettingsLoadError')}
+        actionLabel={t('commonRetry')}
+        onAction={() => {
+          void loadSettings();
+        }}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   return (
     <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <View className="mb-3">
-        <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-          {t('organizerSettingsLabel')}
-        </Text>
-        <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-          {t('organizerSettingsTitle')}
-        </Text>
-      </View>
-      <Text className="text-sm text-gray-500 dark:text-gray-400">
-        {t('organizerSettingsSubtitle')}
-      </Text>
+      <ScreenHeader
+        title={t('organizerSettingsTitle')}
+        subtitle={t('organizerSettingsSubtitle')}
+        label={t('organizerSettingsLabel')}
+        containerClassName="mb-5"
+      />
 
-      <SectionTitle label={t('organizerSettingsSectionNotifications')} />
-      <View className="overflow-hidden rounded-2xl bg-white dark:bg-gray-900">
-        <ToggleRow
+      <SettingsSection title={t('organizerSettingsSectionNotifications')} containerClassName="mb-5">
+        <SettingsToggleRow
           label={t('organizerSettingsNotifyBookings')}
           value={settings.organizerNotifyBookings}
-          onChange={(next) => patch('organizerNotifyBookings', next)}
+          onValueChange={(next) => patch('organizerNotifyBookings', next)}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label={t('organizerSettingsNotifyTeam')}
           value={settings.organizerNotifyTeamUpdates}
-          onChange={(next) => patch('organizerNotifyTeamUpdates', next)}
+          onValueChange={(next) => patch('organizerNotifyTeamUpdates', next)}
         />
         <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
           <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
@@ -463,39 +422,39 @@ export default function OrganizerSettingsScreen() {
             })}
           </View>
         </View>
-      </View>
+      </SettingsSection>
 
-      <SectionTitle label={t('organizerSettingsSectionScanner')} />
-      <View className="overflow-hidden rounded-2xl bg-white dark:bg-gray-900">
-        <ToggleRow
+      <SettingsSection title={t('organizerSettingsSectionScanner')} containerClassName="mb-5">
+        <SettingsToggleRow
           label={t('organizerSettingsScannerOfflineAuto')}
           value={settings.organizerScannerOfflineAuto}
-          onChange={(next) => patch('organizerScannerOfflineAuto', next)}
+          onValueChange={(next) => patch('organizerScannerOfflineAuto', next)}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label={t('organizerSettingsScannerAutoSync')}
           value={settings.organizerScannerAutoSync}
-          onChange={(next) => patch('organizerScannerAutoSync', next)}
+          onValueChange={(next) => patch('organizerScannerAutoSync', next)}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label={t('organizerSettingsScannerHaptics')}
           value={settings.organizerScannerHaptics}
-          onChange={(next) => patch('organizerScannerHaptics', next)}
+          onValueChange={(next) => patch('organizerScannerHaptics', next)}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label={t('organizerSettingsScannerSound')}
           value={settings.organizerScannerSound}
-          onChange={(next) => patch('organizerScannerSound', next)}
+          onValueChange={(next) => patch('organizerScannerSound', next)}
         />
-        <ToggleRow
+        <SettingsToggleRow
           label={t('organizerSettingsScannerStrictWindow')}
           value={settings.organizerScannerStrictWindow}
-          onChange={(next) => patch('organizerScannerStrictWindow', next)}
+          withBorder={false}
+          onValueChange={(next) => patch('organizerScannerStrictWindow', next)}
         />
-      </View>
+      </SettingsSection>
 
-      <SectionTitle label={t('organizerSettingsSectionDefaults')} />
-      <View className="overflow-hidden rounded-2xl bg-white p-4 dark:bg-gray-900">
+      <SettingsSection title={t('organizerSettingsSectionDefaults')} containerClassName="mb-5">
+        <View className="p-4">
         <Text className="text-xs text-gray-500 dark:text-gray-400">
           {t('organizerSettingsDefaultCheckInOpen')}
         </Text>
@@ -562,10 +521,10 @@ export default function OrganizerSettingsScreen() {
           className="mt-1 h-20 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
           textAlignVertical="top"
         />
-      </View>
+        </View>
+      </SettingsSection>
 
-      <SectionTitle label={t('organizerSettingsSectionTeam')} />
-      <View className="overflow-hidden rounded-2xl bg-white dark:bg-gray-900">
+      <SettingsSection title={t('organizerSettingsSectionTeam')} containerClassName="mb-5">
         <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
           <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
             {t('organizerSettingsTeamInviteScope')}
@@ -628,19 +587,20 @@ export default function OrganizerSettingsScreen() {
           </View>
         </View>
 
-        <ToggleRow
+        <SettingsToggleRow
           label={t('organizerSettingsTeamRequireRemovalConfirm')}
           value={settings.organizerTeamRequireRemovalConfirm}
-          onChange={(next) => patch('organizerTeamRequireRemovalConfirm', next)}
+          withBorder={false}
+          onValueChange={(next) => patch('organizerTeamRequireRemovalConfirm', next)}
         />
-      </View>
+      </SettingsSection>
 
       <TouchableOpacity
         onPress={() => {
           void saveAll();
         }}
         disabled={saving}
-        className={`mt-6 rounded-2xl py-4 ${
+        className={`mt-2 rounded-2xl py-4 ${
           saving ? 'bg-[#92A5C7]' : 'bg-[#4c669f]'
         }`}
       >
@@ -649,8 +609,7 @@ export default function OrganizerSettingsScreen() {
         </Text>
       </TouchableOpacity>
 
-      <SectionTitle label={t('organizerSettingsSectionAccount')} />
-      <View className="mb-16 overflow-hidden rounded-2xl bg-white dark:bg-gray-900">
+      <SettingsSection title={t('organizerSettingsSectionAccount')} containerClassName="mt-3 mb-16">
         <TouchableOpacity
           onPress={() => router.replace('/(tabs)/home')}
           className="flex-row items-center justify-between border-b border-gray-100 px-4 py-4 dark:border-gray-800"
@@ -688,7 +647,7 @@ export default function OrganizerSettingsScreen() {
             color={isDark ? '#9ca3af' : '#6b7280'}
           />
         </TouchableOpacity>
-      </View>
+      </SettingsSection>
     </ScrollView>
   );
 }

@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import { formatEventDate, formatPrice } from '@/services/formatters';
 import {
   EventBookingTicket,
   createEventBooking,
@@ -65,33 +66,6 @@ interface EventDetail {
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
-
-function formatEventDate(
-  value: string | null | undefined,
-  locale: string,
-  fallback: string,
-) {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleString(locale, {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatPrice(
-  value: number | string | null | undefined,
-  locale: string,
-  freeLabel: string,
-) {
-  const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
-}
 
 export default function EventBookingScreen() {
   const router = useRouter();
@@ -235,11 +209,9 @@ export default function EventBookingScreen() {
   const ctaPrice = selectedTicketType
     ? Number(selectedTicketType.price || 0)
     : displayPrice;
-  const confirmLabel = `${t('eventDetailConfirmCta')} • ${formatPrice(
-    ctaPrice,
-    locale,
-    t('homePriceFree'),
-  )}`;
+  const confirmLabel = `${t('eventDetailConfirmCta')} • ${formatPrice(ctaPrice, locale, {
+    freeLabel: t('homePriceFree'),
+  })}`;
   const actionLabel = joining
     ? t('eventDetailJoining')
     : hasActiveBooking
@@ -345,7 +317,7 @@ export default function EventBookingScreen() {
           <View className="mt-4 flex-row flex-wrap gap-2">
             <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
               <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-                {formatPrice(displayPrice, locale, t('homePriceFree'))}
+                {formatPrice(displayPrice, locale, { freeLabel: t('homePriceFree') })}
               </Text>
             </View>
           </View>
@@ -357,7 +329,10 @@ export default function EventBookingScreen() {
                 {t('eventDetailStart')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {formatEventDate(event.startTime, locale, t('eventDetailDateToConfirm'))}
+                {formatEventDate(event.startTime, locale, {
+                  includeWeekday: true,
+                  fallback: t('eventDetailDateToConfirm'),
+                })}
               </Text>
             </View>
           </View>
@@ -371,7 +346,7 @@ export default function EventBookingScreen() {
               {event.Place ? (
                 <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
                   {event.Place.name || event.Place.address || t('homeLocationToConfirm')}
-                  {event.Place.City?.name ? ` â€” ${event.Place.City.name}` : ''}
+                  {event.Place.City?.name ? ` — ${event.Place.City.name}` : ''}
                 </Text>
               ) : (
                 <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
@@ -425,7 +400,9 @@ export default function EventBookingScreen() {
                               : 'text-sm font-bold text-[#ff4757]'
                           }
                         >
-                          {formatPrice(ticketType.price, locale, t('homePriceFree'))}
+                          {formatPrice(ticketType.price, locale, {
+                            freeLabel: t('homePriceFree'),
+                          })}
                         </Text>
                       </View>
                       {ticketType.description ? (
@@ -468,7 +445,7 @@ export default function EventBookingScreen() {
               </View>
             ) : (
               <Text className="mt-3 text-sm text-gray-600 dark:text-gray-300">
-                {formatPrice(displayPrice, locale, t('homePriceFree'))}
+                {formatPrice(displayPrice, locale, { freeLabel: t('homePriceFree') })}
               </Text>
             )}
           </View>
@@ -507,7 +484,7 @@ export default function EventBookingScreen() {
                   {selectedTicketType?.name || t('eventDetailBookingSummaryTicketLabel')}
                 </Text>
                 <Text className="text-sm font-bold text-[#ff4757]">
-                  {formatPrice(ctaPrice, locale, t('homePriceFree'))}
+                  {formatPrice(ctaPrice, locale, { freeLabel: t('homePriceFree') })}
                 </Text>
               </View>
               {selectedTicketType ? (

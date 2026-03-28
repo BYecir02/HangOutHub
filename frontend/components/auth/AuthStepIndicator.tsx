@@ -1,6 +1,8 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 
+import { useI18n } from '@/hooks/use-i18n';
+
 type AuthStepIndicatorProps = {
   currentStep: number;
   totalSteps: number;
@@ -12,6 +14,8 @@ export default function AuthStepIndicator({
   totalSteps,
   isDark,
 }: AuthStepIndicatorProps) {
+  const { t } = useI18n();
+
   return (
     <View className="mb-6">
       <View className="mb-2 flex-row items-center justify-between">
@@ -20,14 +24,14 @@ export default function AuthStepIndicator({
             isDark ? 'text-slate-400' : 'text-slate-500'
           }`}
         >
-          Parcours
+          {t('authFlowLabel')}
         </Text>
         <Text
           className={`text-sm font-medium ${
             isDark ? 'text-slate-300' : 'text-slate-600'
           }`}
         >
-          Etape {currentStep}/{totalSteps}
+          {t('authStepCounter', { current: currentStep, total: totalSteps })}
         </Text>
       </View>
 

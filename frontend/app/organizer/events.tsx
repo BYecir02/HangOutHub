@@ -3,8 +3,6 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  Modal,
-  Pressable,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -16,7 +14,11 @@ import { useRouter } from 'expo-router';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import api, { getImageUrl } from '@/services/api';
+import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import {
   formatOrganizerDateTime,
   getOrganizerEventPhase,
@@ -147,6 +149,29 @@ export default function OrganizerEventsScreen() {
 
     return eventsOverview.items.filter((item) => item.phase === activeFilter);
   }, [activeFilter, eventsOverview.items]);
+  const filterOptions = useMemo<
+    readonly FilterChipOption<'all' | OrganizerEventPhase>[]
+  >(
+    () => [
+      {
+        key: 'all',
+        label: `${t('organizerEventsFilterAll')} (${eventsOverview.items.length})`,
+      },
+      {
+        key: 'upcoming',
+        label: `${t('organizerEventsFilterUpcoming')} (${eventsOverview.counts.upcoming})`,
+      },
+      {
+        key: 'live',
+        label: `${t('organizerEventsFilterLive')} (${eventsOverview.counts.live})`,
+      },
+      {
+        key: 'past',
+        label: `${t('organizerEventsFilterPast')} (${eventsOverview.counts.past})`,
+      },
+    ],
+    [eventsOverview.counts.live, eventsOverview.counts.past, eventsOverview.counts.upcoming, eventsOverview.items.length, t],
+  );
 
   const openEventDetail = (eventId: string) => {
     router.push({
@@ -196,14 +221,11 @@ export default function OrganizerEventsScreen() {
                   t('organizerEventsDeleteSuccessTitle'),
                   t('organizerEventsDeleteSuccessMessage'),
                 );
-              } catch (error: any) {
-                const apiMessage =
-                  error?.response?.data?.message &&
-                  typeof error.response.data.message === 'string'
-                    ? error.response.data.message
-                    : t('organizerEventsDeleteFailed');
-
-                Alert.alert(t('commonErrorTitle'), apiMessage);
+              } catch (error: unknown) {
+                Alert.alert(
+                  t('commonErrorTitle'),
+                  getApiErrorMessage(error, t('organizerEventsDeleteFailed')),
+                );
               } finally {
                 setDeletingEventId(null);
               }
@@ -216,140 +238,95 @@ export default function OrganizerEventsScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#ff4757" />
-      </View>
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   if (error && !user) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 px-6 dark:bg-black">
-        <Text className="text-center text-xl font-bold text-gray-900 dark:text-white">
-          {t('organizerDataLoadErrorTitle')}
-        </Text>
-        <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-          {t('organizerDataLoadErrorMessage')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => void refetch()}
-          className="mt-5 rounded-2xl bg-[#ff4757] px-5 py-3"
-        >
-          <Text className="font-semibold text-white">{t('organizerDataRetry')}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerDataLoadErrorTitle')}
+        description={t('organizerDataLoadErrorMessage')}
+        actionLabel={t('organizerDataRetry')}
+        onAction={() => {
+          void refetch();
+        }}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   if (!user || !isAllowed) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#ff4757" />
-      </View>
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
-      <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            {t('organizerEventsLabel')}
-          </Text>
-          <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-            {t('organizerEventsTitle')}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/event')}
-          className="rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <Text className="text-sm font-semibold text-[#ff4757]">
-            {t('organizerEventsCreate')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-        {t('organizerEventsSubtitle')}
-      </Text>
-
-      {error ? (
-        <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
-          <Text className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            {t('organizerDataLoadErrorMessage')}
-          </Text>
+      <ScrollView
+        className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 88 }}
+      >
+      <ScreenHeader
+        title={t('organizerEventsTitle')}
+        subtitle={t('organizerEventsSubtitle')}
+        label={t('organizerEventsLabel')}
+        rightSlot={
           <TouchableOpacity
-            onPress={() => void refetch()}
-            className="mt-3 self-start rounded-full bg-amber-600 px-4 py-2"
+            onPress={() => router.push('/event')}
+            className="rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
           >
-            <Text className="text-xs font-semibold text-white">
-              {t('organizerDataRetry')}
+            <Text className="text-sm font-semibold text-[#ff4757]">
+              {t('organizerEventsCreate')}
             </Text>
           </TouchableOpacity>
-        </View>
+        }
+      />
+
+      {error ? (
+        <ScreenState
+          mode="warning"
+          title={t('organizerDataLoadErrorMessage')}
+          actionLabel={t('organizerDataRetry')}
+          onAction={() => {
+            void refetch();
+          }}
+          containerClassName="px-0 pb-0 pt-5"
+        />
       ) : null}
 
       {eventsOverview.items.length > 0 ? (
-        <View className="mt-4 rounded-2xl bg-white p-4 dark:bg-gray-900">
-          <View className="flex-row flex-wrap gap-2">
-            {(
-              [
-                {
-                  key: 'all',
-                  label: t('organizerEventsFilterAll'),
-                  count: eventsOverview.items.length,
-                },
-                {
-                  key: 'upcoming',
-                  label: t('organizerEventsFilterUpcoming'),
-                  count: eventsOverview.counts.upcoming,
-                },
-                {
-                  key: 'live',
-                  label: t('organizerEventsFilterLive'),
-                  count: eventsOverview.counts.live,
-                },
-                {
-                  key: 'past',
-                  label: t('organizerEventsFilterPast'),
-                  count: eventsOverview.counts.past,
-                },
-              ] as const
-            ).map((filter) => {
-              const isActive = activeFilter === filter.key;
-              return (
-                <TouchableOpacity
-                  key={filter.key}
-                  onPress={() => setActiveFilter(filter.key)}
-                  className={`rounded-full px-3 py-1.5 ${
-                    isActive
-                      ? 'bg-[#4c669f]'
-                      : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      isActive ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {`${filter.label} (${filter.count})`}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+        <FilterChipsBar
+          options={filterOptions}
+          activeKey={activeFilter}
+          onChange={setActiveFilter}
+          activeColor="#4c669f"
+          horizontalPadding={0}
+          textSize="sm"
+          paddingTop={14}
+          paddingBottom={4}
+        />
       ) : null}
 
-      <View className="mt-6 pb-24">
+      <View className="mt-5">
         {eventsOverview.items.length > 0 ? (
           filteredItems.length > 0 ? (
             filteredItems.map(({ event, phase }) => (
             <View
               key={event.id}
-              className="relative mb-4 rounded-3xl bg-white p-3 dark:bg-gray-900"
+              className="relative mb-4 rounded-[24px] bg-white p-4 dark:bg-gray-900"
             >
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -359,13 +336,15 @@ export default function OrganizerEventsScreen() {
                 }}
               >
                 <View className="flex-row">
-                  <Image
-                    source={{
-                      uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
-                    }}
-                    className="h-24 w-24 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                    resizeMode="cover"
-                  />
+                  <View className="h-24 w-24 shrink-0 overflow-hidden rounded-[18px] bg-gray-200 dark:bg-gray-800">
+                    <Image
+                      source={{
+                        uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
+                      }}
+                      className="h-full w-full"
+                      resizeMode="cover"
+                    />
+                  </View>
                   <View className="ml-4 flex-1 justify-center">
                     <View className="flex-row items-center justify-between">
                       <Text
@@ -410,7 +389,7 @@ export default function OrganizerEventsScreen() {
             </View>
             ))
           ) : (
-            <View className="items-center rounded-3xl bg-white px-6 py-10 dark:bg-gray-900">
+            <View className="items-center rounded-[24px] bg-white px-6 py-10 dark:bg-gray-900">
               <Text className="text-center text-lg font-semibold text-gray-900 dark:text-white">
                 {t('organizerEventsEmptyFilteredTitle')}
               </Text>
@@ -428,7 +407,7 @@ export default function OrganizerEventsScreen() {
             </View>
           )
         ) : (
-          <View className="items-center rounded-3xl bg-white px-6 py-10 dark:bg-gray-900">
+          <View className="items-center rounded-[24px] bg-white px-6 py-10 dark:bg-gray-900">
             <Text className="text-center text-lg font-semibold text-gray-900 dark:text-white">
               {t('organizerEventsEmptyTitle')}
             </Text>
@@ -456,93 +435,132 @@ export default function OrganizerEventsScreen() {
       </View>
       </ScrollView>
 
-      <Modal
-        transparent
+      <BottomSheetModal
         visible={Boolean(selectedEvent)}
-        animationType="fade"
-        onRequestClose={() => setOpenActionsEventId(null)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/35"
-          onPress={() => setOpenActionsEventId(null)}
-        >
-          <Pressable
-            className="rounded-t-3xl bg-white p-5 dark:bg-gray-900"
-            onPress={(event) => event.stopPropagation()}
+        onClose={() => setOpenActionsEventId(null)}
+        title={t('organizerEventsActionCenterTitle')}
+        subtitle={
+          selectedEvent?.title || t('organizerEventsActionCenterSubtitle')
+        }
+        maxHeight={620}
+        contentMode="auto"
+        footer={
+          <TouchableOpacity
+            onPress={() => setOpenActionsEventId(null)}
+            className="items-center rounded-2xl border border-gray-200 py-3 dark:border-gray-700"
           >
-            <Text
-              className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500"
-              numberOfLines={1}
-            >
-              {selectedEvent?.title}
+            <Text className="font-semibold text-gray-600 dark:text-gray-300">
+              {t('genericCancel')}
             </Text>
-
-            <TouchableOpacity
-              onPress={() => {
-                if (!selectedEvent) {
-                  return;
-                }
-                setOpenActionsEventId(null);
-                openEventScans(selectedEvent.id);
-              }}
-              className="mt-4 rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700"
+          </TouchableOpacity>
+        }
+      >
+        <View>
+          <TouchableOpacity
+            onPress={() => {
+              if (!selectedEvent) {
+                return;
+              }
+              setOpenActionsEventId(null);
+              openEventScans(selectedEvent.id);
+            }}
+            className="mb-3 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
+            style={{ borderWidth: 1, borderColor: '#4c669f2A' }}
+          >
+            <View
+              className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: '#4c669f18' }}
             >
-              <Text className="text-center text-sm font-semibold text-gray-800 dark:text-gray-100">
+              <Ionicons name="scan-outline" size={24} color="#4c669f" />
+            </View>
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-bold text-gray-800 dark:text-white">
                 {t('organizerEventsActionViewScans')}
               </Text>
-            </TouchableOpacity>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => {
-                if (!selectedEvent) {
-                  return;
-                }
-                setOpenActionsEventId(null);
-                openEventEdit(selectedEvent.id);
-              }}
-              className="mt-3 rounded-2xl border border-[#4c669f] px-4 py-3"
+          <TouchableOpacity
+            onPress={() => {
+              if (!selectedEvent) {
+                return;
+              }
+              setOpenActionsEventId(null);
+              openEventEdit(selectedEvent.id);
+            }}
+            className="mb-3 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
+            style={{ borderWidth: 1, borderColor: '#f39c122A' }}
+          >
+            <View
+              className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: '#f39c1218' }}
             >
-              <Text className="text-center text-sm font-semibold text-[#4c669f]">
+              <Ionicons name="create-outline" size={24} color="#f39c12" />
+            </View>
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-bold text-gray-800 dark:text-white">
                 {t('organizerEventsActionEdit')}
               </Text>
-            </TouchableOpacity>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => {
-                if (!selectedEvent) {
-                  return;
-                }
-                setOpenActionsEventId(null);
-                openEventTeam(selectedEvent.id);
-              }}
-              className="mt-3 rounded-2xl border border-gray-300 px-4 py-3 dark:border-gray-700"
+          <TouchableOpacity
+            onPress={() => {
+              if (!selectedEvent) {
+                return;
+              }
+              setOpenActionsEventId(null);
+              openEventTeam(selectedEvent.id);
+            }}
+            className="mb-3 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
+            style={{ borderWidth: 1, borderColor: '#10b9812A' }}
+          >
+            <View
+              className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: '#10b98118' }}
             >
-              <Text className="text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
+              <Ionicons name="people-outline" size={24} color="#10b981" />
+            </View>
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-bold text-gray-800 dark:text-white">
                 {t('organizerEventsActionTeam')}
               </Text>
-            </TouchableOpacity>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => {
-                if (!selectedEvent || deletingEventId) {
-                  return;
-                }
-                requestDeleteEvent(selectedEvent.id, selectedEvent.title);
-              }}
-              disabled={Boolean(deletingEventId)}
-              className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-900/20"
+          <TouchableOpacity
+            onPress={() => {
+              if (!selectedEvent || deletingEventId) {
+                return;
+              }
+              requestDeleteEvent(selectedEvent.id, selectedEvent.title);
+            }}
+            disabled={Boolean(deletingEventId)}
+            className="mb-1 flex-row items-center rounded-3xl bg-red-50 p-4 dark:bg-red-900/20"
+            style={{ borderWidth: 1, borderColor: '#ef44442A' }}
+          >
+            <View
+              className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: '#ef444418' }}
             >
-              {deletingEventId === selectedEvent?.id ? (
-                <ActivityIndicator color="#ef4444" />
-              ) : (
-                <Text className="text-center text-sm font-semibold text-red-600 dark:text-red-300">
-                  {t('organizerEventsActionDelete')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+              <Ionicons name="trash-outline" size={24} color="#ef4444" />
+            </View>
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-bold text-red-600 dark:text-red-300">
+                {t('organizerEventsActionDelete')}
+              </Text>
+            </View>
+            {deletingEventId === selectedEvent?.id ? (
+              <ActivityIndicator color="#ef4444" />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color="#f87171" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </BottomSheetModal>
     </View>
   );
 }

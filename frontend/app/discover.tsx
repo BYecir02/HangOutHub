@@ -1,21 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Image,
   RefreshControl,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
 import SearchBar from '@/components/ui/SearchBar';
-import api, { getImageUrl } from '@/services/api';
+import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
+import EntityCard from '@/components/ui/EntityCard';
+import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import LocationScopeBar from '@/components/ui/LocationScopeBar';
+import ScreenState from '@/components/ui/ScreenState';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
+import { formatEventDate } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { getStoredLocation, type StoredLocation } from '@/services/location-preferences';
+import { uiTokens } from '@/theme/tokens';
 
 interface DiscoverEvent {
   id: string;
@@ -77,17 +81,6 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-const FILTERS: DiscoverFilter[] = ['all', 'events', 'places'];
-
-function formatEventDate(value: string, locale: string) {
-  return new Date(value).toLocaleString(locale, {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function DiscoverScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
@@ -103,10 +96,15 @@ export default function DiscoverScreen() {
   );
   const [loading, setLoading] = useState(!cachedDiscover);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<DiscoverFilter>('all');
-  const [selectedLocation, setSelectedLocation] =
-    useState<StoredLocation | null>(null);
+  const { filterByLocation, locationLabel } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
 
   const fetchDiscoverData = useCallback(async (forceRefresh = false) => {
     const isRefresh = forceRefresh || getCache('discover') !== null;
@@ -128,12 +126,20 @@ export default function DiscoverScreen() {
     const nextPlaces =
       placesResult.status === 'fulfilled' ? placesResult.value.data : [];
 
+    if (eventsResult.status === 'rejected' && placesResult.status === 'rejected') {
+      setErrorMessage(
+        getApiErrorMessage(eventsResult.reason, t('commonErrorTitle')),
+      );
+    } else {
+      setErrorMessage(null);
+    }
+
     setEvents(nextEvents);
     setPlaces(nextPlaces);
     setCache('discover', { events: nextEvents, places: nextPlaces });
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void fetchDiscoverData();
@@ -145,106 +151,30 @@ export default function DiscoverScreen() {
     }, [fetchDiscoverData]),
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-
-      const hydrateLocation = async () => {
-        const storedLocation = await getStoredLocation();
-        if (!isMounted) {
-          return;
-        }
-
-        setSelectedLocation(storedLocation);
-      };
-
-      void hydrateLocation();
-
-      return () => {
-        isMounted = false;
-      };
-    }, []),
+  const filterOptions = useMemo<readonly FilterChipOption<DiscoverFilter>[]>(
+    () => [
+      { key: 'all', label: t('discoverFilterAll') },
+      { key: 'events', label: t('discoverFilterEvents') },
+      { key: 'places', label: t('discoverFilterPlaces') },
+    ],
+    [t],
   );
 
-  const filterLabels: Record<DiscoverFilter, string> = {
-    all: t('discoverFilterAll'),
-    events: t('discoverFilterEvents'),
-    places: t('discoverFilterPlaces'),
-  };
-
-  const activeCityName =
-    (selectedLocation?.mode === 'city' ||
-      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
-    selectedLocation.cityName
-      ? selectedLocation.cityName.trim().toLowerCase()
-      : '';
-  const activeCountry =
-    selectedLocation?.country?.trim().toLowerCase() || '';
-  const defaultCountry = t('homeLocationCountry').trim().toLowerCase();
-
   const locationFilteredEvents = useMemo(() => {
-    if (!activeCityName) {
-      if (!activeCountry) {
-        return events;
-      }
-
-      return events.filter((event) => {
-        const eventCountry =
-          event.Place?.City?.country?.trim().toLowerCase() ||
-          defaultCountry;
-        return eventCountry === activeCountry;
-      });
-    }
-
-    return events.filter((event) => {
-      if (activeCountry) {
-        const eventCountry =
-          event.Place?.City?.country?.trim().toLowerCase() ||
-          defaultCountry;
-        if (eventCountry !== activeCountry) {
-          return false;
-        }
-      }
-
-      const cityName = event.Place?.City?.name?.trim().toLowerCase();
-      const address = event.address?.trim().toLowerCase();
-      return (
-        cityName === activeCityName ||
-        (!!address && address.includes(activeCityName))
-      );
-    });
-  }, [activeCityName, activeCountry, defaultCountry, events]);
+    return filterByLocation(events, (event) => ({
+      city: event.Place?.City?.name,
+      country: event.Place?.City?.country,
+      address: event.address,
+    }));
+  }, [events, filterByLocation]);
 
   const locationFilteredPlaces = useMemo(() => {
-    if (!activeCityName) {
-      if (!activeCountry) {
-        return places;
-      }
-
-      return places.filter((place) => {
-        const placeCountry =
-          place.City?.country?.trim().toLowerCase() || defaultCountry;
-        return placeCountry === activeCountry;
-      });
-    }
-
-    return places.filter((place) => {
-      if (activeCountry) {
-        const placeCountry =
-          place.City?.country?.trim().toLowerCase() || defaultCountry;
-        if (placeCountry !== activeCountry) {
-          return false;
-        }
-      }
-
-      const cityName = place.City?.name?.trim().toLowerCase();
-      const address = place.address?.trim().toLowerCase();
-      return (
-        cityName === activeCityName ||
-        (!!address && address.includes(activeCityName))
-      );
-    });
-  }, [activeCityName, activeCountry, defaultCountry, places]);
+    return filterByLocation(places, (place) => ({
+      city: place.City?.name,
+      country: place.City?.country,
+      address: place.address,
+    }));
+  }, [filterByLocation, places]);
 
   const discoverItems = useMemo<DiscoverItem[]>(() => {
     const topEvents = locationFilteredEvents.slice(0, 6).map((event) => ({
@@ -283,16 +213,6 @@ export default function DiscoverScreen() {
     return [...topEvents, ...topPlaces];
   }, [locationFilteredEvents, locale, locationFilteredPlaces, t]);
 
-  const activeLocationLabel = activeCityName
-    ? `${t('homeLocationCurrentLabel')}: ${selectedLocation?.cityName}, ${
-        selectedLocation?.country || t('homeLocationCountry')
-      }`
-    : selectedLocation?.country
-      ? `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCities')} • ${
-          selectedLocation.country
-        }`
-      : `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCountries')}`;
-
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -312,92 +232,53 @@ export default function DiscoverScreen() {
   }, [activeFilter, discoverItems, query]);
 
   return (
-    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
-      <View className="px-5 pb-4">
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mr-4 rounded-full bg-white p-3 dark:bg-gray-900"
-          >
-            <Ionicons name="arrow-back" size={22} color="#f39c12" />
-          </TouchableOpacity>
-
-          <View className="flex-1">
-            <Text className="text-xs uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-              {t('discoverLabel')}
-            </Text>
-            <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              {t('discoverTitle')}
-            </Text>
-            <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {t('discoverSubtitle')}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View className="flex-row items-center justify-between px-5 pb-2">
-        <View className="rounded-full bg-white px-3 py-1.5 dark:bg-gray-800">
-          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-100">
-            {activeLocationLabel}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/location')}
-          className="rounded-full border border-gray-200 px-3 py-1.5 dark:border-gray-700"
-        >
-          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-            {t('homeLocationChangeCta')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <SearchBar
-        placeholder={t('discoverSearchPlaceholder')}
-        value={query}
-        onChangeText={setQuery}
-      />
-
-      <FlatList
-        horizontal
-        data={FILTERS}
-        keyExtractor={(item) => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 18,
-          paddingBottom: 10,
-        }}
-        renderItem={({ item }) => {
-          const active = activeFilter === item;
-
-          return (
-            <TouchableOpacity
-              onPress={() => setActiveFilter(item)}
-              className={`mr-3 rounded-full border px-4 py-2.5 ${
-                active
-                  ? 'border-[#f39c12] bg-[#f39c12]'
-                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
-              }`}
-            >
-              <Text
-                className={`text-xs font-semibold ${
-                  active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                }`}
-              >
-                {filterLabels[item]}
-              </Text>
-            </TouchableOpacity>
-          );
-        }}
-        style={{ flexGrow: 0 }}
-      />
-
-      {loading && discoverItems.length === 0 ? (
+    <CatalogScreenLayout
+      label={t('discoverLabel')}
+      title={t('discoverTitle')}
+      subtitle={t('discoverSubtitle')}
+      onBack={() => router.back()}
+      locationScopeBar={
+        <LocationScopeBar
+          locationLabel={locationLabel}
+          actionLabel={t('homeLocationChangeCta')}
+          onPressAction={() => router.push('/location')}
+        />
+      }
+      searchBar={
+        <SearchBar
+          placeholder={t('discoverSearchPlaceholder')}
+          value={query}
+          onChangeText={setQuery}
+        />
+      }
+      filterBar={
+        <FilterChipsBar
+          options={filterOptions}
+          activeKey={activeFilter}
+          onChange={setActiveFilter}
+          activeColor="#f39c12"
+        />
+      }
+    >
+      {!loading && errorMessage && discoverItems.length === 0 ? (
+        <ScreenState
+          mode="error"
+          title={t('commonErrorTitle')}
+          description={errorMessage}
+          actionLabel={t('commonRetry')}
+          onAction={() => {
+            void fetchDiscoverData(true);
+          }}
+          containerClassName="px-5 py-10"
+        />
+      ) : loading && discoverItems.length === 0 ? (
         <FlatList
           data={[0, 1, 2]}
           keyExtractor={(item) => `skeleton-${item}`}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          contentContainerStyle={{
+            paddingHorizontal: uiTokens.spacing.screenX,
+            paddingBottom: 120,
+          }}
           ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
@@ -425,7 +306,10 @@ export default function DiscoverScreen() {
         <FlatList
           data={filteredItems}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          contentContainerStyle={{
+            paddingHorizontal: uiTokens.spacing.screenX,
+            paddingBottom: 120,
+          }}
           ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
@@ -452,7 +336,12 @@ export default function DiscoverScreen() {
             />
           }
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <EntityCard
+              imageUrl={item.image}
+              title={item.title}
+              subtitle={item.subtitle}
+              badge={{ label: item.badge, color: item.actionColor }}
+              meta={item.meta}
               onPress={() =>
                 router.push(
                   item.type === 'event'
@@ -466,57 +355,11 @@ export default function DiscoverScreen() {
                       },
                 )
               }
-              className="flex-row overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
-            >
-              <Image
-                source={{ uri: item.image }}
-                className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
-              />
-
-              <View className="ml-4 flex-1 justify-between py-1">
-                <View>
-                  <View
-                    className="self-start rounded-full px-3 py-1.5"
-                    style={{ backgroundColor: `${item.actionColor}20` }}
-                  >
-                    <Text
-                      className="text-xs font-semibold"
-                      style={{ color: item.actionColor }}
-                    >
-                      {item.badge}
-                    </Text>
-                  </View>
-
-                  <Text
-                    className="mt-3 text-lg font-bold text-gray-900 dark:text-white"
-                    numberOfLines={2}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    className="mt-1 text-sm text-gray-500 dark:text-gray-400"
-                    numberOfLines={1}
-                  >
-                    {item.subtitle}
-                  </Text>
-                </View>
-
-                <View className="mt-3 flex-row items-center justify-between">
-                  <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    {item.meta}
-                  </Text>
-                  <Ionicons
-                    name="arrow-forward-circle"
-                    size={24}
-                    color={item.actionColor}
-                  />
-                </View>
-              </View>
-            </TouchableOpacity>
+            />
           )}
         />
       )}
-    </View>
+    </CatalogScreenLayout>
   );
 }
+

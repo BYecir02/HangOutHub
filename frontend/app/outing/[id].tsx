@@ -13,6 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import {
+  formatEventDate,
+  formatStatusLabel,
+  normalizeStatus,
+} from '@/services/formatters';
 import api, { getImageUrl } from '../../services/api';
 import { FriendshipOverview } from '../../types/social';
 
@@ -53,34 +58,12 @@ interface OutingDetail {
   OutingParticipant: OutingParticipant[];
 }
 
-function formatEventDate(value: string, locale: string) {
-  return new Date(value).toLocaleString(locale, {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatStatus(
-  status: string | null | undefined,
-  t: (key:
-    | 'outingDetailStatusGoing'
-    | 'outingDetailStatusMaybe'
-    | 'outingDetailStatusDeclined'
-    | 'outingDetailStatusInvited') => string,
-) {
-  if (status === 'GOING') {
-    return { label: t('outingDetailStatusGoing'), color: '#2ecc71' };
-  }
-  if (status === 'MAYBE') {
-    return { label: t('outingDetailStatusMaybe'), color: '#f39c12' };
-  }
-  if (status === 'DECLINED') {
-    return { label: t('outingDetailStatusDeclined'), color: '#ef4444' };
-  }
-  return { label: t('outingDetailStatusInvited'), color: '#4c669f' };
-}
+const OUTING_STATUS_COLORS: Record<string, string> = {
+  GOING: '#2ecc71',
+  MAYBE: '#f39c12',
+  DECLINED: '#ef4444',
+  INVITED: '#4c669f',
+};
 
 export default function OutingDetailScreen() {
   const router = useRouter();
@@ -98,6 +81,27 @@ export default function OutingDetailScreen() {
   );
   const [inviting, setInviting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const getParticipantStatus = useCallback(
+    (status: string | null | undefined) => {
+      const normalizedStatus = normalizeStatus(status, 'INVITED');
+
+      return {
+        label: formatStatusLabel(
+          normalizedStatus,
+          {
+            GOING: t('outingDetailStatusGoing'),
+            MAYBE: t('outingDetailStatusMaybe'),
+            DECLINED: t('outingDetailStatusDeclined'),
+            INVITED: t('outingDetailStatusInvited'),
+          },
+          t('outingDetailStatusInvited'),
+        ),
+        color: OUTING_STATUS_COLORS[normalizedStatus] || OUTING_STATUS_COLORS.INVITED,
+      };
+    },
+    [t],
+  );
 
   const loadOuting = useCallback(async () => {
     if (!params.id) {
@@ -275,7 +279,7 @@ export default function OutingDetailScreen() {
           </Text>
           <View className="mt-4 gap-3">
             {outing.OutingParticipant.map((participant) => {
-              const status = formatStatus(participant.status, t);
+              const status = getParticipantStatus(participant.status);
               return (
                 <View
                   key={participant.userId}

@@ -99,6 +99,14 @@ export default function DashboardScreen() {
       : organizerAccountType === 'ORGANIZER'
         ? t('organizerDashboardTypeOrganizer')
         : t('organizerDashboardTypeFallbackUnknown');
+  const isPlaceOwnerWorkspace =
+    user?.role === 'PLACE_OWNER' || organizerAccountType === 'PLACE_OWNER';
+  const workspaceLabel = isPlaceOwnerWorkspace
+    ? t('organizerDashboardLabelPlaceOwner')
+    : t('organizerDashboardLabel');
+  const workspaceSubtitle = isPlaceOwnerWorkspace
+    ? t('organizerDashboardSubtitlePlaceOwner')
+    : t('organizerDashboardSubtitle');
 
   useFocusEffect(
     useCallback(() => {
@@ -182,7 +190,7 @@ export default function DashboardScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
       <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-        {t('organizerDashboardLabel')}
+        {workspaceLabel}
       </Text>
       <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
         {user?.OrganizerProfile?.companyName || t('organizerDashboardOrgFallback')}
@@ -198,8 +206,20 @@ export default function DashboardScreen() {
         </View>
       </View>
       <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-        {t('organizerDashboardSubtitle')}
+        {workspaceSubtitle}
       </Text>
+
+      {isPlaceOwnerWorkspace ? (
+        <TouchableOpacity
+          onPress={() => router.push('/organizer/create-place')}
+          className="mt-4 self-start flex-row items-center rounded-2xl border border-[#4c669f]/30 bg-[#4c669f]/10 px-4 py-2.5 dark:border-[#4c669f]/40 dark:bg-[#4c669f]/20"
+        >
+          <Ionicons name="add-circle-outline" size={16} color="#4c669f" />
+          <Text className="ml-2 text-sm font-semibold text-[#4c669f]">
+            {t('organizerDashboardActionCreatePlace')}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       {error ? (
         <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">

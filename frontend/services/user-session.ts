@@ -32,7 +32,8 @@ function normalizeUserSession(input: UserSessionLike): StoredUserSession {
     username: input.username || undefined,
     displayName: input.displayName || null,
     role: input.role || undefined,
-    hasPlace: Boolean(input.hasPlace),
+    // Preserve unknown state to avoid false redirects for PLACE_OWNER on cold start.
+    hasPlace: input.hasPlace ?? undefined,
     organizerStatus,
   };
 }

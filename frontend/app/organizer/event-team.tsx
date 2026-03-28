@@ -3,16 +3,19 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  TouchableOpacity,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { getApiErrorMessage } from '@/services/api';
 import { discoverUsers } from '@/services/friendships';
 import {
@@ -29,10 +32,20 @@ export default function OrganizerEventTeamScreen() {
   const eventId = typeof params.id === 'string' ? params.id : '';
   const router = useRouter();
   const { t } = useI18n();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = useColorScheme() === 'dark';
+  const {
+    user,
+    loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useUserProfile();
+  const isAllowed = useOrganizerGuard({
+    user,
+    loading: profileLoading,
+    suspend: Boolean(profileError),
+  });
 
-  const [loading, setLoading] = useState(true);
+  const [teamLoading, setTeamLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState<EventCollaboratorItem[]>([]);
   const [newUserId, setNewUserId] = useState('');
@@ -54,7 +67,7 @@ export default function OrganizerEventTeamScreen() {
 
   const loadCollaborators = useCallback(async () => {
     if (!eventId) {
-      setLoading(false);
+      setTeamLoading(false);
       return;
     }
 
@@ -67,7 +80,7 @@ export default function OrganizerEventTeamScreen() {
         getApiErrorMessage(error, t('organizerTeamLoadFailed')),
       );
     } finally {
-      setLoading(false);
+      setTeamLoading(false);
     }
   }, [eventId, t]);
 
@@ -170,48 +183,89 @@ export default function OrganizerEventTeamScreen() {
     );
   };
 
-  if (loading) {
+  if (profileLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-      </View>
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (profileError && !user) {
+    return (
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerDataLoadErrorTitle')}
+        description={t('organizerDataLoadErrorMessage')}
+        actionLabel={t('organizerDataRetry')}
+        onAction={() => {
+          void refetchProfile();
+        }}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (!user || !isAllowed) {
+    return (
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (teamLoading) {
+    return (
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (!eventId) {
+    return (
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerDataLoadErrorTitle')}
+        description={t('organizerDataLoadErrorMessage')}
+        actionLabel={t('organizerGuardActionOk')}
+        onAction={() => router.back()}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <View className="flex-row items-center">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4 rounded-full bg-white p-2 dark:bg-gray-800"
-        >
-          <Ionicons
-            name="arrow-back"
-            size={22}
-            color={isDark ? '#fff' : '#1F2937'}
-          />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            {t('organizerTeamLabel')}
-          </Text>
-          <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-            {t('organizerTeamTitle')}
-          </Text>
-        </View>
-      </View>
+    <ScrollView
+      className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 88 }}
+    >
+      <ScreenHeader
+        title={t('organizerTeamTitle')}
+        subtitle={t('organizerTeamSubtitle')}
+        label={t('organizerTeamLabel')}
+        onBack={() => router.back()}
+      />
 
-      <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-        {t('organizerTeamSubtitle')}
-      </Text>
-
-      <View className="mt-6 rounded-3xl bg-white p-4 dark:bg-gray-900">
+      <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
         <Text className="text-sm font-semibold text-gray-900 dark:text-white">
           {t('organizerTeamAddSectionTitle')}
         </Text>
         <TextInput
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={(value) => {
+            setSearchQuery(value);
+            setNewUserId('');
+          }}
           placeholder={t('organizerTeamSearchPlaceholder')}
           placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
           autoCapitalize="none"
@@ -299,7 +353,7 @@ export default function OrganizerEventTeamScreen() {
         <TouchableOpacity
           disabled={submitting}
           onPress={() => void handleAdd()}
-          className={`mt-4 rounded-2xl px-4 py-3 ${
+          className={`mt-4 rounded-[18px] px-4 py-3 ${
             submitting ? 'bg-[#92A5C7]' : 'bg-[#4c669f]'
           }`}
         >
@@ -309,7 +363,7 @@ export default function OrganizerEventTeamScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="mt-5 rounded-3xl bg-white p-4 dark:bg-gray-900">
+      <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
         <Text className="text-sm font-semibold text-gray-900 dark:text-white">
           {t('organizerTeamMembersCount', { count: collaborators.length })}
         </Text>
@@ -323,7 +377,7 @@ export default function OrganizerEventTeamScreen() {
             {collaborators.map((item) => (
               <View
                 key={item.userId}
-                className="mb-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+                className="mb-3 rounded-[18px] border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
               >
                 <Text className="text-base font-semibold text-gray-900 dark:text-white">
                   {item.User.displayName || item.User.username || item.userId}
@@ -332,7 +386,7 @@ export default function OrganizerEventTeamScreen() {
                   @{item.User.username || 'unknown'}
                 </Text>
                 <View className="mt-2 flex-row items-center justify-between">
-                  <Text className="text-xs font-semibold uppercase tracking-widest text-[#4c669f]">
+                  <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4c669f]">
                     {item.permission === 'SCAN'
                       ? t('organizerTeamPermissionScan')
                       : t('organizerTeamPermissionEdit')}
@@ -351,8 +405,6 @@ export default function OrganizerEventTeamScreen() {
           </View>
         )}
       </View>
-
-      <View className="pb-20" />
     </ScrollView>
   );
 }

@@ -12,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 
+import ContactAction from '@/components/ui/ContactAction';
+import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import { formatEventDate, formatPrice } from '@/services/formatters';
 import { createReport } from '@/services/reports';
 import { getOrCreateDirectChat } from '@/services/direct-chats';
 import {
@@ -68,33 +71,6 @@ interface EventDetail {
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
-function formatEventDate(
-  value: string | null | undefined,
-  locale: string,
-  fallback: string,
-) {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleString(locale, {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatPrice(
-  value: number | string | null | undefined,
-  locale: string,
-  freeLabel: string,
-) {
-  const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
-}
-
 export default function EventDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -103,6 +79,7 @@ export default function EventDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [booking, setBooking] = useState<EventBookingTicket | null>(null);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
 
   const fetchEvent = useCallback(async () => {
     if (!params.id) {
@@ -336,83 +313,23 @@ export default function EventDetailScreen() {
   };
 
   const handleReportEvent = () => {
+    setReportSheetVisible(true);
+  };
+
+  const handleSubmitReportReason = async (reason: string) => {
     if (!event) {
       return;
     }
 
-    Alert.alert(t('reportTitle'), t('reportPrompt'), [
-      {
-        text: t('reportReasonSpam'),
-        onPress: () =>
-          void createReport(event.id, 'EVENT', t('reportReasonSpam'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonHarassment'),
-        onPress: () =>
-          void createReport(event.id, 'EVENT', t('reportReasonHarassment'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonInappropriate'),
-        onPress: () =>
-          void createReport(event.id, 'EVENT', t('reportReasonInappropriate'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonScam'),
-        onPress: () =>
-          void createReport(event.id, 'EVENT', t('reportReasonScam'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonOther'),
-        onPress: () =>
-          void createReport(event.id, 'EVENT', t('reportReasonOther'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      { text: t('genericCancel'), style: 'cancel' },
-    ]);
+    try {
+      await createReport(event.id, 'EVENT', reason);
+      Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage'));
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('reportFailed')),
+      );
+    }
   };
 
   return (
@@ -450,7 +367,7 @@ export default function EventDetailScreen() {
           <View className="mt-4 flex-row flex-wrap gap-2">
             <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
               <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-                {formatPrice(displayPrice, locale, t('homePriceFree'))}
+                {formatPrice(displayPrice, locale, { freeLabel: t('homePriceFree') })}
               </Text>
             </View>
           </View>
@@ -463,7 +380,10 @@ export default function EventDetailScreen() {
                 {t('eventDetailStart')}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {formatEventDate(event.startTime, locale, t('eventDetailDateToConfirm'))}
+                {formatEventDate(event.startTime, locale, {
+                  includeWeekday: true,
+                  fallback: t('eventDetailDateToConfirm'),
+                })}
               </Text>
             </View>
           </View>
@@ -499,14 +419,10 @@ export default function EventDetailScreen() {
                   t('eventDetailUnknownOrganizer')}
               </Text>
               {event.User?.id ? (
-                <TouchableOpacity
+                <ContactAction
                   onPress={handleContactOrganizer}
-                  className="mt-2 self-start rounded-full bg-[#4c669f] px-3 py-1.5"
-                >
-                  <Text className="text-xs font-semibold text-white">
-                    {t('directChatContactOrganizer')}
-                  </Text>
-                </TouchableOpacity>
+                  label={t('directChatContactOrganizer')}
+                />
               ) : null}
             </View>
           </View>
@@ -610,6 +526,12 @@ export default function EventDetailScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <ReportReasonSheet
+        visible={reportSheetVisible}
+        onClose={() => setReportSheetVisible(false)}
+        onSubmitReason={handleSubmitReportReason}
+      />
     </View>
   );
 }

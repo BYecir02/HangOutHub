@@ -1,16 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Callout, Marker, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 
 import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
 import api, { getImageUrl } from '@/services/api';
-import {
-  getStoredLocation,
-  type StoredLocation,
-} from '@/services/location-preferences';
 
 interface PlacePin {
   id: string;
@@ -70,8 +67,12 @@ export default function MapScreen() {
   const { t } = useI18n();
   const router = useRouter();
   const mapRef = useRef<MapView | null>(null);
-  const [selectedLocation, setSelectedLocation] =
-    useState<StoredLocation | null>(null);
+  const { selectedLocation, filterByLocation, locationValueLabel } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
   const [places, setPlaces] = useState<PlacePin[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<PlacePin | null>(null);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -91,27 +92,6 @@ export default function MapScreen() {
     ...BENIN_CENTER,
     ...COUNTRY_DELTA,
   });
-
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-
-      const hydrateLocation = async () => {
-        const storedLocation = await getStoredLocation();
-        if (!isMounted) {
-          return;
-        }
-
-        setSelectedLocation(storedLocation);
-      };
-
-      void hydrateLocation();
-
-      return () => {
-        isMounted = false;
-      };
-    }, []),
-  );
 
   useEffect(() => {
     if (
@@ -182,26 +162,7 @@ export default function MapScreen() {
     }
   }, [activeLayer]);
 
-  const locationLabel =
-    (selectedLocation?.mode === 'city' ||
-      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
-    selectedLocation.cityName
-      ? `${selectedLocation.cityName}, ${
-          selectedLocation.country || t('homeLocationCountry')
-        }`
-      : selectedLocation?.country
-        ? selectedLocation.country
-        : t('homeLocationAllCountries');
-
-  const defaultCountry = t('homeLocationCountry').trim().toLowerCase();
-  const activeCityName =
-    (selectedLocation?.mode === 'city' ||
-      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
-    selectedLocation.cityName
-      ? selectedLocation.cityName.trim().toLowerCase()
-      : '';
-  const activeCountry =
-    selectedLocation?.country?.trim().toLowerCase() || '';
+  const locationLabel = locationValueLabel;
 
   const distanceKm = useCallback(
     (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) => {
@@ -221,8 +182,14 @@ export default function MapScreen() {
   );
 
   const filteredPlaces = useMemo(
-    () =>
-      places.filter((place) => {
+    () => {
+      const locationFilteredPlaces = filterByLocation(places, (place) => ({
+        city: place.City?.name,
+        country: place.City?.country,
+        address: place.address,
+      }));
+
+      return locationFilteredPlaces.filter((place) => {
         if (
           typeof place.latitude !== 'number' ||
           typeof place.longitude !== 'number'
@@ -249,33 +216,13 @@ export default function MapScreen() {
           }
         }
 
-        if (activeCountry) {
-          const placeCountry =
-            place.City?.country?.trim().toLowerCase() || defaultCountry;
-          if (placeCountry !== activeCountry) {
-            return false;
-          }
-        }
-
-        if (activeCityName) {
-          const cityName = place.City?.name?.trim().toLowerCase();
-          const address = place.address?.trim().toLowerCase();
-          const matchesCity =
-            cityName === activeCityName ||
-            (!!address && address.includes(activeCityName));
-          if (!matchesCity) {
-            return false;
-          }
-        }
-
         return true;
-      }),
+      });
+    },
     [
       activeCategoryId,
-      activeCityName,
-      activeCountry,
-      defaultCountry,
       distanceKm,
+      filterByLocation,
       places,
       radiusKm,
       useMyLocation,
@@ -284,8 +231,14 @@ export default function MapScreen() {
   );
 
   const filteredEvents = useMemo(
-    () =>
-      events.filter((event) => {
+    () => {
+      const locationFilteredEvents = filterByLocation(events, (event) => ({
+        city: event.Place?.City?.name,
+        country: event.Place?.City?.country,
+        address: event.Place?.address,
+      }));
+
+      return locationFilteredEvents.filter((event) => {
         const latitude = event.Place?.latitude;
         const longitude = event.Place?.longitude;
 
@@ -303,33 +256,13 @@ export default function MapScreen() {
           }
         }
 
-        if (activeCountry) {
-          const placeCountry =
-            event.Place?.City?.country?.trim().toLowerCase() || defaultCountry;
-          if (placeCountry !== activeCountry) {
-            return false;
-          }
-        }
-
-        if (activeCityName) {
-          const cityName = event.Place?.City?.name?.trim().toLowerCase();
-          const address = event.Place?.address?.trim().toLowerCase();
-          const matchesCity =
-            cityName === activeCityName ||
-            (!!address && address.includes(activeCityName));
-          if (!matchesCity) {
-            return false;
-          }
-        }
-
         return true;
-      }),
+      });
+    },
     [
-      activeCityName,
-      activeCountry,
-      defaultCountry,
       distanceKm,
       events,
+      filterByLocation,
       radiusKm,
       useMyLocation,
       userCoords,

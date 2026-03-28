@@ -16,10 +16,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
+import PostCustomAudienceModal from '@/components/post/PostCustomAudienceModal';
+import PostVisibilityModal from '@/components/post/PostVisibilityModal';
+import ScreenHeader from '@/components/ui/ScreenHeader';
 import api, { getImageUrl } from '../services/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { getFriendshipOverview } from '@/services/friendships';
+import { formatEventDate } from '@/services/formatters';
 import type { FriendshipItem } from '@/types/social';
 import { getMySettings } from '@/services/settings';
 
@@ -650,57 +654,47 @@ export default function CreatePostScreen() {
 
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">
-      <View className="flex-row items-center justify-between border-b border-gray-100 px-5 pb-2 dark:border-gray-800">
-        <TouchableOpacity
-          onPress={() => {
+      <View className="border-b border-gray-100 px-5 pb-2 dark:border-gray-800">
+        <ScreenHeader
+          title={headerTitle}
+          onBack={() => {
             if (currentStep > 1) {
               setCurrentStep((step) => Math.max(1, step - 1));
               return;
             }
             router.back();
           }}
-          className="p-2 -ml-2"
-        >
-          <Ionicons
-            name={currentStep > 1 ? 'arrow-back' : 'close'}
-            size={28}
-            color={isDark ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-
-        <View className="items-center">
-          <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-            {headerTitle}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={handlePrimaryAction}
-          disabled={(isEditStep && !canSubmit) || loading}
-          className={`rounded-full px-5 py-2 ${
-            isEditStep && !canSubmit
-              ? 'bg-gray-200 dark:bg-gray-800'
-              : 'bg-[#f39c12]'
-          }`}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={canSubmit ? 'white' : 'gray'} />
-          ) : (
-            <Text
-              className={`font-bold ${
+          backIcon={currentStep > 1 ? 'arrow-back' : 'close'}
+          rightSlot={
+            <TouchableOpacity
+              onPress={handlePrimaryAction}
+              disabled={(isEditStep && !canSubmit) || loading}
+              className={`rounded-full px-5 py-2 ${
                 isEditStep && !canSubmit
-                  ? 'text-gray-400 dark:text-gray-500'
-                  : 'text-white'
+                  ? 'bg-gray-200 dark:bg-gray-800'
+                  : 'bg-[#f39c12]'
               }`}
             >
-              {isEditStep
-                ? t('postNextStep')
-                : isEditing
-                ? t('postSubmitEdit')
-                : t('postSubmitCreate')}
-            </Text>
-          )}
-        </TouchableOpacity>
+              {loading ? (
+                <ActivityIndicator size="small" color={canSubmit ? 'white' : 'gray'} />
+              ) : (
+                <Text
+                  className={`font-bold ${
+                    isEditStep && !canSubmit
+                      ? 'text-gray-400 dark:text-gray-500'
+                      : 'text-white'
+                  }`}
+                >
+                  {isEditStep
+                    ? t('postNextStep')
+                    : isEditing
+                    ? t('postSubmitEdit')
+                    : t('postSubmitCreate')}
+                </Text>
+              )}
+            </TouchableOpacity>
+          }
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -969,218 +963,52 @@ export default function CreatePostScreen() {
         ) : null}
       </KeyboardAvoidingView>
 
-      <Modal
+      <PostVisibilityModal
         visible={showVisibilityModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowVisibilityModal(false)}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowVisibilityModal(false)}
-          className="flex-1 justify-end bg-black/50"
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            className="rounded-t-3xl bg-white p-5 pb-10 dark:bg-gray-900"
-          >
-            <View className="mb-4 items-center">
-              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-            </View>
+        selectedVisibility={visibility}
+        options={visibilityOptions}
+        selectedCustomCount={selectedVisibilityUserIds.length}
+        title={t('postVisibilityModalTitle')}
+        onClose={() => setShowVisibilityModal(false)}
+        onSelect={(nextVisibility) => {
+          setVisibility(nextVisibility);
+          if (nextVisibility === 'custom') {
+            setShowVisibilityModal(false);
+            setShowCustomAudienceModal(true);
+            return;
+          }
+          setShowVisibilityModal(false);
+        }}
+        customLabelWithCount={(label, count) =>
+          t('postVisibilityCustomOptionLabel', { label, count })
+        }
+      />
 
-            <Text className="mb-6 text-center text-lg font-bold text-gray-800 dark:text-white">
-              {t('postVisibilityModalTitle')}
-            </Text>
-
-            {visibilityOptions.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                onPress={() => {
-                  setVisibility(option.id);
-                  if (option.id === 'custom') {
-                    setShowVisibilityModal(false);
-                    setShowCustomAudienceModal(true);
-                    return;
-                  }
-                  setShowVisibilityModal(false);
-                }}
-                className="flex-row items-center border-b border-gray-100 p-4 dark:border-gray-800"
-              >
-                <View
-                  className={`mr-4 rounded-full p-3 ${
-                    visibility === option.id
-                      ? 'bg-blue-50 dark:bg-blue-900/30'
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}
-                >
-                  <Ionicons
-                    name={option.icon}
-                    size={24}
-                    color={visibility === option.id ? '#4c669f' : 'gray'}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className={`text-base font-bold ${
-                      visibility === option.id
-                        ? 'text-[#4c669f]'
-                        : 'text-gray-800 dark:text-white'
-                    }`}
-                  >
-                    {option.id === 'custom' && selectedVisibilityUserIds.length > 0
-                      ? t('postVisibilityCustomOptionLabel', {
-                          label: option.label,
-                          count: selectedVisibilityUserIds.length,
-                        })
-                      : option.label}
-                  </Text>
-                  <Text className="mt-0.5 text-xs text-gray-500">
-                    {option.description}
-                  </Text>
-                </View>
-                {visibility === option.id ? (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={24}
-                    color="#4c669f"
-                  />
-                ) : null}
-              </TouchableOpacity>
-            ))}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
-      <Modal
+      <PostCustomAudienceModal
         visible={showCustomAudienceModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCustomAudienceModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1"
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => setShowCustomAudienceModal(false)}
-            className="flex-1 justify-end bg-black/50"
-          >
-            <TouchableOpacity
-              activeOpacity={1}
-              className="rounded-t-3xl bg-white p-5 pb-6 dark:bg-gray-900"
-            >
-              <View className="mb-4 items-center">
-                <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-              </View>
-
-            <Text className="mb-1 text-center text-lg font-bold text-gray-800 dark:text-white">
-              {t('postVisibilityCustomTitle')}
-            </Text>
-            <Text className="mb-4 text-center text-xs text-gray-500 dark:text-gray-400">
-              {t('postVisibilityCustomSubtitle')}
-            </Text>
-
-            <TextInput
-              value={audienceSearch}
-              onChangeText={setAudienceSearch}
-              placeholder={t('postVisibilityCustomSearchPlaceholder')}
-              placeholderTextColor={isDark ? '#666' : '#999'}
-              className="rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
-            />
-
-            <ScrollView
-              style={{ maxHeight: 320 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 8 }}
-            >
-              {audienceLoading ? (
-                <View className="mt-4 items-center">
-                  <ActivityIndicator color="#f39c12" />
-                </View>
-              ) : filteredAudienceConnections.length > 0 ? (
-                <View className="mt-4 gap-2">
-                  {filteredAudienceConnections.map((connection) => {
-                    const isSelected = selectedVisibilityUserIds.includes(
-                      connection.user.id,
-                    );
-                    return (
-                      <TouchableOpacity
-                        key={connection.user.id}
-                        onPress={() => {
-                          setSelectedVisibilityUserIds((current) =>
-                            current.includes(connection.user.id)
-                              ? current.filter((id) => id !== connection.user.id)
-                              : [...current, connection.user.id],
-                          );
-                        }}
-                        className={`flex-row items-center rounded-2xl border px-4 py-3 ${
-                          isSelected
-                            ? 'border-[#f39c12] bg-[#f39c12]/10'
-                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
-                        }`}
-                      >
-                        <Image
-                          source={{
-                            uri:
-                              getImageUrl(connection.user.avatarUrl) ||
-                              'https://i.pravatar.cc/150',
-                          }}
-                          className="h-10 w-10 rounded-full mr-3"
-                        />
-                        <View className="flex-1">
-                          <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {connection.user.displayName || connection.user.username}
-                          </Text>
-                          {connection.user.username ? (
-                            <Text className="text-xs text-gray-500 dark:text-gray-400">
-                              @{connection.user.username}
-                            </Text>
-                          ) : null}
-                        </View>
-                        {isSelected ? (
-                          <Ionicons name="checkmark-circle" size={22} color="#f39c12" />
-                        ) : (
-                          <Ionicons
-                            name="ellipse-outline"
-                            size={22}
-                            color={isDark ? '#666' : '#ccc'}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : (
-                <Text className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                  {t('postVisibilityCustomEmpty')}
-                </Text>
-              )}
-            </ScrollView>
-
-              <View className="mt-4 flex-row items-center justify-between">
-                <TouchableOpacity
-                  onPress={() => setSelectedVisibilityUserIds([])}
-                  className="rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-800"
-                >
-                  <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                    {t('postVisibilityCustomClear')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setShowCustomAudienceModal(false)}
-                  className="rounded-full bg-[#f39c12] px-5 py-2"
-                >
-                  <Text className="text-sm font-semibold text-white">
-                    {t('postVisibilityCustomConfirm')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </Modal>
+        isDark={isDark}
+        title={t('postVisibilityCustomTitle')}
+        subtitle={t('postVisibilityCustomSubtitle')}
+        searchPlaceholder={t('postVisibilityCustomSearchPlaceholder')}
+        clearLabel={t('postVisibilityCustomClear')}
+        confirmLabel={t('postVisibilityCustomConfirm')}
+        emptyLabel={t('postVisibilityCustomEmpty')}
+        searchValue={audienceSearch}
+        onSearchChange={setAudienceSearch}
+        loading={audienceLoading}
+        filteredConnections={filteredAudienceConnections}
+        selectedUserIds={selectedVisibilityUserIds}
+        onToggleUser={(userId) => {
+          setSelectedVisibilityUserIds((current) =>
+            current.includes(userId)
+              ? current.filter((id) => id !== userId)
+              : [...current, userId],
+          );
+        }}
+        onClear={() => setSelectedVisibilityUserIds([])}
+        onConfirm={() => setShowCustomAudienceModal(false)}
+        onClose={() => setShowCustomAudienceModal(false)}
+      />
 
       <Modal
         visible={showPlanModal}
@@ -1401,12 +1229,15 @@ export default function CreatePostScreen() {
                                 : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
                             }`}
                           >
-                            <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                              {eventItem.title}
-                            </Text>
-                            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {eventItem.Place?.name || eventItem.address || t('homeAddressToConfirm')}
-                            </Text>
+                          <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                            {eventItem.title}
+                          </Text>
+                          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {formatEventDate(eventItem.startTime, locale)}
+                          </Text>
+                          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {eventItem.Place?.name || eventItem.address || t('homeAddressToConfirm')}
+                          </Text>
                           </TouchableOpacity>
                         );
                       })}

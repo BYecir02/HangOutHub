@@ -5,19 +5,17 @@ import {
   FlatList,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Share,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
@@ -56,6 +54,7 @@ import {
   MessageImage,
   ZoomableImage,
 } from '@/components/direct-chat/ChatMedia';
+import ChatScreenShell from '@/components/ui/ChatScreenShell';
 import { ChatComposer } from '@/components/direct-chat/ChatComposer';
 import {
   emitDirectTyping,
@@ -1326,12 +1325,12 @@ export default function DirectChatScreen() {
       return [];
     }
 
-    const items: Array<{
+    const items: {
       key: string;
       label: string;
       onPress: () => void;
       danger?: boolean;
-    }> = [
+    }[] = [
       {
         key: 'reply',
         label: t('directChatActionReply'),
@@ -1397,10 +1396,7 @@ export default function DirectChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-gray-50 dark:bg-black"
-    >
+    <ChatScreenShell>
       <View className="flex-row items-center border-b border-gray-200 px-5 pb-3 pt-14 dark:border-gray-800">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#4c669f" />
@@ -2119,7 +2115,7 @@ export default function DirectChatScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </ChatScreenShell>
   );
 }
 

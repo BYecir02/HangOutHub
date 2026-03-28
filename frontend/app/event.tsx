@@ -20,6 +20,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import EventFormWizard from '@/components/ui/EventFormWizard';
 import api from '../services/api';
 import { getMySettings } from '@/services/settings';
 
@@ -1096,44 +1097,34 @@ export default function CreateEventScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white pt-14 dark:bg-black">
-      <View className="flex-row items-center border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
-        <TouchableOpacity
-          onPress={handleExitPress}
-          className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-        >
-          <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          {t('createEventTitle')}
-        </Text>
-      </View>
-
-      <ScrollView
+    <View className="flex-1">
+      <EventFormWizard
         ref={scrollRef}
-        className="flex-1 p-5"
-        showsVerticalScrollIndicator={false}
+        title={t('createEventTitle')}
+        onClose={handleExitPress}
+        closeIconColor={isDark ? '#fff' : '#333'}
+        progress={
+          <View className="mb-5 rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
+            <Text className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              {t('createEventStepProgress', {
+                current: currentStep,
+                total: CREATE_EVENT_TOTAL_STEPS,
+              })}
+            </Text>
+            <Text className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+              {currentStep === 1
+                ? t('createEventStepTitleBasics')
+                : currentStep === 2
+                  ? t('createEventStepTitlePlaceDate')
+                  : currentStep === 3
+                    ? t('createEventStepTitleTicketing')
+                    : currentStep === 4
+                      ? t('createEventStepTitleOptions')
+                      : t('createEventStepTitlePhotos')}
+            </Text>
+          </View>
+        }
       >
-        <View className="mb-5 rounded-2xl bg-gray-50 p-4 dark:bg-gray-900">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            {t('createEventStepProgress', {
-              current: currentStep,
-              total: CREATE_EVENT_TOTAL_STEPS,
-            })}
-          </Text>
-          <Text className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
-            {currentStep === 1
-              ? t('createEventStepTitleBasics')
-              : currentStep === 2
-                ? t('createEventStepTitlePlaceDate')
-                : currentStep === 3
-                  ? t('createEventStepTitleTicketing')
-                  : currentStep === 4
-                    ? t('createEventStepTitleOptions')
-                    : t('createEventStepTitlePhotos')}
-          </Text>
-        </View>
-
         {currentStep === 5 ? (
           <View className="mb-6">
           <TouchableOpacity
@@ -1934,7 +1925,7 @@ export default function CreateEventScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+      </EventFormWizard>
 
       <Modal transparent animationType="fade" visible={previewVisible}>
         <View className="flex-1 items-center justify-center bg-black/60 px-5">

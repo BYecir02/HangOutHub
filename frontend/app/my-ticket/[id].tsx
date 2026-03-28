@@ -12,57 +12,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 
+import TicketStatusBadge from '@/components/ui/TicketStatusBadge';
 import { useI18n } from '@/hooks/use-i18n';
 import { getApiErrorMessage, getImageUrl } from '@/services/api';
+import { formatEventDate } from '@/services/formatters';
 import {
   EventBookingTicket,
   getMyEventBookings,
 } from '@/services/event-bookings';
-import type { TranslationKey } from '@/services/i18n';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
-
-const statusToneClass: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  CONFIRMED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  PAID: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  USED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  CHECKED_IN: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  CANCELLED: 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
-};
-
-const statusLabelKey: Record<string, string> = {
-  PENDING: 'myTicketsStatusPending',
-  CONFIRMED: 'myTicketsStatusConfirmed',
-  PAID: 'myTicketsStatusPaid',
-  USED: 'myTicketsStatusUsed',
-  CHECKED_IN: 'myTicketsStatusCheckedIn',
-  CANCELLED: 'myTicketsStatusCancelled',
-};
-
-function getStatusTranslationKey(status: string): TranslationKey {
-  const key = statusLabelKey[status];
-  if (key) {
-    return key as TranslationKey;
-  }
-
-  return 'myTicketsStatusUnknown';
-}
-
-function formatEventDate(value: string | null, locale: string, fallback: string) {
-  if (!value) {
-    return fallback;
-  }
-
-  return new Date(value).toLocaleString(locale, {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export default function MyTicketDetailScreen() {
   const router = useRouter();
@@ -107,10 +67,6 @@ export default function MyTicketDetailScreen() {
   }, [loadTicket]);
 
   const status = (ticket?.status || 'PENDING').toUpperCase();
-  const statusClass =
-    statusToneClass[status] ||
-    'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
-  const statusLabel = t(getStatusTranslationKey(status));
   const hasQr = Boolean(ticket?.qrCode);
 
   const qrHint = useMemo(() => {
@@ -204,12 +160,13 @@ export default function MyTicketDetailScreen() {
                 </Text>
                 <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {t('myTicketsStart')}{' '}
-                  {formatEventDate(ticket.event?.startTime || null, locale, '-')}
+                  {formatEventDate(ticket.event?.startTime || null, locale, {
+                    includeWeekday: true,
+                    fallback: '-',
+                  })}
                 </Text>
               </View>
-              <View className={`rounded-full px-3 py-1 ${statusClass}`}>
-                <Text className="text-xs font-semibold">{statusLabel}</Text>
-              </View>
+              <TicketStatusBadge status={status} context="myTickets" />
             </View>
 
             <View className="mt-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">

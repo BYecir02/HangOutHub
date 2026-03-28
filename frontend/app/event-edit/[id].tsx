@@ -19,6 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import EventFormWizard from '@/components/ui/EventFormWizard';
 import api, { getApiErrorMessage } from '@/services/api';
 import { clearCache } from '@/services/dataCache';
 import { getMySettings } from '@/services/settings';
@@ -714,36 +715,32 @@ export default function EditEventScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white pt-14 dark:bg-black">
-      <View className="flex-row items-center border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-        >
-          <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          {t('eventEditTitle')}
-        </Text>
-        <TouchableOpacity
-          onPress={openTeamScreen}
-          className="rounded-xl border border-[#4c669f] px-3 py-2"
-        >
-          <Text className="text-xs font-semibold text-[#4c669f]">
-            {t('eventEditOpenTeam')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={openRevisionsScreen}
-          className="ml-2 rounded-xl border border-gray-300 px-3 py-2 dark:border-gray-700"
-        >
-          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            {t('eventEditOpenRevisions')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
+    <View className="flex-1">
+      <EventFormWizard
+        title={t('eventEditTitle')}
+        onClose={() => router.back()}
+        closeIconColor={isDark ? '#fff' : '#333'}
+        rightActions={
+          <>
+            <TouchableOpacity
+              onPress={openTeamScreen}
+              className="rounded-xl border border-[#4c669f] px-3 py-2"
+            >
+              <Text className="text-xs font-semibold text-[#4c669f]">
+                {t('eventEditOpenTeam')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openRevisionsScreen}
+              className="ml-2 rounded-xl border border-gray-300 px-3 py-2 dark:border-gray-700"
+            >
+              <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                {t('eventEditOpenRevisions')}
+              </Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
         <View className="mb-6">
           <TouchableOpacity
             onPress={pickImage}
@@ -1268,7 +1265,7 @@ export default function EditEventScreen() {
             </Text>
           )}
         </TouchableOpacity>
-      </ScrollView>
+      </EventFormWizard>
 
       {showPicker ? (
         Platform.OS === 'ios' ? (

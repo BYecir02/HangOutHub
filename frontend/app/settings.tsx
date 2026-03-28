@@ -5,8 +5,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Switch,
-  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -24,6 +22,10 @@ import {
 } from '@/services/settings';
 import { syncAppPreferencesFromSettings } from '@/services/app-preferences';
 import { clearStoredUserSession } from '@/services/user-session';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
+import SettingsSection from '@/components/settings/SettingsSection';
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -146,29 +148,6 @@ export default function SettingsScreen() {
     );
   };
 
-  const renderToggleRow = (
-    icon: keyof typeof Ionicons.glyphMap,
-    label: string,
-    value: boolean,
-    onValueChange: (nextValue: boolean) => void,
-    withBorder = true,
-  ) => (
-    <View
-      className={`flex-row items-center p-4 ${
-        withBorder ? 'border-b border-gray-100 dark:border-gray-800' : ''
-      }`}
-    >
-      <Ionicons name={icon} size={22} color={iconColor} />
-      <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: '#d1d5db', true: '#4c669f' }}
-        thumbColor="#ffffff"
-      />
-    </View>
-  );
-
   const renderChoiceRow = (
     icon: keyof typeof Ionicons.glyphMap,
     label: string,
@@ -211,46 +190,32 @@ export default function SettingsScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50 dark:bg-black">
       <View className="p-5">
-        {/* Header avec bouton retour */}
-        <View className="flex-row items-center mb-4 pt-10">
-          <TouchableOpacity onPress={() => router.back()} className="mr-4">
-            <Ionicons name="arrow-back" size={24} color={iconColor} />
-          </TouchableOpacity>
-          <View>
-            <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-              {t('settingsLabel')}
-            </Text>
-            <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-              {t('settingsTitle')}
-            </Text>
-          </View>
-        </View>
+        <ScreenHeader
+          title={t('settingsTitle')}
+          label={t('settingsLabel')}
+          onBack={() => router.back()}
+          containerClassName="mb-4 pt-10"
+        />
 
         {loading ? (
-          <View className="py-12 items-center">
-            <ActivityIndicator size="large" color="#4c669f" />
-          </View>
+          <ScreenState mode="loading" />
         ) : null}
 
         {!loading && !settings ? (
-          <View className="bg-white dark:bg-gray-900 rounded-xl p-5 mb-6">
-            <Text className="text-gray-700 dark:text-gray-200 font-semibold mb-2">
-              {t('settingsLoadError')}
-            </Text>
-            <TouchableOpacity
-              onPress={() => void loadSettings()}
-              className="self-start rounded-lg bg-[#4c669f] px-4 py-2"
-            >
-              <Text className="text-white font-semibold">{t('commonRetry')}</Text>
-            </TouchableOpacity>
-          </View>
+          <ScreenState
+            mode="error"
+            title={t('settingsLoadError')}
+            actionLabel={t('commonRetry')}
+            onAction={() => {
+              void loadSettings();
+            }}
+            containerClassName="mb-6 px-0 py-0"
+          />
         ) : null}
 
         {!loading && settings ? (
           <>
-            {/* Section Compte */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsSectionAccount')}</Text>
-            <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
+            <SettingsSection title={t('settingsSectionAccount')} containerClassName="mb-6">
               <TouchableOpacity
                 onPress={() => router.push('/edit-profile')}
                 className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
@@ -295,19 +260,17 @@ export default function SettingsScreen() {
                 <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsLogout')}</Text>
                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
               </TouchableOpacity>
-            </View>
+            </SettingsSection>
 
-            {/* Section Confidentialite */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsPrivacySection')}</Text>
-            <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
-              {renderToggleRow(
-                'eye-outline',
-                t('settingsProfilePublic'),
-                settings.profilePublic,
-                (nextValue) => {
+            <SettingsSection title={t('settingsPrivacySection')} containerClassName="mb-6">
+              <SettingsToggleRow
+                icon="eye-outline"
+                label={t('settingsProfilePublic')}
+                value={settings.profilePublic}
+                onValueChange={(nextValue) => {
                   void handleUpdateSetting('profilePublic', nextValue);
-                },
-              )}
+                }}
+              />
 
               {renderChoiceRow(
                 'globe-outline',
@@ -343,11 +306,9 @@ export default function SettingsScreen() {
                 },
                 false,
               )}
-            </View>
+            </SettingsSection>
 
-            {/* Section Application */}
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsAppSection')}</Text>
-            <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
+            <SettingsSection title={t('settingsAppSection')} containerClassName="mb-6">
               {renderChoiceRow(
                 'contrast-outline',
                 t('settingsTheme'),
@@ -375,14 +336,14 @@ export default function SettingsScreen() {
                 },
               )}
 
-              {renderToggleRow(
-                'cellular-outline',
-                t('settingsDataSaver'),
-                settings.dataSaver,
-                (nextValue) => {
+              <SettingsToggleRow
+                icon="cellular-outline"
+                label={t('settingsDataSaver')}
+                value={settings.dataSaver}
+                onValueChange={(nextValue) => {
                   void handleUpdateSetting('dataSaver', nextValue);
-                },
-              )}
+                }}
+              />
 
               <TouchableOpacity
                 onPress={() => router.push('/help-support')}
@@ -392,24 +353,24 @@ export default function SettingsScreen() {
                 <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsHelpSupport')}</Text>
                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
               </TouchableOpacity>
-            </View>
+            </SettingsSection>
           </>
         ) : null}
 
-        {/* Zone Danger */}
-        <View className="mt-8">
-             <Text className="text-red-500 font-bold mb-2 uppercase text-xs tracking-wider">{t('settingsDangerSection')}</Text>
-             <View className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden border border-red-100 dark:border-red-900/40">
-               <TouchableOpacity
-                 onPress={handleDeleteAccount}
-                 className="flex-row items-center p-4"
-               >
-                 <Ionicons name="trash-outline" size={22} color="#ff4757" />
-                 <Text className="flex-1 ml-3 text-red-600 font-semibold text-base">{t('settingsDeleteAccount')}</Text>
-                 <Ionicons name="chevron-forward" size={20} color={chevronColor} />
-               </TouchableOpacity>
-             </View>
-        </View>
+        <SettingsSection
+          title={t('settingsDangerSection')}
+          containerClassName="mt-8"
+          cardClassName="border border-red-100 dark:border-red-900/40"
+        >
+          <TouchableOpacity
+            onPress={handleDeleteAccount}
+            className="flex-row items-center p-4"
+          >
+            <Ionicons name="trash-outline" size={22} color="#ff4757" />
+            <Text className="flex-1 ml-3 text-red-600 font-semibold text-base">{t('settingsDeleteAccount')}</Text>
+            <Ionicons name="chevron-forward" size={20} color={chevronColor} />
+          </TouchableOpacity>
+        </SettingsSection>
         
         <Text className="text-center text-gray-400 mt-8 text-xs">Hangout Hub v1.0.0</Text>
       </View>

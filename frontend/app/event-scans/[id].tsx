@@ -1,35 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
+import TicketStatusBadge from '@/components/ui/TicketStatusBadge';
 import { useI18n } from '@/hooks/use-i18n';
 import { getApiErrorMessage, getImageUrl } from '@/services/api';
 import {
   getEventScans,
   type EventScansResponse,
 } from '@/services/event-bookings';
-import type { TranslationKey } from '@/services/i18n';
 
 const AVATAR_PLACEHOLDER = 'https://i.pravatar.cc/150?img=12';
-
-const statusToneClass: Record<string, string> = {
-  USED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  CHECKED_IN: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-};
-
-const statusLabelKey: Record<string, TranslationKey> = {
-  USED: 'organizerEventScansStatusUsed',
-  CHECKED_IN: 'organizerEventScansStatusCheckedIn',
-};
 
 function CounterCard({
   label,
@@ -61,34 +44,35 @@ export default function EventScansScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [data, setData] = useState<EventScansResponse | null>(null);
 
-  const loadScans = useCallback(async (isRefresh = false) => {
-    if (!eventId) {
-      setErrorMessage(t('organizerEventScansLoadFailed'));
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+  const loadScans = useCallback(
+    async (isRefresh = false) => {
+      if (!eventId) {
+        setErrorMessage(t('organizerEventScansLoadFailed'));
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
-    try {
-      const response = await getEventScans(eventId);
-      setData(response);
-      setErrorMessage(null);
-    } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, t('organizerEventScansLoadFailed')),
-      );
-      setData(null);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [eventId, t]);
+      try {
+        const response = await getEventScans(eventId);
+        setData(response);
+        setErrorMessage(null);
+      } catch (error) {
+        setErrorMessage(getApiErrorMessage(error, t('organizerEventScansLoadFailed')));
+        setData(null);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [eventId, t],
+  );
 
   useEffect(() => {
     void loadScans();
@@ -99,31 +83,38 @@ export default function EventScansScreen() {
   const content = useMemo(() => {
     if (loading) {
       return (
-        <View className="items-center justify-center py-20">
-          <ActivityIndicator size="large" color="#4c669f" />
-          <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-            {t('organizerEventScansLoading')}
-          </Text>
-        </View>
+        <ScreenState
+          mode="loading"
+          title={t('organizerEventScansLoading')}
+          containerClassName="px-0 py-12"
+        />
       );
     }
 
     if (errorMessage) {
       return (
-        <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
-          <Text className="text-sm text-red-600 dark:text-red-300">{errorMessage}</Text>
-          <TouchableOpacity
-            onPress={() => void loadScans(true)}
-            className="mt-3 self-start rounded-xl bg-[#ff4757] px-4 py-2"
-          >
-            <Text className="font-semibold text-white">{t('commonRetry')}</Text>
-          </TouchableOpacity>
-        </View>
+        <ScreenState
+          mode="error"
+          title={t('organizerEventScansLoadFailed')}
+          description={errorMessage}
+          actionLabel={t('commonRetry')}
+          onAction={() => {
+            void loadScans(true);
+          }}
+          containerClassName="px-0 py-0"
+        />
       );
     }
 
     if (!data) {
-      return null;
+      return (
+        <ScreenState
+          mode="empty"
+          title={t('organizerEventScansEmptyTitle')}
+          description={t('organizerEventScansEmptyDescription')}
+          containerClassName="px-0 py-4"
+        />
+      );
     }
 
     const scans = data.scans || [];
@@ -169,13 +160,6 @@ export default function EventScansScreen() {
             </View>
           ) : (
             scans.map((scan) => {
-              const status = (scan.status || 'USED').toUpperCase();
-              const statusClass =
-                statusToneClass[status] ||
-                'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
-              const statusKey =
-                statusLabelKey[status] || 'organizerEventScansStatusUnknown';
-
               return (
                 <View
                   key={scan.bookingId}
@@ -183,7 +167,9 @@ export default function EventScansScreen() {
                 >
                   <View className="flex-row items-center">
                     <Image
-                      source={{ uri: getImageUrl(scan.attendee.avatarUrl) || AVATAR_PLACEHOLDER }}
+                      source={{
+                        uri: getImageUrl(scan.attendee.avatarUrl) || AVATAR_PLACEHOLDER,
+                      }}
                       className="h-11 w-11 rounded-full bg-gray-200 dark:bg-gray-700"
                     />
                     <View className="ml-3 flex-1">
@@ -196,9 +182,11 @@ export default function EventScansScreen() {
                         {scan.ticket.ticketTypeName || t('organizerEventScansTicketFallback')}
                       </Text>
                     </View>
-                    <View className={`rounded-full px-2.5 py-1 ${statusClass}`}>
-                      <Text className="text-xs font-semibold">{t(statusKey)}</Text>
-                    </View>
+                    <TicketStatusBadge
+                      status={scan.status || 'USED'}
+                      context="eventScans"
+                      size="sm"
+                    />
                   </View>
                 </View>
               );
@@ -207,7 +195,7 @@ export default function EventScansScreen() {
         </View>
       </>
     );
-  }, [data, errorMessage, loading, loadScans, t]);
+  }, [data, errorMessage, loadScans, loading, t]);
 
   return (
     <ScrollView
@@ -220,24 +208,13 @@ export default function EventScansScreen() {
         />
       }
     >
-      <View className="mb-6 flex-row items-center">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-3 rounded-full bg-white p-3 dark:bg-gray-900"
-        >
-          <Ionicons name="arrow-back" size={20} color="#4c669f" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            {t('organizerEventScansTitle')}
-          </Text>
-          <Text className="mt-1 text-xl font-bold text-gray-900 dark:text-white" numberOfLines={1}>
-            {eventTitle}
-          </Text>
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {t('organizerEventScansSubtitle')}
-          </Text>
-        </View>
+      <View className="mb-6">
+        <ScreenHeader
+          title={eventTitle}
+          subtitle={t('organizerEventScansSubtitle')}
+          label={t('organizerEventScansTitle')}
+          onBack={() => router.back()}
+        />
       </View>
 
       <View className="pb-10">{content}</View>

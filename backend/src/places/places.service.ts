@@ -39,8 +39,12 @@ export class PlacesService {
     return this.prisma.place.create({
       data: {
         name: createPlaceDto.name,
+        category: createPlaceDto.category,
         description: createPlaceDto.description,
         address: createPlaceDto.address,
+        phone: createPlaceDto.phone,
+        whatsapp: createPlaceDto.whatsapp,
+        openingHours: createPlaceDto.openingHours,
         latitude: createPlaceDto.latitude,
         longitude: createPlaceDto.longitude,
         coverUrl,

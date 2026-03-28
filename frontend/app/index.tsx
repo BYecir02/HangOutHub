@@ -2,9 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -12,8 +10,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, type Href } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AuthBrandBadge from '@/components/auth/AuthBrandBadge';
+import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
 import AuthTextField from '@/components/auth/AuthTextField';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
@@ -154,7 +153,7 @@ export default function LoginScreen() {
       router.replace(getOrganizerEntryPath(persistedUser) as Href);
     } catch (error) {
       Alert.alert(
-        'Oups',
+        t('commonErrorTitle'),
         getApiErrorMessage(
           error,
           t('loginUnavailableFallback'),
@@ -166,43 +165,30 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#08111f]">
-      <LinearGradient
-        colors={
-          isDark
-            ? ['#08111f', '#12233f', '#24122a']
-            : ['#fff3e4', '#eef4ff', '#ffffff']
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="absolute inset-0"
-      />
-
-      <View className="absolute -left-16 top-16 h-48 w-48 rounded-full bg-[#ff7a451f]" />
-      <View className="absolute right-[-32px] top-36 h-56 w-56 rounded-full bg-[#4c669f26]" />
-      <View className="absolute bottom-24 left-8 h-32 w-32 rounded-full bg-[#2ecc7122]" />
-
-      <SafeAreaView className="flex-1">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className="flex-1"
-        >
-          <ScrollView
-            className="flex-1"
-            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 28 }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+    <AuthHeroLayout
+      isDark={isDark}
+      gradientDark={['#08111f', '#12233f', '#24122a']}
+      gradientLight={['#f8fbff', '#eef5ff', '#fff8f0']}
+      orbs={[
+        {
+          style: { left: -64, top: 64, width: 192, height: 192 },
+          darkColor: '#ff7a451f',
+          lightColor: '#ff7a4526',
+        },
+        {
+          style: { right: -32, top: 144, width: 224, height: 224 },
+          darkColor: '#4c669f26',
+          lightColor: '#4c669f20',
+        },
+        {
+          style: { left: 32, bottom: 96, width: 128, height: 128 },
+          darkColor: '#2ecc7122',
+          lightColor: '#2ecc7118',
+        },
+      ]}
+    >
             <View className="pt-6">
-              <View className="self-start rounded-full border border-white/20 bg-white/10 px-4 py-2">
-                <Text
-                  className={`text-xs font-semibold uppercase tracking-[0.28em] ${
-                    isDark ? 'text-white' : 'text-slate-700'
-                  }`}
-                >
-                  HangOutHub
-                </Text>
-              </View>
+              <AuthBrandBadge isDark={isDark} />
 
               <Text
                 className={`mt-6 text-[40px] font-black leading-[44px] ${
@@ -214,7 +200,7 @@ export default function LoginScreen() {
 
               <Text
                 className={`mt-4 max-w-[92%] text-base leading-7 ${
-                  isDark ? 'text-slate-300' : 'text-slate-600'
+                  isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}
               >
                 {t('loginHeroSubtitle')}
@@ -249,7 +235,7 @@ export default function LoginScreen() {
               className={`mt-10 rounded-[36px] border p-6 ${
                 isDark
                   ? 'border-white/10 bg-[#07101dcc]'
-                  : 'border-white/90 bg-white'
+                  : 'border-slate-200 bg-white/95'
               }`}
             >
               <View className="mb-6">
@@ -304,14 +290,13 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry
                 placeholder={t('loginPasswordPlaceholder')}
-                hint={t('loginPasswordHint')}
               />
 
               <TouchableOpacity
                 onPress={handleLogin}
                 disabled={loading}
                 activeOpacity={0.9}
-                className={`mt-2 self-stretch overflow-hidden rounded-[28px] ${
+                className={`mt-1 h-14 self-stretch overflow-hidden rounded-[28px] ${
                   loading ? 'opacity-70' : ''
                 }`}
               >
@@ -319,8 +304,9 @@ export default function LoginScreen() {
                   colors={['#4c669f', '#ff7a45']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  className="w-full min-h-[56px] items-center justify-center rounded-[28px] px-6 py-[18px]"
-                >
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View className="h-full w-full items-center justify-center rounded-[28px] px-6">
                   {loading ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
@@ -328,28 +314,14 @@ export default function LoginScreen() {
                       {t('loginSubmit')}
                     </Text>
                   )}
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
-
-              <View
-                className={`mt-5 rounded-[24px] px-4 py-4 ${
-                  isDark ? 'bg-white/5' : 'bg-slate-50'
-                }`}
-              >
-                <Text
-                  className={`text-sm leading-6 ${
-                    isDark ? 'text-slate-300' : 'text-slate-600'
-                  }`}
-                >
-                  {t('loginUserTypeHint')}
-                </Text>
-              </View>
             </View>
 
             <View className="mt-8 flex-row items-center justify-center">
               <Text
                 className={`text-sm ${
-                  isDark ? 'text-slate-300' : 'text-slate-600'
+                  isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}
               >
                 {t('loginNoAccount')}
@@ -360,9 +332,6 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+    </AuthHeroLayout>
   );
 }

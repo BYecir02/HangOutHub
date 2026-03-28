@@ -13,7 +13,12 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
+import { usePaginatedList } from '@/hooks/usePaginatedList';
+import { formatEventDate } from '@/services/formatters';
 import {
   fetchOrganizerNotifications,
   markOrganizerNotificationRead,
@@ -79,14 +84,45 @@ export default function OrganizerNotificationsScreen() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'urgent'>(
     'all',
   );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<OrganizerNotificationItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const lastLoadMoreAtRef = useRef(0);
   const skeletonOpacity = useRef(new Animated.Value(0.45)).current;
+  const mapOrganizerNotificationsError = useCallback(
+    () => t('organizerNotificationsLoadFailed'),
+    [t],
+  );
+  const fetchNotificationsPage = useCallback(
+    async ({ cursor }: { cursor?: string }) => {
+      const response = await fetchOrganizerNotifications({
+        limit: 20,
+        cursor,
+        unreadOnly: activeFilter === 'unread',
+        urgentOnly: activeFilter === 'urgent',
+      });
+
+      return {
+        items: response.items || [],
+        nextCursor: response.nextCursor || null,
+      };
+    },
+    [activeFilter],
+  );
+
+  const {
+    items,
+    setItems,
+    nextCursor,
+    loading,
+    refreshing,
+    loadingMore,
+    error,
+    loadInitial,
+    refresh,
+    loadMore,
+  } = usePaginatedList<OrganizerNotificationItem>({
+    fetchPage: fetchNotificationsPage,
+    getItemKey: (item) => item.id,
+    mapError: mapOrganizerNotificationsError,
+  });
 
   useEffect(() => {
     if (!loadingMore) {
@@ -116,81 +152,15 @@ export default function OrganizerNotificationsScreen() {
     };
   }, [loadingMore, skeletonOpacity]);
 
-  const load = useCallback(async (options?: { reset?: boolean }) => {
-    setError(null);
-
-    try {
-      const isReset = options?.reset ?? true;
-      const response = await fetchOrganizerNotifications({
-        limit: 20,
-        cursor: isReset ? undefined : nextCursor || undefined,
-        unreadOnly: activeFilter === 'unread',
-        urgentOnly: activeFilter === 'urgent',
-      });
-
-      const newItems = response.items || [];
-
-      if (isReset) {
-        setItems(newItems);
-      } else {
-        setItems((current) => {
-          const currentIds = new Set(current.map((item) => item.id));
-          const next = [...current];
-
-          for (const item of newItems) {
-            if (!currentIds.has(item.id)) {
-              next.push(item);
-            }
-          }
-
-          return next;
-        });
-      }
-
-      setNextCursor(response.nextCursor || null);
-    } catch {
-      setError(t('organizerNotificationsLoadFailed'));
-      if (options?.reset ?? true) {
-        setItems([]);
-      }
-    } finally {
-      if (options?.reset ?? true) {
-        setLoading(false);
-      }
-    }
-  }, [activeFilter, nextCursor, t]);
-
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      setNextCursor(null);
-      void load({ reset: true });
-    }, [load]),
+      void loadInitial();
+    }, [loadInitial]),
   );
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-
-    try {
-      setNextCursor(null);
-      await load({ reset: true });
-    } finally {
-      setRefreshing(false);
-    }
-  }, [load]);
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore || loading) {
-      return;
-    }
-
-    setLoadingMore(true);
-    try {
-      await load({ reset: false });
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [load, loading, loadingMore, nextCursor]);
+    await refresh();
+  }, [refresh]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -219,20 +189,7 @@ export default function OrganizerNotificationsScreen() {
   );
 
   const formatDate = useCallback(
-    (value: string) => {
-      const parsed = new Date(value);
-
-      if (Number.isNaN(parsed.getTime())) {
-        return '--';
-      }
-
-      return new Intl.DateTimeFormat(locale, {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(parsed);
-    },
+    (value: string) => formatEventDate(value, locale),
     [locale],
   );
 
@@ -308,6 +265,16 @@ export default function OrganizerNotificationsScreen() {
 
     return mapped;
   }, [activeFilter, mapped]);
+  const filterOptions = useMemo<
+    readonly FilterChipOption<'all' | 'unread' | 'urgent'>[]
+  >(
+    () => [
+      { key: 'all', label: t('organizerNotificationsFilterAll') },
+      { key: 'unread', label: t('organizerNotificationsFilterUnread') },
+      { key: 'urgent', label: t('organizerNotificationsFilterUrgent') },
+    ],
+    [t],
+  );
 
   const markVisibleAsRead = useCallback(async () => {
     const visibleUnreadIds = filteredItems
@@ -334,11 +301,13 @@ export default function OrganizerNotificationsScreen() {
     } catch {
       // On garde le comportement silencieux pour ne pas casser l'experience.
     }
-  }, [filteredItems]);
+  }, [filteredItems, setItems]);
 
   return (
     <ScrollView
       className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 88 }}
       onScroll={handleScroll}
       scrollEventThrottle={120}
       refreshControl={
@@ -351,79 +320,27 @@ export default function OrganizerNotificationsScreen() {
         />
       }
     >
-      <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-        {t('organizerNotificationsLabel')}
-      </Text>
-      <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-        {t('organizerNotificationsTitle')}
-      </Text>
-      <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-        {t('organizerNotificationsSubtitle')}
-      </Text>
-      <Text className="mt-2 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+      <ScreenHeader
+        title={t('organizerNotificationsTitle')}
+        subtitle={t('organizerNotificationsSubtitle')}
+        label={t('organizerNotificationsLabel')}
+      />
+      <Text className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
         {t('organizerNotificationsResultsCount', {
           count: filteredItems.length,
         })}
       </Text>
 
-      <View className="mt-4 flex-row gap-2">
-        <TouchableOpacity
-          onPress={() => setActiveFilter('all')}
-          className={`rounded-full px-3 py-2 ${
-            activeFilter === 'all'
-              ? 'bg-[#4c669f]'
-              : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
-          }`}
-        >
-          <Text
-            className={`text-xs font-semibold ${
-              activeFilter === 'all'
-                ? 'text-white'
-                : 'text-gray-700 dark:text-gray-200'
-            }`}
-          >
-            {t('organizerNotificationsFilterAll')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => setActiveFilter('unread')}
-          className={`rounded-full px-3 py-2 ${
-            activeFilter === 'unread'
-              ? 'bg-[#4c669f]'
-              : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
-          }`}
-        >
-          <Text
-            className={`text-xs font-semibold ${
-              activeFilter === 'unread'
-                ? 'text-white'
-                : 'text-gray-700 dark:text-gray-200'
-            }`}
-          >
-            {t('organizerNotificationsFilterUnread')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => setActiveFilter('urgent')}
-          className={`rounded-full px-3 py-2 ${
-            activeFilter === 'urgent'
-              ? 'bg-[#4c669f]'
-              : 'border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
-          }`}
-        >
-          <Text
-            className={`text-xs font-semibold ${
-              activeFilter === 'urgent'
-                ? 'text-white'
-                : 'text-gray-700 dark:text-gray-200'
-            }`}
-          >
-            {t('organizerNotificationsFilterUrgent')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <FilterChipsBar
+        options={filterOptions}
+        activeKey={activeFilter}
+        onChange={setActiveFilter}
+        activeColor="#4c669f"
+        horizontalPadding={0}
+        textSize="sm"
+        paddingTop={14}
+        paddingBottom={6}
+      />
 
       {filteredItems.some((item) => !item.isRead) ? (
         <View className="mt-3 flex-row justify-end">
@@ -431,9 +348,9 @@ export default function OrganizerNotificationsScreen() {
             onPress={() => {
               void markVisibleAsRead();
             }}
-            className="rounded-full border border-gray-300 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-900"
+            className="rounded-full border border-gray-300 bg-white px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900"
           >
-            <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
               {t('organizerNotificationsMarkVisibleRead')}
             </Text>
           </TouchableOpacity>
@@ -441,21 +358,23 @@ export default function OrganizerNotificationsScreen() {
       ) : null}
 
       {loading ? (
-        <View className="mt-8 items-center justify-center rounded-2xl bg-white p-8 dark:bg-gray-900">
-          <ActivityIndicator size="small" color="#4c669f" />
-        </View>
+        <ScreenState mode="loading" containerClassName="px-0 pb-0 pt-4" />
       ) : null}
 
       {error ? (
-        <View className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
-          <Text className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            {error}
-          </Text>
-        </View>
+        <ScreenState
+          mode="warning"
+          title={error}
+          actionLabel={t('commonRetry')}
+          onAction={() => {
+            void loadInitial();
+          }}
+          containerClassName="px-0 pb-0 pt-4"
+        />
       ) : null}
 
       {!loading && !error && filteredItems.length === 0 ? (
-        <View className="mt-6 rounded-2xl bg-white p-6 dark:bg-gray-900">
+        <View className="mt-6 rounded-[24px] bg-white p-6 dark:bg-gray-900">
           <Text className="text-base font-semibold text-gray-900 dark:text-white">
             {activeFilter === 'all'
               ? t('organizerNotificationsEmptyTitle')
@@ -469,7 +388,7 @@ export default function OrganizerNotificationsScreen() {
         </View>
       ) : null}
 
-      <View className="mt-6 pb-24">
+      <View className="mt-5">
         {filteredItems.map((item) => (
           <TouchableOpacity
             key={item.id}
@@ -492,7 +411,7 @@ export default function OrganizerNotificationsScreen() {
                 router.push(item.targetPath as never);
               }
             }}
-            className={`mb-3 rounded-2xl border p-4 ${getTypeTone(item.type)}`}
+            className={`mb-3 rounded-[24px] border p-4 ${getTypeTone(item.type)}`}
           >
             <View className="flex-row items-center justify-between">
               <View className="mr-3 flex-row items-center">
@@ -513,7 +432,7 @@ export default function OrganizerNotificationsScreen() {
               {item.description}
             </Text>
             <Text
-              className={`mt-2 text-xs font-semibold uppercase ${getSeverityTone(item.severity)}`}
+              className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${getSeverityTone(item.severity)}`}
             >
               {item.severity}
             </Text>
@@ -524,12 +443,12 @@ export default function OrganizerNotificationsScreen() {
         ))}
 
         {loadingMore ? (
-          <View className="mt-2 gap-2 rounded-2xl py-2">
+          <View className="mt-2 gap-2 rounded-[24px] py-2">
             {[0, 1].map((index) => (
               <Animated.View
                 key={`notif-skeleton-${index}`}
                 style={{ opacity: skeletonOpacity }}
-                className="rounded-2xl border border-gray-200 bg-gray-100 p-4 dark:border-gray-700 dark:bg-gray-800"
+                className="rounded-[24px] border border-gray-200 bg-gray-100 p-4 dark:border-gray-700 dark:bg-gray-800"
               >
                 <View className="h-3 w-36 rounded bg-gray-200 dark:bg-gray-700" />
                 <View className="mt-3 h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
@@ -538,7 +457,7 @@ export default function OrganizerNotificationsScreen() {
             ))}
             <View className="items-center pt-1">
               <ActivityIndicator size="small" color="#4c669f" />
-              <Text className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
+              <Text className="mt-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                 {t('organizerNotificationsLoadingMore')}
               </Text>
             </View>
@@ -547,7 +466,7 @@ export default function OrganizerNotificationsScreen() {
 
         {!loading && !loadingMore && !nextCursor && filteredItems.length > 0 ? (
           <View className="mt-3 items-center rounded-2xl border border-dashed border-gray-300 p-3 dark:border-gray-700">
-            <Text className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+            <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
               {t('organizerNotificationsEndOfList')}
             </Text>
           </View>

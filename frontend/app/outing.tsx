@@ -16,9 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
 
+import ScreenHeader from '@/components/ui/ScreenHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '../services/api';
+import { formatEventDate } from '@/services/formatters';
 
 interface PlaceOption {
   id: string;
@@ -98,6 +100,7 @@ export default function CreateOutingScreen() {
   const isDraftHydratedRef = useRef(false);
   const lastSavedDraftRef = useRef<string | null>(null);
   const OUTING_DRAFT_KEY = 'outing-draft-v1';
+  const scheduledDateLabel = formatEventDate(scheduledDate, locale);
 
   useEffect(() => {
     if (typeof params.title === 'string' && params.title.trim()) {
@@ -340,16 +343,12 @@ export default function CreateOutingScreen() {
 
   return (
     <View className="flex-1 bg-white pt-14 dark:bg-black">
-      <View className="flex-row items-center border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4 rounded-full bg-gray-50 p-2 dark:bg-gray-800"
-        >
-          <Ionicons name="close" size={24} color={isDark ? '#fff' : '#333'} />
-        </TouchableOpacity>
-        <Text className="flex-1 text-xl font-bold text-gray-800 dark:text-white">
-          {t('outingCreateTitle')}
-        </Text>
+      <View className="border-b border-gray-100 px-5 pb-4 dark:border-gray-800">
+        <ScreenHeader
+          title={t('outingCreateTitle')}
+          onBack={() => router.back()}
+          backIcon="close"
+        />
       </View>
 
       <ScrollView className="flex-1 px-5 py-5" showsVerticalScrollIndicator={false}>
@@ -399,11 +398,7 @@ export default function CreateOutingScreen() {
                     {t('outingCreateEventDateFixed')}
                   </Text>
                   <Text className="mt-1 text-base text-gray-800 dark:text-white">
-                    {scheduledDate.toLocaleDateString(locale)} ·{' '}
-                    {scheduledDate.toLocaleTimeString(locale, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {scheduledDateLabel}
                   </Text>
                   {selectedPlaceId ? (
                     <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">

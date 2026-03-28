@@ -1,21 +1,20 @@
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
 import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
+import { getApiErrorMessage } from '@/services/api';
 import {
   acceptFriendRequest,
   getFriendshipOverview,
@@ -36,10 +35,9 @@ const EMPTY_FRIENDSHIPS: FriendshipOverview = {
 
 export default function FriendRequestsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
   const { t } = useI18n();
-  const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [friendships, setFriendships] =
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
 
@@ -49,13 +47,15 @@ export default function FriendRequestsScreen() {
     try {
       const data = await getFriendshipOverview();
       setFriendships(data);
+      setErrorMessage(null);
     } catch (error) {
       console.error('Erreur chargement demandes:', error);
       setFriendships(EMPTY_FRIENDSHIPS);
+      setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -84,18 +84,9 @@ export default function FriendRequestsScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white pt-16 dark:bg-black">
-      <View className="flex-row items-center px-5 pb-4">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color={isDark ? 'white' : 'black'}
-          />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          {t('friendRequestsTitle')}
-        </Text>
+    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
+      <View className="px-5 pb-4">
+        <ScreenHeader title={t('friendRequestsTitle')} onBack={() => router.back()} />
       </View>
 
       <ScrollView
@@ -121,9 +112,17 @@ export default function FriendRequestsScreen() {
 
         <View className="mt-6">
           {loading ? (
-            <View className="py-8">
-              <ActivityIndicator color="#f39c12" />
-            </View>
+            <ScreenState mode="loading" containerClassName="px-0 py-4" />
+          ) : errorMessage ? (
+            <ScreenState
+              mode="error"
+              title={errorMessage}
+              actionLabel={t('commonRetry')}
+              onAction={() => {
+                void loadRequests();
+              }}
+              containerClassName="px-0 py-0"
+            />
           ) : friendships.incomingRequests.length > 0 ? (
             friendships.incomingRequests.map((item) => (
               <PersonRow

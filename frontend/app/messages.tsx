@@ -3,11 +3,8 @@ import {
   Alert,
   ActivityIndicator,
   FlatList,
-  Image,
   RefreshControl,
-  ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,9 +12,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { Socket } from 'socket.io-client';
 
+import DirectConversationCard from '@/components/messages/DirectConversationCard';
+import OutingConversationCard, {
+  type OutingConversationSummary,
+} from '@/components/messages/OutingConversationCard';
 import PersonRow from '@/components/social/PersonRow';
+import BottomSheetListModal from '@/components/ui/BottomSheetListModal';
+import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import SearchBar from '@/components/ui/SearchBar';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import api, { getApiErrorMessage } from '@/services/api';
 import {
   getOrCreateDirectChat,
   listDirectChats,
@@ -28,51 +33,13 @@ import { getDirectChatSocket } from '@/services/direct-chat-realtime';
 import { getFriendshipOverview } from '@/services/friendships';
 import type { SocialUser } from '@/types/social';
 
-interface ChatUser {
-  id: string;
-  username?: string;
-  displayName?: string | null;
-}
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  sentAt?: string;
-  User?: ChatUser;
-}
-
-interface OutingChatSummary {
-  id: string;
-  title: string;
-  scheduledDate: string;
-  participantsCount: number;
-  messagesCount: number;
-  unreadCount: number;
-  Place?: {
-    name?: string | null;
-    address?: string | null;
-    City?: {
-      name: string;
-    } | null;
-  } | null;
-  lastMessage?: ChatMessage | null;
-}
-
-function formatDate(value: string, locale: string) {
-  return new Date(value).toLocaleString(locale, {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function MessagesScreen() {
   const router = useRouter();
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const [tab, setTab] = useState<'outings' | 'direct'>('outings');
-  const [chats, setChats] = useState<OutingChatSummary[]>([]);
-  const chatsRef = useRef<OutingChatSummary[]>([]);
+  type OutingFilter = 'all' | 'upcoming' | 'withMessages' | 'unread';
+  const [chats, setChats] = useState<OutingConversationSummary[]>([]);
+  const chatsRef = useRef<OutingConversationSummary[]>([]);
   const [directChats, setDirectChats] = useState<DirectChatSummary[]>([]);
   const directChatsRef = useRef<DirectChatSummary[]>([]);
   const directSocketRef = useRef<Socket | null>(null);
@@ -99,9 +66,7 @@ export default function MessagesScreen() {
   const [creatingChatForUserId, setCreatingChatForUserId] = useState<string | null>(
     null,
   );
-  const [filter, setFilter] = useState<
-    'all' | 'upcoming' | 'withMessages' | 'unread'
-  >('all');
+  const [filter, setFilter] = useState<OutingFilter>('all');
 
   const loadChats = useCallback(
     async ({ isRefresh = false, silent = false } = {}) => {
@@ -112,7 +77,7 @@ export default function MessagesScreen() {
       }
 
       try {
-        const response = await api.get<OutingChatSummary[]>('/outings/chats');
+        const response = await api.get<OutingConversationSummary[]>('/outings/chats');
         setChats(response.data);
         chatsRef.current = response.data;
         setSyncWarning(false);
@@ -383,6 +348,15 @@ export default function MessagesScreen() {
     tab === 'outings'
       ? t('messagesSearchPlaceholder')
       : t('directChatSearchPlaceholder');
+  const outingFilterOptions = useMemo<FilterChipOption<OutingFilter>[]>(
+    () => [
+      { key: 'all', label: t('messagesFilterAll') },
+      { key: 'upcoming', label: t('messagesFilterUpcoming') },
+      { key: 'withMessages', label: t('messagesFilterWithMessages') },
+      { key: 'unread', label: t('messagesFilterUnread') },
+    ],
+    [t],
+  );
 
   if (isLoading) {
     return (
@@ -394,17 +368,14 @@ export default function MessagesScreen() {
 
   if (hasError && emptyListLength === 0) {
     return (
-      <View className="flex-1 bg-gray-50 px-6 pt-16 dark:bg-black">
-        <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-4">
-            <Ionicons name="arrow-back" size={24} color="#4c669f" />
-          </TouchableOpacity>
-          <Text className="text-xl font-bold text-gray-900 dark:text-white">
-            {t('messagesTitle')}
-          </Text>
-        </View>
+      <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
+        <ScreenHeader
+          title={t('messagesTitle')}
+          onBack={() => router.back()}
+          containerClassName="px-5 pb-4"
+        />
 
-        <View className="mt-12 rounded-3xl bg-white p-5 dark:bg-gray-900">
+        <View className="mx-5 mt-8 rounded-3xl bg-white p-5 dark:bg-gray-900">
           <Text className="text-base font-semibold text-gray-900 dark:text-white">
             {t('messagesLoadFailedTitle')}
           </Text>
@@ -430,22 +401,21 @@ export default function MessagesScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
-      <View className="flex-row items-center px-5 pb-4">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons name="arrow-back" size={24} color="#4c669f" />
-        </TouchableOpacity>
-        <Text className="flex-1 text-xl font-bold text-gray-900 dark:text-white">
-          {t('messagesTitle')}
-        </Text>
-        {tab === 'direct' ? (
-          <TouchableOpacity
-            onPress={() => void openConnectionPicker()}
-            className="h-10 w-10 items-center justify-center rounded-full bg-[#4c669f]"
-          >
-            <Ionicons name="add" size={20} color="#ffffff" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      <ScreenHeader
+        title={t('messagesTitle')}
+        onBack={() => router.back()}
+        containerClassName="px-5 pb-4"
+        rightSlot={
+          tab === 'direct' ? (
+            <TouchableOpacity
+              onPress={() => void openConnectionPicker()}
+              className="h-10 w-10 items-center justify-center rounded-full bg-[#4c669f]"
+            >
+              <Ionicons name="add" size={20} color="#ffffff" />
+            </TouchableOpacity>
+          ) : null
+        }
+      />
 
       <View className="px-5 pb-2">
         <View className="flex-row rounded-full bg-gray-200 p-1 dark:bg-gray-900">
@@ -488,91 +458,20 @@ export default function MessagesScreen() {
         </View>
       ) : null}
 
-      <View className="px-5 pb-4">
-        <View className="flex-row items-center rounded-2xl bg-white px-3 py-2 dark:bg-gray-900">
-          <Ionicons name="search-outline" size={18} color="#9ca3af" />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={searchPlaceholder}
-            placeholderTextColor="#9ca3af"
-            className="ml-2 flex-1 text-gray-900 dark:text-white"
-          />
-        </View>
-
+      <View className="pb-4">
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder={searchPlaceholder}
+        />
         {tab === 'outings' ? (
-          <View className="mt-3 flex-row gap-2">
-            <TouchableOpacity
-              onPress={() => setFilter('all')}
-              className={`rounded-full px-4 py-2 ${
-                filter === 'all'
-                  ? 'bg-[#4c669f]'
-                  : 'bg-gray-200 dark:bg-gray-800'
-              }`}
-            >
-              <Text
-                className={`text-xs font-semibold ${
-                  filter === 'all' ? 'text-white' : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                  {t('messagesFilterAll')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setFilter('upcoming')}
-              className={`rounded-full px-4 py-2 ${
-                filter === 'upcoming'
-                  ? 'bg-[#4c669f]'
-                  : 'bg-gray-200 dark:bg-gray-800'
-              }`}
-            >
-              <Text
-                className={`text-xs font-semibold ${
-                  filter === 'upcoming'
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                  {t('messagesFilterUpcoming')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setFilter('withMessages')}
-              className={`rounded-full px-4 py-2 ${
-                filter === 'withMessages'
-                  ? 'bg-[#4c669f]'
-                  : 'bg-gray-200 dark:bg-gray-800'
-              }`}
-            >
-              <Text
-                className={`text-xs font-semibold ${
-                  filter === 'withMessages'
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                  {t('messagesFilterWithMessages')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setFilter('unread')}
-              className={`rounded-full px-4 py-2 ${
-                filter === 'unread'
-                  ? 'bg-[#4c669f]'
-                  : 'bg-gray-200 dark:bg-gray-800'
-              }`}
-            >
-              <Text
-                className={`text-xs font-semibold ${
-                  filter === 'unread'
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                  {t('messagesFilterUnread')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <FilterChipsBar
+            options={outingFilterOptions}
+            activeKey={filter}
+            onChange={setFilter}
+            paddingTop={10}
+            paddingBottom={0}
+          />
         ) : null}
       </View>
 
@@ -599,70 +498,16 @@ export default function MessagesScreen() {
               </View>
             }
             renderItem={({ item }) => {
-              const location =
-                item.Place?.name ||
-                item.Place?.City?.name ||
-                item.Place?.address ||
-                t('messagesLocationFallback');
-              const lastMessageText = item.lastMessage?.content || t('messagesLastMessageEmpty');
-              const lastMessageAuthor =
-                item.lastMessage?.User?.displayName ||
-                item.lastMessage?.User?.username ||
-                t('messagesSystemAuthor');
-
               return (
-                <TouchableOpacity
+                <OutingConversationCard
+                  item={item}
                   onPress={() =>
                     router.push({
                       pathname: '/outing-chat/[id]',
                       params: { id: item.id },
                     })
                   }
-                  className="mb-3 rounded-3xl bg-white p-4 dark:bg-gray-900"
-                >
-                  <View className="flex-row items-center justify-between">
-                    <Text className="mr-2 flex-1 text-base font-semibold text-gray-900 dark:text-white">
-                      {item.title}
-                    </Text>
-                    <Text className="text-xs text-gray-400 dark:text-gray-500">
-                      {formatDate(item.scheduledDate, locale)}
-                    </Text>
-                  </View>
-
-                  <Text className="mt-1 text-xs uppercase tracking-wider text-[#4c669f]">
-                    {location}
-                  </Text>
-
-                  <Text className="mt-3 text-sm text-gray-600 dark:text-gray-300" numberOfLines={2}>
-                    {item.lastMessage
-                      ? `${lastMessageAuthor}: ${lastMessageText}`
-                      : lastMessageText}
-                  </Text>
-
-                  <View className="mt-4 flex-row items-center justify-between">
-                    <Text className="text-xs text-gray-400 dark:text-gray-500">
-                      {item.participantsCount > 1
-                        ? t('messagesParticipantsMany', { count: item.participantsCount })
-                        : t('messagesParticipantsOne', { count: item.participantsCount })}
-                    </Text>
-                    <View className="flex-row items-center gap-2">
-                      <View className="rounded-full bg-[#4c669f]/10 px-3 py-1">
-                        <Text className="text-xs font-semibold text-[#4c669f]">
-                          {item.messagesCount} {t('messagesCountMsg')}
-                        </Text>
-                      </View>
-                      {item.unreadCount > 0 ? (
-                        <View className="rounded-full bg-red-500 px-3 py-1">
-                          <Text className="text-xs font-semibold text-white">
-                            {item.unreadCount > 1
-                              ? t('messagesUnreadMany', { count: item.unreadCount })
-                              : t('messagesUnreadOne', { count: item.unreadCount })}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                />
               );
             }}
           />
@@ -697,180 +542,62 @@ export default function MessagesScreen() {
               </View>
             }
             renderItem={({ item }) => {
-              const partnerName =
-                item.partner.displayName ||
-                item.partner.username ||
-                t('directChatTitleFallback');
-              const lastMessageText = item.lastMessage?.isDeleted
-                ? t('directChatMessageDeleted')
-                : item.lastMessage?.images?.length
-                  ? item.lastMessage.content
-                    ? item.lastMessage.content
-                    : t('directChatLastMessageImage')
-                  : item.lastMessage?.content || t('directChatLastMessageEmpty');
-              const cleanedLastMessageText = lastMessageText
-                ? item.lastMessage?.isDeleted
-                  ? lastMessageText
-                  : stripSystemMarkers(item.lastMessage)
-                : lastMessageText;
-              const lastMessageDate = item.lastMessageAt
-                ? formatDate(item.lastMessageAt, locale)
-                : '';
-              const avatarUrl = getImageUrl(item.partner.avatarUrl);
-              const fallbackInitial =
-                (item.partner.displayName || item.partner.username || '*')
-                  .trim()
-                  .charAt(0)
-                  .toUpperCase();
-
               return (
-                <TouchableOpacity
+                <DirectConversationCard
+                  item={item}
                   onPress={() =>
                     router.push({
                       pathname: '/direct-chat/[id]',
                       params: { id: item.id },
                     })
                   }
-                  className="mb-3 rounded-3xl bg-white p-4 dark:bg-gray-900"
-                >
-                  <View className="flex-row items-center gap-3">
-                    {avatarUrl ? (
-                      <Image
-                        source={{ uri: avatarUrl }}
-                        className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-800"
-                      />
-                    ) : (
-                      <View className="h-12 w-12 items-center justify-center rounded-full bg-[#4c669f]/15">
-                        <Text className="text-base font-semibold text-[#4c669f]">
-                          {fallbackInitial}
-                        </Text>
-                      </View>
-                    )}
-                    <View className="flex-1">
-                      <View className="flex-row items-start justify-between">
-                        <Text className="mr-2 flex-1 text-base font-semibold text-gray-900 dark:text-white">
-                          {partnerName}
-                        </Text>
-                        <View className="items-end">
-                          {lastMessageDate ? (
-                            <Text className="text-xs text-gray-400 dark:text-gray-500">
-                              {lastMessageDate}
-                            </Text>
-                          ) : null}
-                          {item.unreadCount && item.unreadCount > 0 ? (
-                            <View className="mt-1 rounded-full bg-red-500 px-2.5 py-0.5">
-                              <Text className="text-[10px] font-semibold text-white">
-                                {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                      </View>
-
-                      <Text
-                        className="mt-2 text-sm text-gray-600 dark:text-gray-300"
-                        numberOfLines={2}
-                      >
-                        {cleanedLastMessageText}
-                      </Text>
-                    </View>
-                  </View>
-
-                </TouchableOpacity>
+                />
               );
             }}
           />
       )}
 
-      {connectionPickerOpen ? (
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setConnectionPickerOpen(false)}
-          className="absolute inset-0 z-50 bg-black/60"
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            className="absolute bottom-0 w-full rounded-t-3xl bg-white p-5 pb-8 dark:bg-gray-900"
-          >
-            <View className="mb-4 items-center">
-              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-            </View>
-            <View className="mb-4 flex-row items-center justify-between">
-              <View className="flex-1 pr-3">
-                <Text className="text-lg font-bold text-gray-800 dark:text-white">
-                  {t('messagesDirectPickerTitle')}
-                </Text>
-                <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {t('messagesDirectPickerSubtitle')}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setConnectionPickerOpen(false)}
-                className="rounded-full bg-gray-100 p-2 dark:bg-gray-800"
-              >
-                <Ionicons name="close" size={18} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-
-            <View className="mb-4 flex-row items-center rounded-2xl bg-gray-100 px-3 py-2 dark:bg-gray-800">
-              <Ionicons name="search-outline" size={18} color="#9ca3af" />
-              <TextInput
-                value={connectionsQuery}
-                onChangeText={setConnectionsQuery}
-                placeholder={t('messagesDirectPickerSearchPlaceholder')}
-                placeholderTextColor="#9ca3af"
-                className="ml-2 flex-1 text-gray-900 dark:text-white"
-              />
-            </View>
-
-            {connectionsLoading ? (
-              <View className="items-center py-10">
+      <BottomSheetListModal
+        visible={connectionPickerOpen}
+        onClose={() => setConnectionPickerOpen(false)}
+        title={t('messagesDirectPickerTitle')}
+        subtitle={t('messagesDirectPickerSubtitle')}
+        items={filteredConnections}
+        keyExtractor={(user) => user.id}
+        renderItem={(user) => (
+          <PersonRow
+            user={user}
+            subtitle={user.bio?.trim() || t('connectionsAcceptedSubtitle')}
+            onPress={() => void startConversationWithConnection(user)}
+            primaryAction={
+              creatingChatForUserId === user.id ? (
                 <ActivityIndicator color="#4c669f" />
-              </View>
-            ) : connectionsErrorMessage ? (
-              <View className="items-center py-6">
-                <Text className="text-center text-sm text-red-500">
-                  {connectionsErrorMessage}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => void loadConnections({ force: true })}
-                  className="mt-4 rounded-2xl bg-[#4c669f] px-4 py-2.5"
-                >
-                  <Text className="text-sm font-semibold text-white">{t('commonRetry')}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : filteredConnections.length === 0 ? (
-              <Text className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                {connectionsQuery.trim()
-                  ? t('messagesDirectPickerNoResult')
-                  : t('messagesDirectPickerEmpty')}
-              </Text>
-            ) : (
-              <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-                {filteredConnections.map((user) => (
-                  <PersonRow
-                    key={user.id}
-                    user={user}
-                    subtitle={user.bio?.trim() || t('connectionsAcceptedSubtitle')}
-                    onPress={() => void startConversationWithConnection(user)}
-                    primaryAction={
-                      creatingChatForUserId === user.id ? (
-                        <ActivityIndicator color="#4c669f" />
-                      ) : (
-                        <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
-                          <Text className="text-xs font-semibold text-[#4c669f]">
-                            {t('messagesDirectPickerStartAction')}
-                          </Text>
-                        </View>
-                      )
-                    }
-                  />
-                ))}
-              </ScrollView>
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      ) : null}
+              ) : (
+                <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
+                  <Text className="text-xs font-semibold text-[#4c669f]">
+                    {t('messagesDirectPickerStartAction')}
+                  </Text>
+                </View>
+              )
+            }
+          />
+        )}
+        searchValue={connectionsQuery}
+        onSearchChange={setConnectionsQuery}
+        searchPlaceholder={t('messagesDirectPickerSearchPlaceholder')}
+        loading={connectionsLoading}
+        errorMessage={connectionsErrorMessage}
+        onRetry={() => {
+          void loadConnections({ force: true });
+        }}
+        retryLabel={t('commonRetry')}
+        emptyTitle={
+          connectionsQuery.trim()
+            ? t('messagesDirectPickerNoResult')
+            : t('messagesDirectPickerEmpty')
+        }
+        maxHeight={560}
+      />
     </View>
   );
 }

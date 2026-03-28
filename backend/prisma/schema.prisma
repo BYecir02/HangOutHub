@@ -293,8 +293,12 @@ model Place {
   cityId       Int
   ownerId      String?        @db.Uuid // ✅ Le propriétaire du lieu
   name         String         @db.VarChar(100)
+  category     String?        @db.VarChar(32)
   description  String?
   address      String?        @db.VarChar(255)
+  phone        String?        @db.VarChar(30)
+  whatsapp     String?        @db.VarChar(30)
+  openingHours String?        @db.VarChar(255)
   latitude     Float
   longitude    Float
   priceLevel   Int?           @default(1)
@@ -314,6 +318,7 @@ model Place {
   Story        Story[]
   Subscription Subscription[]
   Post         Post[]
+
 }
 
 model PlaceClaim {

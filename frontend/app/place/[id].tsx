@@ -18,6 +18,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import ContactAction from '@/components/ui/ContactAction';
+import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
 import { createReport } from '@/services/reports';
@@ -35,8 +37,12 @@ interface RelatedEvent {
 interface PlaceDetail {
   id: string;
   name: string;
+  category?: string | null;
   description?: string | null;
   address?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  openingHours?: string | null;
   coverUrl?: string | null;
   images: string[];
   avgRating?: number | null;
@@ -100,6 +106,43 @@ function formatReviewDate(value: string | null | undefined, locale: string) {
   });
 }
 
+function getPlaceCategoryLabel(
+  category: string | null | undefined,
+  t: (
+    key:
+      | 'placeDetailTypeLabel'
+      | 'createPlaceCategoryBar'
+      | 'createPlaceCategoryRestaurant'
+      | 'createPlaceCategoryClub'
+      | 'createPlaceCategoryCafe'
+      | 'createPlaceCategoryCulture',
+  ) => string,
+) {
+  if (!category) {
+    return t('placeDetailTypeLabel');
+  }
+
+  const normalized = category.trim().toLowerCase();
+
+  if (normalized === 'bar') {
+    return t('createPlaceCategoryBar');
+  }
+  if (normalized === 'restaurant') {
+    return t('createPlaceCategoryRestaurant');
+  }
+  if (normalized === 'club') {
+    return t('createPlaceCategoryClub');
+  }
+  if (normalized === 'cafe') {
+    return t('createPlaceCategoryCafe');
+  }
+  if (normalized === 'culture') {
+    return t('createPlaceCategoryCulture');
+  }
+
+  return category;
+}
+
 export default function PlaceDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -118,6 +161,7 @@ export default function PlaceDetailScreen() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -265,6 +309,11 @@ export default function PlaceDetailScreen() {
   const myReview = currentUserId
     ? reviews.find((review) => review.User?.id === currentUserId)
     : undefined;
+  const placeCategoryLabel = getPlaceCategoryLabel(place.category, t);
+  const openingHoursLines = (place.openingHours || '')
+    .split('|')
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   const handleOpenCreateModal = () => {
     router.push({
@@ -324,83 +373,23 @@ export default function PlaceDetailScreen() {
   };
 
   const handleReportPlace = () => {
+    setReportSheetVisible(true);
+  };
+
+  const handleSubmitReportReason = async (reason: string) => {
     if (!place) {
       return;
     }
 
-    Alert.alert(t('reportTitle'), t('reportPrompt'), [
-      {
-        text: t('reportReasonSpam'),
-        onPress: () =>
-          void createReport(place.id, 'PLACE', t('reportReasonSpam'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonHarassment'),
-        onPress: () =>
-          void createReport(place.id, 'PLACE', t('reportReasonHarassment'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonInappropriate'),
-        onPress: () =>
-          void createReport(place.id, 'PLACE', t('reportReasonInappropriate'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonScam'),
-        onPress: () =>
-          void createReport(place.id, 'PLACE', t('reportReasonScam'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      {
-        text: t('reportReasonOther'),
-        onPress: () =>
-          void createReport(place.id, 'PLACE', t('reportReasonOther'))
-            .then(() =>
-              Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage')),
-            )
-            .catch((error) =>
-              Alert.alert(
-                t('commonErrorTitle'),
-                getApiErrorMessage(error, t('reportFailed')),
-              ),
-            ),
-      },
-      { text: t('genericCancel'), style: 'cancel' },
-    ]);
+    try {
+      await createReport(place.id, 'PLACE', reason);
+      Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage'));
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('reportFailed')),
+      );
+    }
   };
 
   const handleSubmitReview = async () => {
@@ -461,7 +450,7 @@ export default function PlaceDetailScreen() {
           </TouchableOpacity>
           <View className="rounded-full bg-black/45 px-3 py-2">
             <Text className="text-xs font-semibold uppercase tracking-widest text-white">
-              {t('placeDetailTypeLabel')}
+              {placeCategoryLabel}
             </Text>
           </View>
         </View>
@@ -483,6 +472,13 @@ export default function PlaceDetailScreen() {
               {formatPriceLevel(place.priceLevel, t)}
             </Text>
           </View>
+          {place.category ? (
+            <View className="rounded-full bg-sky-100 px-3 py-2 dark:bg-sky-900/30">
+              <Text className="text-xs font-semibold text-sky-700 dark:text-sky-300">
+                {placeCategoryLabel}
+              </Text>
+            </View>
+          ) : null}
           {typeof place.avgRating === 'number' && place.avgRating > 0 ? (
             <View className="flex-row items-center rounded-full bg-yellow-100 px-3 py-2 dark:bg-yellow-900/30">
               <Ionicons name="star" size={12} color="#f59e0b" />
@@ -568,17 +564,70 @@ export default function PlaceDetailScreen() {
                   t('placeDetailUnknownOrganizer')}
               </Text>
               {place.Owner?.id ? (
-                <TouchableOpacity
+                <ContactAction
                   onPress={handleContactPlace}
-                  className="mt-2 self-start rounded-full bg-[#4c669f] px-3 py-1.5"
-                >
-                  <Text className="text-xs font-semibold text-white">
-                    {t('directChatContactPlace')}
-                  </Text>
-                </TouchableOpacity>
+                  label={t('directChatContactPlace')}
+                />
               ) : null}
             </View>
           </View>
+
+          {place.phone || place.whatsapp || place.openingHours ? (
+            <View className="mt-5">
+              {place.phone ? (
+                <View className="flex-row items-start">
+                  <Ionicons name="call-outline" size={20} color="#0ea5e9" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                      {t('createPlacePhoneLabel')}
+                    </Text>
+                    <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
+                      {place.phone}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {place.whatsapp ? (
+                <View className="mt-4 flex-row items-start">
+                  <Ionicons name="logo-whatsapp" size={20} color="#16a34a" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                      {t('createPlaceWhatsappLabel')}
+                    </Text>
+                    <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
+                      {place.whatsapp}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {place.openingHours ? (
+                <View className="mt-4 flex-row items-start">
+                  <Ionicons name="time-outline" size={20} color="#f59e0b" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                      {t('createPlaceHoursLabel')}
+                    </Text>
+                    {openingHoursLines.length > 0 ? (
+                      openingHoursLines.map((line, index) => (
+                        <Text
+                          key={`${place.id}-hours-${index}`}
+                          className="mt-1 text-base text-gray-800 dark:text-gray-100"
+                        >
+                          {line}
+                        </Text>
+                      ))
+                    ) : (
+                      <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
+                        {place.openingHours}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View className="mt-6">
@@ -773,9 +822,9 @@ export default function PlaceDetailScreen() {
       </View>
     </Modal>
 
-    <Modal
-      visible={showReviewModal}
-      transparent
+      <Modal
+        visible={showReviewModal}
+        transparent
       animationType="fade"
       onRequestClose={() => setShowReviewModal(false)}
     >
@@ -851,7 +900,13 @@ export default function PlaceDetailScreen() {
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </Modal>
-  </View>
+      </Modal>
+
+      <ReportReasonSheet
+        visible={reportSheetVisible}
+        onClose={() => setReportSheetVisible(false)}
+        onSubmitReason={handleSubmitReportReason}
+      />
+    </View>
   );
 }

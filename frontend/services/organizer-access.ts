@@ -64,7 +64,8 @@ export function getOrganizerAccessDenialReason(
 export function getOrganizerEntryPath(
   user?: OrganizerAccessUser | null,
 ): '/organizer/create-place' | '/organizer/dashboard' {
-  if (user?.role === 'PLACE_OWNER' && !user?.hasPlace) {
+  // Redirect to place creation only when we explicitly know the owner has no place.
+  if (user?.role === 'PLACE_OWNER' && user?.hasPlace === false) {
     return '/organizer/create-place';
   }
 

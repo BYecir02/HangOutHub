@@ -5,14 +5,15 @@ import {
   ScrollView,
   Share,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
 import PostItem from '@/components/social/PostItem';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { getApiErrorMessage } from '@/services/api';
 import {
   getPostById,
@@ -36,6 +37,9 @@ export default function PostViewScreen() {
   const [connections, setConnections] = useState<SocialUser[]>([]);
   const [connectionsLoaded, setConnectionsLoaded] = useState(false);
   const [loadingConnections, setLoadingConnections] = useState(false);
+  const [connectionsErrorMessage, setConnectionsErrorMessage] = useState<string | null>(
+    null,
+  );
   const [sendingConnectionId, setSendingConnectionId] = useState<string | null>(
     null,
   );
@@ -101,13 +105,17 @@ export default function PostViewScreen() {
       const overview = await getFriendshipOverview();
       setConnections(overview.connections.map((item) => item.user));
       setConnectionsLoaded(true);
+      setConnectionsErrorMessage(null);
     } catch (error) {
       console.error('Erreur chargement connexions', error);
       setConnections([]);
+      setConnectionsErrorMessage(
+        getApiErrorMessage(error, t('commonErrorTitle')),
+      );
     } finally {
       setLoadingConnections(false);
     }
-  }, [connectionsLoaded]);
+  }, [connectionsLoaded, t]);
 
   const openShareToConnection = useCallback(async () => {
     if (!post) {
@@ -161,7 +169,7 @@ export default function PostViewScreen() {
           pathname: '/direct-chat/[id]',
           params: { id: chat.id },
         });
-      } catch (error) {
+      } catch {
         Alert.alert(t('commonErrorTitle'), t('postShareSendError'));
       } finally {
         setSendingConnectionId(null);
@@ -179,39 +187,27 @@ export default function PostViewScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator color="#4c669f" />
-      </View>
+      <ScreenState mode="loading" fullScreen containerClassName="bg-gray-50 dark:bg-black" />
     );
   }
 
   if (!post) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 px-6 dark:bg-black">
-        <Text className="text-base text-gray-500 dark:text-gray-400">
-          {errorMessage || t('postDetailEmpty')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mt-4 rounded-2xl bg-[#4c669f] px-4 py-2"
-        >
-          <Text className="text-sm font-semibold text-white">
-            {t('genericCancel')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={errorMessage || t('postDetailEmpty')}
+        actionLabel={t('genericCancel')}
+        onAction={() => router.back()}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
-      <View className="flex-row items-center px-5 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons name="arrow-back" size={24} color="#4c669f" />
-        </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-900 dark:text-white">
-          {t('postDetailTitle')}
-        </Text>
+      <View className="px-5 pb-3 pt-14">
+        <ScreenHeader title={t('postDetailTitle')} onBack={() => router.back()} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -225,63 +221,51 @@ export default function PostViewScreen() {
         />
       </ScrollView>
 
-      {shareModalOpen ? (
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShareModalOpen(false)}
-          className="absolute inset-0 z-50 bg-black/60"
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            className="absolute bottom-0 w-full rounded-t-3xl bg-white p-5 pb-8 dark:bg-gray-900"
-          >
-            <View className="mb-4 items-center">
-              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-            </View>
-            <Text className="mb-1 text-center text-lg font-bold text-gray-800 dark:text-white">
-              {t('postShareConnectionsTitle')}
-            </Text>
-            <Text className="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
-              {t('postShareConnectionsSubtitle')}
-            </Text>
-
-            {loadingConnections ? (
-              <View className="items-center py-10">
-                <ActivityIndicator color="#4c669f" />
-              </View>
-            ) : connections.length === 0 ? (
-              <Text className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                {t('postShareConnectionsEmpty')}
-              </Text>
-            ) : (
-              <ScrollView
-                style={{ maxHeight: 360 }}
-                showsVerticalScrollIndicator={false}
-              >
-                {connections.map((user) => (
-                  <PersonRow
-                    key={user.id}
-                    user={user}
-                    subtitle={t('postShareConnectionsHint')}
-                    onPress={() => void handleSendToConnection(user)}
-                    primaryAction={
-                      sendingConnectionId === user.id ? (
-                        <ActivityIndicator color="#4c669f" />
-                      ) : (
-                        <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
-                          <Text className="text-xs font-semibold text-[#4c669f]">
-                            {t('postShareSend')}
-                          </Text>
-                        </View>
-                      )
-                    }
-                  />
-                ))}
-              </ScrollView>
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      ) : null}
+      <BottomSheetModal
+        visible={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        title={t('postShareConnectionsTitle')}
+        subtitle={t('postShareConnectionsSubtitle')}
+        maxHeight={520}
+      >
+        {loadingConnections ? (
+          <ScreenState mode="loading" />
+        ) : connectionsErrorMessage ? (
+          <ScreenState
+            mode="error"
+            title={connectionsErrorMessage}
+            actionLabel={t('commonRetry')}
+            onAction={() => {
+              setConnectionsLoaded(false);
+              void loadConnections();
+            }}
+          />
+        ) : connections.length === 0 ? (
+          <ScreenState mode="empty" title={t('postShareConnectionsEmpty')} />
+        ) : (
+          <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+            {connections.map((user) => (
+              <PersonRow
+                key={user.id}
+                user={user}
+                subtitle={t('postShareConnectionsHint')}
+                onPress={() => void handleSendToConnection(user)}
+                primaryAction={
+                  sendingConnectionId === user.id ? (
+                    <ActivityIndicator color="#4c669f" />
+                  ) : (
+                    <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
+                      <Text className="text-xs font-semibold text-[#4c669f]">
+                        {t('postShareSend')}
+                      </Text>
+                    </View>
+                  )
+                }
+              />
+            ))}
+          </ScrollView>
+        )}
+      </BottomSheetModal>
     </View>
   );
 }

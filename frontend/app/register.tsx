@@ -2,9 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -12,14 +10,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AuthBrandBadge from '@/components/auth/AuthBrandBadge';
+import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
 import AuthStepIndicator from '@/components/auth/AuthStepIndicator';
 import AuthTextField from '@/components/auth/AuthTextField';
 import RoleOptionCard from '@/components/auth/RoleOptionCard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api from '@/services/api';
+import api, { getApiErrorMessage } from '@/services/api';
 
 type AccountType = 'USER' | 'PLACE' | 'NOMAD';
 
@@ -171,10 +170,11 @@ export default function RegisterScreen() {
           [{ text: t('registerLoginCta'), onPress: () => router.replace('/') }],
         );
       }
-    } catch (error: any) {
-      const message =
-        error.response?.data?.message || t('registerApiErrorFallback');
-      Alert.alert('Oups', Array.isArray(message) ? message[0] : message);
+    } catch (error: unknown) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('registerApiErrorFallback')),
+      );
     } finally {
       setLoading(false);
     }
@@ -226,38 +226,33 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#08111f]">
-      <LinearGradient
-        colors={
-          isDark
-            ? ['#08111f', '#151f36', '#20111f']
-            : ['#eef4ff', '#fff3e4', '#ffffff']
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="absolute inset-0"
-      />
-
-      <View className="absolute left-[-40px] top-24 h-48 w-48 rounded-full bg-[#4c669f24]" />
-      <View className="absolute bottom-24 right-[-56px] h-56 w-56 rounded-full bg-[#ff47571c]" />
-      <View className="absolute right-12 top-28 h-24 w-24 rounded-full bg-[#2ecc7124]" />
-
-      <SafeAreaView className="flex-1">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className="flex-1"
-        >
-          <ScrollView
-            className="flex-1"
-            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 28 }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+    <AuthHeroLayout
+      isDark={isDark}
+      gradientDark={['#08111f', '#151f36', '#20111f']}
+      gradientLight={['#f8fbff', '#edf4ff', '#fff8f0']}
+      orbs={[
+        {
+          style: { left: -40, top: 96, width: 192, height: 192 },
+          darkColor: '#4c669f24',
+          lightColor: '#4c669f20',
+        },
+        {
+          style: { right: -56, bottom: 96, width: 224, height: 224 },
+          darkColor: '#ff47571c',
+          lightColor: '#ff47571a',
+        },
+        {
+          style: { right: 48, top: 112, width: 96, height: 96 },
+          darkColor: '#2ecc7124',
+          lightColor: '#2ecc7118',
+        },
+      ]}
+    >
             <View className="flex-row items-center justify-between pt-2">
               <TouchableOpacity
                 onPress={goBack}
-                className={`h-12 w-12 items-center justify-center rounded-2xl ${
-                  isDark ? 'bg-white/10' : 'bg-white/80'
+                className={`h-12 w-12 items-center justify-center rounded-2xl border ${
+                  isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-white/95'
                 }`}
               >
                 <Ionicons
@@ -282,8 +277,9 @@ export default function RegisterScreen() {
             </View>
 
             <View className="pt-6">
+              <AuthBrandBadge isDark={isDark} />
               <Text
-                className={`text-[38px] font-black leading-[42px] ${
+                className={`mt-6 text-[38px] font-black leading-[42px] ${
                   isDark ? 'text-white' : 'text-slate-950'
                 }`}
               >
@@ -291,7 +287,7 @@ export default function RegisterScreen() {
               </Text>
               <Text
                 className={`mt-4 max-w-[92%] text-base leading-7 ${
-                  isDark ? 'text-slate-300' : 'text-slate-600'
+                  isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}
               >
                 {t(getStepDescriptionKey(step, accountType))}
@@ -302,7 +298,7 @@ export default function RegisterScreen() {
               className={`mt-8 rounded-[36px] border p-6 ${
                 isDark
                   ? 'border-white/10 bg-[#07101dcc]'
-                  : 'border-white/90 bg-white'
+                  : 'border-slate-200 bg-white/95'
               }`}
             >
               <AuthStepIndicator
@@ -415,7 +411,7 @@ export default function RegisterScreen() {
                   <View className="mt-4">
                     <Text
                       className={`text-xs font-semibold uppercase tracking-[0.22em] ${
-                        isDark ? 'text-slate-400' : 'text-slate-500'
+                        isDark ? 'text-slate-400' : 'text-slate-600'
                       }`}
                     >
                       {t('registerSocialSectionLabel')}
@@ -464,7 +460,7 @@ export default function RegisterScreen() {
                   onPress={handleNext}
                   disabled={loading}
                   activeOpacity={0.9}
-                  className={`mt-4 self-stretch overflow-hidden rounded-[28px] ${
+                  className={`mt-4 h-14 self-stretch overflow-hidden rounded-[28px] ${
                     loading ? 'opacity-70' : ''
                   }`}
                 >
@@ -472,8 +468,9 @@ export default function RegisterScreen() {
                     colors={[accentColor, '#4c669f']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    className="w-full min-h-[56px] items-center justify-center rounded-[28px] px-6 py-[18px]"
-                  >
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View className="h-full w-full items-center justify-center rounded-[28px] px-6">
                     {loading ? (
                       <ActivityIndicator color="#ffffff" />
                     ) : (
@@ -481,7 +478,7 @@ export default function RegisterScreen() {
                         {ctaLabel}
                       </Text>
                     )}
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -490,7 +487,7 @@ export default function RegisterScreen() {
               <View className="mt-8 flex-row items-center justify-center">
                 <Text
                   className={`text-sm ${
-                    isDark ? 'text-slate-300' : 'text-slate-600'
+                    isDark ? 'text-slate-300' : 'text-slate-700'
                   }`}
                 >
                   {t('registerExistingAccount')}
@@ -502,9 +499,6 @@ export default function RegisterScreen() {
                 </TouchableOpacity>
               </View>
             ) : null}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+    </AuthHeroLayout>
   );
 }

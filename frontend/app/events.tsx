@@ -1,21 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Image,
   RefreshControl,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
+import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
+import EntityCard from '@/components/ui/EntityCard';
+import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
-import api, { getImageUrl } from '@/services/api';
+import ScreenState from '@/components/ui/ScreenState';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
+import { formatEventDate, formatPrice } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { getStoredLocation, type StoredLocation } from '@/services/location-preferences';
+import { uiTokens } from '@/theme/tokens';
 
 interface EventItem {
   id: string;
@@ -38,25 +42,6 @@ type EventFilter = 'all' | 'upcoming' | 'free' | 'week';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
-
-function formatEventDate(value: string, locale: string) {
-  return new Date(value).toLocaleString(locale, {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatPrice(
-  value: number | string | null,
-  locale: string,
-  freeLabel: string,
-) {
-  const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
-}
 
 function isWithinNextWeek(value: string) {
   const eventDate = new Date(value);
@@ -82,8 +67,6 @@ function isWithinNextWeek(value: string) {
   return eventTime >= nowTime && eventTime <= endOfWeek.getTime();
 }
 
-const FILTERS: EventFilter[] = ['all', 'upcoming', 'free', 'week'];
-
 export default function EventsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
@@ -91,10 +74,15 @@ export default function EventsScreen() {
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
   const [loading, setLoading] = useState(!cachedEvents);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<EventFilter>('upcoming');
-  const [selectedLocation, setSelectedLocation] =
-    useState<StoredLocation | null>(null);
+  const { filterByLocation, locationLabel } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
 
   const fetchEvents = useCallback(async (forceRefresh = false) => {
     const isRefresh = forceRefresh || getCache('events') !== null;
@@ -109,7 +97,9 @@ export default function EventsScreen() {
       const response = await api.get<EventItem[]>('/events');
       setEvents(response.data);
       setCache('events', response.data);
-    } catch {
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
       if (!getCache('events')) {
         setEvents([]);
       }
@@ -117,7 +107,7 @@ export default function EventsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void fetchEvents();
@@ -129,69 +119,26 @@ export default function EventsScreen() {
     }, [fetchEvents]),
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-
-      const hydrateLocation = async () => {
-        const storedLocation = await getStoredLocation();
-        if (!isMounted) {
-          return;
-        }
-
-        setSelectedLocation(storedLocation);
-      };
-
-      void hydrateLocation();
-
-      return () => {
-        isMounted = false;
-      };
-    }, []),
+  const filterOptions = useMemo<readonly FilterChipOption<EventFilter>[]>(
+    () => [
+      { key: 'all', label: t('eventsFilterAll') },
+      { key: 'upcoming', label: t('eventsFilterUpcoming') },
+      { key: 'free', label: t('eventsFilterFree') },
+      { key: 'week', label: t('eventsFilterWeek') },
+    ],
+    [t],
   );
-
-  const filterLabels: Record<EventFilter, string> = {
-    all: t('eventsFilterAll'),
-    upcoming: t('eventsFilterUpcoming'),
-    free: t('eventsFilterFree'),
-    week: t('eventsFilterWeek'),
-  };
-
-  const activeCityName =
-    (selectedLocation?.mode === 'city' ||
-      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
-    selectedLocation.cityName
-      ? selectedLocation.cityName.trim().toLowerCase()
-      : '';
-  const activeCountry =
-    selectedLocation?.country?.trim().toLowerCase() || '';
-  const defaultCountry = t('homeLocationCountry').trim().toLowerCase();
 
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const locationFilteredEvents = filterByLocation(events, (event) => ({
+      city: event.Place?.City?.name,
+      country: event.Place?.City?.country,
+      address: event.address,
+    }));
 
-    return events
+    return locationFilteredEvents
       .filter((event) => {
-        if (activeCountry) {
-          const eventCountry =
-            event.Place?.City?.country?.trim().toLowerCase() ||
-            defaultCountry;
-          if (eventCountry !== activeCountry) {
-            return false;
-          }
-        }
-
-        if (activeCityName) {
-          const cityName = event.Place?.City?.name?.trim().toLowerCase();
-          const address = event.address?.trim().toLowerCase();
-          const matchesCity =
-            cityName === activeCityName ||
-            (!!address && address.includes(activeCityName));
-          if (!matchesCity) {
-            return false;
-          }
-        }
-
         if (activeFilter === 'free' && Number(event.entryFee || 0) > 0) {
           return false;
         }
@@ -227,106 +174,57 @@ export default function EventsScreen() {
         (left, right) =>
           new Date(left.startTime).getTime() - new Date(right.startTime).getTime(),
       );
-  }, [activeCityName, activeCountry, activeFilter, defaultCountry, events, query]);
-
-  const activeLocationLabel = activeCityName
-    ? `${t('homeLocationCurrentLabel')}: ${selectedLocation?.cityName}, ${
-        selectedLocation?.country || t('homeLocationCountry')
-      }`
-    : selectedLocation?.country
-      ? `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCities')} • ${
-          selectedLocation.country
-        }`
-      : `${t('homeLocationCurrentLabel')}: ${t('homeLocationAllCountries')}`;
+  }, [activeFilter, events, filterByLocation, query]);
 
   return (
-    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
-      <View className="px-5 pb-4">
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mr-4 rounded-full bg-white p-3 dark:bg-gray-900"
-          >
-            <Ionicons name="arrow-back" size={22} color="#4c669f" />
-          </TouchableOpacity>
-
-          <View className="flex-1">
-            <Text className="text-xs uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-              {t('eventsLabel')}
-            </Text>
-            <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              {t('eventsTitle')}
-            </Text>
-            <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {t('eventsSubtitle')}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View className="flex-row items-center justify-between px-5 pb-2">
-        <View className="rounded-full bg-white px-3 py-1.5 dark:bg-gray-800">
-          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-100">
-            {activeLocationLabel}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/location')}
-          className="rounded-full border border-gray-200 px-3 py-1.5 dark:border-gray-700"
-        >
-          <Text className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-            {t('homeLocationChangeCta')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <SearchBar
-        placeholder={t('eventsSearchPlaceholder')}
-        value={query}
-        onChangeText={setQuery}
-      />
-
-      <FlatList
-        horizontal
-        data={FILTERS}
-        keyExtractor={(item) => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 18,
-          paddingBottom: 10,
-        }}
-        renderItem={({ item }) => {
-          const active = activeFilter === item;
-
-          return (
-            <TouchableOpacity
-              onPress={() => setActiveFilter(item)}
-              className={`mr-3 rounded-full px-4 py-2.5 ${
-                active ? 'bg-[#4c669f]' : 'bg-white dark:bg-gray-900'
-              }`}
-            >
-              <Text
-                className={`text-sm font-semibold ${
-                  active
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-200'
-                }`}
-              >
-                {/* Fallback si la trad est manquante */}
-                {filterLabels[item] || item}
-              </Text>
-            </TouchableOpacity>
-          );
-        }}
-        style={{ flexGrow: 0 }}
-      />
-
-      {loading && events.length === 0 ? (
+    <CatalogScreenLayout
+      label={t('eventsLabel')}
+      title={t('eventsTitle')}
+      subtitle={t('eventsSubtitle')}
+      onBack={() => router.back()}
+      locationScopeBar={
+        <LocationScopeBar
+          locationLabel={locationLabel}
+          actionLabel={t('homeLocationChangeCta')}
+          onPressAction={() => router.push('/location')}
+        />
+      }
+      searchBar={
+        <SearchBar
+          placeholder={t('eventsSearchPlaceholder')}
+          value={query}
+          onChangeText={setQuery}
+        />
+      }
+      filterBar={
+        <FilterChipsBar
+          options={filterOptions}
+          activeKey={activeFilter}
+          onChange={setActiveFilter}
+          activeColor="#4c669f"
+          textSize="sm"
+        />
+      }
+    >
+      {!loading && errorMessage && events.length === 0 ? (
+        <ScreenState
+          mode="error"
+          title={t('commonErrorTitle')}
+          description={errorMessage}
+          actionLabel={t('commonRetry')}
+          onAction={() => {
+            void fetchEvents(true);
+          }}
+          containerClassName="px-5 py-10"
+        />
+      ) : loading && events.length === 0 ? (
         <FlatList
           data={[0, 1, 2]}
           keyExtractor={(item) => `skeleton-${item}`}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          contentContainerStyle={{
+            paddingHorizontal: uiTokens.spacing.screenX,
+            paddingBottom: 120,
+          }}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
@@ -358,7 +256,10 @@ export default function EventsScreen() {
         <FlatList
           data={filteredEvents}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+          contentContainerStyle={{
+            paddingHorizontal: uiTokens.spacing.screenX,
+            paddingBottom: 120,
+          }}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
@@ -385,28 +286,21 @@ export default function EventsScreen() {
             />
           }
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <EntityCard
+              variant="cover"
+              imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
+              title={item.title}
               onPress={() =>
                 router.push({
                   pathname: '/event/[id]',
                   params: { id: item.id },
                 })
               }
-              className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-            >
-              <Image
-                source={{
-                  uri: getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER,
-                }}
-                className="h-52 w-full bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
-              />
-
-              <View className="p-5">
+              topContent={
                 <View className="flex-row flex-wrap items-center gap-2">
                   <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
                     <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-                      {formatPrice(item.entryFee, locale, t('homePriceFree'))}
+                      {formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
                     </Text>
                   </View>
                   <View className="rounded-full bg-gray-100 px-3 py-2 dark:bg-gray-800">
@@ -415,32 +309,24 @@ export default function EventsScreen() {
                     </Text>
                   </View>
                 </View>
-
-                <Text className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
-                  {item.title}
-                </Text>
-
-                <View className="mt-3 flex-row items-center">
-                  <Ionicons name="time-outline" size={16} color="#ff4757" />
-                  <Text className="ml-2 text-sm text-gray-600 dark:text-gray-300">
-                    {formatEventDate(item.startTime, locale)}
-                  </Text>
-                </View>
-
-                <View className="mt-2 flex-row items-center">
-                  <Ionicons name="location-outline" size={16} color="#4c669f" />
-                  <Text
-                    className="ml-2 flex-1 text-sm text-gray-500 dark:text-gray-400"
-                    numberOfLines={1}
-                  >
-                    {item.Place?.name || item.address || t('homeLocationToConfirm')}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+              }
+              metaRows={[
+                {
+                  icon: 'time-outline',
+                  iconColor: '#ff4757',
+                  text: formatEventDate(item.startTime, locale, { includeWeekday: true }),
+                },
+                {
+                  icon: 'location-outline',
+                  iconColor: '#4c669f',
+                  text: item.Place?.name || item.address || t('homeLocationToConfirm'),
+                },
+              ]}
+            />
           )}
         />
       )}
-    </View>
+    </CatalogScreenLayout>
   );
 }
+

@@ -38,15 +38,15 @@ interface CategoryOption {
 }
 
 interface FeedAuthor {
-  id: string;
-  username?: string;
+  id?: string;
+  username?: string | null;
   displayName?: string | null;
   avatarUrl?: string | null;
 }
 
 interface FeedPost {
   id: string;
-  userId: string;
+  userId?: string;
   content?: string | null;
   images?: string[];
   postType?: 'post' | 'plan';
@@ -291,8 +291,8 @@ export default function SocialFeed() {
           limit: FEED_PAGE_SIZE,
         };
 
-        if (mode === 'more' && nextCursor) {
-          params.cursor = nextCursor;
+        if (mode === 'more' && nextCursorRef.current) {
+          params.cursor = nextCursorRef.current;
         }
 
         if (mode === 'background') {
@@ -508,6 +508,10 @@ export default function SocialFeed() {
 
   const handleOpenMessages = useCallback(() => {
     router.push('/messages');
+  }, [router]);
+
+  const handleOpenSearch = useCallback(() => {
+    router.push('/search');
   }, [router]);
 
   const applyPendingPosts = useCallback(async () => {
@@ -731,12 +735,24 @@ export default function SocialFeed() {
           </Text>
         </View>
 
-        <TouchableOpacity
-          onPress={handleOpenMessages}
-          className="h-12 w-12 items-center justify-center rounded-2xl bg-[#4c669f]"
-        >
-          <Ionicons name="chatbubble-ellipses-outline" size={22} color="#ffffff" />
-        </TouchableOpacity>
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={handleOpenSearch}
+            className="mr-2 h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
+          >
+            <Ionicons
+              name="search-outline"
+              size={22}
+              color="#4c669f"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleOpenMessages}
+            className="h-12 w-12 items-center justify-center rounded-2xl bg-[#4c669f]"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

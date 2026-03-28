@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -6,14 +6,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import EventCard from '@/components/ui/EventCard';
+import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
+import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl } from '@/services/api';
+import { useLocationScope } from '@/hooks/useLocationScope';
+import { useScreenAsync } from '@/hooks/useScreenAsync';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
+import { formatEventDate, formatPrice } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 interface EventItem {
@@ -24,17 +29,13 @@ interface EventItem {
   entryFee: number | string | null;
   Place?: {
     name?: string | null;
+    address?: string | null;
+    City?: {
+      name?: string | null;
+      country?: string | null;
+    } | null;
   } | null;
   address?: string | null;
-}
-
-function formatEventDate(value: string, locale: string) {
-  return new Date(value).toLocaleString(locale, {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export default function ExploreScreen() {
@@ -42,35 +43,78 @@ export default function ExploreScreen() {
   const { locale, t } = useI18n();
   const cachedEvents = getCache<EventItem[]>('events');
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
-  const [loading, setLoading] = useState(!cachedEvents);
-  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+  const {
+    loading,
+    refreshing,
+    error,
+    runInitial,
+    runRefresh,
+  } = useScreenAsync({
+    initialLoading: !cachedEvents,
+  });
+  const { filterByLocation, locationLabel } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
 
-  const fetchEvents = useCallback(async (forceRefresh = false) => {
-    const isRefresh = forceRefresh || getCache('events') !== null;
+  const fetchEvents = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      const runner = mode === 'refresh' ? runRefresh : runInitial;
+      const nextEvents = await runner(
+        async () => {
+          const response = await api.get<EventItem[]>('/events');
+          setCache('events', response.data);
+          return response.data;
+        },
+        {
+          mapError: (errorValue) =>
+            getApiErrorMessage(errorValue, t('commonErrorTitle')),
+        },
+      );
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+      if (nextEvents) {
+        setEvents(nextEvents);
+        return;
+      }
 
-    try {
-      const response = await api.get<EventItem[]>('/events');
-      setEvents(response.data);
-      setCache('events', response.data);
-    } catch {
       if (!getCache('events')) {
         setEvents([]);
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    [runRefresh, runInitial, t],
+  );
 
   useEffect(() => {
-    void fetchEvents();
+    void fetchEvents('initial');
   }, [fetchEvents]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchEvents('refresh');
+    }, [fetchEvents]),
+  );
+
+  const filteredEvents = useMemo(() => {
+    const locationFilteredEvents = filterByLocation(events, (event) => ({
+      city: event.Place?.City?.name || event.Place?.name,
+      country: event.Place?.City?.country,
+      address: event.Place?.address || event.address,
+    }));
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return locationFilteredEvents;
+    }
+
+    return locationFilteredEvents.filter((event) =>
+      `${event.title} ${event.Place?.name || ''} ${event.address || ''}`
+        .toLowerCase()
+        .includes(normalizedQuery),
+    );
+  }, [events, filterByLocation, query]);
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black pt-16">
@@ -88,7 +132,30 @@ export default function ExploreScreen() {
         </View>
       </View>
 
-      <SearchBar placeholder={t('exploreSearchPlaceholder')} />
+      <LocationScopeBar
+        locationLabel={locationLabel}
+        actionLabel={t('homeLocationChangeCta')}
+        onPressAction={() => router.push('/location')}
+      />
+
+      <SearchBar
+        placeholder={t('exploreSearchPlaceholder')}
+        value={query}
+        onChangeText={setQuery}
+      />
+
+      {!loading && error && events.length === 0 ? (
+        <ScreenState
+          mode="error"
+          title={t('commonErrorTitle')}
+          description={error}
+          actionLabel={t('commonRetry')}
+          onAction={() => {
+            void fetchEvents('refresh');
+          }}
+          containerClassName="px-5 py-6"
+        />
+      ) : null}
 
       {loading && events.length === 0 ? (
         <FlatList
@@ -110,7 +177,7 @@ export default function ExploreScreen() {
         />
       ) : (
         <FlatList
-          data={events}
+          data={filteredEvents}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
@@ -128,7 +195,7 @@ export default function ExploreScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
-                void fetchEvents(true);
+                void fetchEvents('refresh');
               }}
               tintColor="#4c669f"
             />
@@ -142,11 +209,7 @@ export default function ExploreScreen() {
                 getImageUrl(item.coverUrl) ||
                 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200'
               }
-              price={
-                Number(item.entryFee || 0) > 0
-                  ? `${item.entryFee} FCFA`
-                  : t('homePriceFree')
-              }
+              price={formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
               onPress={() =>
                 router.push({
                   pathname: '/event/[id]',

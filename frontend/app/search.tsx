@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '../components/ui/SearchBar';
 import PersonActionButton from '../components/social/PersonActionButton';
@@ -29,9 +27,8 @@ export default function SearchScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const [query, setQuery] = useState('');
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [searchLoading, setSearchLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [results, setResults] = useState<DiscoverUser[]>([]);
 
   useEffect(() => {
@@ -41,6 +38,7 @@ export default function SearchScreen() {
       if (normalizedQuery.length < 2) {
         setResults([]);
         setSearchLoading(false);
+        setErrorMessage(null);
         return;
       }
 
@@ -50,9 +48,11 @@ export default function SearchScreen() {
         try {
           const nextResults = await discoverUsers(normalizedQuery);
           setResults(nextResults);
+          setErrorMessage(null);
         } catch (error) {
           console.error('Erreur recherche utilisateurs:', error);
           setResults([]);
+          setErrorMessage(t('commonErrorTitle'));
         } finally {
           setSearchLoading(false);
         }
@@ -62,7 +62,7 @@ export default function SearchScreen() {
     }, 280);
 
     return () => clearTimeout(timeout);
-  }, [query]);
+  }, [query, t]);
 
   const refreshSearch = async () => {
     const normalizedQuery = query.trim();
@@ -75,8 +75,10 @@ export default function SearchScreen() {
     try {
       const nextResults = await discoverUsers(normalizedQuery);
       setResults(nextResults);
+      setErrorMessage(null);
     } catch (error) {
       console.error('Erreur recherche utilisateurs:', error);
+      setErrorMessage(t('commonErrorTitle'));
     }
   };
 
@@ -121,18 +123,9 @@ export default function SearchScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white pt-16 dark:bg-black">
-      <View className="flex-row items-center px-5 pb-4">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color={isDark ? 'white' : 'black'}
-          />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          {t('searchTitle')}
-        </Text>
+    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
+      <View className="px-5 pb-4">
+        <ScreenHeader title={t('searchTitle')} onBack={() => router.back()} />
       </View>
 
       <SearchBar
@@ -153,9 +146,17 @@ export default function SearchScreen() {
             description={t('searchHintDescription')}
           />
         ) : searchLoading ? (
-          <View className="py-12">
-            <ActivityIndicator color="#4c669f" />
-          </View>
+          <ScreenState mode="loading" containerClassName="px-0 py-8" />
+        ) : errorMessage ? (
+          <ScreenState
+            mode="error"
+            title={errorMessage}
+            actionLabel={t('commonRetry')}
+            onAction={() => {
+              void refreshSearch();
+            }}
+            containerClassName="px-0 py-4"
+          />
         ) : results.length > 0 ? (
           <>
             <Text className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">

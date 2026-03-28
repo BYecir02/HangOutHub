@@ -62,6 +62,10 @@ export default function ProfileHeader({
     'https://images.unsplash.com/photo-1557683316-973673baf926';
   const avatarUrl = getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150';
   const statusConfig = getStatusColors(user?.OrganizerProfile?.status, t);
+  const organizerPanelLabel =
+    user?.role === 'PLACE_OWNER'
+      ? t('profilePlaceOwnerPanel')
+      : t('profileOrganizerPanel');
 
   return (
     <View>
@@ -147,7 +151,7 @@ export default function ProfileHeader({
             onPress={() => router.push('/organizer/dashboard')}
           >
             <Text className="text-sm font-bold text-gray-800 dark:text-white">
-              {t('profileOrganizerPanel')}
+              {organizerPanelLabel}
             </Text>
           </TouchableOpacity>
         ) : null}

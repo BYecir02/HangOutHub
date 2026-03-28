@@ -1,20 +1,9 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  SlideInDown,
-  SlideOutDown,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import { useI18n } from '@/hooks/use-i18n';
 import type { TranslationKey } from '@/services/i18n';
 import {
@@ -105,16 +94,16 @@ function getActionsForUser(
           color: '#2ecc71',
           path: '/organizer/create-place',
         },
-      {
-        label: t('createActionPostLabel'),
-        description: t('createActionPostQuickDesc'),
-        icon: 'create-outline',
-        color: '#f39c12',
-        path: '/post',
-        params: Object.keys(postParams).length ? postParams : undefined,
-      },
-    ];
-  }
+        {
+          label: t('createActionPostLabel'),
+          description: t('createActionPostQuickDesc'),
+          icon: 'create-outline',
+          color: '#f39c12',
+          path: '/post',
+          params: Object.keys(postParams).length ? postParams : undefined,
+        },
+      ];
+    }
 
     return [
       {
@@ -174,7 +163,6 @@ export default function CreateModalScreen() {
     eventId?: string;
     eventTitle?: string;
   }>();
-  const translateY = useSharedValue(0);
   const [currentUser, setCurrentUser] = useState<StoredUserSession | null>(null);
 
   useFocusEffect(
@@ -182,18 +170,18 @@ export default function CreateModalScreen() {
       let isMounted = true;
 
       const hydrateUser = async () => {
-        const resolvedUser = await resolveStoredUserSession();
-
-        if (!isMounted) {
-          return;
-        }
-
-        if (!resolvedUser) {
+        try {
+          const resolvedUser = await resolveStoredUserSession();
+          if (!isMounted) {
+            return;
+          }
+          setCurrentUser(resolvedUser || null);
+        } catch {
+          if (!isMounted) {
+            return;
+          }
           setCurrentUser(null);
-          return;
         }
-
-        setCurrentUser(resolvedUser);
       };
 
       void hydrateUser();
@@ -204,85 +192,74 @@ export default function CreateModalScreen() {
     }, []),
   );
 
-  const actions = getActionsForUser(currentUser, t, {
-    placeId: typeof params.placeId === 'string' ? params.placeId : undefined,
-    placeName: typeof params.placeName === 'string' ? params.placeName : undefined,
-    cityName: typeof params.cityName === 'string' ? params.cityName : undefined,
-    sourceLabel: typeof params.sourceLabel === 'string' ? params.sourceLabel : undefined,
-    outingTitle: typeof params.outingTitle === 'string' ? params.outingTitle : undefined,
-    eventId: typeof params.eventId === 'string' ? params.eventId : undefined,
-    eventTitle: typeof params.eventTitle === 'string' ? params.eventTitle : undefined,
-  });
+  const actions = useMemo(
+    () =>
+      getActionsForUser(currentUser, t, {
+        placeId: typeof params.placeId === 'string' ? params.placeId : undefined,
+        placeName: typeof params.placeName === 'string' ? params.placeName : undefined,
+        cityName: typeof params.cityName === 'string' ? params.cityName : undefined,
+        sourceLabel: typeof params.sourceLabel === 'string' ? params.sourceLabel : undefined,
+        outingTitle: typeof params.outingTitle === 'string' ? params.outingTitle : undefined,
+        eventId: typeof params.eventId === 'string' ? params.eventId : undefined,
+        eventTitle: typeof params.eventTitle === 'string' ? params.eventTitle : undefined,
+      }),
+    [
+      currentUser,
+      params.cityName,
+      params.eventId,
+      params.eventTitle,
+      params.outingTitle,
+      params.placeId,
+      params.placeName,
+      params.sourceLabel,
+      t,
+    ],
+  );
 
   const handleClose = () => router.back();
 
-  const gesture = Gesture.Pan()
-    .onChange((event) => {
-      if (event.translationY > 0) {
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd(() => {
-      if (translateY.value > 100) {
-        runOnJS(handleClose)();
-      } else {
-        translateY.value = withSpring(0);
-      }
-    });
-
   const navigateTo = (path: string, pathParams?: Record<string, string>) => {
-    translateY.value = withTiming(1000, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(router.replace)({
-          pathname: path as never,
-          params: pathParams,
-        });
-      }
+    router.replace({
+      pathname: path as never,
+      params: pathParams,
     });
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
   return (
-    <View className="flex-1 justify-end">
-      <Animated.View
-        entering={FadeIn}
-        exiting={FadeOut}
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-      >
+    <BottomSheetModal
+      visible
+      onClose={handleClose}
+      title={t('createModalTitle')}
+      subtitle={t('createModalSubtitle')}
+      maxHeight={680}
+      contentMode="auto"
+      footer={
         <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
           onPress={handleClose}
-        />
-      </Animated.View>
-
-      <GestureDetector gesture={gesture}>
-        <Animated.View
-          entering={SlideInDown}
-          exiting={SlideOutDown}
-          style={animatedStyle}
-          className="rounded-t-3xl bg-white p-6 pb-10 shadow-2xl dark:bg-gray-900"
+          className="items-center rounded-2xl border border-gray-200 py-3 dark:border-gray-700"
         >
-          <View className="mb-6 items-center">
-            <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-600" />
-          </View>
-
-          <Text className="text-center text-xl font-bold text-gray-800 dark:text-white">
-            {t('createModalTitle')}
+          <Text className="font-semibold text-gray-600 dark:text-gray-300">
+            {t('createModalCancel')}
           </Text>
-          <Text className="mt-2 text-center text-sm leading-6 text-gray-500 dark:text-gray-400">
-            {t('createModalSubtitle')}
-          </Text>
-
-          <View className="mt-6">
+        </TouchableOpacity>
+      }
+    >
+      {actions.length > 0 ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 8 }}
+          style={{ maxHeight: 420 }}
+        >
+          <View>
             {actions.map((action) => (
               <TouchableOpacity
                 key={action.label}
                 onPress={() => navigateTo(action.path, action.params)}
-                className="mb-4 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
+                className="mb-3 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
+                style={{
+                  borderWidth: 1,
+                  borderColor: `${action.color}2A`,
+                }}
               >
                 <View
                   className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
@@ -290,6 +267,7 @@ export default function CreateModalScreen() {
                 >
                   <Ionicons name={action.icon} size={26} color={action.color} />
                 </View>
+
                 <View className="flex-1 pr-3">
                   <Text className="text-base font-bold text-gray-800 dark:text-white">
                     {action.label}
@@ -302,14 +280,14 @@ export default function CreateModalScreen() {
               </TouchableOpacity>
             ))}
           </View>
-
-          <TouchableOpacity onPress={handleClose} className="mt-4 items-center">
-            <Text className="font-medium text-gray-400 dark:text-gray-500">
-              {t('createModalCancel')}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </GestureDetector>
-    </View>
+        </ScrollView>
+      ) : (
+        <View className="py-8">
+          <Text className="text-center text-sm text-gray-500 dark:text-gray-400">
+            Aucune action disponible pour le moment.
+          </Text>
+        </View>
+      )}
+    </BottomSheetModal>
   );
 }

@@ -7,7 +7,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   Text,
   TextInput,
   TouchableOpacity,
@@ -15,15 +14,16 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
+import ScreenState from '@/components/ui/ScreenState';
 import CommentItem from '../components/social/CommentItem';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl } from '../services/api';
+import api, { getApiErrorMessage, getImageUrl } from '../services/api';
 
 interface CommentAuthor {
   displayName?: string | null;
-  username?: string;
+  username?: string | null;
   avatarUrl?: string | null;
 }
 
@@ -60,23 +60,26 @@ export default function CommentsScreen() {
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<CommentListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUserState | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommentListItem | null>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
-  const mapComment = useCallback((item: ApiComment): CommentListItem => {
-    return {
-      id: item.id,
-      user: item.User.displayName || item.User.username || t('commentsUserFallback'),
-      avatar:
-        getImageUrl(item.User.avatarUrl) || 'https://i.pravatar.cc/150',
-      content: item.content,
-      time: new Date(item.createdAt).toLocaleDateString(locale),
-      userId: item.userId,
-      parentId: item.parentId,
-    };
-  }, [locale, t]);
+  const mapComment = useCallback(
+    (item: ApiComment): CommentListItem => {
+      return {
+        id: item.id,
+        user: item.User.displayName || item.User.username || t('commentsUserFallback'),
+        avatar: getImageUrl(item.User.avatarUrl) || 'https://i.pravatar.cc/150',
+        content: item.content,
+        time: new Date(item.createdAt).toLocaleDateString(locale),
+        userId: item.userId,
+        parentId: item.parentId,
+      };
+    },
+    [locale, t],
+  );
 
   const fetchComments = useCallback(async () => {
     if (!postId) {
@@ -85,15 +88,18 @@ export default function CommentsScreen() {
       return;
     }
 
+    setLoading(true);
     try {
       const res = await api.get<ApiComment[]>(`/posts/${postId}/comments`);
       setComments(res.data.map(mapComment));
+      setErrorMessage(null);
     } catch (error) {
       console.error('Erreur chargement commentaires:', error);
+      setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
       setLoading(false);
     }
-  }, [mapComment, postId]);
+  }, [mapComment, postId, t]);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -103,7 +109,7 @@ export default function CommentsScreen() {
         avatarUrl: res.data.avatarUrl,
       });
     } catch {
-      console.log('Erreur user');
+      setCurrentUser(null);
     }
   }, []);
 
@@ -141,9 +147,11 @@ export default function CommentsScreen() {
       setComments((prev) => [...prev, mapComment(res.data)]);
       setComment('');
       setReplyingTo(null);
+      setErrorMessage(null);
       Keyboard.dismiss();
     } catch (error) {
       console.error('Erreur envoi commentaire:', error);
+      Alert.alert(t('commonErrorTitle'), getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
       setIsSending(false);
     }
@@ -178,119 +186,110 @@ export default function CommentsScreen() {
   };
 
   const handleReportComment = () => {
-    Alert.alert(
-      t('commentsReportTitle'),
-      t('commentsReportMessage'),
-    );
+    Alert.alert(t('commentsReportTitle'), t('commentsReportMessage'));
   };
+
+  const composer = (
+    <>
+      {replyingTo ? (
+        <View className="flex-row items-center justify-between border-t border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
+          <Text className="text-sm text-gray-500 dark:text-gray-400">
+            {t('commentsReplyToUser', { user: replyingTo.user })}
+          </Text>
+          <TouchableOpacity onPress={() => setReplyingTo(null)}>
+            <Ionicons name="close-circle" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <View
+        className={`flex-row items-end border-t border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 ${
+          isKeyboardVisible ? '' : 'pb-5'
+        } ${replyingTo ? 'border-t-0' : ''}`}
+      >
+        <Image
+          source={{
+            uri: getImageUrl(currentUser?.avatarUrl) || 'https://i.pravatar.cc/150?u=me',
+          }}
+          className="mb-2 mr-3 h-8 w-8 rounded-full"
+        />
+        <View className="flex-1 flex-row items-center rounded-3xl bg-gray-100 px-4 py-2 dark:bg-gray-800">
+          <TextInput
+            className="max-h-24 flex-1 pb-2 pt-2 text-gray-800 dark:text-white"
+            placeholder={
+              replyingTo
+                ? t('commentsReplyPlaceholder', { user: replyingTo.user })
+                : t('commentsInputPlaceholder')
+            }
+            placeholderTextColor="#999"
+            multiline
+            value={comment}
+            onChangeText={setComment}
+          />
+          <TouchableOpacity
+            onPress={handleSend}
+            disabled={!comment.trim() || isSending}
+            className="mb-1 ml-2"
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color="#4c669f" />
+            ) : (
+              <Text
+                className={`font-bold ${
+                  comment.trim() ? 'text-[#4c669f]' : 'text-gray-400'
+                }`}
+              >
+                {t('commentsPublish')}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </>
+  );
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1"
     >
-      <View className="flex-1 justify-end bg-black/50">
-        <Pressable className="flex-1" onPress={() => router.back()} />
-
-        <Animated.View
-          className="h-[75%] w-full bg-white dark:bg-gray-900 rounded-t-3xl shadow-xl overflow-hidden"
-          entering={SlideInDown}
-          exiting={SlideOutDown}
-        >
-          <View className="flex-row justify-between items-center p-4 border-b border-gray-100 dark:border-gray-800">
-            <View className="w-8" />
-            <View className="items-center">
-              <View className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mb-2" />
-              <Text className="font-bold text-lg text-gray-800 dark:text-white">
-                {t('commentsTitle')}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => router.back()} className="p-1">
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="large" color="#4c669f" className="mt-10" />
-          ) : (
-            <FlatList
-              data={comments}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-              renderItem={({ item }) => (
-                <CommentItem
-                  item={{ ...item, isMine: item.userId === currentUser?.id }}
-                  onDelete={handleDeleteComment}
-                  onReport={handleReportComment}
-                  onReply={setReplyingTo}
-                />
-              )}
-              ListEmptyComponent={
-                <Text className="text-center text-gray-400 mt-10">
-                  {t('commentsFirstComment')}
-                </Text>
-              }
-            />
-          )}
-
-          {replyingTo && (
-            <View className="px-4 py-2 bg-gray-50 dark:bg-gray-800 flex-row justify-between items-center border-t border-gray-200 dark:border-gray-700">
-              <Text className="text-gray-500 dark:text-gray-400 text-sm">
-                {t('commentsReplyToUser', { user: replyingTo.user })}
-              </Text>
-              <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                <Ionicons name="close-circle" size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View
-            className={`flex-row items-end p-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 ${
-              isKeyboardVisible ? '' : 'pb-5'
-            } ${replyingTo ? 'border-t-0' : ''}`}
-          >
-            <Image
-              source={{
-                uri:
-                  getImageUrl(currentUser?.avatarUrl) ||
-                  'https://i.pravatar.cc/150?u=me',
-              }}
-              className="w-8 h-8 rounded-full mr-3 mb-2"
-            />
-            <View className="flex-1 flex-row items-center bg-gray-100 dark:bg-gray-800 rounded-3xl px-4 py-2">
-              <TextInput
-                className="flex-1 text-gray-800 dark:text-white max-h-24 pt-2 pb-2"
-                placeholder={
-                  replyingTo
-                    ? t('commentsReplyPlaceholder', { user: replyingTo.user })
-                    : t('commentsInputPlaceholder')
-                }
-                placeholderTextColor="#999"
-                multiline
-                value={comment}
-                onChangeText={setComment}
+      <BottomSheetModal
+        visible
+        onClose={() => router.back()}
+        title={t('commentsTitle')}
+        maxHeight={680}
+        footer={composer}
+      >
+        {loading ? (
+          <ScreenState mode="loading" />
+        ) : errorMessage ? (
+          <ScreenState
+            mode="error"
+            title={t('commonErrorTitle')}
+            description={errorMessage}
+            actionLabel={t('commonRetry')}
+            onAction={() => {
+              void fetchComments();
+            }}
+          />
+        ) : comments.length === 0 ? (
+          <ScreenState mode="empty" title={t('commentsFirstComment')} />
+        ) : (
+          <FlatList
+            data={comments}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16, paddingBottom: 12 }}
+            renderItem={({ item }) => (
+              <CommentItem
+                item={{ ...item, isMine: item.userId === currentUser?.id }}
+                onDelete={handleDeleteComment}
+                onReport={handleReportComment}
+                onReply={setReplyingTo}
               />
-              <TouchableOpacity
-                onPress={handleSend}
-                disabled={!comment.trim() || isSending}
-                className="ml-2 mb-1"
-              >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="#4c669f" />
-                ) : (
-                  <Text
-                    className={`font-bold ${
-                      comment.trim() ? 'text-[#4c669f]' : 'text-gray-400'
-                    }`}
-                  >
-                    {t('commentsPublish')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
-      </View>
+            )}
+          />
+        )}
+      </BottomSheetModal>
     </KeyboardAvoidingView>
   );
 }

@@ -16,11 +16,12 @@ import Header from '@/components/ui/Header';
 import PlaceCard from '@/components/ui/PlaceCard';
 import SuggestionCard from '@/components/ui/SuggestionCard';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
 import api, { getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
+import { formatEventDate, formatPrice } from '@/services/formatters';
 import { getFriendshipOverview } from '@/services/friendships';
 import {
-  getStoredLocation,
   setStoredLocation,
   type StoredLocation,
 } from '@/services/location-preferences';
@@ -71,27 +72,9 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-function formatEventDate(value: string, locale: 'fr-FR' | 'en-US') {
-  return new Date(value).toLocaleString(locale, {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatEventPrice(
-  value: number | string | null,
-  locale: 'fr-FR' | 'en-US',
-  freeLabel: string,
-) {
-  const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
-}
-
 function formatEventPriceLabel(
   event: HomeEvent,
-  locale: 'fr-FR' | 'en-US',
+  locale: string,
   t: (key: 'homePriceFree' | 'homePriceFrom' | 'homePriceSoldOut', params?: { price: string }) => string,
 ) {
   const ticketTypes = event.TicketType || [];
@@ -114,7 +97,7 @@ function formatEventPriceLabel(
     });
   }
 
-  return formatEventPrice(event.entryFee, locale, t('homePriceFree'));
+  return formatPrice(event.entryFee, locale, { freeLabel: t('homePriceFree') });
 }
 
 function SectionPlaceholder({ message }: { message: string }) {
@@ -139,9 +122,18 @@ export default function HomeScreen() {
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [locationLoaded, setLocationLoaded] = useState(false);
-  const [selectedLocation, setSelectedLocation] =
-    useState<StoredLocation | null>(null);
+  const {
+    hydrated: locationHydrated,
+    selectedLocation,
+    filterByLocation,
+    setSelectedLocation,
+    locationValueLabel,
+  } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
 
   const isUnauthorized = useCallback((error: unknown) => {
     if (!error || typeof error !== 'object') {
@@ -195,28 +187,6 @@ export default function HomeScreen() {
     useCallback(() => {
       void loadNotificationCount();
     }, [loadNotificationCount]),
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-
-      const hydrateLocation = async () => {
-        const storedLocation = await getStoredLocation();
-        if (!isMounted) {
-          return;
-        }
-
-        setSelectedLocation(storedLocation);
-        setLocationLoaded(true);
-      };
-
-      void hydrateLocation();
-
-      return () => {
-        isMounted = false;
-      };
-    }, []),
   );
 
   const loadHomeData = useCallback(async () => {
@@ -291,7 +261,7 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    if (!locationLoaded) {
+    if (!locationHydrated) {
       return;
     }
 
@@ -308,7 +278,7 @@ export default function HomeScreen() {
 
     setSelectedLocation(nextLocation);
     void setStoredLocation(nextLocation);
-  }, [locationLoaded, selectedLocation, t]);
+  }, [locationHydrated, selectedLocation, setSelectedLocation, t]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -320,66 +290,21 @@ export default function HomeScreen() {
     }
   }, [loadHomeData]);
 
-  const defaultCountry = t('homeLocationCountry');
-  const selectedCountry = selectedLocation?.country;
-  const normalizedSelectedCountry = selectedCountry?.trim().toLowerCase() || '';
-  const normalizedDefaultCountry = defaultCountry.trim().toLowerCase();
-  const effectiveCountry =
-    selectedCountry || (selectedLocation?.cityName ? defaultCountry : undefined);
-
-  const activeCityName =
-    (selectedLocation?.mode === 'city' ||
-      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
-    selectedLocation.cityName
-      ? selectedLocation.cityName.trim().toLowerCase()
-      : '';
-
   const locationFilteredEvents = useMemo(() => {
-    return events.filter((event) => {
-      if (normalizedSelectedCountry) {
-        const eventCountry =
-          event.Place?.City?.country?.trim().toLowerCase() ||
-          normalizedDefaultCountry;
-        if (eventCountry !== normalizedSelectedCountry) {
-          return false;
-        }
-      }
-
-      if (!activeCityName) {
-        return true;
-      }
-
-      const cityName = event.Place?.City?.name?.trim().toLowerCase();
-      const address = event.address?.trim().toLowerCase();
-      return (
-        cityName === activeCityName ||
-        (!!address && address.includes(activeCityName))
-      );
-    });
-  }, [activeCityName, events, normalizedDefaultCountry, normalizedSelectedCountry]);
+    return filterByLocation(events, (event) => ({
+      city: event.Place?.City?.name,
+      country: event.Place?.City?.country,
+      address: event.address,
+    }));
+  }, [events, filterByLocation]);
 
   const locationFilteredPlaces = useMemo(() => {
-    return places.filter((place) => {
-      if (normalizedSelectedCountry) {
-        const placeCountry =
-          place.City?.country?.trim().toLowerCase() || normalizedDefaultCountry;
-        if (placeCountry !== normalizedSelectedCountry) {
-          return false;
-        }
-      }
-
-      if (!activeCityName) {
-        return true;
-      }
-
-      const cityName = place.City?.name?.trim().toLowerCase();
-      const address = place.address?.trim().toLowerCase();
-      return (
-        cityName === activeCityName ||
-        (!!address && address.includes(activeCityName))
-      );
-    });
-  }, [activeCityName, normalizedDefaultCountry, normalizedSelectedCountry, places]);
+    return filterByLocation(places, (place) => ({
+      city: place.City?.name,
+      country: place.City?.country,
+      address: place.address,
+    }));
+  }, [filterByLocation, places]);
 
   const featuredEvents = useMemo(
     () => locationFilteredEvents.slice(0, 5),
@@ -407,14 +332,7 @@ export default function HomeScreen() {
     [featuredEvents, locale, t],
   );
 
-  const locationLabel =
-    (selectedLocation?.mode === 'city' ||
-      (!selectedLocation?.mode && selectedLocation?.cityName)) &&
-    selectedLocation.cityName
-      ? `${selectedLocation.cityName}, ${effectiveCountry || defaultCountry}`
-    : effectiveCountry
-        ? effectiveCountry
-        : t('homeLocationAllCountries');
+  const locationLabel = locationValueLabel;
 
   const handleCategoryPress = (categoryId: number) => {
     const id = String(categoryId);
@@ -456,7 +374,6 @@ export default function HomeScreen() {
         locationLabel={t('homeLocationLabel')}
         onLocationPress={() => router.push('/location')}
         onNotificationPress={() => router.push('/notifications')}
-        onSearchPress={() => router.push('/search')}
       />
 
       <View className="mt-6">

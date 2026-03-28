@@ -1,283 +1,52 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  AppState,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { CameraView, BarcodeType, useCameraPermissions } from 'expo-camera';
-import * as Haptics from 'expo-haptics';
+import React, { useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { BarcodeType, CameraView } from 'expo-camera';
 
+import ScannerEventPickerModal from '@/components/organizer/scanner/ScannerEventPickerModal';
+import ScannerRecentScansPanel from '@/components/organizer/scanner/ScannerRecentScansPanel';
+import ScannerScanResultCard from '@/components/organizer/scanner/ScannerScanResultCard';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { getApiErrorMessage, isApiNetworkError } from '@/services/api';
-import { TranslationKey } from '@/services/i18n';
-import {
-  enqueueOfflineScan,
-  listOfflineScans,
-  ScannerVerificationResult,
-  ScannerVerificationStatus,
-  syncOfflineScans,
-  verifyOrganizerScan,
-} from '@/services/organizer-scanner';
-import { getOrganizerEventPhase } from '@/services/organizer-ui';
+import { useScannerFlow } from '@/hooks/useScannerFlow';
+import { scannerStatusTitleKey } from '@/services/scanner-status';
 
-const SCAN_THROTTLE_MS = 1000;
-const SCAN_FREEZE_MS = 1500;
-const RECENT_SCANS_LIMIT = 8;
-const OFFLINE_SYNC_INTERVAL_MS = 15000;
-
-interface RecentScanItem {
-  id: string;
-  attendeeName: string;
-  ticketName: string;
-  status: ScannerVerificationStatus;
-  scannedAt: string;
-}
-
-const statusToneClass: Record<ScannerVerificationStatus, string> = {
-  VALID_CHECKED_IN_NOW:
-    'border-emerald-200 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-900/20',
-  VALID_ALREADY_CHECKED_IN:
-    'border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-900/20',
-  INVALID_CODE:
-    'border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-900/20',
-  BOOKING_NOT_FOUND:
-    'border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-900/20',
-  NOT_FOR_THIS_EVENT:
-    'border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-900/20',
-  BOOKING_NOT_CONFIRMED:
-    'border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-900/20',
-  EVENT_EXPIRED:
-    'border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-900/20',
-  UNAUTHORIZED_SCANNER:
-    'border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-900/20',
-};
-
-const statusTitleKey: Record<ScannerVerificationStatus, TranslationKey> = {
-  VALID_CHECKED_IN_NOW: 'scannerStatusValidNow',
-  VALID_ALREADY_CHECKED_IN: 'scannerStatusAlreadyUsed',
-  INVALID_CODE: 'scannerStatusInvalid',
-  BOOKING_NOT_FOUND: 'scannerStatusNotFound',
-  NOT_FOR_THIS_EVENT: 'scannerStatusWrongEvent',
-  BOOKING_NOT_CONFIRMED: 'scannerStatusNotConfirmed',
-  EVENT_EXPIRED: 'scannerStatusExpired',
-  UNAUTHORIZED_SCANNER: 'scannerStatusUnauthorized',
-};
-
-const statusMessageKey: Record<ScannerVerificationStatus, TranslationKey> = {
-  VALID_CHECKED_IN_NOW: 'scannerStatusMessageValidNow',
-  VALID_ALREADY_CHECKED_IN: 'scannerStatusMessageAlreadyUsed',
-  INVALID_CODE: 'scannerStatusMessageInvalid',
-  BOOKING_NOT_FOUND: 'scannerStatusMessageNotFound',
-  NOT_FOR_THIS_EVENT: 'scannerStatusMessageWrongEvent',
-  BOOKING_NOT_CONFIRMED: 'scannerStatusMessageNotConfirmed',
-  EVENT_EXPIRED: 'scannerStatusMessageExpired',
-  UNAUTHORIZED_SCANNER: 'scannerStatusMessageUnauthorized',
-};
+const SCANNER_BARCODE_TYPES: BarcodeType[] = ['qr' as BarcodeType];
 
 export default function ScannerScreen() {
-  const router = useRouter();
-  const { locale, t } = useI18n();
-  const { loading, user, organizerEvents, error, refetch } = useUserProfile();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [isProcessingScan, setIsProcessingScan] = useState(false);
-  const [isScanFrozen, setIsScanFrozen] = useState(false);
-  const [lastScanAt, setLastScanAt] = useState(0);
-  const [scanResult, setScanResult] =
-    useState<ScannerVerificationResult | null>(null);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState('');
-  const [recentScans, setRecentScans] = useState<RecentScanItem[]>([]);
-  const [cameraMountError, setCameraMountError] = useState<string | null>(null);
-  const [cameraInstanceKey, setCameraInstanceKey] = useState(0);
-  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
-  const [offlineSyncing, setOfflineSyncing] = useState(false);
+  const { t } = useI18n();
   const [eventPickerVisible, setEventPickerVisible] = useState(false);
-  const [offlineSyncMessage, setOfflineSyncMessage] = useState<string | null>(
-    null,
-  );
-  const freezeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const scanEligibleEvents = useMemo(() => {
-    const now = Date.now();
-
-    return organizerEvents.filter((event) => {
-      const boundaryRaw = event.endTime || event.startTime;
-      const boundary = new Date(boundaryRaw).getTime();
-
-      if (!Number.isFinite(boundary)) {
-        return false;
-      }
-
-      return boundary >= now;
-    });
-  }, [organizerEvents]);
-
-  const isAllowed = useOrganizerGuard({
+  const {
     user,
     loading,
-    suspend: Boolean(error),
-  });
-
-  useEffect(() => {
-    return () => {
-      if (freezeTimeoutRef.current) {
-        clearTimeout(freezeTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (scanEligibleEvents.length === 0) {
-      setSelectedEventId('');
-      return;
-    }
-
-    const hasSelection = scanEligibleEvents.some((event) => event.id === selectedEventId);
-    if (!hasSelection) {
-      setSelectedEventId(scanEligibleEvents[0].id);
-    }
-  }, [scanEligibleEvents, selectedEventId]);
-
-  const refreshOfflineQueueCount = useCallback(async () => {
-    const items = await listOfflineScans(selectedEventId || undefined);
-    setOfflineQueueCount(items.length);
-  }, [selectedEventId]);
-
-  useEffect(() => {
-    void refreshOfflineQueueCount();
-  }, [refreshOfflineQueueCount]);
-
-  const releaseScan = useCallback(() => {
-    if (freezeTimeoutRef.current) {
-      clearTimeout(freezeTimeoutRef.current);
-    }
-
-    freezeTimeoutRef.current = setTimeout(() => {
-      setIsScanFrozen(false);
-    }, SCAN_FREEZE_MS);
-  }, []);
-
-  const triggerHaptic = useCallback(async (isSuccess: boolean) => {
-    if (Platform.OS === 'web') {
-      return;
-    }
-
-    await Haptics.notificationAsync(
-      isSuccess
-        ? Haptics.NotificationFeedbackType.Success
-        : Haptics.NotificationFeedbackType.Error,
-    );
-  }, []);
-
-  const handleBarcodeScanned = useCallback(
-    async ({ data }: { data: string }) => {
-      const now = Date.now();
-
-      if (isProcessingScan || isScanFrozen || now - lastScanAt < SCAN_THROTTLE_MS) {
-        return;
-      }
-
-      if (!selectedEventId) {
-        setScanError(t('scannerSelectEventRequired'));
-        await triggerHaptic(false);
-        return;
-      }
-
-      setLastScanAt(now);
-      setIsProcessingScan(true);
-      setIsScanFrozen(true);
-      setScanError(null);
-
-      try {
-        const source =
-          Platform.OS === 'ios' || Platform.OS === 'android'
-            ? Platform.OS
-            : 'web';
-        const result = await verifyOrganizerScan({
-          code: data,
-          eventId: selectedEventId,
-          source,
-        });
-        setScanResult(result);
-        if (result.attendee) {
-          const attendeeName =
-            result.attendee.displayName || result.attendee.username || '-';
-          const ticketName = result.ticket?.ticketTypeName || '-';
-          const scannedAt = result.checkedInAt || new Date().toISOString();
-
-          setRecentScans((current) => [
-            {
-              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              attendeeName,
-              ticketName,
-              status: result.status,
-              scannedAt,
-            },
-            ...current,
-          ].slice(0, RECENT_SCANS_LIMIT));
-        }
-        await triggerHaptic(result.status === 'VALID_CHECKED_IN_NOW');
-      } catch (scanRequestError) {
-        setScanResult(null);
-        if (isApiNetworkError(scanRequestError) && selectedEventId) {
-          const source =
-            Platform.OS === 'ios' || Platform.OS === 'android'
-              ? Platform.OS
-              : 'web';
-
-          await enqueueOfflineScan({
-            code: data,
-            eventId: selectedEventId,
-            source,
-          });
-
-          setScanError(t('scannerOfflineQueued'));
-          setOfflineSyncMessage(null);
-          await refreshOfflineQueueCount();
-        } else {
-          setScanError(
-            getApiErrorMessage(scanRequestError, t('scannerUnexpectedError')),
-          );
-        }
-        await triggerHaptic(false);
-      } finally {
-        setIsProcessingScan(false);
-        releaseScan();
-      }
-    },
-    [
-      isProcessingScan,
-      isScanFrozen,
-      lastScanAt,
-      releaseScan,
-      selectedEventId,
-      t,
-      triggerHaptic,
-      refreshOfflineQueueCount,
-    ],
-  );
-
-  const resetScanState = useCallback(() => {
-    setScanResult(null);
-    setScanError(null);
-    setIsScanFrozen(false);
-    setCameraMountError(null);
-    setCameraInstanceKey((current) => current + 1);
-  }, []);
-
-  const selectedEvent = scanEligibleEvents.find((event) => event.id === selectedEventId);
-  const selectedEventPhase = selectedEvent
-    ? getOrganizerEventPhase(selectedEvent.startTime, selectedEvent.endTime)
-    : null;
+    error,
+    refetch,
+    isAllowed,
+    permission,
+    requestPermission,
+    isProcessingScan,
+    scanResult,
+    scanError,
+    selectedEventId,
+    setSelectedEventId,
+    scanEligibleEvents,
+    selectedEvent,
+    selectedEventPhase,
+    recentScans,
+    cameraMountError,
+    cameraInstanceKey,
+    offlineQueueCount,
+    offlineSyncing,
+    offlineSyncMessage,
+    handleBarcodeScanned,
+    resetScanState,
+    getScanStatusMessage,
+    openSelectedEventScans,
+    syncQueuedScans,
+    formatRecentScanTime,
+    handleCameraMountError,
+    statusTone,
+  } = useScannerFlow();
 
   const selectedEventPhaseClass =
     selectedEventPhase === 'upcoming'
@@ -285,14 +54,12 @@ export default function ScannerScreen() {
       : selectedEventPhase === 'live'
         ? 'rounded-full bg-amber-100 px-2.5 py-1 dark:bg-amber-900/30'
         : 'rounded-full bg-gray-200 px-2.5 py-1 dark:bg-gray-800';
-
   const selectedEventPhaseTextClass =
     selectedEventPhase === 'upcoming'
       ? 'text-xs font-semibold text-emerald-700 dark:text-emerald-300'
       : selectedEventPhase === 'live'
         ? 'text-xs font-semibold text-amber-700 dark:text-amber-300'
         : 'text-xs font-semibold text-gray-600 dark:text-gray-300';
-
   const selectedEventPhaseLabel =
     selectedEventPhase === 'upcoming'
       ? t('organizerEventsPhaseUpcoming')
@@ -300,224 +67,64 @@ export default function ScannerScreen() {
         ? t('organizerEventsPhaseLive')
         : t('organizerEventsPhasePast');
 
-  const formatRecentScanTime = (value: string) => {
-    const parsed = new Date(value);
-
-    if (Number.isNaN(parsed.getTime())) {
-      return '--:--';
-    }
-
-    return new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(parsed);
-  };
-
-  const formatScannerBoundaryMoment = (value: string) => {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return '--:--';
-    }
-
-    const now = new Date();
-    const isSameDay =
-      parsed.getFullYear() === now.getFullYear() &&
-      parsed.getMonth() === now.getMonth() &&
-      parsed.getDate() === now.getDate();
-
-    if (isSameDay) {
-      return new Intl.DateTimeFormat(locale, {
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(parsed);
-    }
-
-    return new Intl.DateTimeFormat(locale, {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(parsed);
-  };
-
-  const getScanStatusMessage = (result: ScannerVerificationResult) => {
-    if (result.status === 'EVENT_EXPIRED' && result.checkInWindow) {
-      const windowDate =
-        result.checkInWindow.reason === 'TOO_EARLY'
-          ? result.checkInWindow.opensAt
-          : result.checkInWindow.closesAt;
-
-      const formattedTime = formatScannerBoundaryMoment(windowDate);
-
-      if (result.checkInWindow.reason === 'TOO_EARLY') {
-        return t('scannerStatusMessageExpiredTooEarly', { time: formattedTime });
-      }
-
-      return t('scannerStatusMessageExpiredTooLate', { time: formattedTime });
-    }
-
-    return t(statusMessageKey[result.status]);
-  };
-
-  const openSelectedEventScans = () => {
-    if (!selectedEventId) {
-      return;
-    }
-
-    router.push({
-      pathname: '/event-scans/[id]',
-      params: { id: selectedEventId },
-    });
-  };
-
-  const syncQueuedScans = useCallback(async (options?: { silent?: boolean }) => {
-    if (!selectedEventId || offlineSyncing || offlineQueueCount === 0) {
-      return;
-    }
-
-    const silent = options?.silent ?? false;
-
-    setOfflineSyncing(true);
-
-    if (!silent) {
-      setOfflineSyncMessage(null);
-    }
-
-    try {
-      const result = await syncOfflineScans(selectedEventId);
-
-      if (!silent && result.synced > 0 && result.failed === 0) {
-        setOfflineSyncMessage(
-          t('scannerOfflineSyncSuccess', { count: result.synced }),
-        );
-      } else if (!silent && result.synced > 0 && result.failed > 0) {
-        setOfflineSyncMessage(
-          t('scannerOfflineSyncPartial', {
-            synced: result.synced,
-            failed: result.failed,
-          }),
-        );
-      } else if (!silent && result.remaining === 0) {
-        setOfflineSyncMessage(t('scannerOfflineSyncNoPending'));
-      } else if (!silent) {
-        setOfflineSyncMessage(t('scannerOfflineSyncFailed'));
-      }
-
-      await refreshOfflineQueueCount();
-    } catch {
-      if (!silent) {
-        setOfflineSyncMessage(t('scannerOfflineSyncFailed'));
-      }
-    } finally {
-      setOfflineSyncing(false);
-    }
-  }, [
-    offlineQueueCount,
-    offlineSyncing,
-    refreshOfflineQueueCount,
-    selectedEventId,
-    t,
-  ]);
-
-  useEffect(() => {
-    if (!selectedEventId || offlineQueueCount === 0) {
-      return;
-    }
-
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void syncQueuedScans({ silent: true });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [offlineQueueCount, selectedEventId, syncQueuedScans]);
-
-  useEffect(() => {
-    if (!selectedEventId || offlineQueueCount === 0) {
-      return;
-    }
-
-    const timer = setInterval(() => {
-      void syncQueuedScans({ silent: true });
-    }, OFFLINE_SYNC_INTERVAL_MS);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [offlineQueueCount, selectedEventId, syncQueuedScans]);
-
-  const handleCameraMountError = useCallback(
-    (mountError: { message?: string }) => {
-      setCameraMountError(
-        mountError.message || t('scannerCameraUnavailableMessage'),
-      );
-    },
-    [t],
-  );
-
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-      </View>
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   if (error && !user) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 px-6 dark:bg-black">
-        <Text className="text-center text-xl font-bold text-gray-900 dark:text-white">
-          {t('organizerDataLoadErrorTitle')}
-        </Text>
-        <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-          {t('organizerDataLoadErrorMessage')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => void refetch()}
-          className="mt-5 rounded-2xl bg-[#4c669f] px-5 py-3"
-        >
-          <Text className="font-semibold text-white">{t('organizerDataRetry')}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerDataLoadErrorTitle')}
+        description={t('organizerDataLoadErrorMessage')}
+        actionLabel={t('organizerDataRetry')}
+        onAction={() => {
+          void refetch();
+        }}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
   if (!user || !isAllowed) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-      </View>
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
     );
   }
 
-  const statusTone = scanResult ? statusToneClass[scanResult.status] : null;
-
   return (
     <>
-      <ScrollView className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black">
-      <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-        {t('organizerEventsLabel')}
-      </Text>
-      <Text className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
-        {t('scannerTitle')}
-      </Text>
-      <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-        {t('scannerSubtitle')}
-      </Text>
+      <ScrollView
+        className="flex-1 bg-gray-50 px-5 pt-16 dark:bg-black"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 88 }}
+      >
+        <ScreenHeader
+          title={t('scannerTitle')}
+          subtitle={t('scannerSubtitle')}
+          label={t('organizerEventsLabel')}
+        />
 
-      <View className="mt-4 rounded-2xl bg-white p-4 dark:bg-gray-900">
-        {scanEligibleEvents.length === 0 ? (
-          <Text className="text-sm text-gray-500 dark:text-gray-400">
-            {t('scannerEventNoEvents')}
-          </Text>
-        ) : selectedEvent ? (
-          <>
+        <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
+          {scanEligibleEvents.length === 0 ? (
+            <Text className="text-sm text-gray-500 dark:text-gray-400">
+              {t('scannerEventNoEvents')}
+            </Text>
+          ) : selectedEvent ? (
             <View className="flex-row items-center justify-between">
               <View className="mr-3 flex-1">
-                <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
                   {t('scannerActiveEvent')}
                 </Text>
                 <Text
@@ -537,276 +144,188 @@ export default function ScannerScreen() {
 
               <TouchableOpacity
                 onPress={() => setEventPickerVisible(true)}
-                className="rounded-full border border-[#4c669f] px-3 py-1.5"
+                className="rounded-full border border-[#4c669f] px-4 py-2"
               >
-                <Text className="text-xs font-semibold text-[#4c669f]">
+                <Text className="text-sm font-semibold text-[#4c669f]">
                   {t('scannerSwitchEvent')}
                 </Text>
               </TouchableOpacity>
             </View>
-
-          </>
-        ) : null}
-      </View>
-
-      {offlineQueueCount > 0 ? (
-        <View className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800/60 dark:bg-sky-900/20">
-          <Text className="text-sm font-semibold text-sky-800 dark:text-sky-200">
-            {t('scannerOfflineQueueTitle')}
-          </Text>
-          <Text className="mt-1 text-xs text-sky-700 dark:text-sky-300">
-            {t('scannerOfflineQueueSubtitle')}
-          </Text>
-          <Text className="mt-3 text-sm font-medium text-sky-800 dark:text-sky-200">
-            {t('scannerOfflinePendingCount', { count: offlineQueueCount })}
-          </Text>
-          <TouchableOpacity
-            onPress={() => void syncQueuedScans()}
-            disabled={offlineSyncing}
-            className={
-              offlineSyncing
-                ? 'mt-3 rounded-xl bg-sky-300 px-4 py-3'
-                : 'mt-3 rounded-xl bg-sky-600 px-4 py-3'
-            }
-          >
-            <Text className="text-center text-sm font-semibold text-white">
-              {offlineSyncing
-                ? t('scannerOfflineSyncing')
-                : t('scannerOfflineSyncAction')}
-            </Text>
-          </TouchableOpacity>
-          {offlineSyncMessage ? (
-            <Text className="mt-2 text-xs text-sky-700 dark:text-sky-300">
-              {offlineSyncMessage}
-            </Text>
           ) : null}
         </View>
-      ) : null}
 
-      {error ? (
-        <View className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-900/20">
-          <Text className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            {t('organizerDataLoadErrorMessage')}
-          </Text>
-          <TouchableOpacity
-            onPress={() => void refetch()}
-            className="mt-3 self-start rounded-full bg-amber-600 px-4 py-2"
-          >
-            <Text className="text-xs font-semibold text-white">
-              {t('organizerDataRetry')}
+        {offlineQueueCount > 0 ? (
+          <View className="mt-5 rounded-[24px] border border-sky-200 bg-sky-50 p-5 dark:border-sky-800/60 dark:bg-sky-900/20">
+            <Text className="text-sm font-semibold text-sky-800 dark:text-sky-200">
+              {t('scannerOfflineQueueTitle')}
             </Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      <View className="mt-6 rounded-3xl bg-white p-6 dark:bg-gray-900">
-        {!permission ? (
-          <View className="items-center justify-center py-10">
-            <ActivityIndicator size="small" color="#4c669f" />
-            <Text className="mt-3 text-gray-500 dark:text-gray-400">
-              {t('scannerCameraLoading')}
+            <Text className="mt-1 text-xs text-sky-700 dark:text-sky-300">
+              {t('scannerOfflineQueueSubtitle')}
             </Text>
-          </View>
-        ) : null}
-
-        {permission && !permission.granted ? (
-          <View>
-            <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('scannerPermissionTitle')}
-            </Text>
-            <Text className="mt-2 text-gray-500 dark:text-gray-400">
-              {t('scannerPermissionMessage')}
+            <Text className="mt-3 text-sm font-medium text-sky-800 dark:text-sky-200">
+              {t('scannerOfflinePendingCount', { count: offlineQueueCount })}
             </Text>
             <TouchableOpacity
               onPress={() => {
-                void requestPermission();
+                void syncQueuedScans();
               }}
-              className="mt-5 items-center rounded-2xl bg-[#4c669f] py-3"
+              disabled={offlineSyncing}
+              className={
+                offlineSyncing
+                  ? 'mt-3 rounded-[14px] bg-sky-300 px-4 py-3'
+                  : 'mt-3 rounded-[14px] bg-sky-600 px-4 py-3'
+              }
             >
-              <Text className="font-semibold text-white">
-                {t('scannerPermissionButton')}
+              <Text className="text-center text-sm font-semibold text-white">
+                {offlineSyncing
+                  ? t('scannerOfflineSyncing')
+                  : t('scannerOfflineSyncAction')}
               </Text>
             </TouchableOpacity>
+            {offlineSyncMessage ? (
+              <Text className="mt-2 text-xs text-sky-700 dark:text-sky-300">
+                {offlineSyncMessage}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
-        {permission?.granted ? (
-          <View>
-            {cameraMountError ? (
-              <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/60 dark:bg-red-900/20">
-                <Text className="text-base font-semibold text-red-700 dark:text-red-300">
-                  {t('scannerCameraUnavailableTitle')}
-                </Text>
-                <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
-                  {cameraMountError}
-                </Text>
-                <TouchableOpacity
-                  onPress={resetScanState}
-                  className="mt-4 self-start rounded-full bg-red-600 px-4 py-2"
-                >
-                  <Text className="text-xs font-semibold text-white">
-                    {t('scannerCameraRetry')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-                <CameraView
-                  key={cameraInstanceKey}
-                  style={{ height: 288, width: '100%' }}
-                  onMountError={handleCameraMountError}
-                  onBarcodeScanned={handleBarcodeScanned}
-                  barcodeScannerSettings={{
-                    barcodeTypes: ['qr' as BarcodeType],
-                  }}
-                />
-              </View>
-            )}
+        {error ? (
+          <ScreenState
+            mode="warning"
+            title={t('organizerDataLoadErrorMessage')}
+            actionLabel={t('organizerDataRetry')}
+            onAction={() => {
+              void refetch();
+            }}
+            containerClassName="px-0 pb-0 pt-5"
+          />
+        ) : null}
 
-            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              {cameraMountError
-                ? t('scannerCameraUnavailableMessage')
-                : isProcessingScan
-                  ? t('scannerProcessing')
-                  : t('scannerReadyHint')}
-            </Text>
+        <View className="mt-5 rounded-[24px] bg-white p-6 dark:bg-gray-900">
+          {!permission ? (
+            <ScreenState
+              mode="loading"
+              title={t('scannerCameraLoading')}
+              containerClassName="px-0 py-0"
+            />
+          ) : null}
 
-            {scanResult ? (
-              <View className={`mt-4 rounded-2xl border p-4 ${statusTone}`}>
-                <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                  {t(statusTitleKey[scanResult.status])}
+          {permission && !permission.granted ? (
+            <View>
+              <Text className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('scannerPermissionTitle')}
+              </Text>
+              <Text className="mt-2 text-gray-500 dark:text-gray-400">
+                {t('scannerPermissionMessage')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  void requestPermission();
+                }}
+                className="mt-5 items-center rounded-2xl bg-[#4c669f] py-3"
+              >
+                <Text className="font-semibold text-white">
+                  {t('scannerPermissionButton')}
                 </Text>
-                <Text className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                  {getScanStatusMessage(scanResult)}
-                </Text>
-
-                {scanResult.attendee ? (
-                  <Text className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                    {t('scannerResultAttendee')}: {scanResult.attendee.displayName || scanResult.attendee.username || '-'}
-                  </Text>
-                ) : null}
-
-                {scanResult.ticket ? (
-                  <Text className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                    {t('scannerResultTicket')}: {scanResult.ticket.ticketTypeName || '-'}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-
-            {scanError ? (
-              <View className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/60 dark:bg-red-900/20">
-                <Text className="text-sm font-semibold text-red-700 dark:text-red-300">
-                  {t('scannerLastScanError')}
-                </Text>
-                <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
-                  {scanError}
-                </Text>
-              </View>
-            ) : null}
-
-            <View className="mt-6 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {t('scannerRecentScansTitle')}
-                </Text>
-                <TouchableOpacity
-                  onPress={openSelectedEventScans}
-                  className="rounded-full border border-gray-300 px-3 py-1.5 dark:border-gray-700"
-                >
-                  <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                    {t('scannerOpenAllScans')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {recentScans.length === 0 ? (
-                <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  {t('scannerRecentScansEmpty')}
-                </Text>
-              ) : (
-                recentScans.map((item) => (
-                  <View
-                    key={item.id}
-                    className="mt-3 flex-row items-center justify-between rounded-xl bg-gray-100 px-3 py-2 dark:bg-gray-800"
-                  >
-                    <View className="mr-3 flex-1">
-                      <Text className="text-sm font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
-                        {item.attendeeName}
-                      </Text>
-                      <Text className="mt-0.5 text-xs text-gray-500 dark:text-gray-400" numberOfLines={1}>
-                        {item.ticketName}
-                      </Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                        {t(statusTitleKey[item.status])}
-                      </Text>
-                      <Text className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        {formatRecentScanTime(item.scannedAt)}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              )}
+              </TouchableOpacity>
             </View>
-          </View>
-        ) : null}
-      </View>
+          ) : null}
+
+          {permission?.granted ? (
+            <View>
+              {cameraMountError ? (
+                <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/60 dark:bg-red-900/20">
+                  <Text className="text-base font-semibold text-red-700 dark:text-red-300">
+                    {t('scannerCameraUnavailableTitle')}
+                  </Text>
+                  <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
+                    {cameraMountError}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={resetScanState}
+                    className="mt-4 self-start rounded-full bg-red-600 px-4 py-2.5"
+                  >
+                    <Text className="text-xs font-semibold text-white">
+                      {t('scannerCameraRetry')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
+                  <CameraView
+                    key={cameraInstanceKey}
+                    style={{ height: 288, width: '100%' }}
+                    onMountError={handleCameraMountError}
+                    onBarcodeScanned={handleBarcodeScanned}
+                    barcodeScannerSettings={{
+                      barcodeTypes: SCANNER_BARCODE_TYPES,
+                    }}
+                  />
+                </View>
+              )}
+
+              <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                {cameraMountError
+                  ? t('scannerCameraUnavailableMessage')
+                  : isProcessingScan
+                    ? t('scannerProcessing')
+                    : t('scannerReadyHint')}
+              </Text>
+
+              {scanResult && statusTone ? (
+                <ScannerScanResultCard
+                  toneClass={statusTone}
+                  title={t(scannerStatusTitleKey[scanResult.status])}
+                  message={getScanStatusMessage(scanResult)}
+                  attendeeLabel={t('scannerResultAttendee')}
+                  ticketLabel={t('scannerResultTicket')}
+                  attendeeName={
+                    scanResult.attendee?.displayName ||
+                    scanResult.attendee?.username ||
+                    '-'
+                  }
+                  ticketName={scanResult.ticket?.ticketTypeName || '-'}
+                />
+              ) : null}
+
+              {scanError ? (
+                <View className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/60 dark:bg-red-900/20">
+                  <Text className="text-sm font-semibold text-red-700 dark:text-red-300">
+                    {t('scannerLastScanError')}
+                  </Text>
+                  <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
+                    {scanError}
+                  </Text>
+                </View>
+              ) : null}
+
+              <ScannerRecentScansPanel
+                title={t('scannerRecentScansTitle')}
+                openAllLabel={t('scannerOpenAllScans')}
+                emptyLabel={t('scannerRecentScansEmpty')}
+                scans={recentScans}
+                onOpenAllScans={openSelectedEventScans}
+                formatTime={formatRecentScanTime}
+                statusLabelFor={(status) => t(scannerStatusTitleKey[status])}
+              />
+            </View>
+          ) : null}
+        </View>
       </ScrollView>
 
-      <Modal
-        transparent
+      <ScannerEventPickerModal
         visible={eventPickerVisible}
-        animationType="fade"
-        onRequestClose={() => setEventPickerVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/35"
-          onPress={() => setEventPickerVisible(false)}
-        >
-          <Pressable
-            className="rounded-t-3xl bg-white p-5 dark:bg-gray-900"
-            onPress={(event) => event.stopPropagation()}
-          >
-            <Text className="text-sm font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              {t('scannerEventPickerTitle')}
-            </Text>
-            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {t('scannerEventPickerSubtitle')}
-            </Text>
-
-            <View className="mt-4 max-h-72">
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {scanEligibleEvents.map((event) => {
-                  const selected = event.id === selectedEventId;
-                  return (
-                    <TouchableOpacity
-                      key={event.id}
-                      onPress={() => {
-                        setSelectedEventId(event.id);
-                        setEventPickerVisible(false);
-                      }}
-                      className={selected
-                        ? 'mb-2 rounded-2xl border border-[#4c669f] bg-[#4c669f]/10 px-4 py-3'
-                        : 'mb-2 rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700'}
-                    >
-                      <Text
-                        numberOfLines={1}
-                        className={selected
-                          ? 'text-sm font-semibold text-[#4c669f]'
-                          : 'text-sm font-semibold text-gray-800 dark:text-gray-100'}
-                      >
-                        {event.title}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        title={t('scannerEventPickerTitle')}
+        subtitle={t('scannerEventPickerSubtitle')}
+        events={scanEligibleEvents}
+        selectedEventId={selectedEventId}
+        onClose={() => setEventPickerVisible(false)}
+        onSelectEvent={(eventId) => {
+          setSelectedEventId(eventId);
+          setEventPickerVisible(false);
+        }}
+      />
     </>
   );
 }

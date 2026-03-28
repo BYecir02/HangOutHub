@@ -25,11 +25,12 @@ export default function Header({
   const isDark = colorScheme === 'dark';
   const safeCount = Number.isFinite(notificationCount) ? notificationCount : 0;
   const badgeLabel = safeCount > 99 ? '99+' : String(safeCount);
+  const hasSearchAction = typeof onSearchPress === 'function';
 
   return (
     <View className="bg-white dark:bg-black px-5 pt-14 pb-4 shadow-sm flex-row justify-between items-center border-b border-gray-100 dark:border-gray-800">
       {/* Espace vide pour ÃƒÂ©quilibrer le header et garder le titre centrÃƒÂ© */}
-      <View className="w-20" />
+      <View className={hasSearchAction ? 'w-20' : 'w-10'} />
 
       {/* Localisation Centrale */}
       <TouchableOpacity className="flex-row items-center" onPress={onLocationPress}>
@@ -45,13 +46,21 @@ export default function Header({
       </TouchableOpacity>
 
       {/* Actions ÃƒÂ  droite */}
-      <View className="flex-row items-center">
-        <TouchableOpacity 
-          onPress={onSearchPress}
-          className="h-10 w-10 justify-center items-center mr-1"
-        >
-          <Ionicons name="search-outline" size={24} color={isDark ? "#fff" : "#333"} />
-        </TouchableOpacity>
+      <View
+        className={
+          hasSearchAction
+            ? 'flex-row items-center justify-end w-20'
+            : 'flex-row items-center justify-end w-10'
+        }
+      >
+        {hasSearchAction ? (
+          <TouchableOpacity
+            onPress={onSearchPress}
+            className="h-10 w-10 justify-center items-center mr-1"
+          >
+            <Ionicons name="search-outline" size={24} color={isDark ? "#fff" : "#333"} />
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity 
           onPress={onNotificationPress}
