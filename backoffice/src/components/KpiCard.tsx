@@ -1,5 +1,5 @@
 
-type Tone = 'brand' | 'slate' | 'rose';
+type Tone = 'brand' | 'slate' | 'rose' | 'emerald';
 
 const toneStyles: Record<Tone, { box: string; label: string; value: string; hint: string }> = {
   brand: {
@@ -19,6 +19,12 @@ const toneStyles: Record<Tone, { box: string; label: string; value: string; hint
     label: 'text-rose-400',
     value: 'text-rose-700',
     hint: 'text-rose-500',
+  },
+  emerald: {
+    box: 'bg-emerald-50',
+    label: 'text-emerald-400',
+    value: 'text-emerald-700',
+    hint: 'text-emerald-500',
   },
 };
 

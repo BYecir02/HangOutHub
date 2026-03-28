@@ -319,12 +319,12 @@ export default function LoginScreen() {
                   colors={['#4c669f', '#ff7a45']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  className="w-full items-center rounded-[28px] px-6 py-[18px]"
+                  className="w-full min-h-[56px] items-center justify-center rounded-[28px] px-6 py-[18px]"
                 >
                   {loading ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
-                    <Text className="text-base font-semibold text-white p-5">
+                    <Text className="text-base font-semibold text-white">
                       {t('loginSubmit')}
                     </Text>
                   )}

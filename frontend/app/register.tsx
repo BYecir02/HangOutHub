@@ -472,7 +472,7 @@ export default function RegisterScreen() {
                     colors={[accentColor, '#4c669f']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    className="w-full items-center rounded-[28px] px-6 py-[18px]"
+                    className="w-full min-h-[56px] items-center justify-center rounded-[28px] px-6 py-[18px]"
                   >
                     {loading ? (
                       <ActivityIndicator color="#ffffff" />

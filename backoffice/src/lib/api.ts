@@ -65,6 +65,28 @@ export function apiDelete<T>(path: string) {
   return request<T>(path, { method: 'DELETE' });
 }
 
+export function resolveImageUrl(url?: string | null) {
+  if (!url) {
+    return null;
+  }
+
+  if (url.startsWith('http')) {
+    return url;
+  }
+
+  const uploadsIndex = url.indexOf('/uploads/');
+  if (uploadsIndex >= 0) {
+    const path = url.substring(uploadsIndex);
+    return `${API_URL}${path}`;
+  }
+
+  if (url.startsWith('uploads/')) {
+    return `${API_URL}/${url}`;
+  }
+
+  return url;
+}
+
 export async function apiUpload<T>(
   path: string,
   formData: FormData,

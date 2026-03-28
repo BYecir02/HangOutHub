@@ -4,18 +4,24 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  Share,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
+import PersonRow from './PersonRow';
 import PostItem from './PostItem';
 import { SkeletonBlock } from '../ui/Skeleton';
 import api, { storage } from '../../services/api';
+import { getFriendshipOverview } from '../../services/friendships';
+import { getOrCreateDirectChat, sendDirectMessage } from '../../services/direct-chats';
+import type { SocialUser } from '../../types/social';
 
 const FEED_CACHE_KEY = 'socialFeedCache:v2';
 const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt:v2';
@@ -72,6 +78,7 @@ interface FeedPost {
     likes?: number;
     comments?: number;
   };
+  shareCount?: number | null;
 }
 
 function EmptyState({
@@ -134,6 +141,14 @@ export default function SocialFeed() {
   const nextCursorRef = useRef<string | null>(null);
   const latestFetchedAtRef = useRef<string | null>(null);
   const isAtTopRef = useRef(true);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
+  const [connections, setConnections] = useState<SocialUser[]>([]);
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [sendingConnectionId, setSendingConnectionId] = useState<string | null>(
+    null,
+  );
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'category' | 'type' | 'location'>(
@@ -402,6 +417,99 @@ export default function SocialFeed() {
     ]),
   );
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadCategories = async () => {
+      try {
+        const response = await api.get<CategoryOption[]>('/categories');
+        if (isMounted) {
+          setCategories(response.data);
+        }
+      } catch {
+        if (isMounted) {
+          setCategories([]);
+        }
+      }
+    };
+    void loadCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const removePostFromLists = useCallback((postId: string) => {
+    setPosts((current) => current.filter((post) => post.id !== postId));
+    setPendingPosts((current) => current.filter((post) => post.id !== postId));
+  }, []);
+
+  const handleDeletePost = useCallback(
+    async (postId: string) => {
+      try {
+        await api.delete(`/posts/${postId}`);
+        removePostFromLists(postId);
+        Alert.alert(
+          t('profileDeletePostSuccessTitle'),
+          t('profileDeletePostSuccessMessage'),
+        );
+      } catch {
+        Alert.alert(t('commonErrorTitle'), t('socialFeedDeleteError'));
+      }
+    },
+    [removePostFromLists, t],
+  );
+
+  const handleEditPost = useCallback(
+    (post: {
+      id: string;
+      content?: string | null;
+      images?: string[];
+      postType?: 'post' | 'plan';
+      placeId?: string | null;
+      eventId?: string | null;
+      Event?: {
+        title?: string | null;
+      } | null;
+      placeName?: string | null;
+      cityName?: string | null;
+      ambiance?: string | null;
+      visibilityUserIds?: string[] | null;
+      visibility?: 'public' | 'friends' | 'private' | 'custom';
+    }) => {
+      router.push({
+        pathname: '/post',
+        params: {
+          postId: post.id,
+          content: post.content || '',
+          images: JSON.stringify(post.images || []),
+          postType: post.postType || 'post',
+          placeId: post.placeId || '',
+          eventId: post.eventId || '',
+          eventTitle: post.Event?.title || '',
+          placeName: post.placeName || '',
+          cityName: post.cityName || '',
+          ambiance: post.ambiance || '',
+          visibilityUserIds: JSON.stringify(post.visibilityUserIds || []),
+          visibility: post.visibility || 'public',
+        },
+      });
+    },
+    [router],
+  );
+
+  const handleCommentPost = useCallback(
+    (post: { id: string }) => {
+      router.push({
+        pathname: '/comments',
+        params: { postId: post.id },
+      });
+    },
+    [router],
+  );
+
+  const handleOpenMessages = useCallback(() => {
+    router.push('/messages');
+  }, [router]);
+
   const applyPendingPosts = useCallback(async () => {
     if (pendingPosts.length === 0) {
       return;
@@ -424,6 +532,22 @@ export default function SocialFeed() {
     [applyPendingPosts, pendingPosts.length],
   );
 
+  const resolveLocationLabel = useCallback((post: FeedPost) => {
+    const direct = [post.placeName, post.cityName]
+      .map((value) => (value || '').trim())
+      .filter(Boolean)
+      .join(' - ');
+    if (direct) {
+      return direct;
+    }
+    if (post.Event?.Place?.name) {
+      return [post.Event.Place.name, post.Event.Place.City?.name]
+        .filter(Boolean)
+        .join(' - ');
+    }
+    return '';
+  }, []);
+
   const pendingLabel = useMemo(() => {
     const label = t('socialFeedNewPosts', { count: pendingPosts.length });
     if (!label || label === 'socialFeedNewPosts') {
@@ -432,97 +556,120 @@ export default function SocialFeed() {
     return label;
   }, [pendingPosts.length, t]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadCategories = async () => {
-      try {
-        const response = await api.get<CategoryOption[]>('/categories');
-        if (isMounted) {
-          setCategories(response.data);
-        }
-      } catch {
-        if (isMounted) {
-          setCategories([]);
-        }
-      }
-    };
-    void loadCategories();
-    return () => {
-      isMounted = false;
-    };
+  const buildShareMessage = useCallback(
+    (post: FeedPost) => {
+      const title = (post.content || '').split('\n')[0]?.trim();
+      const location = resolveLocationLabel(post);
+      const eventTitle = post.Event?.title?.trim();
+      const parts = [
+        title || t('postItemPlanFallback'),
+        eventTitle,
+        location,
+        Linking.createURL(`/post-view/${post.id}`),
+      ].filter(Boolean);
+      return parts.join('\n');
+    },
+    [resolveLocationLabel, t],
+  );
+
+  const loadConnections = useCallback(async () => {
+    if (connectionsLoaded) {
+      return;
+    }
+    setLoadingConnections(true);
+    try {
+      const overview = await getFriendshipOverview();
+      setConnections(overview.connections.map((item) => item.user));
+      setConnectionsLoaded(true);
+    } catch (error) {
+      console.error('Erreur chargement connexions', error);
+      setConnections([]);
+    } finally {
+      setLoadingConnections(false);
+    }
+  }, [connectionsLoaded]);
+
+  const openShareToConnection = useCallback(
+    async (post: FeedPost) => {
+      setShareTarget(post);
+      setShareModalOpen(true);
+      await loadConnections();
+    },
+    [loadConnections],
+  );
+
+  const bumpShareCount = useCallback((postId: string) => {
+    const bump = (items: FeedPost[]) =>
+      items.map((post) =>
+        post.id === postId
+          ? { ...post, shareCount: (post.shareCount || 0) + 1 }
+          : post,
+      );
+    setPosts((current) => bump(current));
+    setPendingPosts((current) => bump(current));
   }, []);
 
-  const handleDeletePost = async (postId: string) => {
+  const recordShare = useCallback(async (postId: string) => {
+    bumpShareCount(postId);
     try {
-      await api.delete(`/posts/${postId}`);
-      setPosts((currentPosts) => currentPosts.filter((post) => post.id !== postId));
-      Alert.alert(t('profileDeletePostSuccessTitle'), t('profileDeletePostSuccessMessage'));
-    } catch {
-      Alert.alert(t('commonErrorTitle'), t('socialFeedDeleteError'));
+      await api.post(`/posts/${postId}/share`);
+    } catch (error) {
+      console.error('Erreur suivi partage:', error);
     }
-  };
+  }, [bumpShareCount]);
 
-  const handleEditPost = (post: {
-    id: string;
-    content?: string | null;
-    images?: string[];
-    postType?: 'post' | 'plan';
-    placeId?: string | null;
-    eventId?: string | null;
-    Event?: {
-      title?: string | null;
-    } | null;
-    placeName?: string | null;
-    cityName?: string | null;
-    ambiance?: string | null;
-    visibilityUserIds?: string[] | null;
-    visibility?: 'public' | 'friends' | 'private' | 'custom';
-  }) => {
-    router.push({
-      pathname: '/post',
-      params: {
-        postId: post.id,
-        content: post.content || '',
-        images: JSON.stringify(post.images || []),
-        postType: post.postType || 'post',
-        placeId: post.placeId || '',
-        eventId: post.eventId || '',
-        eventTitle: post.Event?.title || '',
-        placeName: post.placeName || '',
-        cityName: post.cityName || '',
-        ambiance: post.ambiance || '',
-        visibilityUserIds: JSON.stringify(post.visibilityUserIds || []),
-        visibility: post.visibility || 'public',
-      },
-    });
-  };
+  const handleSharePost = useCallback(
+    (post: FeedPost) => {
+      const message = buildShareMessage(post);
+      Alert.alert(t('postShareTitle'), undefined, [
+        {
+          text: t('postShareExternal'),
+          onPress: () => {
+            void Share.share({ message }).then(() => {
+              void recordShare(post.id);
+            });
+          },
+        },
+        {
+          text: t('postShareDirect'),
+          onPress: () => {
+            void openShareToConnection(post);
+          },
+        },
+        { text: t('postItemCancel'), style: 'cancel' },
+      ]);
+    },
+    [buildShareMessage, openShareToConnection, recordShare, t],
+  );
 
-  const handleCommentPost = (post: { id: string }) => {
-    router.push({
-      pathname: '/comments',
-      params: { postId: post.id },
-    });
-  };
-
-  const handleOpenMessages = () => {
-    router.push('/messages');
-  };
-
-  const resolveLocationLabel = (post: FeedPost) => {
-    const direct = [post.placeName, post.cityName]
-      .map((value) => (value || '').trim())
-      .filter(Boolean)
-      .join(' · ');
-    if (direct) {
-      return direct;
-    }
-    if (post.Event?.Place?.name) {
-      return [post.Event.Place.name, post.Event.Place.City?.name]
-        .filter(Boolean)
-        .join(' · ');
-    }
-    return '';
-  };
+  const handleSendToConnection = useCallback(
+    async (user: SocialUser) => {
+      if (!shareTarget) {
+        return;
+      }
+      setSendingConnectionId(user.id);
+      try {
+        const chat = await getOrCreateDirectChat(user.id);
+        await sendDirectMessage(chat.id, {
+          content: buildShareMessage(shareTarget),
+          sharedPostId: shareTarget.id,
+        });
+        await recordShare(shareTarget.id);
+        setShareModalOpen(false);
+        setShareTarget(null);
+        router.push({
+          pathname: '/direct-chat/[id]',
+          params: { id: chat.id },
+        });
+      } catch (error) {
+        Alert.alert(t('commonErrorTitle'), t('postShareSendError'));
+        console.error('Erreur partage direct:', error);
+      } finally {
+        setSendingConnectionId(null);
+      }
+    },
+    [buildShareMessage, recordShare, router, shareTarget, t],
+  );
 
   const locationOptions = useMemo(() => {
     const values = new Set<string>();
@@ -533,7 +680,7 @@ export default function SocialFeed() {
       }
     });
     return Array.from(values);
-  }, [posts]);
+  }, [posts, resolveLocationLabel]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -560,7 +707,7 @@ export default function SocialFeed() {
 
       return true;
     });
-  }, [posts, selectedCategory, selectedLocation, selectedType]);
+  }, [posts, resolveLocationLabel, selectedCategory, selectedLocation, selectedType]);
 
   const typeLabel =
     selectedType === 'plan'
@@ -686,6 +833,7 @@ export default function SocialFeed() {
             onDelete={item.isOwner ? handleDeletePost : undefined}
             onEdit={item.isOwner ? handleEditPost : undefined}
             onComment={handleCommentPost}
+            onShare={handleSharePost}
           />
         )}
         ListHeaderComponent={renderHeader}
@@ -812,6 +960,67 @@ export default function SocialFeed() {
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
+
+      {shareModalOpen ? (
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShareModalOpen(false)}
+          className="absolute inset-0 z-50 bg-black/60"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            className="absolute bottom-0 w-full rounded-t-3xl bg-white p-5 pb-8 dark:bg-gray-900"
+          >
+            <View className="mb-4 items-center">
+              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+            </View>
+            <Text className="mb-1 text-center text-lg font-bold text-gray-800 dark:text-white">
+              {t('postShareConnectionsTitle')}
+            </Text>
+            <Text className="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t('postShareConnectionsSubtitle')}
+            </Text>
+
+            {loadingConnections ? (
+              <View className="items-center py-10">
+                <ActivityIndicator color="#4c669f" />
+              </View>
+            ) : connections.length === 0 ? (
+              <Text className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                {t('postShareConnectionsEmpty')}
+              </Text>
+            ) : (
+              <ScrollView
+                style={{ maxHeight: 360 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {connections.map((user) => (
+                  <PersonRow
+                    key={user.id}
+                    user={user}
+                    subtitle={t('postShareConnectionsHint')}
+                    onPress={() => void handleSendToConnection(user)}
+                    primaryAction={
+                      sendingConnectionId === user.id ? (
+                        <ActivityIndicator color="#4c669f" />
+                      ) : (
+                        <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
+                          <Text className="text-xs font-semibold text-[#4c669f]">
+                            {t('postShareSend')}
+                          </Text>
+                        </View>
+                      )
+                    }
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      ) : null}
     </>
   );
 }
+
+
+

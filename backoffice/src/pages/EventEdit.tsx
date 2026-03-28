@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { apiGet, apiPatch, apiPost, apiUpload } from '../lib/api';
+import { apiGet, apiPatch, apiPost, apiUpload, resolveImageUrl } from '../lib/api';
 import PageHeader from '../components/PageHeader';
 import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
@@ -754,7 +754,7 @@ export default function EventEditPage() {
             </p>
             {coverPreview || event.coverUrl ? (
               <img
-                src={coverPreview || event.coverUrl || ''}
+                src={coverPreview || resolveImageUrl(event.coverUrl) || ''}
                 alt="cover"
                 className="mt-2 h-40 w-full rounded-xl object-cover"
               />
@@ -795,7 +795,7 @@ export default function EventEditPage() {
                   className="group relative overflow-hidden rounded-lg"
                 >
                   <img
-                    src={image}
+                    src={resolveImageUrl(image) || image}
                     alt="gallery"
                     className="h-24 w-full rounded-lg object-cover"
                   />

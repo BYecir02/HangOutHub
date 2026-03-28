@@ -81,6 +81,13 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Get('admin/analytics/shares')
+  getShareAnalytics(@Request() req: AuthenticatedRequest) {
+    this.ensureAdmin(req);
+    return this.postsService.getShareAnalytics();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get('admin/:id')
   findOneAdmin(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     this.ensureAdmin(req);
@@ -100,6 +107,21 @@ export class PostsController {
   @Delete(':id')
   remove(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     return this.postsService.remove(id, req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id')
+  findOne(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.postsService.findOneForUser(id, req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/share')
+  incrementShareCount(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.postsService.incrementShareCount(id, req.user.userId);
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { apiGet } from '../lib/api';
+import { apiGet, resolveImageUrl } from '../lib/api';
 import PageHeader from '../components/PageHeader';
 import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
@@ -37,6 +37,7 @@ interface PostDetail {
     likes?: number;
     comments?: number;
   };
+  shareCount?: number | null;
 }
 
 export default function PostViewPage() {
@@ -122,7 +123,7 @@ export default function PostViewPage() {
                 <SectionTitle label="Interactions" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
                   {post._count?.likes || 0} likes - {post._count?.comments || 0}{' '}
-                  commentaires
+                  commentaires - {post.shareCount || 0} partages
                 </p>
               </div>
             </div>
@@ -149,7 +150,7 @@ export default function PostViewPage() {
                       className="overflow-hidden rounded-2xl border border-slate-100"
                     >
                       <img
-                        src={url}
+                        src={resolveImageUrl(url) || url}
                         alt={`Post ${index + 1}`}
                         className="h-40 w-full object-cover"
                       />

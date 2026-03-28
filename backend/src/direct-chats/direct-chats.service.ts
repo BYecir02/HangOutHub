@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,7 +7,10 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import { DirectChatsGateway } from './direct-chats.gateway';
 import { CreateDirectMessageDto } from './dto/create-direct-message.dto';
+import { UpdateDirectMessageDto } from './dto/update-direct-message.dto';
 
 const userSummarySelect = Prisma.validator<Prisma.UserSelect>()({
   id: true,
@@ -15,9 +19,24 @@ const userSummarySelect = Prisma.validator<Prisma.UserSelect>()({
   avatarUrl: true,
 });
 
+const directMessageInclude = Prisma.validator<Prisma.DirectMessageInclude>()({
+  User: { select: userSummarySelect },
+  Reactions: {
+    select: {
+      messageId: true,
+      userId: true,
+      emoji: true,
+    },
+  },
+});
+
 @Injectable()
 export class DirectChatsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storageService: StorageService,
+    private directChatsGateway: DirectChatsGateway,
+  ) {}
 
   private normalizePair(userId: string, otherUserId: string) {
     return userId < otherUserId
@@ -75,6 +94,55 @@ export class DirectChatsService {
     return conversation;
   }
 
+  private resolvePartnerId(
+    conversation: { userOneId: string; userTwoId: string },
+    userId: string,
+  ) {
+    return conversation.userOneId === userId
+      ? conversation.userTwoId
+      : conversation.userOneId;
+  }
+
+  private async assertReplyTarget(
+    conversationId: string,
+    replyToMessageId?: string | null,
+  ) {
+    if (!replyToMessageId) {
+      return null;
+    }
+
+    const replyTarget = await this.prisma.directMessage.findFirst({
+      where: {
+        id: replyToMessageId,
+        conversationId,
+      },
+      select: { id: true },
+    });
+
+    if (!replyTarget) {
+      throw new NotFoundException('Message de reponse introuvable.');
+    }
+
+    return replyTarget.id;
+  }
+
+  private async assertSharedPost(sharedPostId?: string | null) {
+    if (!sharedPostId) {
+      return null;
+    }
+
+    const post = await this.prisma.post.findUnique({
+      where: { id: sharedPostId },
+      select: { id: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post introuvable pour ce partage.');
+    }
+
+    return post.id;
+  }
+
   async getOrCreateConversation(userId: string, otherUserId: string) {
     await this.assertConnected(userId, otherUserId);
     const { userOneId, userTwoId } = this.normalizePair(userId, otherUserId);
@@ -119,9 +187,7 @@ export class DirectChatsService {
         DirectMessage: {
           orderBy: { sentAt: 'desc' },
           take: 1,
-          include: {
-            User: { select: userSummarySelect },
-          },
+          include: directMessageInclude,
         },
         _count: {
           select: {
@@ -155,14 +221,20 @@ export class DirectChatsService {
       }),
     );
 
-    return conversations.map((conversation) => ({
-      id: conversation.id,
-      partner: this.mapPartner(conversation, userId),
-      lastMessage: conversation.DirectMessage[0] ?? null,
-      messagesCount: conversation._count.DirectMessage,
-      unreadCount: unreadCounts.get(conversation.id) || 0,
-      lastMessageAt: conversation.lastMessageAt || conversation.updatedAt,
-    }));
+    return conversations
+      .map((conversation) => ({
+        id: conversation.id,
+        partner: this.mapPartner(conversation, userId),
+        lastMessage: conversation.DirectMessage[0] ?? null,
+        messagesCount: conversation._count.DirectMessage,
+        unreadCount: unreadCounts.get(conversation.id) || 0,
+        lastMessageAt: conversation.lastMessageAt || conversation.updatedAt,
+      }))
+      .sort((left, right) => {
+        const leftTime = new Date(left.lastMessageAt || 0).getTime();
+        const rightTime = new Date(right.lastMessageAt || 0).getTime();
+        return rightTime - leftTime;
+      });
   }
 
   async getConversation(userId: string, conversationId: string) {
@@ -188,68 +260,427 @@ export class DirectChatsService {
     };
   }
 
-  async findMessages(userId: string, conversationId: string) {
+  async findMessages(
+    userId: string,
+    conversationId: string,
+    options?: { beforeMessageId?: string; limit?: number },
+  ) {
     await this.assertMember(userId, conversationId);
-    await this.touchReadAt(userId, conversationId);
+    const readAt = await this.touchReadAt(userId, conversationId);
+    this.directChatsGateway.emitReadUpdated(conversationId, userId, readAt);
 
-    return this.prisma.directMessage.findMany({
-      where: { conversationId },
-      orderBy: { sentAt: 'asc' },
-      include: {
-        User: { select: userSummarySelect },
-      },
+    const take = Math.min(Math.max(options?.limit || 40, 1), 100);
+    const where: Prisma.DirectMessageWhereInput = { conversationId };
+
+    if (options?.beforeMessageId) {
+      const beforeMessage = await this.prisma.directMessage.findFirst({
+        where: {
+          id: options.beforeMessageId,
+          conversationId,
+        },
+        select: { id: true, sentAt: true },
+      });
+
+      if (!beforeMessage) {
+        throw new NotFoundException('Message de pagination introuvable.');
+      }
+
+      where.OR = [
+        {
+          sentAt: {
+            lt: beforeMessage.sentAt || new Date(),
+          },
+        },
+        {
+          AND: [
+            {
+              sentAt: beforeMessage.sentAt || new Date(),
+            },
+            {
+              id: {
+                lt: beforeMessage.id,
+              },
+            },
+          ],
+        },
+      ];
+    }
+
+    const rows = await this.prisma.directMessage.findMany({
+      where,
+      orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      include: directMessageInclude,
     });
+
+    const hasMore = rows.length > take;
+    const pageRows = hasMore ? rows.slice(0, take) : rows;
+    const items = [...pageRows].reverse();
+    const nextCursor = hasMore ? items[0]?.id || null : null;
+
+    return {
+      items,
+      hasMore,
+      nextCursor,
+    };
   }
 
   async sendMessage(
     userId: string,
     conversationId: string,
     payload: CreateDirectMessageDto,
+    files: Express.Multer.File[] = [],
   ) {
-    await this.assertMember(userId, conversationId);
+    const conversation = await this.assertMember(userId, conversationId);
 
-    const content = payload.content.trim();
-    if (!content) {
+    const content = payload.content?.trim() || '';
+    const clientId = payload.clientId?.trim() || null;
+
+    if (clientId) {
+      const existing = await this.prisma.directMessage.findFirst({
+        where: {
+          conversationId,
+          senderId: userId,
+          clientId,
+        },
+        include: directMessageInclude,
+      });
+
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const replyToMessageId = await this.assertReplyTarget(
+      conversationId,
+      payload.replyToMessageId,
+    );
+    const sharedPostId = await this.assertSharedPost(payload.sharedPostId);
+    const images = files.length > 0
+      ? await this.storageService.uploadFiles('direct-messages', files)
+      : [];
+    if (!content && images.length === 0) {
       throw new ForbiddenException('Message vide.');
     }
+
+    const recipientUserId = this.resolvePartnerId(conversation, userId);
+    const recipientActiveInConversation =
+      this.directChatsGateway.isUserInConversation(recipientUserId, conversationId);
+    const deliveredAt = recipientActiveInConversation ? new Date() : null;
 
     const message = await this.prisma.directMessage.create({
       data: {
         conversationId,
         senderId: userId,
+        clientId,
         content,
+        images,
+        replyToMessageId,
+        sharedPostId,
+        deliveredAt,
       },
-      include: {
-        User: { select: userSummarySelect },
-      },
+      include: directMessageInclude,
     });
 
     await this.prisma.directConversation.update({
       where: { id: conversationId },
       data: {
         lastMessageAt: message.sentAt || new Date(),
-        ...(await this.getReadUpdatePayload(userId, conversationId)),
+        ...(await this.getReadUpdatePayload(userId, conversationId, new Date())),
       },
     });
+
+    this.directChatsGateway.emitMessageCreated(
+      conversationId,
+      message,
+    );
+    this.directChatsGateway.emitChatListUpdated(
+      [userId, recipientUserId],
+      conversationId,
+    );
 
     return message;
   }
 
+  async updateMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+    payload: UpdateDirectMessageDto,
+  ) {
+    const conversation = await this.assertMember(userId, conversationId);
+
+    const message = await this.prisma.directMessage.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true,
+        senderId: true,
+        conversationId: true,
+        isDeleted: true,
+        replyToMessageId: true,
+        sharedPostId: true,
+      },
+    });
+
+    if (!message || message.conversationId !== conversationId) {
+      throw new NotFoundException('Message introuvable.');
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenException("Vous ne pouvez pas modifier ce message.");
+    }
+
+    if (message.isDeleted) {
+      throw new ForbiddenException("Ce message a deja ete supprime.");
+    }
+
+    const content = payload.content?.trim() || '';
+    if (!content) {
+      throw new ForbiddenException('Message vide.');
+    }
+
+    const hasReplyToUpdate = Object.prototype.hasOwnProperty.call(
+      payload,
+      'replyToMessageId',
+    );
+    const hasSharedPostUpdate = Object.prototype.hasOwnProperty.call(
+      payload,
+      'sharedPostId',
+    );
+
+    const replyToMessageId = hasReplyToUpdate
+      ? await this.assertReplyTarget(conversationId, payload.replyToMessageId)
+      : message.replyToMessageId;
+    const sharedPostId = hasSharedPostUpdate
+      ? await this.assertSharedPost(payload.sharedPostId)
+      : message.sharedPostId;
+
+    if (replyToMessageId && replyToMessageId === messageId) {
+      throw new ForbiddenException('Un message ne peut pas repondre a lui-meme.');
+    }
+
+    const updated = await this.prisma.directMessage.update({
+      where: { id: messageId },
+      data: {
+        content,
+        replyToMessageId,
+        sharedPostId,
+        editedAt: new Date(),
+      },
+      include: directMessageInclude,
+    });
+
+    this.directChatsGateway.emitMessageUpdated(conversationId, updated);
+    this.directChatsGateway.emitChatListUpdated(
+      [conversation.userOneId, conversation.userTwoId],
+      conversationId,
+    );
+    return updated;
+  }
+
+  async deleteMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+  ) {
+    const conversation = await this.assertMember(userId, conversationId);
+
+    const message = await this.prisma.directMessage.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true,
+        senderId: true,
+        conversationId: true,
+        isDeleted: true,
+      },
+    });
+
+    if (!message || message.conversationId !== conversationId) {
+      throw new NotFoundException('Message introuvable.');
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenException("Vous ne pouvez pas supprimer ce message.");
+    }
+
+    if (message.isDeleted) {
+      return this.prisma.directMessage.findUnique({
+        where: { id: messageId },
+        include: directMessageInclude,
+      });
+    }
+
+    await this.prisma.directMessage.update({
+      where: { id: messageId },
+      data: {
+        content: '',
+        images: [],
+        replyToMessageId: null,
+        sharedPostId: null,
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
+    });
+
+    await this.prisma.directMessageReaction.deleteMany({
+      where: { messageId },
+    });
+
+    const deleted = await this.prisma.directMessage.findUnique({
+      where: { id: messageId },
+      include: directMessageInclude,
+    });
+
+    if (!deleted) {
+      throw new NotFoundException('Message introuvable.');
+    }
+
+    this.directChatsGateway.emitMessageUpdated(conversationId, deleted);
+    this.directChatsGateway.emitChatListUpdated(
+      [conversation.userOneId, conversation.userTwoId],
+      conversationId,
+    );
+    return deleted;
+  }
+
   async markRead(userId: string, conversationId: string) {
+    const conversation = await this.assertMember(userId, conversationId);
+    const readAt = await this.touchReadAt(userId, conversationId);
+    this.directChatsGateway.emitReadUpdated(conversationId, userId, readAt);
+    this.directChatsGateway.emitChatListUpdated(
+      [conversation.userOneId, conversation.userTwoId],
+      conversationId,
+    );
+    return { success: true };
+  }
+
+  async addReaction(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ) {
     await this.assertMember(userId, conversationId);
-    await this.touchReadAt(userId, conversationId);
+
+    const trimmedEmoji = emoji.trim();
+    if (!trimmedEmoji) {
+      throw new BadRequestException('Emoji invalide.');
+    }
+
+    const message = await this.prisma.directMessage.findFirst({
+      where: {
+        id: messageId,
+        conversationId,
+      },
+      select: {
+        id: true,
+        isDeleted: true,
+      },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message introuvable.');
+    }
+
+    if (message.isDeleted) {
+      throw new ForbiddenException("Reaction impossible sur un message supprime.");
+    }
+
+    const reaction = await this.prisma.directMessageReaction.upsert({
+      where: {
+        messageId_userId: {
+          messageId,
+          userId,
+        },
+      },
+      update: {
+        emoji: trimmedEmoji,
+      },
+      create: {
+        messageId,
+        userId,
+        emoji: trimmedEmoji,
+      },
+    });
+
+    this.directChatsGateway.emitReactionUpdated(conversationId, {
+      messageId,
+      userId,
+      emoji: reaction.emoji,
+    });
+
+    return reaction;
+  }
+
+  async removeReaction(userId: string, conversationId: string, messageId: string) {
+    await this.assertMember(userId, conversationId);
+
+    const message = await this.prisma.directMessage.findFirst({
+      where: {
+        id: messageId,
+        conversationId,
+      },
+      select: { id: true },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message introuvable.');
+    }
+
+    await this.prisma.directMessageReaction.deleteMany({
+      where: {
+        messageId,
+        userId,
+      },
+    });
+
+    this.directChatsGateway.emitReactionUpdated(conversationId, {
+      messageId,
+      userId,
+      emoji: null,
+    });
+
     return { success: true };
   }
 
   private async touchReadAt(userId: string, conversationId: string) {
-    const payload = await this.getReadUpdatePayload(userId, conversationId);
+    const now = new Date();
+    const payload = await this.getReadUpdatePayload(userId, conversationId, now);
     await this.prisma.directConversation.update({
       where: { id: conversationId },
       data: payload,
     });
+
+    await this.prisma.directMessage.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        deliveredAt: null,
+      },
+      data: {
+        deliveredAt: now,
+      },
+    });
+
+    await this.prisma.directMessage.updateMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        readAt: null,
+      },
+      data: {
+        readAt: now,
+      },
+    });
+
+    return now;
   }
 
-  private async getReadUpdatePayload(userId: string, conversationId: string) {
+  private async getReadUpdatePayload(
+    userId: string,
+    conversationId: string,
+    at: Date,
+  ) {
     const conversation = await this.prisma.directConversation.findUnique({
       where: { id: conversationId },
       select: { userOneId: true, userTwoId: true },
@@ -260,7 +691,7 @@ export class DirectChatsService {
     }
 
     return conversation.userOneId === userId
-      ? { userOneLastReadAt: new Date() }
-      : { userTwoLastReadAt: new Date() };
+      ? { userOneLastReadAt: at }
+      : { userTwoLastReadAt: at };
   }
 }

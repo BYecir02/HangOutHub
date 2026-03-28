@@ -54,6 +54,7 @@ interface PostItemData {
     likes?: number;
     comments?: number;
   };
+  shareCount?: number | null;
 }
 
 interface PostItemProps {
@@ -61,6 +62,7 @@ interface PostItemProps {
   onDelete?: (id: string) => void;
   onEdit?: (post: PostItemData) => void;
   onComment?: (post: PostItemData) => void;
+  onShare?: (post: PostItemData) => void;
   showDateColumn?: boolean;
 }
 
@@ -69,6 +71,7 @@ export default function PostItem({
   onDelete,
   onEdit,
   onComment,
+  onShare,
   showDateColumn = true,
 }: PostItemProps) {
   const router = useRouter();
@@ -82,6 +85,7 @@ export default function PostItem({
   const [isLiked, setIsLiked] = useState(Boolean(item.isLiked));
   const [likesCount, setLikesCount] = useState(item._count?.likes || 0);
   const [commentsCount, setCommentsCount] = useState(item._count?.comments || 0);
+  const shareCount = item.shareCount || 0;
   const isConnections = item.visibility === 'friends';
   const isPlanPost = item.postType === 'plan' || isConnections;
   const visibilityLabel =
@@ -513,6 +517,19 @@ export default function PostItem({
                 />
                 <Text className="ml-1.5 text-sm font-semibold text-gray-500 dark:text-gray-400">
                   {commentsCount}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-row items-center ml-5"
+                onPress={() => onShare?.(item)}
+              >
+                <Ionicons
+                  name="share-social-outline"
+                  size={20}
+                  color={isDark ? '#aaa' : '#666'}
+                />
+                <Text className="ml-1.5 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                  {shareCount}
                 </Text>
               </TouchableOpacity>
             </View>

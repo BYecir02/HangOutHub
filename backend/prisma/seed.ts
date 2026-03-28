@@ -673,6 +673,83 @@ async function main() {
     ],
   });
 
+  const normalizeDirectPair = (a: string, b: string) =>
+    a < b ? [a, b] : [b, a];
+  const directPairs = [
+    normalizeDirectPair(user.id, organizer.id),
+    normalizeDirectPair(organizer.id, owner.id),
+  ];
+  const existingConversations = await prisma.directConversation.findMany({
+    where: {
+      OR: directPairs.map(([userOneId, userTwoId]) => ({
+        userOneId,
+        userTwoId,
+      })),
+    },
+    select: { id: true },
+  });
+  const existingConversationIds = existingConversations.map((conversation) => conversation.id);
+  if (existingConversationIds.length > 0) {
+    await prisma.directMessage.deleteMany({
+      where: { conversationId: { in: existingConversationIds } },
+    });
+    await prisma.directConversation.deleteMany({
+      where: { id: { in: existingConversationIds } },
+    });
+  }
+
+  const now = new Date();
+  const makeConversation = async (
+    userA: string,
+    userB: string,
+    unreadFor: string,
+  ) => {
+    const [userOneId, userTwoId] = normalizeDirectPair(userA, userB);
+    const lastReadFor = (userId: string) =>
+      userId === unreadFor
+        ? new Date(now.getTime() - 1000 * 60 * 60 * 2)
+        : now;
+
+    const conversation = await prisma.directConversation.create({
+      data: {
+        userOneId,
+        userTwoId,
+        userOneLastReadAt: lastReadFor(userOneId),
+        userTwoLastReadAt: lastReadFor(userTwoId),
+      },
+    });
+
+    const messages = [
+      {
+        conversationId: conversation.id,
+        senderId: userA,
+        content: 'Salut ! On se cale un cafe cette semaine ?',
+        sentAt: new Date(now.getTime() - 1000 * 60 * 60 * 6),
+      },
+      {
+        conversationId: conversation.id,
+        senderId: userB,
+        content: 'Yes, dispo jeudi soir si tu veux.',
+        sentAt: new Date(now.getTime() - 1000 * 60 * 60 * 4),
+      },
+      {
+        conversationId: conversation.id,
+        senderId: userA,
+        content: 'Parfait, je reserve un spot.',
+        sentAt: new Date(now.getTime() - 1000 * 60 * 60 * 3),
+      },
+    ];
+
+    await prisma.directMessage.createMany({ data: messages });
+    await prisma.directConversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: messages[messages.length - 1].sentAt },
+    });
+  };
+
+  await makeConversation(user.id, organizer.id, user.id);
+  await makeConversation(organizer.id, owner.id, owner.id);
+
   await prisma.notification.createMany({
     data: [
       {

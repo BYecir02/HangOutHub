@@ -82,6 +82,40 @@ export class PostsService {
     return [];
   }
 
+  private async canViewPost(
+    post: {
+      userId: string;
+      visibility?: string | null;
+      visibilityUserIds?: string[] | null;
+    },
+    currentUserId: string,
+  ) {
+    if (post.userId === currentUserId) {
+      return true;
+    }
+
+    const visibility = post.visibility || 'public';
+
+    if (visibility === 'public') {
+      return true;
+    }
+
+    if (visibility === 'private') {
+      return false;
+    }
+
+    if (visibility === 'custom') {
+      return (post.visibilityUserIds || []).includes(currentUserId);
+    }
+
+    if (visibility === 'friends') {
+      const connections = await this.getConnectionIds(currentUserId);
+      return connections.includes(post.userId);
+    }
+
+    return false;
+  }
+
   async create(
     userId: string,
     createPostDto: CreatePostDto,
@@ -164,6 +198,7 @@ export class PostsService {
           select: {
             id: true,
             name: true,
+            coverUrl: true,
             City: {
               select: {
                 name: true,
@@ -177,10 +212,13 @@ export class PostsService {
             title: true,
             startTime: true,
             placeId: true,
+            coverUrl: true,
+            images: true,
             Place: {
               select: {
                 id: true,
                 name: true,
+                coverUrl: true,
                 City: {
                   select: {
                     name: true,
@@ -338,6 +376,87 @@ export class PostsService {
     };
   }
 
+  async findOneForUser(id: string, currentUserId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id },
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            City: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            placeId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+                City: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+        likes: {
+          where: { userId: currentUserId },
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException(`Post with ID ${id} not found`);
+    }
+
+    const canView = await this.canViewPost(post, currentUserId);
+    if (!canView) {
+      throw new ForbiddenException('You are not allowed to view this post');
+    }
+
+    return this.serializePost(post, currentUserId);
+  }
+
+  async incrementShareCount(id: string, currentUserId: string) {
+    await this.findOneForUser(id, currentUserId);
+    const updated = await this.prisma.post.update({
+      where: { id },
+      data: {
+        shareCount: { increment: 1 },
+      },
+      select: {
+        shareCount: true,
+      },
+    });
+    return updated;
+  }
+
   async findOneAdmin(id: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
@@ -394,6 +513,55 @@ export class PostsService {
     }
 
     return post;
+  }
+
+  async getShareAnalytics() {
+    const [aggregate, topShared] = await Promise.all([
+      this.prisma.post.aggregate({
+        _sum: { shareCount: true },
+      }),
+      this.prisma.post.findMany({
+        where: { shareCount: { gt: 0 } },
+        orderBy: { shareCount: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          content: true,
+          shareCount: true,
+          placeName: true,
+          cityName: true,
+          createdAt: true,
+          User: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
+          Place: {
+            select: {
+              id: true,
+              name: true,
+              City: {
+                select: { name: true },
+              },
+            },
+          },
+          Event: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      totalShares: aggregate._sum.shareCount ?? 0,
+      topShared,
+    };
   }
 
   async findAllByUser(userId: string, currentUserId: string) {

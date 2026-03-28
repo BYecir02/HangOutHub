@@ -25,6 +25,10 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+LogBox.ignoreLogs([
+  'SafeAreaView has been deprecated and will be removed in a future release.',
+]);
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { setColorScheme } = useNativeWindColorScheme();
@@ -33,10 +37,6 @@ export default function RootLayout() {
   );
 
   useEffect(() => {
-    LogBox.ignoreLogs([
-      'SafeAreaView has been deprecated and will be removed in a future release.',
-    ]);
-
     const unsubscribe = subscribeThemePreference(setThemePreference);
     void loadAppPreferences();
 

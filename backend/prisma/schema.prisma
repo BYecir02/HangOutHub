@@ -63,13 +63,42 @@ model DirectMessage {
   id             String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   conversationId String             @db.Uuid
   senderId       String             @db.Uuid
+  clientId       String?            @db.VarChar(64)
+  replyToMessageId String?          @db.Uuid
+  sharedPostId   String?            @db.Uuid
   content        String
+  images         String[]           @default([])
+  deliveredAt    DateTime?          @db.Timestamp(6)
+  readAt         DateTime?          @db.Timestamp(6)
+  editedAt       DateTime?          @db.Timestamp(6)
+  deletedAt      DateTime?          @db.Timestamp(6)
+  isDeleted      Boolean            @default(false)
   sentAt         DateTime?          @default(now()) @db.Timestamp(6)
   Conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   User           User               @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ReplyToMessage DirectMessage?     @relation("DirectMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  Replies        DirectMessage[]    @relation("DirectMessageReplies")
+  SharedPost     Post?              @relation("DirectMessageSharedPost", fields: [sharedPostId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  Reactions      DirectMessageReaction[]
 
   @@index([conversationId, sentAt])
   @@index([senderId])
+  @@index([replyToMessageId])
+  @@index([sharedPostId])
+  @@unique([conversationId, senderId, clientId])
+}
+
+model DirectMessageReaction {
+  id        String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  messageId String        @db.Uuid
+  userId    String        @db.Uuid
+  emoji     String        @db.VarChar(16)
+  createdAt DateTime?     @default(now()) @db.Timestamp(6)
+  Message   DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User      User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
 
 model City {
@@ -336,6 +365,7 @@ model Post {
   placeName  String?   @db.VarChar(120)
   cityName   String?   @db.VarChar(120)
   ambiance   String?   @db.VarChar(50)
+  shareCount Int       @default(0)
   createdAt  DateTime? @default(now()) @db.Timestamp(6)
   updatedAt  DateTime? @updatedAt @db.Timestamp(6)
   User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -343,6 +373,7 @@ model Post {
   Event      Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments   PostComment[]
   likes      PostLike[]
+  SharedDirectMessage DirectMessage[] @relation("DirectMessageSharedPost")
 
   @@index([visibilityUserIds], type: Gin)
 }
@@ -605,6 +636,7 @@ model User {
   DirectConversationAsUserOne             DirectConversation[] @relation("DirectConversationUserOne")
   DirectConversationAsUserTwo             DirectConversation[] @relation("DirectConversationUserTwo")
   DirectMessage                           DirectMessage[]
+  DirectMessageReaction                   DirectMessageReaction[]
   DeviceToken                             DeviceToken[]
   Event                                   Event[]
   EventCollaborator                       EventCollaborator[]
