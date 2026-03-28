@@ -12,6 +12,7 @@ export interface PostDetails {
   userId: string;
   content?: string | null;
   images?: string[];
+  publicationScope?: 'personal' | 'structure';
   postType?: 'post' | 'plan';
   placeId?: string | null;
   eventId?: string | null;

@@ -67,6 +67,14 @@ function getActionsForUser(
   if (role === 'ORGANIZER') {
     return [
       {
+        label: t('createActionOutingLabel'),
+        description: t('createActionOutingDesc'),
+        icon: 'people-outline',
+        color: '#4c669f',
+        path: '/outing',
+        params: Object.keys(outingParams).length ? outingParams : undefined,
+      },
+      {
         label: t('createActionEventLabel'),
         description: t('createActionEventPublishDesc'),
         icon: 'calendar-outline',
@@ -88,8 +96,16 @@ function getActionsForUser(
     if (!user?.hasPlace) {
       return [
         {
-          label: t('createActionMyPlaceLabel'),
-          description: t('createActionMyPlaceDesc'),
+          label: t('createActionOutingLabel'),
+          description: t('createActionOutingDesc'),
+          icon: 'people-outline',
+          color: '#4c669f',
+          path: '/outing',
+          params: Object.keys(outingParams).length ? outingParams : undefined,
+        },
+        {
+          label: t('createActionAddPlaceLabel'),
+          description: t('createActionAddPlaceDesc'),
           icon: 'location-outline',
           color: '#2ecc71',
           path: '/organizer/create-place',
@@ -106,6 +122,14 @@ function getActionsForUser(
     }
 
     return [
+      {
+        label: t('createActionOutingLabel'),
+        description: t('createActionOutingDesc'),
+        icon: 'people-outline',
+        color: '#4c669f',
+        path: '/outing',
+        params: Object.keys(outingParams).length ? outingParams : undefined,
+      },
       {
         label: t('createActionEventLabel'),
         description: t('createActionEventInPlaceDesc'),

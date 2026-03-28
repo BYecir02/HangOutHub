@@ -17,6 +17,14 @@ import PostItem from '../../components/social/PostItem';
 import { SkeletonBlock } from '../../components/ui/Skeleton';
 import Tabs from '../../components/ui/Tabs';
 import { getImageUrl } from '../../services/api';
+import {
+  canAccessOrganizerPanel,
+  getOrganizerEntryPath,
+  isOrganizerPending,
+  isOrganizerRejected,
+  isOrganizerSuspended,
+  normalizeTeamWorkspaceRole,
+} from '../../services/organizer-access';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { useI18n } from '@/hooks/use-i18n';
 
@@ -92,9 +100,76 @@ export default function ProfileScreen() {
     deletePost,
   } = useUserProfile();
 
-  const isOrganizer =
+  const isProfessionalAccount =
     user?.role === 'ORGANIZER' || user?.role === 'PLACE_OWNER';
+  const isPendingOrganizer = isOrganizerPending(user);
+  const isRejectedOrganizer = isOrganizerRejected(user);
+  const isSuspendedOrganizer = isOrganizerSuspended(user);
+  const isOrganizer =
+    isProfessionalAccount &&
+    !isPendingOrganizer &&
+    !isRejectedOrganizer &&
+    !isSuspendedOrganizer;
+  const normalizedTeamRole = normalizeTeamWorkspaceRole(user?.teamRole);
+  const canAccessProPanel = canAccessOrganizerPanel(user);
+  const canActivateProPanel = !canAccessProPanel && user?.role === 'USER';
   const [activeTab, setActiveTab] = useState('');
+  const proAccessStatusCard = useMemo(() => {
+    if (!isProfessionalAccount || canAccessProPanel) {
+      return null;
+    }
+
+    if (isPendingOrganizer) {
+      return {
+        icon: 'time-outline' as const,
+        accentColor: '#f59e0b',
+        title: t('organizerGuardPendingTitle'),
+        message: t('organizerGuardPendingMessage'),
+      };
+    }
+
+    if (isRejectedOrganizer) {
+      return {
+        icon: 'close-circle-outline' as const,
+        accentColor: '#ef4444',
+        title: t('organizerGuardRejectedTitle'),
+        message: t('organizerGuardRejectedMessage'),
+      };
+    }
+
+    if (isSuspendedOrganizer) {
+      return {
+        icon: 'pause-circle-outline' as const,
+        accentColor: '#f97316',
+        title: t('organizerGuardSuspendedTitle'),
+        message: t('organizerGuardSuspendedMessage'),
+      };
+    }
+
+    return null;
+  }, [
+    canAccessProPanel,
+    isPendingOrganizer,
+    isProfessionalAccount,
+    isRejectedOrganizer,
+    isSuspendedOrganizer,
+    t,
+  ]);
+  const proPanelLabel = useMemo(() => {
+    if (normalizedTeamRole === 'MANAGER') {
+      return t('profileTeamManagerPanel');
+    }
+    if (normalizedTeamRole === 'STAFF') {
+      return t('profileTeamStaffPanel');
+    }
+    if (normalizedTeamRole === 'SCANNER') {
+      return t('profileTeamScannerPanel');
+    }
+
+    return user?.role === 'PLACE_OWNER'
+      ? t('profilePlaceOwnerPanel')
+      : t('profileOrganizerPanel');
+  }, [normalizedTeamRole, t, user?.role]);
 
   const organizerPublicProfileLabel = useMemo(() => {
     if (user?.role === 'PLACE_OWNER') {
@@ -164,6 +239,7 @@ export default function ProfileScreen() {
     id: string;
     content?: string | null;
     visibility?: 'public' | 'friends' | 'private' | 'custom';
+    publicationScope?: 'personal' | 'structure';
   }) => {
     router.push({
       pathname: '/post',
@@ -171,6 +247,7 @@ export default function ProfileScreen() {
         postId: post.id,
         content: post.content,
         visibility: post.visibility,
+        publicationScope: post.publicationScope || 'personal',
       },
     });
   };
@@ -214,8 +291,47 @@ export default function ProfileScreen() {
       <ProfileHeader
         user={displayUser}
         isOrganizer={isOrganizer}
+        canAccessProPanel={canAccessProPanel}
+        canActivateProPanel={canActivateProPanel}
+        proPanelLabel={proPanelLabel}
+        onOpenProPanel={() => router.push(getOrganizerEntryPath(user))}
+        onActivateProPanel={() => router.push('/activate-pro')}
         onImagePress={setPreviewImage}
       />
+      {proAccessStatusCard ? (
+        <View className="mt-4 px-5">
+          <View
+            className="rounded-3xl border p-4"
+            style={{
+              borderColor: `${proAccessStatusCard.accentColor}66`,
+              backgroundColor: `${proAccessStatusCard.accentColor}14`,
+            }}
+          >
+            <View className="flex-row items-start">
+              <View
+                className="mr-3 h-9 w-9 items-center justify-center rounded-full"
+                style={{
+                  backgroundColor: `${proAccessStatusCard.accentColor}24`,
+                }}
+              >
+                <Ionicons
+                  name={proAccessStatusCard.icon}
+                  size={18}
+                  color={proAccessStatusCard.accentColor}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {proAccessStatusCard.title}
+                </Text>
+                <Text className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {proAccessStatusCard.message}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       <ProfileStats
         postsCount={posts.length}

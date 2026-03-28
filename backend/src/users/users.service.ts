@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
+import { ActivateProProfileDto } from './dto/activate-pro-profile.dto';
 
 interface OrganizerDetailsInput {
   accountType: string;
@@ -436,8 +437,15 @@ export class UsersService {
   }
 
   async findOneByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
+    const normalizedEmail = email.replace(/\s+/g, '').toLowerCase();
+
+    return this.prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: 'insensitive',
+        },
+      },
       include: {
         UserRole: {
           include: {
@@ -523,6 +531,100 @@ export class UsersService {
       where: { userId },
       data: { status: normalized },
     });
+  }
+
+  async activateProProfile(
+    userId: string,
+    activateDto: ActivateProProfileDto,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        OrganizerProfile: true,
+        UserRole: {
+          include: {
+            Role: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const targetRoleName =
+      activateDto.accountType === 'PLACE' ? 'PLACE_OWNER' : 'ORGANIZER';
+    const targetRole = await this.prisma.role.findUnique({
+      where: { name: targetRoleName },
+    });
+
+    if (!targetRole) {
+      throw new NotFoundException(`Role '${targetRoleName}' introuvable.`);
+    }
+
+    const currentRoleName = user.UserRole[0]?.Role?.name || 'USER';
+    const alreadyActive =
+      currentRoleName === targetRoleName &&
+      user.OrganizerProfile?.status === 'APPROVED';
+
+    if (alreadyActive) {
+      throw new BadRequestException('Votre espace pro est deja actif.');
+    }
+
+    const organizerData = {
+      accountType: activateDto.accountType,
+      companyName: activateDto.companyName,
+      ifuNumber: activateDto.ifuNumber,
+      payoutInfo: activateDto.payoutInfo,
+      jobTitle: activateDto.jobTitle,
+      instagramUrl: activateDto.instagramUrl || null,
+      tiktokUrl: activateDto.tiktokUrl || null,
+      facebookUrl: activateDto.facebookUrl || null,
+      xUrl: activateDto.xUrl || null,
+      websiteUrl: activateDto.websiteUrl || null,
+      status: 'PENDING',
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({
+        where: { userId },
+      });
+
+      await tx.userRole.create({
+        data: {
+          userId,
+          roleId: targetRole.id,
+        },
+      });
+
+      if (user.OrganizerProfile) {
+        await tx.organizerProfile.update({
+          where: { userId },
+          data: organizerData,
+        });
+      } else {
+        await tx.organizerProfile.create({
+          data: {
+            userId,
+            ...organizerData,
+          },
+        });
+      }
+    });
+
+    const updated = await this.findOne(userId);
+    return {
+      ...updated,
+      role: targetRoleName,
+      organizerStatus: 'PENDING',
+      organizerAccountType: activateDto.accountType,
+      organizerCompanyName: activateDto.companyName,
+    };
   }
 
   async getTagPreferences(userId: string): Promise<UserTagPreferencesResponse> {

@@ -398,7 +398,7 @@ async function main() {
   }
 
   const user = await prisma.user.upsert({
-    where: { phoneNumber: '+22997000001' },
+    where: { email: 'amina@hangouthub.dev' },
     update: {
       email: 'amina@hangouthub.dev',
       phoneNumber: '+22997000001',
@@ -429,7 +429,7 @@ async function main() {
   });
 
   const admin = await prisma.user.upsert({
-    where: { phoneNumber: '+22997000000' },
+    where: { email: 'admin@hangouthub.dev' },
     update: {
       email: 'admin@hangouthub.dev',
       phoneNumber: '+22997000000',
@@ -460,7 +460,7 @@ async function main() {
   });
 
   const organizer = await prisma.user.upsert({
-    where: { phoneNumber: '+22997000002' },
+    where: { email: 'nova@hangouthub.dev' },
     update: {
       email: 'nova@hangouthub.dev',
       phoneNumber: '+22997000002',
@@ -491,7 +491,7 @@ async function main() {
   });
 
   const owner = await prisma.user.upsert({
-    where: { phoneNumber: '+22997000003' },
+    where: { email: 'district@hangouthub.dev' },
     update: {
       email: 'district@hangouthub.dev',
       phoneNumber: '+22997000003',
@@ -521,10 +521,106 @@ async function main() {
     },
   });
 
+  const placeManager = await prisma.user.upsert({
+    where: { email: 'manager.place@hangouthub.dev' },
+    update: {
+      email: 'manager.place@hangouthub.dev',
+      phoneNumber: '+22997000004',
+      displayName: 'Maya Manager',
+      bio: 'Manager operationnel du lieu: programmation et supervision equipe.',
+      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200',
+      residenceCityId: cotonou.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+    create: {
+      username: 'maya_manager',
+      email: 'manager.place@hangouthub.dev',
+      phoneNumber: '+22997000004',
+      displayName: 'Maya Manager',
+      bio: 'Manager operationnel du lieu: programmation et supervision equipe.',
+      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200',
+      residenceCityId: cotonou.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+  });
+
+  const placeStaff = await prisma.user.upsert({
+    where: { email: 'staff.place@hangouthub.dev' },
+    update: {
+      email: 'staff.place@hangouthub.dev',
+      phoneNumber: '+22997000005',
+      displayName: 'Sami Staff',
+      bio: 'Support operationnel: suivi des events et coordination equipe.',
+      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200',
+      residenceCityId: calavi.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+    create: {
+      username: 'sami_staff',
+      email: 'staff.place@hangouthub.dev',
+      phoneNumber: '+22997000005',
+      displayName: 'Sami Staff',
+      bio: 'Support operationnel: suivi des events et coordination equipe.',
+      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200',
+      residenceCityId: calavi.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+  });
+
+  const placeScanner = await prisma.user.upsert({
+    where: { email: 'scanner.place@hangouthub.dev' },
+    update: {
+      email: 'scanner.place@hangouthub.dev',
+      phoneNumber: '+22997000006',
+      displayName: 'Nina Scanner',
+      bio: 'Controle acces et validation billets sur les evenements.',
+      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=1200',
+      residenceCityId: cotonou.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+    create: {
+      username: 'nina_scanner',
+      email: 'scanner.place@hangouthub.dev',
+      phoneNumber: '+22997000006',
+      displayName: 'Nina Scanner',
+      bio: 'Controle acces et validation billets sur les evenements.',
+      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
+      coverUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=1200',
+      residenceCityId: cotonou.id,
+      passwordHash,
+      isVerified: true,
+      followersCount: 0,
+      followingCount: 0,
+    },
+  });
+
   await assignRole(user.id, 'USER');
   await assignRole(admin.id, 'ADMIN');
   await assignRole(organizer.id, 'ORGANIZER');
   await assignRole(owner.id, 'PLACE_OWNER');
+  await assignRole(placeManager.id, 'USER');
+  await assignRole(placeStaff.id, 'USER');
+  await assignRole(placeScanner.id, 'USER');
 
   await prisma.organizerProfile.upsert({
     where: { userId: organizer.id },
@@ -568,7 +664,14 @@ async function main() {
     },
   });
 
-  const seededUserIds = [user.id, organizer.id, owner.id];
+  const seededUserIds = [
+    user.id,
+    organizer.id,
+    owner.id,
+    placeManager.id,
+    placeStaff.id,
+    placeScanner.id,
+  ];
   await prisma.report.deleteMany({
     where: { reporterId: { in: seededUserIds } },
   });
@@ -801,6 +904,27 @@ async function main() {
         'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=1200',
       ],
     },
+  });
+
+  await prisma.placeTeamMember.createMany({
+    data: [
+      {
+        placeId: placeOne.id,
+        userId: placeManager.id,
+        role: 'MANAGER',
+      },
+      {
+        placeId: placeOne.id,
+        userId: placeStaff.id,
+        role: 'STAFF',
+      },
+      {
+        placeId: placeOne.id,
+        userId: placeScanner.id,
+        role: 'SCANNER',
+      },
+    ],
+    skipDuplicates: true,
   });
 
   const ouidahPlacesData = [
@@ -3415,6 +3539,9 @@ async function main() {
   console.log('USER -> amina@hangouthub.dev / Demo12345!');
   console.log('ORGANIZER -> nova@hangouthub.dev / Demo12345!');
   console.log('PLACE_OWNER -> district@hangouthub.dev / Demo12345!');
+  console.log('TEAM_MANAGER -> manager.place@hangouthub.dev / Demo12345!');
+  console.log('TEAM_STAFF -> staff.place@hangouthub.dev / Demo12345!');
+  console.log('TEAM_SCANNER -> scanner.place@hangouthub.dev / Demo12345!');
   console.log('Contenus crees:');
   const totalPlacesCount =
     2 +

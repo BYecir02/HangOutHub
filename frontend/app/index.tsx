@@ -121,14 +121,19 @@ export default function LoginScreen() {
   }, [router, t]);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    const normalizedEmail = email.replace(/\s+/g, '').toLowerCase();
+
+    if (!normalizedEmail || !password) {
       Alert.alert(t('commonErrorTitle'), t('loginMissingFields'));
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', {
+        email: normalizedEmail,
+        password,
+      });
       const { access_token, refresh_token, user } = response.data as {
         access_token: string;
         refresh_token: string;

@@ -12,7 +12,22 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import api, { storage } from '@/services/api';
+import { setLanguagePreference } from '@/services/app-preferences';
+import {
+  clearOfflineScans,
+  listOfflineScans,
+} from '@/services/organizer-scanner';
+import {
+  normalizeTeamWorkspaceRole,
+} from '@/services/organizer-access';
+import {
+  getScannerPreferences,
+  patchScannerPreferences,
+  type ScannerPreferences,
+} from '@/services/scanner-preferences';
 import { clearStoredUserSession } from '@/services/user-session';
 import {
   getMySettings,
@@ -25,6 +40,12 @@ import SettingsSection from '@/components/settings/SettingsSection';
 import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
 
 const REMINDER_PRESETS = [1440, 180, 60] as const;
+const DEFAULT_SCANNER_PREFERENCES: ScannerPreferences = {
+  continuousScan: false,
+  defaultTorchEnabled: false,
+  defaultCameraFacing: 'back',
+  ticketInfoMode: 'detailed',
+};
 
 function formatReminderOffset(offsetMin: number) {
   if (offsetMin % 1440 === 0) {
@@ -53,15 +74,37 @@ export default function OrganizerSettingsScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const isDark = useColorScheme() === 'dark';
+  const {
+    user,
+    loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useUserProfile();
+  const teamWorkspaceRole = normalizeTeamWorkspaceRole(user?.teamRole);
+  const isScannerWorkspace = teamWorkspaceRole === 'SCANNER';
+  const isAllowed = useOrganizerGuard({
+    user,
+    loading: profileLoading,
+    suspend: Boolean(profileError),
+    requiredCapability: 'settings',
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [scannerPreferences, setScannerPreferences] = useState<ScannerPreferences>(
+    DEFAULT_SCANNER_PREFERENCES,
+  );
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [customReminderInput, setCustomReminderInput] = useState('');
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await getMySettings();
+      const [next, nextScannerPreferences, queuedScans] = await Promise.all([
+        getMySettings(),
+        getScannerPreferences(),
+        listOfflineScans(),
+      ]);
       const fallbackLegacyOffsets = normalizeReminderOffsets([
         next.organizerNotifyReminderD1 ? 1440 : 0,
         next.organizerNotifyReminderH3 ? 180 : 0,
@@ -77,6 +120,8 @@ export default function OrganizerSettingsScreen() {
             ? normalizeReminderOffsets(next.organizerReminderOffsetsMin || [])
             : fallbackLegacyOffsets,
       });
+      setScannerPreferences(nextScannerPreferences);
+      setOfflineQueueCount(queuedScans.length);
     } catch {
       setSettings(null);
     } finally {
@@ -101,6 +146,16 @@ export default function OrganizerSettingsScreen() {
         [key]: value,
       };
     });
+  };
+
+  const patchScanner = <K extends keyof ScannerPreferences>(
+    key: K,
+    value: ScannerPreferences[K],
+  ) => {
+    setScannerPreferences((current) => ({
+      ...current,
+      [key]: value,
+    }));
   };
 
   const addReminderOffset = (offsetMin: number) => {
@@ -194,13 +249,72 @@ export default function OrganizerSettingsScreen() {
       };
 
       const saved = await updateMySettings(payload);
-      setSettings(saved);
+      const normalizedSavedOffsets = normalizeReminderOffsets(
+        saved.organizerReminderOffsetsMin || [],
+      );
+
+      const savedScannerPreferences =
+        await patchScannerPreferences(scannerPreferences);
+
+      await setLanguagePreference(payload.language);
+
+      setSettings({
+        ...saved,
+        organizerReminderMode:
+          saved.organizerReminderMode === 'custom' ? 'custom' : 'preset',
+        organizerReminderOffsetsMin:
+          normalizedSavedOffsets.length > 0
+            ? normalizedSavedOffsets
+            : normalizeReminderOffsets([
+                saved.organizerNotifyReminderD1 ? 1440 : 0,
+                saved.organizerNotifyReminderH3 ? 180 : 0,
+                saved.organizerNotifyReminderH1 ? 60 : 0,
+              ]),
+      });
+      setScannerPreferences(savedScannerPreferences);
       Alert.alert(t('organizerSettingsSavedTitle'), t('organizerSettingsSavedMessage'));
     } catch {
       Alert.alert(t('commonErrorTitle'), t('organizerSettingsSaveError'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const clearOfflineQueue = () => {
+    if (offlineQueueCount === 0) {
+      Alert.alert(
+        t('organizerSettingsScannerOfflineClearTitle'),
+        t('organizerSettingsScannerOfflineClearEmpty'),
+      );
+      return;
+    }
+
+    Alert.alert(
+      t('organizerSettingsScannerOfflineClearTitle'),
+      t('organizerSettingsScannerOfflineClearMessage', { count: offlineQueueCount }),
+      [
+        { text: t('genericCancel'), style: 'cancel' },
+        {
+          text: t('organizerSettingsScannerOfflineClearAction'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const removed = await clearOfflineScans();
+              setOfflineQueueCount((current) => Math.max(0, current - removed));
+              Alert.alert(
+                t('organizerSettingsScannerOfflineClearTitle'),
+                t('organizerSettingsScannerOfflineClearSuccess', { count: removed }),
+              );
+            } catch {
+              Alert.alert(
+                t('commonErrorTitle'),
+                t('organizerSettingsScannerOfflineClearFailed'),
+              );
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleLogout = async () => {
@@ -230,6 +344,34 @@ export default function OrganizerSettingsScreen() {
     );
   }
 
+  if (profileLoading) {
+    return (
+      <ScreenState mode="loading" fullScreen containerClassName="bg-gray-50 dark:bg-black" />
+    );
+  }
+
+  if (profileError && !user) {
+    return (
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerDataLoadErrorTitle')}
+        description={t('organizerDataLoadErrorMessage')}
+        actionLabel={t('organizerDataRetry')}
+        onAction={() => {
+          void refetchProfile();
+        }}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (!user || !isAllowed) {
+    return (
+      <ScreenState mode="loading" fullScreen containerClassName="bg-gray-50 dark:bg-black" />
+    );
+  }
+
   if (!settings) {
     return (
       <ScreenState
@@ -254,7 +396,8 @@ export default function OrganizerSettingsScreen() {
         containerClassName="mb-5"
       />
 
-      <SettingsSection title={t('organizerSettingsSectionNotifications')} containerClassName="mb-5">
+      {!isScannerWorkspace ? (
+        <SettingsSection title={t('organizerSettingsSectionNotifications')} containerClassName="mb-5">
         <SettingsToggleRow
           label={t('organizerSettingsNotifyBookings')}
           value={settings.organizerNotifyBookings}
@@ -422,9 +565,24 @@ export default function OrganizerSettingsScreen() {
             })}
           </View>
         </View>
-      </SettingsSection>
+        </SettingsSection>
+      ) : null}
 
-      <SettingsSection title={t('organizerSettingsSectionScanner')} containerClassName="mb-5">
+      <SettingsSection
+        title={
+          isScannerWorkspace
+            ? t('organizerSettingsSectionScannerWorkspace')
+            : t('organizerSettingsSectionScanner')
+        }
+        containerClassName="mb-5"
+      >
+        {isScannerWorkspace ? (
+          <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <Text className="text-xs text-gray-500 dark:text-gray-400">
+              {t('organizerSettingsScannerWorkspaceHint')}
+            </Text>
+          </View>
+        ) : null}
         <SettingsToggleRow
           label={t('organizerSettingsScannerOfflineAuto')}
           value={settings.organizerScannerOfflineAuto}
@@ -448,12 +606,128 @@ export default function OrganizerSettingsScreen() {
         <SettingsToggleRow
           label={t('organizerSettingsScannerStrictWindow')}
           value={settings.organizerScannerStrictWindow}
-          withBorder={false}
           onValueChange={(next) => patch('organizerScannerStrictWindow', next)}
         />
+        <SettingsToggleRow
+          label={t('organizerSettingsScannerContinuousScan')}
+          value={scannerPreferences.continuousScan}
+          onValueChange={(next) => patchScanner('continuousScan', next)}
+        />
+        <SettingsToggleRow
+          label={t('organizerSettingsScannerTorchDefault')}
+          value={scannerPreferences.defaultTorchEnabled}
+          onValueChange={(next) => patchScanner('defaultTorchEnabled', next)}
+        />
+
+        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
+            {t('organizerSettingsScannerCameraFacing')}
+          </Text>
+          <View className="flex-row gap-2">
+            {(['back', 'front'] as const).map((cameraFacing) => {
+              const active = scannerPreferences.defaultCameraFacing === cameraFacing;
+              return (
+                <TouchableOpacity
+                  key={cameraFacing}
+                  onPress={() => patchScanner('defaultCameraFacing', cameraFacing)}
+                  className={`rounded-full px-3 py-2 ${
+                    active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {cameraFacing === 'back'
+                      ? t('organizerSettingsScannerCameraBack')
+                      : t('organizerSettingsScannerCameraFront')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
+            {t('organizerSettingsScannerTicketInfoMode')}
+          </Text>
+          <View className="flex-row gap-2">
+            {(['detailed', 'compact'] as const).map((ticketInfoMode) => {
+              const active = scannerPreferences.ticketInfoMode === ticketInfoMode;
+              return (
+                <TouchableOpacity
+                  key={ticketInfoMode}
+                  onPress={() => patchScanner('ticketInfoMode', ticketInfoMode)}
+                  className={`rounded-full px-3 py-2 ${
+                    active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {ticketInfoMode === 'detailed'
+                      ? t('organizerSettingsScannerTicketInfoDetailed')
+                      : t('organizerSettingsScannerTicketInfoCompact')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
+            {t('settingsLanguage')}
+          </Text>
+          <View className="flex-row gap-2">
+            {(['fr', 'en'] as const).map((languageCode) => {
+              const active = settings.language === languageCode;
+              return (
+                <TouchableOpacity
+                  key={languageCode}
+                  onPress={() => patch('language', languageCode)}
+                  className={`rounded-full px-3 py-2 ${
+                    active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {languageCode === 'fr'
+                      ? t('settingsLanguageFrench')
+                      : t('settingsLanguageEnglish')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View className="px-4 py-3">
+          <Text className="text-xs text-gray-500 dark:text-gray-400">
+            {t('organizerSettingsScannerOfflinePendingCount', {
+              count: offlineQueueCount,
+            })}
+          </Text>
+          <TouchableOpacity
+            onPress={clearOfflineQueue}
+            className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-500/50 dark:bg-red-500/10"
+          >
+            <Text className="text-center text-xs font-semibold text-red-600 dark:text-red-300">
+              {t('organizerSettingsScannerOfflineClearAction')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </SettingsSection>
 
-      <SettingsSection title={t('organizerSettingsSectionDefaults')} containerClassName="mb-5">
+      {!isScannerWorkspace ? (
+        <SettingsSection title={t('organizerSettingsSectionDefaults')} containerClassName="mb-5">
         <View className="p-4">
         <Text className="text-xs text-gray-500 dark:text-gray-400">
           {t('organizerSettingsDefaultCheckInOpen')}
@@ -522,9 +796,11 @@ export default function OrganizerSettingsScreen() {
           textAlignVertical="top"
         />
         </View>
-      </SettingsSection>
+        </SettingsSection>
+      ) : null}
 
-      <SettingsSection title={t('organizerSettingsSectionTeam')} containerClassName="mb-5">
+      {!isScannerWorkspace ? (
+        <SettingsSection title={t('organizerSettingsSectionTeam')} containerClassName="mb-5">
         <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
           <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
             {t('organizerSettingsTeamInviteScope')}
@@ -593,7 +869,8 @@ export default function OrganizerSettingsScreen() {
           withBorder={false}
           onValueChange={(next) => patch('organizerTeamRequireRemovalConfirm', next)}
         />
-      </SettingsSection>
+        </SettingsSection>
+      ) : null}
 
       <TouchableOpacity
         onPress={() => {

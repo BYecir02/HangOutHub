@@ -46,6 +46,9 @@ export default function ScannerScreen() {
     formatRecentScanTime,
     handleCameraMountError,
     statusTone,
+    cameraFacing,
+    torchEnabled,
+    showDetailedTicketInfo,
   } = useScannerFlow();
 
   const selectedEventPhaseClass =
@@ -256,6 +259,8 @@ export default function ScannerScreen() {
                   <CameraView
                     key={cameraInstanceKey}
                     style={{ height: 288, width: '100%' }}
+                    facing={cameraFacing}
+                    enableTorch={torchEnabled}
                     onMountError={handleCameraMountError}
                     onBarcodeScanned={handleBarcodeScanned}
                     barcodeScannerSettings={{
@@ -281,11 +286,17 @@ export default function ScannerScreen() {
                   attendeeLabel={t('scannerResultAttendee')}
                   ticketLabel={t('scannerResultTicket')}
                   attendeeName={
-                    scanResult.attendee?.displayName ||
-                    scanResult.attendee?.username ||
-                    '-'
+                    showDetailedTicketInfo
+                      ? scanResult.attendee?.displayName ||
+                        scanResult.attendee?.username ||
+                        '-'
+                      : null
                   }
-                  ticketName={scanResult.ticket?.ticketTypeName || '-'}
+                  ticketName={
+                    showDetailedTicketInfo
+                      ? scanResult.ticket?.ticketTypeName || '-'
+                      : null
+                  }
                 />
               ) : null}
 

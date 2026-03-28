@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
+import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
 
 const ORGANIZER_NOTIFICATION_TYPES = [
@@ -44,6 +45,27 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly remindersSweepWindowMs = 15 * 60 * 1000;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  async hasOrganizerOrTeamAccess(userId: string, role: string) {
+    const normalizedRole = role.toUpperCase();
+    if (
+      normalizedRole === 'ADMIN' ||
+      normalizedRole === 'ORGANIZER' ||
+      normalizedRole === 'PLACE_OWNER'
+    ) {
+      return true;
+    }
+
+    const membershipRows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+      SELECT "role"
+      FROM "PlaceTeamMember"
+      WHERE "userId" = ${userId}::uuid
+    `;
+
+    return membershipRows.some((membership) =>
+      hasPlaceTeamRoleAtLeast(membership.role, 'STAFF'),
+    );
+  }
 
   private normalizeReminderOffsets(offsets: number[] | null | undefined): number[] {
     if (!Array.isArray(offsets)) {

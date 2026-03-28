@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 
+import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerifyScanDto } from './dto/verify-scan.dto';
 
@@ -69,24 +70,26 @@ export class OrganizerScannerService {
     role: string,
     input: VerifyScanDto,
   ): Promise<VerifyScanResult> {
-    if (role !== 'ORGANIZER' && role !== 'PLACE_OWNER') {
-      throw new ForbiddenException('UNAUTHORIZED_SCANNER');
-    }
+    const normalizedRole = role.toUpperCase();
+    const isProfessionalScannerRole =
+      normalizedRole === 'ORGANIZER' || normalizedRole === 'PLACE_OWNER';
 
-    const scannerUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        OrganizerProfile: {
-          select: {
-            status: true,
+    if (isProfessionalScannerRole) {
+      const scannerUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          OrganizerProfile: {
+            select: {
+              status: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    const organizerStatus = scannerUser?.OrganizerProfile?.status || 'PENDING';
-    if (['PENDING', 'REJECTED', 'SUSPENDED'].includes(organizerStatus)) {
-      throw new ForbiddenException('UNAUTHORIZED_SCANNER');
+      const organizerStatus = scannerUser?.OrganizerProfile?.status || 'PENDING';
+      if (['PENDING', 'REJECTED', 'SUSPENDED'].includes(organizerStatus)) {
+        throw new ForbiddenException('UNAUTHORIZED_SCANNER');
+      }
     }
 
     const normalizedCode = input.code?.trim();
@@ -172,9 +175,23 @@ export class OrganizerScannerService {
       );
     }
 
+    const placeTeamRole = booking.Event.placeId
+      ? (
+          await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+            SELECT "role"
+            FROM "PlaceTeamMember"
+            WHERE "placeId" = ${booking.Event.placeId}::uuid
+              AND "userId" = ${userId}::uuid
+            LIMIT 1
+          `
+        )[0]?.role || null
+      : null;
+
     const isAuthorizedForEvent =
-      (role === 'ORGANIZER' && booking.Event.organizerId === userId) ||
-      (role === 'PLACE_OWNER' && booking.Event.Place?.ownerId === userId) ||
+      normalizedRole === 'ADMIN' ||
+      (normalizedRole === 'ORGANIZER' && booking.Event.organizerId === userId) ||
+      (normalizedRole === 'PLACE_OWNER' && booking.Event.Place?.ownerId === userId) ||
+      hasPlaceTeamRoleAtLeast(placeTeamRole, 'SCANNER') ||
       ['SCAN', 'EDIT'].includes(
         booking.Event.EventCollaborator[0]?.permission?.toUpperCase() || '',
       );

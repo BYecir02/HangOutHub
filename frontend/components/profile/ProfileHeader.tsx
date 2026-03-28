@@ -17,6 +17,11 @@ import { getImageUrl } from '../../services/api';
 interface ProfileHeaderProps {
   user: UserProfile | null;
   isOrganizer?: boolean;
+  canAccessProPanel?: boolean;
+  canActivateProPanel?: boolean;
+  proPanelLabel?: string;
+  onOpenProPanel?: () => void;
+  onActivateProPanel?: () => void;
   onImagePress: (url: string) => void;
 }
 
@@ -50,6 +55,11 @@ function getStatusColors(
 export default function ProfileHeader({
   user,
   isOrganizer = false,
+  canAccessProPanel = false,
+  canActivateProPanel = false,
+  proPanelLabel,
+  onOpenProPanel,
+  onActivateProPanel,
   onImagePress,
 }: ProfileHeaderProps) {
   const router = useRouter();
@@ -145,13 +155,36 @@ export default function ProfileHeader({
 
         </View>
 
-        {isOrganizer ? (
+        {canAccessProPanel ? (
           <TouchableOpacity
             className="mt-3 items-center rounded-lg border border-gray-200 bg-gray-100 py-2.5 active:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:active:bg-gray-700"
-            onPress={() => router.push('/organizer/dashboard')}
+            onPress={() => {
+              if (onOpenProPanel) {
+                onOpenProPanel();
+                return;
+              }
+              router.push('/organizer/dashboard');
+            }}
           >
             <Text className="text-sm font-bold text-gray-800 dark:text-white">
-              {organizerPanelLabel}
+              {proPanelLabel || organizerPanelLabel}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {!canAccessProPanel && canActivateProPanel ? (
+          <TouchableOpacity
+            className="mt-3 items-center rounded-lg border border-[#4c669f]/35 bg-[#4c669f]/10 py-2.5 active:opacity-90 dark:border-[#4c669f]/50 dark:bg-[#4c669f]/20"
+            onPress={() => {
+              if (onActivateProPanel) {
+                onActivateProPanel();
+                return;
+              }
+              router.push('/activate-pro');
+            }}
+          >
+            <Text className="text-sm font-bold text-[#4c669f]">
+              {t('profileActivateProPanel')}
             </Text>
           </TouchableOpacity>
         ) : null}

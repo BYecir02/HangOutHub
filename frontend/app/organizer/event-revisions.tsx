@@ -53,6 +53,7 @@ export default function OrganizerEventRevisionsScreen() {
     user,
     loading: profileLoading,
     suspend: Boolean(profileError),
+    requiredCapability: 'eventRevisions',
   });
 
   const [loading, setLoading] = useState(true);

@@ -29,6 +29,7 @@ import { getMySettings } from '@/services/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 type PostType = 'post' | 'plan';
+type PublicationScope = 'personal' | 'structure';
 
 const MAX_IMAGES = 5;
 const MAX_CHARS = 500;
@@ -104,6 +105,27 @@ const VISIBILITY_OPTIONS: {
   },
 ];
 
+const PUBLICATION_SCOPE_OPTIONS: {
+  id: PublicationScope;
+  labelKey:
+    | 'postPublicationScopePersonalLabel'
+    | 'postPublicationScopeStructureLabel';
+  descriptionKey:
+    | 'postPublicationScopePersonalDescription'
+    | 'postPublicationScopeStructureDescription';
+}[] = [
+  {
+    id: 'personal',
+    labelKey: 'postPublicationScopePersonalLabel',
+    descriptionKey: 'postPublicationScopePersonalDescription',
+  },
+  {
+    id: 'structure',
+    labelKey: 'postPublicationScopeStructureLabel',
+    descriptionKey: 'postPublicationScopeStructureDescription',
+  },
+];
+
 export default function CreatePostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -111,6 +133,7 @@ export default function CreatePostScreen() {
     content?: string;
     visibility?: PostVisibility;
     postType?: PostType;
+    publicationScope?: PublicationScope;
     placeId?: string;
     eventId?: string;
     eventTitle?: string;
@@ -160,6 +183,9 @@ export default function CreatePostScreen() {
     params.visibility ||
       (params.postType === 'plan' ? 'friends' : 'public'),
   );
+  const [publicationScope, setPublicationScope] = useState<PublicationScope>(
+    params.publicationScope === 'structure' ? 'structure' : 'personal',
+  );
   const [placeId, setPlaceId] = useState(
     params.placeId ? String(params.placeId) : '',
   );
@@ -206,6 +232,15 @@ export default function CreatePostScreen() {
   const visibilityOptions = useMemo(
     () =>
       VISIBILITY_OPTIONS.map((option) => ({
+        ...option,
+        label: t(option.labelKey),
+        description: t(option.descriptionKey),
+      })),
+    [t],
+  );
+  const publicationScopeOptions = useMemo(
+    () =>
+      PUBLICATION_SCOPE_OPTIONS.map((option) => ({
         ...option,
         label: t(option.labelKey),
         description: t(option.descriptionKey),
@@ -370,6 +405,9 @@ export default function CreatePostScreen() {
   const visibilityIcon =
     visibilityOptions.find((option) => option.id === visibility)?.icon ||
     'globe-outline';
+  const publicationScopeLabel =
+    publicationScopeOptions.find((option) => option.id === publicationScope)
+      ?.label || t('postPublicationScopePersonalLabel');
   const visibilityTone = useMemo(() => {
     if (visibility === 'friends') {
       return {
@@ -536,6 +574,15 @@ export default function CreatePostScreen() {
       setShowCustomAudienceModal(true);
       return;
     }
+    const effectivePlaceId = placeId.trim();
+    if (publicationScope === 'structure' && !effectivePlaceId) {
+      Alert.alert(
+        t('postPublicationScopeStructureRequiredTitle'),
+        t('postPublicationScopeStructureRequiredMessage'),
+      );
+      setShowPlanModal(true);
+      return;
+    }
 
     setLoading(true);
 
@@ -547,6 +594,7 @@ export default function CreatePostScreen() {
         formData.append('content', content);
         formData.append('visibility', effectiveVisibility);
         formData.append('postType', derivedPostType);
+        formData.append('publicationScope', publicationScope);
         if (visibility === 'custom') {
           formData.append(
             'visibilityUserIds',
@@ -555,8 +603,8 @@ export default function CreatePostScreen() {
         } else if (selectedVisibilityUserIds.length > 0) {
           formData.append('visibilityUserIds', JSON.stringify([]));
         }
-        if (placeId) {
-          formData.append('placeId', placeId);
+        if (effectivePlaceId) {
+          formData.append('placeId', effectivePlaceId);
         }
         if (eventId) {
           formData.append('eventId', eventId);
@@ -593,14 +641,15 @@ export default function CreatePostScreen() {
         formData.append('content', content);
         formData.append('visibility', effectiveVisibility);
         formData.append('postType', derivedPostType);
+        formData.append('publicationScope', publicationScope);
         if (visibility === 'custom') {
           formData.append(
             'visibilityUserIds',
             JSON.stringify(selectedVisibilityUserIds),
           );
         }
-        if (placeId) {
-          formData.append('placeId', placeId);
+        if (effectivePlaceId) {
+          formData.append('placeId', effectivePlaceId);
         }
         if (eventId) {
           formData.append('eventId', eventId);
@@ -719,6 +768,46 @@ export default function CreatePostScreen() {
                 onChangeText={setContent}
                 maxLength={MAX_CHARS}
               />
+
+              <View className="mx-5 mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+                <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                  {t('postPublicationScopeTitle')}
+                </Text>
+                <View className="mt-3 gap-2">
+                  {publicationScopeOptions.map((option) => {
+                    const isActive = publicationScope === option.id;
+                    const isStructure = option.id === 'structure';
+                    return (
+                      <TouchableOpacity
+                        key={option.id}
+                        onPress={() => setPublicationScope(option.id)}
+                        className={`rounded-xl border px-3 py-3 ${
+                          isActive
+                            ? isStructure
+                              ? 'border-[#1f7aec] bg-[#1f7aec]/10'
+                              : 'border-[#4c669f] bg-[#4c669f]/10'
+                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                        }`}
+                      >
+                        <Text
+                          className={`text-sm font-semibold ${
+                            isActive
+                              ? isStructure
+                                ? 'text-[#1f7aec]'
+                                : 'text-[#4c669f]'
+                              : 'text-gray-700 dark:text-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </Text>
+                        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {option.description}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
 
               <View className="mx-5 mt-3">
                 {hasContextDetails ? (
@@ -851,6 +940,13 @@ export default function CreatePostScreen() {
                     </View>
                   </View>
                   <View className="flex-1 px-4 py-4">
+                    {publicationScope === 'structure' ? (
+                      <View className="mb-2 self-start rounded-full bg-[#1f7aec]/10 px-2 py-1">
+                        <Text className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1f7aec]">
+                          {t('postPublicationScopeStructureBadge')}
+                        </Text>
+                      </View>
+                    ) : null}
                     <Text className="text-base font-bold text-gray-900 dark:text-white">
                       {previewTitle}
                     </Text>
@@ -923,7 +1019,9 @@ export default function CreatePostScreen() {
             >
               <Ionicons name={visibilityIcon} size={14} color={visibilityTone.accent} />
               <Text className="ml-1 text-xs font-semibold" style={{ color: visibilityTone.accent }}>
-                {visibilityBadgeLabel}
+                {publicationScope === 'structure'
+                  ? `${visibilityBadgeLabel} · ${publicationScopeLabel}`
+                  : visibilityBadgeLabel}
               </Text>
             </TouchableOpacity>
 
@@ -955,7 +1053,9 @@ export default function CreatePostScreen() {
               >
                 <Ionicons name={visibilityIcon} size={14} color={visibilityTone.accent} />
                 <Text className="ml-1 text-xs font-semibold" style={{ color: visibilityTone.accent }}>
-                  {visibilityBadgeLabel}
+                  {publicationScope === 'structure'
+                    ? `${visibilityBadgeLabel} · ${publicationScopeLabel}`
+                    : visibilityBadgeLabel}
                 </Text>
               </TouchableOpacity>
             </View>

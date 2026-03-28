@@ -25,8 +25,12 @@ interface AuthenticatedRequest {
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  private ensureOrganizerRole(req: AuthenticatedRequest) {
-    if (req.user.role !== 'ORGANIZER' && req.user.role !== 'PLACE_OWNER') {
+  private async ensureOrganizerRole(req: AuthenticatedRequest) {
+    const hasAccess = await this.notificationsService.hasOrganizerOrTeamAccess(
+      req.user.userId,
+      req.user.role,
+    );
+    if (!hasAccess) {
       throw new ForbiddenException(
         'Acces reserve aux organisateurs et gerants de lieux.',
       );
@@ -48,7 +52,7 @@ export class NotificationsController {
 
   @Get('organizer/unread-count')
   async getOrganizerUnreadCount(@Request() req: AuthenticatedRequest) {
-    this.ensureOrganizerRole(req);
+    await this.ensureOrganizerRole(req);
     const count = await this.notificationsService.getOrganizerUnreadCount(
       req.user.userId,
     );
@@ -57,20 +61,20 @@ export class NotificationsController {
   }
 
   @Post('organizer/mark-read')
-  markOrganizerRead(@Request() req: AuthenticatedRequest) {
-    this.ensureOrganizerRole(req);
+  async markOrganizerRead(@Request() req: AuthenticatedRequest) {
+    await this.ensureOrganizerRole(req);
     return this.notificationsService.markOrganizerAllRead(req.user.userId);
   }
 
   @Get('organizer/activity')
-  getOrganizerActivity(
+  async getOrganizerActivity(
     @Request() req: AuthenticatedRequest,
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
     @Query('unreadOnly') unreadOnly?: string,
     @Query('urgentOnly') urgentOnly?: string,
   ) {
-    this.ensureOrganizerRole(req);
+    await this.ensureOrganizerRole(req);
     return this.notificationsService.getOrganizerActivity(req.user.userId, {
       limit: limit ? Number(limit) : undefined,
       cursor,
@@ -80,11 +84,11 @@ export class NotificationsController {
   }
 
   @Post('organizer/:id/mark-read')
-  markOrganizerOneRead(
+  async markOrganizerOneRead(
     @Request() req: AuthenticatedRequest,
     @Param('id') notificationId: string,
   ) {
-    this.ensureOrganizerRole(req);
+    await this.ensureOrganizerRole(req);
     return this.notificationsService.markOrganizerOneRead(
       req.user.userId,
       notificationId,
@@ -92,11 +96,11 @@ export class NotificationsController {
   }
 
   @Post('organizer/mark-read-batch')
-  markOrganizerBatchRead(
+  async markOrganizerBatchRead(
     @Request() req: AuthenticatedRequest,
     @Body('ids') notificationIds?: string[],
   ) {
-    this.ensureOrganizerRole(req);
+    await this.ensureOrganizerRole(req);
     return this.notificationsService.markOrganizerBatchRead(
       req.user.userId,
       notificationIds || [],
@@ -104,8 +108,18 @@ export class NotificationsController {
   }
 
   @Post('organizer/debug/emit-reminders')
-  emitOrganizerReminders(@Request() req: AuthenticatedRequest) {
-    this.ensureOrganizerRole(req);
+  async emitOrganizerReminders(@Request() req: AuthenticatedRequest) {
+    await this.ensureOrganizerRole(req);
+
+    if (
+      req.user.role !== 'ADMIN' &&
+      req.user.role !== 'ORGANIZER' &&
+      req.user.role !== 'PLACE_OWNER'
+    ) {
+      throw new ForbiddenException(
+        'Endpoint debug reserve aux comptes organisateur.',
+      );
+    }
 
     if (process.env.NODE_ENV === 'production') {
       throw new ForbiddenException(

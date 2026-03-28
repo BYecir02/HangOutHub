@@ -14,6 +14,10 @@ export class CreatePostDto {
   postType?: string;
 
   @IsOptional()
+  @IsIn(['personal', 'structure'])
+  publicationScope?: string;
+
+  @IsOptional()
   @IsUUID()
   placeId?: string;
 

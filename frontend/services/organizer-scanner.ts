@@ -115,6 +115,20 @@ export const listOfflineScans = async (
   return current.filter((item) => item.eventId === eventId);
 };
 
+export const clearOfflineScans = async (eventId?: string): Promise<number> => {
+  const current = await readOfflineQueue();
+
+  if (!eventId) {
+    await writeOfflineQueue([]);
+    return current.length;
+  }
+
+  const remaining = current.filter((item) => item.eventId !== eventId);
+  await writeOfflineQueue(remaining);
+
+  return current.length - remaining.length;
+};
+
 export const syncOfflineScans = async (
   eventId?: string,
 ): Promise<SyncOfflineScansResult> => {

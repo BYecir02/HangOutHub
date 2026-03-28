@@ -27,6 +27,7 @@ export const unstable_settings = {
 
 LogBox.ignoreLogs([
   'SafeAreaView has been deprecated and will be removed in a future release.',
+  "Due to changes in Androids permission requirements, Expo Go can no longer provide full access to the media library.",
 ]);
 
 export default function RootLayout() {
@@ -89,6 +90,10 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="activate-pro"
+            options={{ headerShown: false, presentation: 'fullScreenModal' }}
+          />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
           <Stack.Screen name="preferences" options={{ headerShown: false }} />

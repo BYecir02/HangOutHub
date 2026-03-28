@@ -21,23 +21,34 @@ export default function RoleOptionCard({
   selected = false,
   onPress,
 }: RoleOptionCardProps) {
+  const selectedSurface = isDark ? `${accentColor}22` : `${accentColor}14`;
+  const selectedBorder = isDark ? `${accentColor}AA` : `${accentColor}99`;
+
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.86}
-      className={`mb-4 rounded-[30px] border p-5 ${
+      className={`mb-3 rounded-[28px] border px-5 py-4 ${
         selected
           ? isDark
-            ? 'border-white/30 bg-white/10'
-            : 'border-slate-900/10 bg-white'
+            ? 'bg-white/10'
+            : 'bg-white'
           : isDark
             ? 'border-white/10 bg-white/5'
             : 'border-slate-200 bg-white/80'
       }`}
+      style={
+        selected
+          ? {
+              borderColor: selectedBorder,
+              backgroundColor: selectedSurface,
+            }
+          : undefined
+      }
     >
       <View className="flex-row items-center">
         <View
-          className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
+          className="mr-4 h-14 w-14 items-center justify-center rounded-[18px]"
           style={{ backgroundColor: `${accentColor}20` }}
         >
           <Ionicons name={icon} size={24} color={accentColor} />
@@ -46,23 +57,39 @@ export default function RoleOptionCard({
         <View className="flex-1">
           <View className="flex-row items-center justify-between">
             <Text
-              className={`text-lg font-semibold ${
+              className={`text-[17px] font-semibold ${
                 isDark ? 'text-white' : 'text-slate-950'
               }`}
             >
               {title}
             </Text>
-            {selected ? (
-              <View
-                className="h-7 w-7 items-center justify-center rounded-full"
-                style={{ backgroundColor: accentColor }}
-              >
+            <View
+              className={`h-7 w-7 items-center justify-center rounded-full border ${
+                selected
+                  ? ''
+                  : isDark
+                    ? 'border-white/20 bg-transparent'
+                    : 'border-slate-300 bg-transparent'
+              }`}
+              style={
+                selected
+                  ? { borderColor: accentColor, backgroundColor: accentColor }
+                  : undefined
+              }
+            >
+              {selected ? (
                 <Ionicons name="checkmark" size={16} color="#ffffff" />
-              </View>
-            ) : null}
+              ) : (
+                <Ionicons
+                  name="ellipse-outline"
+                  size={13}
+                  color={isDark ? '#64748b' : '#94a3b8'}
+                />
+              )}
+            </View>
           </View>
           <Text
-            className={`mt-1 text-sm leading-5 ${
+            className={`mt-1.5 text-[13px] leading-5 ${
               isDark ? 'text-slate-300' : 'text-slate-600'
             }`}
           >

@@ -49,6 +49,7 @@ interface FeedPost {
   userId?: string;
   content?: string | null;
   images?: string[];
+  publicationScope?: 'personal' | 'structure';
   postType?: 'post' | 'plan';
   placeId?: string | null;
   eventId?: string | null;
@@ -464,6 +465,7 @@ export default function SocialFeed() {
       content?: string | null;
       images?: string[];
       postType?: 'post' | 'plan';
+      publicationScope?: 'personal' | 'structure';
       placeId?: string | null;
       eventId?: string | null;
       Event?: {
@@ -482,6 +484,7 @@ export default function SocialFeed() {
           content: post.content || '',
           images: JSON.stringify(post.images || []),
           postType: post.postType || 'post',
+          publicationScope: post.publicationScope || 'personal',
           placeId: post.placeId || '',
           eventId: post.eventId || '',
           eventTitle: post.Event?.title || '',

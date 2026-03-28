@@ -20,6 +20,7 @@ import { memoryStorage } from 'multer';
 
 import { CreateEventBookingDto } from './dto/create-event-booking.dto';
 import { CreateEventCollaboratorDto } from './dto/create-event-collaborator.dto';
+import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { OrganizerAnalyticsOverview } from './events.service';
 import { EventsService } from './events.service';
@@ -88,7 +89,7 @@ export class EventsController {
   @UseGuards(AuthGuard('jwt'))
   @Get('mine')
   findMine(@Req() req: AuthenticatedRequest) {
-    return this.eventsService.findMine(req.user.userId);
+    return this.eventsService.findMine(req.user.userId, req.user.role);
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -96,7 +97,6 @@ export class EventsController {
   getOrganizerAnalytics(
     @Req() req: AuthenticatedRequest,
   ): Promise<OrganizerAnalyticsOverview> {
-    this.ensureOrganizerRole(req);
     return this.eventsService.getOrganizerAnalytics(
       req.user.userId,
       req.user.role,
@@ -190,6 +190,45 @@ export class EventsController {
       req.user.userId,
       req.user.role,
       collaboratorUserId,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/place-team')
+  listPlaceTeam(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.listPlaceTeam(id, req.user.userId, req.user.role);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/place-team')
+  addPlaceTeamMember(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreatePlaceTeamMemberDto,
+  ) {
+    return this.eventsService.addPlaceTeamMember(
+      id,
+      req.user.userId,
+      req.user.role,
+      body,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/place-team/:userId')
+  removePlaceTeamMember(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) placeMemberUserId: string,
+  ) {
+    return this.eventsService.removePlaceTeamMember(
+      id,
+      req.user.userId,
+      req.user.role,
+      placeMemberUserId,
     );
   }
 

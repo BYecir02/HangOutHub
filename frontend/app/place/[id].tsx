@@ -20,6 +20,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import ContactAction from '@/components/ui/ContactAction';
 import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
+import Tabs, { type TabItem } from '@/components/ui/Tabs';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
 import { createReport } from '@/services/reports';
@@ -73,6 +74,7 @@ interface PlaceReview {
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
+type PlaceDetailTab = 'info' | 'events' | 'reviews';
 
 function formatPriceLevel(
   level: number | null | undefined,
@@ -162,6 +164,7 @@ export default function PlaceDetailScreen() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<PlaceDetailTab>('info');
 
   useEffect(() => {
     let isMounted = true;
@@ -314,6 +317,11 @@ export default function PlaceDetailScreen() {
     .split('|')
     .map((line) => line.trim())
     .filter(Boolean);
+  const tabItems: TabItem[] = [
+    { id: 'info', label: t('placeDetailTabInfo') },
+    { id: 'events', label: t('placeDetailTabEvents') },
+    { id: 'reviews', label: t('placeDetailTabReviews') },
+  ];
 
   const handleOpenCreateModal = () => {
     router.push({
@@ -539,249 +547,267 @@ export default function PlaceDetailScreen() {
             </TouchableOpacity>
           </View>
 
-        <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
-          <View className="flex-row items-start">
-            <Ionicons name="location-outline" size={20} color="#2ecc71" />
-            <View className="ml-3 flex-1">
-              <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                {t('placeDetailAddressLabel')}
-              </Text>
-              <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {place.address || t('homeAddressToConfirm')}
-              </Text>
-            </View>
-          </View>
+        <View className="mt-6 rounded-3xl bg-white p-4 dark:bg-gray-900">
+          <Tabs
+            items={tabItems}
+            activeTab={activeTab}
+            onTabChange={(id) => setActiveTab(id as PlaceDetailTab)}
+          />
 
-          <View className="mt-5 flex-row items-start">
-            <Ionicons name="person-outline" size={20} color="#4c669f" />
-            <View className="ml-3 flex-1">
-              <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                {t('placeDetailPublishedBy')}
-              </Text>
-              <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                {place.Owner?.displayName ||
-                  place.Owner?.username ||
-                  t('placeDetailUnknownOrganizer')}
-              </Text>
-              {place.Owner?.id ? (
-                <ContactAction
-                  onPress={handleContactPlace}
-                  label={t('directChatContactPlace')}
-                />
-              ) : null}
-            </View>
-          </View>
-
-          {place.phone || place.whatsapp || place.openingHours ? (
-            <View className="mt-5">
-              {place.phone ? (
+          {activeTab === 'info' ? (
+            <View className="pb-2 pt-4">
+              <View className="rounded-3xl bg-gray-50 p-5 dark:bg-gray-800">
                 <View className="flex-row items-start">
-                  <Ionicons name="call-outline" size={20} color="#0ea5e9" />
+                  <Ionicons name="location-outline" size={20} color="#2ecc71" />
                   <View className="ml-3 flex-1">
                     <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                      {t('createPlacePhoneLabel')}
+                      {t('placeDetailAddressLabel')}
                     </Text>
                     <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                      {place.phone}
+                      {place.address || t('homeAddressToConfirm')}
                     </Text>
                   </View>
                 </View>
-              ) : null}
 
-              {place.whatsapp ? (
-                <View className="mt-4 flex-row items-start">
-                  <Ionicons name="logo-whatsapp" size={20} color="#16a34a" />
+                <View className="mt-5 flex-row items-start">
+                  <Ionicons name="person-outline" size={20} color="#4c669f" />
                   <View className="ml-3 flex-1">
                     <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                      {t('createPlaceWhatsappLabel')}
+                      {t('placeDetailPublishedBy')}
                     </Text>
                     <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                      {place.whatsapp}
+                      {place.Owner?.displayName ||
+                        place.Owner?.username ||
+                        t('placeDetailUnknownOrganizer')}
                     </Text>
+                    {place.Owner?.id ? (
+                      <ContactAction
+                        onPress={handleContactPlace}
+                        label={t('directChatContactPlace')}
+                      />
+                    ) : null}
                   </View>
                 </View>
-              ) : null}
 
-              {place.openingHours ? (
-                <View className="mt-4 flex-row items-start">
-                  <Ionicons name="time-outline" size={20} color="#f59e0b" />
-                  <View className="ml-3 flex-1">
-                    <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                      {t('createPlaceHoursLabel')}
-                    </Text>
-                    {openingHoursLines.length > 0 ? (
-                      openingHoursLines.map((line, index) => (
-                        <Text
-                          key={`${place.id}-hours-${index}`}
-                          className="mt-1 text-base text-gray-800 dark:text-gray-100"
-                        >
-                          {line}
-                        </Text>
-                      ))
-                    ) : (
-                      <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
-                        {place.openingHours}
+                {place.phone || place.whatsapp || place.openingHours ? (
+                  <View className="mt-5">
+                    {place.phone ? (
+                      <View className="flex-row items-start">
+                        <Ionicons name="call-outline" size={20} color="#0ea5e9" />
+                        <View className="ml-3 flex-1">
+                          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                            {t('createPlacePhoneLabel')}
+                          </Text>
+                          <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
+                            {place.phone}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {place.whatsapp ? (
+                      <View className="mt-4 flex-row items-start">
+                        <Ionicons name="logo-whatsapp" size={20} color="#16a34a" />
+                        <View className="ml-3 flex-1">
+                          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                            {t('createPlaceWhatsappLabel')}
+                          </Text>
+                          <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
+                            {place.whatsapp}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {place.openingHours ? (
+                      <View className="mt-4 flex-row items-start">
+                        <Ionicons name="time-outline" size={20} color="#f59e0b" />
+                        <View className="ml-3 flex-1">
+                          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                            {t('createPlaceHoursLabel')}
+                          </Text>
+                          {openingHoursLines.length > 0 ? (
+                            openingHoursLines.map((line, index) => (
+                              <Text
+                                key={`${place.id}-hours-${index}`}
+                                className="mt-1 text-base text-gray-800 dark:text-gray-100"
+                              >
+                                {line}
+                              </Text>
+                            ))
+                          ) : (
+                            <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
+                              {place.openingHours}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+
+              <View className="mt-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                  {t('placeDetailAbout')}
+                </Text>
+                <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
+                  {place.description || t('placeDetailDescriptionFallback')}
+                </Text>
+              </View>
+
+              <View className="mt-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                  {t('placeDetailGallery')}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingTop: 16, paddingBottom: 8 }}
+                >
+                  {gallery.map((image, index) => (
+                    <TouchableOpacity
+                      key={`${place.id}-gallery-${index}`}
+                      onPress={() => {
+                        setGalleryIndex(index);
+                        setGalleryOpen(true);
+                      }}
+                      className="mr-3"
+                      activeOpacity={0.9}
+                    >
+                      <Image
+                        source={{ uri: image }}
+                        className="h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          ) : null}
+
+          {activeTab === 'events' ? (
+            <View className="pb-2 pt-4">
+              <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                {t('placeDetailRelatedEvents')}
+              </Text>
+              {place.Event && place.Event.length > 0 ? (
+                place.Event.map((event) => (
+                  <TouchableOpacity
+                    key={event.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/event/[id]',
+                        params: { id: event.id },
+                      })
+                    }
+                    className="mt-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-800"
+                  >
+                    <Image
+                      source={{
+                        uri: getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER,
+                      }}
+                      className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                      resizeMode="cover"
+                    />
+                    <View className="ml-4 flex-1 justify-center">
+                      <Text
+                        className="text-base font-semibold text-gray-900 dark:text-white"
+                        numberOfLines={1}
+                      >
+                        {event.title}
                       </Text>
-                    )}
-                  </View>
+                      <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        {formatEventDate(event.startTime, locale)}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
+                  {t('placeDetailNoRelatedEvents')}
+                </Text>
+              )}
+            </View>
+          ) : null}
+
+          {activeTab === 'reviews' ? (
+            <View className="pb-2 pt-4">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                  {t('placeDetailReviewsTitle')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (myReview) {
+                      setReviewRating(myReview.rating || 0);
+                      setReviewComment(myReview.comment ?? '');
+                    } else {
+                      setReviewRating(0);
+                      setReviewComment('');
+                    }
+                    setShowReviewModal(true);
+                  }}
+                  className="rounded-full bg-[#2ecc71] px-4 py-2"
+                >
+                  <Text className="text-xs font-semibold text-white">
+                    {myReview ? t('placeDetailEditReview') : t('placeDetailAddReview')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {reviewsLoading ? (
+                <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  {t('placeDetailReviewsLoading')}
+                </Text>
+              ) : reviews.length > 0 ? (
+                <View className="mt-4 gap-3">
+                  {reviews.map((review) => (
+                    <View
+                      key={review.id}
+                      className="rounded-3xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800"
+                    >
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {review.User?.displayName ||
+                            review.User?.username ||
+                            t('placeDetailReviewAnonymous')}
+                        </Text>
+                        <Text className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatReviewDate(review.createdAt, locale)}
+                        </Text>
+                      </View>
+                      <View className="mt-2 flex-row items-center">
+                        {Array.from({ length: 5 }).map((_, index) => (
+                          <Ionicons
+                            key={`${review.id}-star-${index}`}
+                            name={index < (review.rating || 0) ? 'star' : 'star-outline'}
+                            size={14}
+                            color={index < (review.rating || 0) ? '#f59e0b' : '#9ca3af'}
+                            style={{ marginRight: 2 }}
+                          />
+                        ))}
+                      </View>
+                      {review.comment ? (
+                        <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                          {review.comment}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
                 </View>
-              ) : null}
+              ) : (
+                <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                  {t('placeDetailReviewsEmpty')}
+                </Text>
+              )}
             </View>
           ) : null}
         </View>
 
-        <View className="mt-6">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            {t('placeDetailAbout')}
-          </Text>
-          <Text className="mt-3 text-base leading-7 text-gray-600 dark:text-gray-300">
-            {place.description || t('placeDetailDescriptionFallback')}
-          </Text>
-        </View>
-
-        <View className="mt-6">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            {t('placeDetailGallery')}
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: 16, paddingBottom: 8 }}
-          >
-            {gallery.map((image, index) => (
-              <TouchableOpacity
-                key={`${place.id}-gallery-${index}`}
-                onPress={() => {
-                  setGalleryIndex(index);
-                  setGalleryOpen(true);
-                }}
-                className="mr-3"
-                activeOpacity={0.9}
-              >
-                <Image
-                  source={{ uri: image }}
-                  className="h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View className="mt-6">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            {t('placeDetailRelatedEvents')}
-          </Text>
-          {place.Event && place.Event.length > 0 ? (
-            place.Event.map((event) => (
-              <TouchableOpacity
-                key={event.id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/event/[id]',
-                    params: { id: event.id },
-                  })
-                }
-                className="mt-4 flex-row rounded-3xl bg-white p-3 dark:bg-gray-900"
-              >
-                <Image
-                  source={{
-                    uri: getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER,
-                  }}
-                  className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                  resizeMode="cover"
-                />
-                <View className="ml-4 flex-1 justify-center">
-                  <Text
-                    className="text-base font-semibold text-gray-900 dark:text-white"
-                    numberOfLines={1}
-                  >
-                    {event.title}
-                  </Text>
-                  <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {formatEventDate(event.startTime, locale)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text className="mt-3 text-base text-gray-500 dark:text-gray-400">
-              {t('placeDetailNoRelatedEvents')}
-            </Text>
-          )}
-        </View>
-
-        <View className="mt-6 pb-24">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-gray-900 dark:text-white">
-              {t('placeDetailReviewsTitle')}
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                if (myReview) {
-                  setReviewRating(myReview.rating || 0);
-                  setReviewComment(myReview.comment ?? '');
-                } else {
-                  setReviewRating(0);
-                  setReviewComment('');
-                }
-                setShowReviewModal(true);
-              }}
-              className="rounded-full bg-[#2ecc71] px-4 py-2"
-            >
-              <Text className="text-xs font-semibold text-white">
-                {myReview ? t('placeDetailEditReview') : t('placeDetailAddReview')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {reviewsLoading ? (
-            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              {t('placeDetailReviewsLoading')}
-            </Text>
-          ) : reviews.length > 0 ? (
-            <View className="mt-4 gap-3">
-              {reviews.map((review) => (
-                <View
-                  key={review.id}
-                  className="rounded-3xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
-                >
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {review.User?.displayName ||
-                        review.User?.username ||
-                        t('placeDetailReviewAnonymous')}
-                    </Text>
-                    <Text className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatReviewDate(review.createdAt, locale)}
-                    </Text>
-                  </View>
-                  <View className="mt-2 flex-row items-center">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <Ionicons
-                        key={`${review.id}-star-${index}`}
-                        name={index < (review.rating || 0) ? 'star' : 'star-outline'}
-                        size={14}
-                        color={index < (review.rating || 0) ? '#f59e0b' : '#9ca3af'}
-                        style={{ marginRight: 2 }}
-                      />
-                    ))}
-                  </View>
-                  {review.comment ? (
-                    <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                      {review.comment}
-                    </Text>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              {t('placeDetailReviewsEmpty')}
-            </Text>
-          )}
-        </View>
+        <View className="pb-24" />
       </View>
     </ScrollView>
 

@@ -27,6 +27,7 @@ export interface PostItemData {
   userId?: string;
   content?: string | null;
   images?: string[];
+  publicationScope?: 'personal' | 'structure';
   postType?: 'post' | 'plan';
   placeId?: string | null;
   eventId?: string | null;
@@ -90,6 +91,7 @@ export default function PostItem({
   const shareCount = item.shareCount || 0;
   const isConnections = item.visibility === 'friends';
   const isPlanPost = item.postType === 'plan' || isConnections;
+  const isOfficialPost = item.publicationScope === 'structure';
   const visibilityLabel =
     item.visibility === 'friends'
       ? t('postVisibilityFriendsLabel')
@@ -361,6 +363,14 @@ export default function PostItem({
           <Text className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
             {titleText}
           </Text>
+
+          {isOfficialPost ? (
+            <View className="mt-2 self-start rounded-full bg-[#1f7aec]/10 px-2.5 py-1">
+              <Text className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1f7aec]">
+                {t('postPublicationScopeStructureBadge')}
+              </Text>
+            </View>
+          ) : null}
 
           {eventLabel ? (
             <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2.5 py-1">

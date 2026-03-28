@@ -89,6 +89,8 @@ const isSilentUnauthorizedEndpoint = (url: string) =>
   url.includes('/notifications/organizer/unread-count') ||
   url.includes('/notifications/unread-count') ||
   url.includes('/events/my-bookings') ||
+  url.includes('/friendships/mine') ||
+  url.includes('/outings/invitations') ||
   url.includes('/users/me') ||
   url.includes('/users/me/settings');
 
@@ -130,7 +132,7 @@ api.interceptors.response.use(
     const requestPath = error.config?.url || '';
     const isSilent401 = status === 401 && isSilentUnauthorizedEndpoint(requestPath);
 
-    if (status && !isSilent401) {
+    if (status && !isSilent401 && status >= 500) {
       console.error(`[API ${status}] ${method} ${requestUrl}`, data);
     }
 

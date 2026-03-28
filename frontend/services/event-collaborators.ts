@@ -14,6 +14,21 @@ export interface EventCollaboratorItem {
   };
 }
 
+export type PlaceTeamRole = 'STAFF' | 'MANAGER' | 'SCANNER';
+
+export interface PlaceTeamMemberItem {
+  placeId: string;
+  userId: string;
+  role: PlaceTeamRole | null;
+  createdAt: string | null;
+  User: {
+    id: string;
+    username: string | null;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
+}
+
 export async function listEventCollaborators(eventId: string) {
   const response = await api.get<EventCollaboratorItem[]>(
     `/events/${eventId}/collaborators`,
@@ -41,6 +56,37 @@ export async function removeEventCollaborator(
 ) {
   const response = await api.delete<EventCollaboratorItem[]>(
     `/events/${eventId}/collaborators/${collaboratorUserId}`,
+  );
+  return response.data;
+}
+
+export async function listEventPlaceTeam(eventId: string) {
+  const response = await api.get<PlaceTeamMemberItem[]>(
+    `/events/${eventId}/place-team`,
+  );
+  return response.data;
+}
+
+export async function addEventPlaceTeamMember(
+  eventId: string,
+  payload: {
+    userId: string;
+    role?: PlaceTeamRole;
+  },
+) {
+  const response = await api.post<PlaceTeamMemberItem[]>(
+    `/events/${eventId}/place-team`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function removeEventPlaceTeamMember(
+  eventId: string,
+  placeMemberUserId: string,
+) {
+  const response = await api.delete<PlaceTeamMemberItem[]>(
+    `/events/${eventId}/place-team/${placeMemberUserId}`,
   );
   return response.data;
 }

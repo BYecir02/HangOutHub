@@ -9,6 +9,7 @@ export interface StoredUserSession {
   role?: string;
   hasPlace?: boolean;
   organizerStatus?: string;
+  teamRole?: string;
 }
 
 type UserSessionLike = {
@@ -18,6 +19,7 @@ type UserSessionLike = {
   role?: string | null;
   hasPlace?: boolean | null;
   organizerStatus?: string | null;
+  teamRole?: string | null;
   OrganizerProfile?: {
     status?: string | null;
   } | null;
@@ -35,6 +37,7 @@ function normalizeUserSession(input: UserSessionLike): StoredUserSession {
     // Preserve unknown state to avoid false redirects for PLACE_OWNER on cold start.
     hasPlace: input.hasPlace ?? undefined,
     organizerStatus,
+    teamRole: input.teamRole || undefined,
   };
 }
 

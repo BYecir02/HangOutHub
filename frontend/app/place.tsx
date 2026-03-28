@@ -26,7 +26,7 @@ import { patchStoredUserSession } from '@/services/user-session';
 
 const PRICE_LEVELS = [1, 2, 3, 4] as const;
 const PHONE_REGEX = /^\+?[0-9\s().-]{8,20}$/;
-const CREATE_PLACE_TOTAL_STEPS = 3;
+const CREATE_PLACE_TOTAL_STEPS = 5;
 const DAY_ORDER = [
   'monday',
   'tuesday',
@@ -145,8 +145,72 @@ export default function CreatePlaceScreen() {
     if (currentStep === 2) {
       return t('createPlaceStepTitleHours');
     }
-    return t('createPlaceStepTitleLocation');
+    if (currentStep === 3) {
+      return t('createPlaceStepTitleLocation');
+    }
+    if (currentStep === 4) {
+      return t('createPlaceStepTitlePhotos');
+    }
+    return t('createPlaceStepTitleReview');
   }, [currentStep, t]);
+
+  const schedulePreviewByDay = useMemo(
+    () =>
+      DAY_ORDER.map((day) => {
+        const schedule = weeklySchedule[day];
+        const hasAnyValue = Object.values(schedule).some((part) => part.trim().length > 0);
+        let display = t('createPlaceHoursClosed');
+        if (hasAnyValue) {
+          const isComplete = Object.values(schedule).every((part) => part.trim().length > 0);
+          if (isComplete) {
+            display = `${schedule.openHour.padStart(2, '0')}:${schedule.openMinute.padStart(2, '0')} - ${schedule.closeHour.padStart(2, '0')}:${schedule.closeMinute.padStart(2, '0')}`;
+          } else {
+            display = t('createPlaceHoursIncomplete');
+          }
+        }
+        return {
+          day,
+          label: dayLabels[day],
+          display,
+          hasAnyValue,
+        };
+      }),
+    [dayLabels, t, weeklySchedule],
+  );
+  const hasDraftChanges = useMemo(() => {
+    const hasSchedule =
+      DAY_ORDER.some((day) =>
+        Object.values(weeklySchedule[day]).some((part) => part.trim().length > 0),
+      );
+
+    return Boolean(
+      name.trim()
+      || description.trim()
+      || selectedCategory.trim()
+      || phone.trim()
+      || whatsapp.trim()
+      || selectedCountry.trim()
+      || selectedCity
+      || latitudeInput.trim()
+      || longitudeInput.trim()
+      || images.length > 0
+      || hasSchedule
+      || priceLevel !== 1,
+    );
+  }, [
+    description,
+    images.length,
+    latitudeInput,
+    longitudeInput,
+    name,
+    phone,
+    priceLevel,
+    selectedCategory,
+    selectedCity,
+    selectedCountry,
+    whatsapp,
+    weeklySchedule,
+  ]);
 
   const loadCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -308,6 +372,11 @@ export default function CreatePlaceScreen() {
       }
     }
 
+    if (step === 3 && !parsedCoordinates) {
+      Alert.alert(t('commonErrorTitle'), t('createPlaceStepLocationInvalid'));
+      return false;
+    }
+
     return true;
   };
 
@@ -320,6 +389,35 @@ export default function CreatePlaceScreen() {
 
   const handlePrevStep = () => {
     setCurrentStep((value) => Math.max(1, value - 1));
+  };
+
+  const handleCancelCreation = () => {
+    if (loading) {
+      return;
+    }
+
+    if (!hasDraftChanges) {
+      router.back();
+      return;
+    }
+
+    Alert.alert(
+      t('createPlaceUnsavedExitTitle'),
+      t('createPlaceUnsavedExitMessage'),
+      [
+        {
+          text: t('genericCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('createPlaceUnsavedExitDiscardAction'),
+          style: 'destructive',
+          onPress: () => {
+            router.back();
+          },
+        },
+      ],
+    );
   };
 
   const handleSubmit = async () => {
@@ -492,7 +590,7 @@ export default function CreatePlaceScreen() {
           title={t('createPlaceTitle')}
           subtitle={t('createActionAddPlaceDesc')}
           label={t('createActionAddPlaceLabel')}
-          onBack={() => router.back()}
+          onBack={handleCancelCreation}
           rightSlot={(
             <View className="rounded-full border border-[#4c669f]/20 bg-[#4c669f]/10 px-3 py-1.5">
               <Text className="text-xs font-semibold text-[#4c669f]">
@@ -528,7 +626,7 @@ export default function CreatePlaceScreen() {
           </View>
         </View>
 
-        {currentStep === 1 ? (
+        {currentStep === 4 ? (
           <FormImagePicker
             containerClassName="mt-5"
             images={images}
@@ -721,29 +819,16 @@ export default function CreatePlaceScreen() {
               <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#4c669f]">
                 {t('createPlaceHoursPreviewTitle')}
               </Text>
-              {DAY_ORDER.map((day) => {
-                const schedule = weeklySchedule[day];
-                const hasAnyValue = Object.values(schedule).some((part) => part.trim().length > 0);
-                let display = t('createPlaceHoursClosed');
-                if (hasAnyValue) {
-                  const isComplete = Object.values(schedule).every((part) => part.trim().length > 0);
-                  if (isComplete) {
-                    display = `${schedule.openHour.padStart(2, '0')}:${schedule.openMinute.padStart(2, '0')} - ${schedule.closeHour.padStart(2, '0')}:${schedule.closeMinute.padStart(2, '0')}`;
-                  } else {
-                    display = t('createPlaceHoursIncomplete');
-                  }
-                }
-                return (
-                  <View key={day} className="flex-row items-center py-1">
+              {schedulePreviewByDay.map((item) => (
+                  <View key={item.day} className="flex-row items-center py-1">
                     <Text className="w-28 text-xs font-semibold text-gray-700 dark:text-gray-200">
-                      {dayLabels[day]}
+                      {item.label}
                     </Text>
                     <Text className="text-xs text-gray-500 dark:text-gray-400">
-                      {display}
+                      {item.display}
                     </Text>
                   </View>
-                );
-              })}
+              ))}
             </View>
 
             {DAY_ORDER.map((day) => (
@@ -925,9 +1010,99 @@ export default function CreatePlaceScreen() {
           </View>
             </>
           ) : null}
+
+          {currentStep === 4 ? (
+            <>
+              <View className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  {t('createPlacePhotosSummaryTitle')}
+                </Text>
+                <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {images.length > 0
+                    ? t('createPlacePhotosSummaryCount', { count: images.length })
+                    : t('createPlacePhotosSummaryEmpty')}
+                </Text>
+              </View>
+            </>
+          ) : null}
+
+          {currentStep === 5 ? (
+            <>
+              <View className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('createPlaceReviewSectionIdentity')}
+                </Text>
+                <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                  {name.trim() || '-'}
+                </Text>
+                <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {[selectedCategory || '-', selectedCity?.name || '-', selectedCountry || '-'].join(' • ')}
+                </Text>
+                <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {phone.trim() || '-'} | {whatsapp.trim() || '-'}
+                </Text>
+              </View>
+
+              <View className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('createPlaceReviewSectionHours')}
+                </Text>
+                <View className="mt-2">
+                  {schedulePreviewByDay.map((item) => (
+                    <View key={item.day} className="mb-1 flex-row items-center justify-between">
+                      <Text className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {item.label}
+                      </Text>
+                      <Text className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.display}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <View className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('createPlaceReviewSectionLocation')}
+                </Text>
+                <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {parsedCoordinates
+                    ? `Lat: ${parsedCoordinates.lat.toFixed(6)} • Lng: ${parsedCoordinates.lng.toFixed(6)}`
+                    : '-'}
+                </Text>
+              </View>
+
+              <View className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('createPlaceReviewSectionMedia')}
+                </Text>
+                <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {images.length > 0
+                    ? t('createPlacePhotosSummaryCount', { count: images.length })
+                    : t('createPlacePhotosSummaryEmpty')}
+                </Text>
+              </View>
+
+              <View className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/50 dark:bg-emerald-900/20">
+                <Text className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  {t('createPlaceReviewFinalHint')}
+                </Text>
+              </View>
+            </>
+          ) : null}
         </View>
 
-        <View className="mt-6 flex-row items-center gap-3 pb-4">
+        <TouchableOpacity
+          onPress={handleCancelCreation}
+          disabled={loading}
+          className="mt-6 items-center rounded-xl border border-gray-200 bg-white py-3 dark:border-gray-700 dark:bg-gray-900"
+        >
+          <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            {t('createPlaceCancelCreation')}
+          </Text>
+        </TouchableOpacity>
+
+        <View className="mt-3 flex-row items-center gap-3 pb-4">
           {currentStep > 1 ? (
             <TouchableOpacity
               onPress={handlePrevStep}

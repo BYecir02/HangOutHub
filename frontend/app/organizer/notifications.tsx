@@ -17,7 +17,9 @@ import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChi
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
+import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { usePaginatedList } from '@/hooks/usePaginatedList';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { formatEventDate } from '@/services/formatters';
 import {
   fetchOrganizerNotifications,
@@ -81,6 +83,18 @@ function getSeverityTone(severity: OrganizerNotificationItem['severity']) {
 export default function OrganizerNotificationsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const {
+    user,
+    loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useUserProfile();
+  const isAllowed = useOrganizerGuard({
+    user,
+    loading: profileLoading,
+    suspend: Boolean(profileError),
+    requiredCapability: 'notifications',
+  });
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'urgent'>(
     'all',
   );
@@ -302,6 +316,42 @@ export default function OrganizerNotificationsScreen() {
       // On garde le comportement silencieux pour ne pas casser l'experience.
     }
   }, [filteredItems, setItems]);
+
+  if (profileLoading) {
+    return (
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (profileError && !user) {
+    return (
+      <ScreenState
+        mode="error"
+        fullScreen
+        title={t('organizerDataLoadErrorTitle')}
+        description={t('organizerDataLoadErrorMessage')}
+        actionLabel={t('organizerDataRetry')}
+        onAction={() => {
+          void refetchProfile();
+        }}
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  if (!user || !isAllowed) {
+    return (
+      <ScreenState
+        mode="loading"
+        fullScreen
+        containerClassName="bg-gray-50 dark:bg-black"
+      />
+    );
+  }
 
   return (
     <ScrollView

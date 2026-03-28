@@ -26,6 +26,7 @@ import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UpdateUserTagPreferencesDto } from './dto/update-user-tag-preferences.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateOrganizerStatusDto } from './dto/update-organizer-status.dto';
+import { ActivateProProfileDto } from './dto/activate-pro-profile.dto';
 import { UserTagPreferencesResponse } from './users.service';
 
 interface AuthenticatedRequest {
@@ -149,6 +150,18 @@ export class UsersController {
     files: { avatar?: Express.Multer.File[]; cover?: Express.Multer.File[] },
   ) {
     return this.updateProfileData(req.user.userId, updateUserDto, files);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('me/activate-pro')
+  activateProProfile(
+    @Request() req: AuthenticatedRequest,
+    @Body() activateProProfileDto: ActivateProProfileDto,
+  ) {
+    return this.usersService.activateProProfile(
+      req.user.userId,
+      activateProProfileDto,
+    );
   }
 
   private async updateProfileData(

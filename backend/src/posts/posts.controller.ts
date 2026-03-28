@@ -61,7 +61,12 @@ export class PostsController {
     @Body() createPostDto: CreatePostDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    return this.postsService.create(req.user.userId, createPostDto, files);
+    return this.postsService.create(
+      req.user.userId,
+      req.user.role || 'USER',
+      createPostDto,
+      files,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -146,7 +151,13 @@ export class PostsController {
     @Body() updatePostDto: UpdatePostDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    return this.postsService.update(id, req.user.userId, updatePostDto, files);
+    return this.postsService.update(
+      id,
+      req.user.userId,
+      req.user.role || 'USER',
+      updatePostDto,
+      files,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

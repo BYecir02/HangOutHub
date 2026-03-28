@@ -1,16 +1,20 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateCommentDto } from '../comments/dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostsGateway } from './posts.gateway';
+
+type PublicationScope = 'personal' | 'structure';
 
 @Injectable()
 export class PostsService {
@@ -116,8 +120,73 @@ export class PostsService {
     return false;
   }
 
+  private normalizePublicationScope(
+    scope: string | null | undefined,
+    fallback: PublicationScope = 'personal',
+  ): PublicationScope {
+    if (!scope) {
+      return fallback;
+    }
+
+    const normalized = scope.trim().toLowerCase();
+    if (normalized === 'personal' || normalized === 'structure') {
+      return normalized;
+    }
+
+    throw new BadRequestException('Type de publication invalide.');
+  }
+
+  private async findPlaceTeamRole(placeId: string, userId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+      SELECT "role"
+      FROM "PlaceTeamMember"
+      WHERE "placeId" = ${placeId}::uuid
+        AND "userId" = ${userId}::uuid
+      LIMIT 1
+    `;
+
+    return rows[0]?.role || null;
+  }
+
+  private async ensureStructurePublicationPermission(
+    userId: string,
+    userRole: string,
+    placeId: string,
+  ) {
+    const normalizedRole = userRole.toUpperCase();
+    if (normalizedRole === 'ADMIN') {
+      return;
+    }
+
+    const place = await this.prisma.place.findUnique({
+      where: { id: placeId },
+      select: {
+        id: true,
+        ownerId: true,
+      },
+    });
+
+    if (!place) {
+      throw new NotFoundException('Lieu introuvable.');
+    }
+
+    if (normalizedRole === 'PLACE_OWNER' && place.ownerId === userId) {
+      return;
+    }
+
+    const placeTeamRole = await this.findPlaceTeamRole(place.id, userId);
+    if (hasPlaceTeamRoleAtLeast(placeTeamRole, 'STAFF')) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'Vous n etes pas autorise a publier un post de structure pour ce lieu.',
+    );
+  }
+
   async create(
     userId: string,
+    userRole: string,
     createPostDto: CreatePostDto,
     files: Express.Multer.File[],
   ) {
@@ -154,9 +223,26 @@ export class PostsService {
       computedPostType === 'plan'
         ? 'friends'
         : createPostDto.visibility || 'public';
+    const publicationScope = this.normalizePublicationScope(
+      createPostDto.publicationScope,
+      'personal',
+    );
     const visibilityUsers = parseVisibilityUsers(
       createPostDto.visibilityUserIds,
     );
+    const normalizedPlaceId = normalizeId(createPostDto.placeId);
+    if (publicationScope === 'structure') {
+      if (!normalizedPlaceId) {
+        throw new BadRequestException(
+          'Un post de structure doit etre rattache a un lieu.',
+        );
+      }
+      await this.ensureStructurePublicationPermission(
+        userId,
+        userRole,
+        normalizedPlaceId,
+      );
+    }
     const connectionIds =
       effectiveVisibility === 'custom'
         ? await this.getConnectionIds(userId)
@@ -170,17 +256,18 @@ export class PostsService {
       data: {
         userId,
         content: createPostDto.content,
+        publicationScope,
         visibility: effectiveVisibility,
         postType: computedPostType,
         visibilityUserIds:
           effectiveVisibility === 'custom' ? filteredVisibilityUsers : [],
-        placeId: normalizeId(createPostDto.placeId) || undefined,
+        placeId: normalizedPlaceId || undefined,
         eventId: normalizeId(createPostDto.eventId) || undefined,
         placeName: normalizeText(createPostDto.placeName) || undefined,
         cityName: normalizeText(createPostDto.cityName) || undefined,
         ambiance: normalizeText(createPostDto.ambiance) || undefined,
         images: imageUrls,
-      },
+      } as Prisma.PostUncheckedCreateInput & { publicationScope?: string },
     });
 
     const postForFeed = await this.prisma.post.findUnique({
@@ -725,6 +812,7 @@ export class PostsService {
   async update(
     id: string,
     userId: string,
+    userRole: string,
     updatePostDto: UpdatePostDto,
     files: Express.Multer.File[],
   ) {
@@ -761,7 +849,19 @@ export class PostsService {
         return [];
       }
     };
-    const { existingImages, visibilityUserIds, ...rest } = updatePostDto;
+    const {
+      existingImages,
+      visibilityUserIds,
+      publicationScope,
+      ...rest
+    } = updatePostDto;
+    const nextPublicationScope = this.normalizePublicationScope(
+      publicationScope,
+      this.normalizePublicationScope(
+        (post as { publicationScope?: string | null }).publicationScope,
+        'personal',
+      ),
+    );
 
     let retainedImages: string[] = [];
     if (existingImages) {
@@ -780,7 +880,12 @@ export class PostsService {
         ? await this.storageService.uploadFiles('posts', files)
         : [];
 
-    const data: Prisma.PostUncheckedUpdateInput = { ...rest };
+    const data: Prisma.PostUncheckedUpdateInput & {
+      publicationScope?: string;
+    } = {
+      ...rest,
+      publicationScope: nextPublicationScope,
+    };
 
     if (rest.placeId !== undefined) {
       data.placeId = normalizeId(rest.placeId);
@@ -823,6 +928,28 @@ export class PostsService {
     }
     if (rest.visibility && rest.visibility !== 'custom') {
       data.visibilityUserIds = [];
+    }
+
+    const nextPlaceId = (() => {
+      if (rest.placeId !== undefined) {
+        const normalized = normalizeId(rest.placeId);
+        return normalized ? normalized : null;
+      }
+      return post.placeId || null;
+    })();
+
+    if (nextPublicationScope === 'structure') {
+      if (!nextPlaceId) {
+        throw new BadRequestException(
+          'Un post de structure doit etre rattache a un lieu.',
+        );
+      }
+
+      await this.ensureStructurePublicationPermission(
+        userId,
+        userRole,
+        nextPlaceId,
+      );
     }
 
     if (existingImages !== undefined || newImages.length > 0) {

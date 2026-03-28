@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  ParseUUIDPipe,
   Param,
   Patch,
   Post,
@@ -16,6 +18,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
 import { CreatePlaceDto } from './dto/create-place.dto';
+import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
 import { CreatePlaceReviewDto } from './dto/create-place-review.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { PlacesService } from './places.service';
@@ -130,6 +133,55 @@ export class PlacesController {
     @Request() req: AuthenticatedRequest,
   ) {
     return this.placesService.upsertReview(id, req.user.userId, payload);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('team/me')
+  listMyPlaceTeams(@Request() req: AuthenticatedRequest) {
+    return this.placesService.listMyPlaceTeams(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/team')
+  listPlaceTeam(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.placesService.listPlaceTeam(
+      id,
+      req.user.userId,
+      req.user.role || 'USER',
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/team')
+  upsertPlaceTeamMember(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() payload: CreatePlaceTeamMemberDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.placesService.upsertPlaceTeamMember(
+      id,
+      req.user.userId,
+      req.user.role || 'USER',
+      payload,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/team/:userId')
+  removePlaceTeamMember(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) placeMemberUserId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.placesService.removePlaceTeamMember(
+      id,
+      req.user.userId,
+      req.user.role || 'USER',
+      placeMemberUserId,
+    );
   }
 
   @Get(':id')

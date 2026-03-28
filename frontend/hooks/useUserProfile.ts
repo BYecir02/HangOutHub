@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import api from '../services/api';
+import { getHighestTeamWorkspaceRole } from '@/services/organizer-access';
+import { listMyPlaceTeams, type MyPlaceTeamMembershipItem } from '@/services/place-team';
 import { setStoredUserSession } from '@/services/user-session';
 
 const debugProfileError = (context: string, error: unknown) => {
@@ -68,6 +70,7 @@ export interface UserProfile {
   } | null;
   OwnedPlaces?: OwnedPlace[];
   hasPlace?: boolean;
+  teamRole?: 'MANAGER' | 'STAFF' | 'SCANNER' | null;
 }
 
 export interface UserPost {
@@ -114,6 +117,9 @@ export function useUserProfile() {
   const [outings, setOutings] = useState<UserOuting[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [organizerEvents, setOrganizerEvents] = useState<OrganizerEvent[]>([]);
+  const [placeTeamMemberships, setPlaceTeamMemberships] = useState<
+    MyPlaceTeamMembershipItem[]
+  >([]);
   const [connectionsCount, setConnectionsCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,11 +143,8 @@ export function useUserProfile() {
       const isOrganizer =
         currentUser.role === 'ORGANIZER' || currentUser.role === 'PLACE_OWNER';
 
-      setUser(currentUser);
-      await setStoredUserSession(currentUser);
-
       if (currentUser.id) {
-        const [postsRes, outingsRes, savedPlacesRes, friendshipsRes] =
+        const [postsRes, outingsRes, savedPlacesRes, friendshipsRes, myTeams] =
           await Promise.all([
             api.get<UserPost[]>(`/posts/user/${currentUser.id}`),
             api.get<UserOuting[]>('/outings/mine'),
@@ -151,24 +154,44 @@ export function useUserProfile() {
                 connections?: number;
               };
             }>('/friendships/mine'),
+            listMyPlaceTeams().catch(() => [] as MyPlaceTeamMembershipItem[]),
           ]);
+        const highestTeamRole = getHighestTeamWorkspaceRole(
+          myTeams.map((team) => team.role),
+        );
+        const nextUser: UserProfile = {
+          ...currentUser,
+          teamRole: highestTeamRole,
+        };
+
+        setUser(nextUser);
+        await setStoredUserSession(nextUser);
+        setPlaceTeamMemberships(myTeams);
 
         setPosts(postsRes.data);
         setOutings(outingsRes.data);
         setSavedPlaces(savedPlacesRes.data);
         setConnectionsCount(friendshipsRes.data.counts?.connections || 0);
       } else {
+        setUser(currentUser);
+        await setStoredUserSession(currentUser);
         setPosts([]);
         setOutings([]);
         setSavedPlaces([]);
         setConnectionsCount(0);
+        setPlaceTeamMemberships([]);
       }
 
       if (isOrganizer) {
         const eventsRes = await api.get<OrganizerEvent[]>('/events/mine');
         setOrganizerEvents(eventsRes.data);
       } else {
-        setOrganizerEvents([]);
+        try {
+          const eventsRes = await api.get<OrganizerEvent[]>('/events/mine');
+          setOrganizerEvents(eventsRes.data);
+        } catch {
+          setOrganizerEvents([]);
+        }
       }
     } catch (error) {
       debugProfileError('fetchUserProfile failed', error);
@@ -179,6 +202,7 @@ export function useUserProfile() {
         setOutings([]);
         setSavedPlaces([]);
         setOrganizerEvents([]);
+        setPlaceTeamMemberships([]);
         setConnectionsCount(0);
       }
     } finally {
@@ -224,6 +248,7 @@ export function useUserProfile() {
     outings,
     savedPlaces,
     organizerEvents,
+    placeTeamMemberships,
     ownedPlaces: user?.OwnedPlaces || [],
     connectionsCount,
     loading,

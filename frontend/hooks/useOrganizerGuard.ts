@@ -5,8 +5,11 @@ import { useRouter } from 'expo-router';
 import { useI18n } from '@/hooks/use-i18n';
 import type { TranslationKey } from '@/services/i18n';
 import {
+  canAccessOrganizerCapability,
   canAccessOrganizerPanel,
+  type OrganizerCapability,
   getOrganizerAccessDenialReason,
+  getOrganizerEntryPath,
   type OrganizerAccessDenialReason,
   type OrganizerAccessUser,
 } from '@/services/organizer-access';
@@ -15,12 +18,13 @@ interface UseOrganizerGuardOptions {
   user?: OrganizerAccessUser | null;
   loading: boolean;
   suspend?: boolean;
+  requiredCapability?: OrganizerCapability;
 }
 
 function getGuardCopy(
   reason: OrganizerAccessDenialReason,
   t: (key: TranslationKey) => string,
-): { title: string; message: string; target: '/(tabs)/home' | '/(tabs)/profile' } {
+): { title: string; message: string; target: string } {
   if (reason === 'PENDING') {
     return {
       title: t('organizerGuardPendingTitle'),
@@ -56,43 +60,50 @@ export function useOrganizerGuard({
   user,
   loading,
   suspend = false,
+  requiredCapability = 'dashboard',
 }: UseOrganizerGuardOptions): boolean {
   const router = useRouter();
   const { t } = useI18n();
   const hasRedirectedRef = useRef(false);
 
-  const isAllowed = canAccessOrganizerPanel(user);
+  const hasPanelAccess = canAccessOrganizerPanel(user);
+  const isAllowed = canAccessOrganizerCapability(user, requiredCapability);
 
   useEffect(() => {
     if (suspend || loading || isAllowed || hasRedirectedRef.current) {
       return;
     }
 
-    const reason = getOrganizerAccessDenialReason(user);
-
-    if (!reason) {
-      return;
-    }
-
     hasRedirectedRef.current = true;
-
-    const { title, message, target } = getGuardCopy(reason, t);
+    const reason = getOrganizerAccessDenialReason(user);
+    const entryPath = getOrganizerEntryPath(user);
+    const fallbackCopy = {
+      title: t('organizerGuardNotAllowedTitle'),
+      message: t('organizerGuardNotAllowedMessage'),
+      target: entryPath,
+    };
+    const { title, message, target } =
+      hasPanelAccess && !reason
+        ? fallbackCopy
+        : reason
+          ? getGuardCopy(reason, t)
+          : fallbackCopy;
 
     Alert.alert(title, message, [
       {
         text: t('organizerGuardActionOk'),
-        onPress: () => router.replace(target),
+        onPress: () => router.replace(target as never),
       },
     ]);
 
     const fallbackRedirect = setTimeout(() => {
-      router.replace(target);
+      router.replace(target as never);
     }, 500);
 
     return () => {
       clearTimeout(fallbackRedirect);
     };
-  }, [isAllowed, loading, router, suspend, t, user]);
+  }, [hasPanelAccess, isAllowed, loading, router, suspend, t, user]);
 
   return isAllowed;
 }

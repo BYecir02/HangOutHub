@@ -6,9 +6,11 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
+import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
 import { CreatePlaceReviewDto } from './dto/create-place-review.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 
@@ -174,6 +176,261 @@ export class PlacesService {
     }
 
     return Array.from(new Set(normalized));
+  }
+
+  private async getPlaceAuthorizationContext(placeId: string) {
+    const place = await this.prisma.place.findUnique({
+      where: { id: placeId },
+      select: {
+        id: true,
+        ownerId: true,
+      },
+    });
+
+    if (!place) {
+      throw new NotFoundException('Lieu introuvable');
+    }
+
+    return place;
+  }
+
+  private canManagePlaceTeam(
+    role: string,
+    place: { ownerId: string | null },
+    userId: string,
+    placeTeamRole: string | null,
+  ) {
+    const normalizedRole = role.toUpperCase();
+    return (
+      normalizedRole === 'ADMIN' ||
+      place.ownerId === userId ||
+      hasPlaceTeamRoleAtLeast(placeTeamRole, 'MANAGER')
+    );
+  }
+
+  private canReadPlaceTeam(
+    role: string,
+    place: { ownerId: string | null },
+    userId: string,
+    placeTeamRole: string | null,
+  ) {
+    const normalizedRole = role.toUpperCase();
+    return (
+      normalizedRole === 'ADMIN' ||
+      place.ownerId === userId ||
+      hasPlaceTeamRoleAtLeast(placeTeamRole, 'STAFF')
+    );
+  }
+
+  private async findPlaceTeamRole(placeId: string, userId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+      SELECT "role"
+      FROM "PlaceTeamMember"
+      WHERE "placeId" = ${placeId}::uuid
+        AND "userId" = ${userId}::uuid
+      LIMIT 1
+    `;
+
+    return rows[0]?.role || null;
+  }
+
+  async listPlaceTeam(placeId: string, userId: string, role: string) {
+    const place = await this.getPlaceAuthorizationContext(placeId);
+    const placeTeamRole = await this.findPlaceTeamRole(placeId, userId);
+    if (!this.canReadPlaceTeam(role, place, userId, placeTeamRole)) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a consulter l'equipe de ce lieu.",
+      );
+    }
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        placeId: string;
+        userId: string;
+        role: string | null;
+        createdAt: Date | null;
+      }>
+    >`SELECT "placeId", "userId", "role", "createdAt"
+      FROM "PlaceTeamMember"
+      WHERE "placeId" = ${placeId}::uuid
+      ORDER BY "createdAt" ASC`;
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: {
+          in: rows.map((row) => row.userId),
+        },
+      },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+      },
+    });
+    const userById = new Map(users.map((entry) => [entry.id, entry]));
+
+    return rows
+      .map((row) => {
+        const teamUser = userById.get(row.userId);
+        if (!teamUser) {
+          return null;
+        }
+        return {
+          ...row,
+          User: teamUser,
+        };
+      })
+      .filter((entry) => Boolean(entry));
+  }
+
+  async listMyPlaceTeams(userId: string) {
+    const rows = await this.prisma.placeTeamMember.findMany({
+      where: {
+        userId,
+      },
+      select: {
+        placeId: true,
+        role: true,
+        createdAt: true,
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            ownerId: true,
+            City: {
+              select: {
+                id: true,
+                name: true,
+                country: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    return rows.map((row) => ({
+      placeId: row.placeId,
+      role: row.role,
+      createdAt: row.createdAt,
+      Place: row.Place,
+    }));
+  }
+
+  async upsertPlaceTeamMember(
+    placeId: string,
+    userId: string,
+    role: string,
+    payload: CreatePlaceTeamMemberDto,
+  ) {
+    const place = await this.getPlaceAuthorizationContext(placeId);
+    const actorPlaceTeamRole = await this.findPlaceTeamRole(placeId, userId);
+    if (!this.canManagePlaceTeam(role, place, userId, actorPlaceTeamRole)) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a modifier l'equipe de ce lieu.",
+      );
+    }
+
+    const normalizedActorRole = role.toUpperCase();
+    const actorIsAdminOrOwner =
+      normalizedActorRole === 'ADMIN' || place.ownerId === userId;
+    const targetRole = (payload.role || 'STAFF').toUpperCase();
+    if (!actorIsAdminOrOwner && targetRole === 'MANAGER') {
+      throw new ForbiddenException(
+        'Seul le proprietaire du lieu peut nommer un manager.',
+      );
+    }
+
+    if (payload.userId === place.ownerId) {
+      throw new BadRequestException(
+        'Le gerant principal du lieu ne peut pas etre ajoute comme membre secondaire.',
+      );
+    }
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('Utilisateur introuvable.');
+    }
+
+    await this.prisma.$executeRaw`
+      INSERT INTO "PlaceTeamMember" ("placeId", "userId", "role")
+      VALUES (${placeId}::uuid, ${payload.userId}::uuid, ${targetRole})
+      ON CONFLICT ("placeId", "userId")
+      DO UPDATE SET "role" = EXCLUDED."role"
+    `;
+
+    return this.listPlaceTeam(placeId, userId, role);
+  }
+
+  async removePlaceTeamMember(
+    placeId: string,
+    userId: string,
+    role: string,
+    placeMemberUserId: string,
+  ) {
+    const place = await this.getPlaceAuthorizationContext(placeId);
+    const actorPlaceTeamRole = await this.findPlaceTeamRole(placeId, userId);
+    if (!this.canManagePlaceTeam(role, place, userId, actorPlaceTeamRole)) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a modifier l'equipe de ce lieu.",
+      );
+    }
+
+    const normalizedActorRole = role.toUpperCase();
+    const actorIsAdminOrOwner =
+      normalizedActorRole === 'ADMIN' || place.ownerId === userId;
+    if (!actorIsAdminOrOwner) {
+      const targetRows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+        SELECT "role"
+        FROM "PlaceTeamMember"
+        WHERE "placeId" = ${placeId}::uuid
+          AND "userId" = ${placeMemberUserId}::uuid
+        LIMIT 1
+      `;
+      if (hasPlaceTeamRoleAtLeast(targetRows[0]?.role || null, 'MANAGER')) {
+        throw new ForbiddenException(
+          'Seul le proprietaire du lieu peut retirer un manager.',
+        );
+      }
+    }
+
+    await this.prisma.$executeRaw`
+      DELETE FROM "PlaceTeamMember"
+      WHERE "placeId" = ${placeId}::uuid
+        AND "userId" = ${placeMemberUserId}::uuid
+    `;
+
+    const placeEventIds = await this.prisma.event.findMany({
+      where: { placeId },
+      select: { id: true },
+    });
+
+    if (placeEventIds.length > 0) {
+      await this.prisma.eventCollaborator.deleteMany({
+        where: {
+          userId: placeMemberUserId,
+          eventId: {
+            in: placeEventIds.map((event) => event.id),
+          },
+        },
+      });
+    }
+
+    return this.listPlaceTeam(placeId, userId, role);
   }
 
   findAll() {

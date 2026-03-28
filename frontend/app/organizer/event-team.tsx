@@ -3,29 +3,33 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  TouchableOpacity,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
 import { getApiErrorMessage } from '@/services/api';
-import { discoverUsers } from '@/services/friendships';
 import {
   addEventCollaborator,
-  EventCollaboratorPermission,
-  EventCollaboratorItem,
+  addEventPlaceTeamMember,
+  type EventCollaboratorItem,
+  type EventCollaboratorPermission,
   listEventCollaborators,
+  listEventPlaceTeam,
+  type PlaceTeamMemberItem,
   removeEventCollaborator,
+  removeEventPlaceTeamMember,
 } from '@/services/event-collaborators';
-import { DiscoverUser } from '@/types/social';
+import { discoverUsers } from '@/services/friendships';
+import type { DiscoverUser } from '@/types/social';
 
 export default function OrganizerEventTeamScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -43,12 +47,26 @@ export default function OrganizerEventTeamScreen() {
     user,
     loading: profileLoading,
     suspend: Boolean(profileError),
+    requiredCapability: 'eventTeam',
   });
 
   const [teamLoading, setTeamLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState<EventCollaboratorItem[]>([]);
   const [newUserId, setNewUserId] = useState('');
+
+  const [placeTeamMembers, setPlaceTeamMembers] = useState<PlaceTeamMemberItem[]>(
+    [],
+  );
+  const [placeTeamSupported, setPlaceTeamSupported] = useState(true);
+  const [placeTeamMessage, setPlaceTeamMessage] = useState<string | null>(null);
+  const [addingPlaceMember, setAddingPlaceMember] = useState(false);
+  const [removingPlaceMemberId, setRemovingPlaceMemberId] = useState<string | null>(
+    null,
+  );
+  const [selectedSearchUserId, setSelectedSearchUserId] = useState('');
+  const [assigningUserId, setAssigningUserId] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<DiscoverUser[]>([]);
@@ -65,19 +83,57 @@ export default function OrganizerEventTeamScreen() {
     [items],
   );
 
-  const loadCollaborators = useCallback(async () => {
+  const placeTeam = useMemo(
+    () =>
+      placeTeamMembers.slice().sort((a, b) => {
+        const aName = (a.User.displayName || a.User.username || '').toLowerCase();
+        const bName = (b.User.displayName || b.User.username || '').toLowerCase();
+        return aName.localeCompare(bName);
+      }),
+    [placeTeamMembers],
+  );
+
+  const collaboratorIdSet = useMemo(
+    () => new Set(collaborators.map((item) => item.userId)),
+    [collaborators],
+  );
+
+  const assignablePlaceMembers = useMemo(
+    () =>
+      placeTeam.filter((member) => !collaboratorIdSet.has(member.userId)),
+    [collaboratorIdSet, placeTeam],
+  );
+
+  const loadTeamData = useCallback(async () => {
     if (!eventId) {
       setTeamLoading(false);
       return;
     }
 
+    setTeamLoading(true);
     try {
-      const response = await listEventCollaborators(eventId);
-      setItems(response);
+      const collaboratorsResponse = await listEventCollaborators(eventId);
+      setItems(collaboratorsResponse);
     } catch (error) {
       Alert.alert(
         t('commonErrorTitle'),
         getApiErrorMessage(error, t('organizerTeamLoadFailed')),
+      );
+    }
+
+    try {
+      const placeTeamResponse = await listEventPlaceTeam(eventId);
+      setPlaceTeamSupported(true);
+      setPlaceTeamMessage(null);
+      setPlaceTeamMembers(placeTeamResponse);
+    } catch (error) {
+      setPlaceTeamSupported(false);
+      setPlaceTeamMembers([]);
+      setPlaceTeamMessage(
+        getApiErrorMessage(
+          error,
+          "Equipe de lieu indisponible sur cet evenement.",
+        ),
       );
     } finally {
       setTeamLoading(false);
@@ -85,8 +141,8 @@ export default function OrganizerEventTeamScreen() {
   }, [eventId, t]);
 
   useEffect(() => {
-    void loadCollaborators();
-  }, [loadCollaborators]);
+    void loadTeamData();
+  }, [loadTeamData]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -102,10 +158,11 @@ export default function OrganizerEventTeamScreen() {
         setSearchLoading(true);
         try {
           const results = await discoverUsers(normalizedQuery);
-          const alreadyInTeam = new Set(items.map((item) => item.userId));
-          setSearchResults(
-            results.filter((user) => !alreadyInTeam.has(user.id)),
-          );
+          const excludedIds = placeTeamSupported
+            ? new Set(placeTeamMembers.map((member) => member.userId))
+            : new Set(items.map((item) => item.userId));
+
+          setSearchResults(results.filter((candidate) => !excludedIds.has(candidate.id)));
         } catch {
           setSearchResults([]);
         } finally {
@@ -117,9 +174,9 @@ export default function OrganizerEventTeamScreen() {
     }, 280);
 
     return () => clearTimeout(timeout);
-  }, [searchQuery, items]);
+  }, [items, placeTeamMembers, placeTeamSupported, searchQuery]);
 
-  const handleAdd = async () => {
+  const handleLegacyAddCollaborator = async () => {
     if (!eventId) {
       return;
     }
@@ -139,7 +196,10 @@ export default function OrganizerEventTeamScreen() {
       setNewUserId('');
       setSearchQuery('');
       setSearchResults([]);
-      Alert.alert(t('organizerTeamAddSuccessTitle'), t('organizerTeamAddSuccessMessage'));
+      Alert.alert(
+        t('organizerTeamAddSuccessTitle'),
+        t('organizerTeamAddSuccessMessage'),
+      );
     } catch (error) {
       Alert.alert(
         t('commonErrorTitle'),
@@ -150,7 +210,94 @@ export default function OrganizerEventTeamScreen() {
     }
   };
 
-  const handleRemove = (collaboratorUserId: string) => {
+  const handleAddPlaceMember = async () => {
+    if (!eventId || !selectedSearchUserId) {
+      Alert.alert(t('commonErrorTitle'), 'Selectionne un utilisateur.');
+      return;
+    }
+
+    setAddingPlaceMember(true);
+    try {
+      const updated = await addEventPlaceTeamMember(eventId, {
+        userId: selectedSearchUserId,
+        role: 'STAFF',
+      });
+      setPlaceTeamMembers(updated);
+      setSelectedSearchUserId('');
+      setSearchQuery('');
+      setSearchResults([]);
+      Alert.alert('Equipe du lieu', 'Membre ajoute a l equipe du lieu.');
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, "Impossible d'ajouter ce membre au lieu."),
+      );
+    } finally {
+      setAddingPlaceMember(false);
+    }
+  };
+
+  const handleAssignFromPlace = async (candidateUserId: string) => {
+    if (!eventId) {
+      return;
+    }
+
+    setAssigningUserId(candidateUserId);
+    try {
+      const updated = await addEventCollaborator(eventId, {
+        userId: candidateUserId,
+        permission: newPermission,
+      });
+      setItems(updated);
+    } catch (error) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        getApiErrorMessage(error, t('organizerTeamAddFailed')),
+      );
+    } finally {
+      setAssigningUserId(null);
+    }
+  };
+
+  const handleRemovePlaceMember = (placeMemberUserId: string) => {
+    Alert.alert(
+      'Retirer de l equipe du lieu ?',
+      'Ce membre sera aussi retire de cet evenement s il y etait assigne.',
+      [
+        {
+          text: t('genericCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('organizerTeamRemoveAction'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setRemovingPlaceMemberId(placeMemberUserId);
+              try {
+                const updatedPlaceTeam = await removeEventPlaceTeamMember(
+                  eventId,
+                  placeMemberUserId,
+                );
+                setPlaceTeamMembers(updatedPlaceTeam);
+                const updatedCollaborators = await listEventCollaborators(eventId);
+                setItems(updatedCollaborators);
+              } catch (error) {
+                Alert.alert(
+                  t('commonErrorTitle'),
+                  getApiErrorMessage(error, "Impossible de retirer ce membre du lieu."),
+                );
+              } finally {
+                setRemovingPlaceMemberId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRemoveCollaborator = (collaboratorUserId: string) => {
     Alert.alert(
       t('organizerTeamRemoveConfirmTitle'),
       t('organizerTeamRemoveConfirmMessage'),
@@ -258,12 +405,21 @@ export default function OrganizerEventTeamScreen() {
 
       <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
         <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-          {t('organizerTeamAddSectionTitle')}
+          {placeTeamSupported
+            ? 'Equipe du lieu'
+            : t('organizerTeamAddSectionTitle')}
         </Text>
+        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {placeTeamSupported
+            ? 'Ajoute des membres au lieu, puis assigne-les a cet evenement.'
+            : 'Aucun lieu lie a cet evenement. Mode legacy active.'}
+        </Text>
+
         <TextInput
           value={searchQuery}
           onChangeText={(value) => {
             setSearchQuery(value);
+            setSelectedSearchUserId('');
             setNewUserId('');
           }}
           placeholder={t('organizerTeamSearchPlaceholder')}
@@ -277,20 +433,23 @@ export default function OrganizerEventTeamScreen() {
             {searchLoading ? (
               <ActivityIndicator color="#4c669f" />
             ) : searchResults.length > 0 ? (
-              searchResults.slice(0, 5).map((user) => (
+              searchResults.slice(0, 5).map((candidate) => (
                 <TouchableOpacity
-                  key={user.id}
+                  key={candidate.id}
                   onPress={() => {
-                    setNewUserId(user.id);
-                    setSearchQuery(user.displayName || user.username || user.id);
+                    const label =
+                      candidate.displayName || candidate.username || candidate.id;
+                    setSearchQuery(label);
+                    setSelectedSearchUserId(candidate.id);
+                    setNewUserId(candidate.id);
                   }}
                   className="mb-2 rounded-lg bg-white px-3 py-2 dark:bg-gray-900"
                 >
                   <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {user.displayName || user.username || user.id}
+                    {candidate.displayName || candidate.username || candidate.id}
                   </Text>
                   <Text className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    @{user.username || 'unknown'}
+                    @{candidate.username || 'unknown'}
                   </Text>
                 </TouchableOpacity>
               ))
@@ -302,15 +461,60 @@ export default function OrganizerEventTeamScreen() {
           </View>
         ) : null}
 
-        <TextInput
-          value={newUserId}
-          onChangeText={setNewUserId}
-          placeholder={t('organizerTeamUserIdPlaceholder')}
-          placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
-          autoCapitalize="none"
-          className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-        />
+        {placeTeamSupported ? (
+          <TouchableOpacity
+            disabled={addingPlaceMember || !selectedSearchUserId}
+            onPress={() => {
+              void handleAddPlaceMember();
+            }}
+            className={`mt-4 rounded-[18px] px-4 py-3 ${
+              addingPlaceMember || !selectedSearchUserId
+                ? 'bg-[#92A5C7]'
+                : 'bg-[#4c669f]'
+            }`}
+          >
+            <Text className="text-center font-semibold text-white">
+              {addingPlaceMember ? 'Ajout en cours...' : 'Ajouter a l equipe du lieu'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TextInput
+              value={newUserId}
+              onChangeText={setNewUserId}
+              placeholder={t('organizerTeamUserIdPlaceholder')}
+              placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+              autoCapitalize="none"
+              className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
 
+            <TouchableOpacity
+              disabled={submitting}
+              onPress={() => {
+                void handleLegacyAddCollaborator();
+              }}
+              className={`mt-4 rounded-[18px] px-4 py-3 ${
+                submitting ? 'bg-[#92A5C7]' : 'bg-[#4c669f]'
+              }`}
+            >
+              <Text className="text-center font-semibold text-white">
+                {submitting ? t('organizerTeamAdding') : t('organizerTeamAddAction')}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {!placeTeamSupported && placeTeamMessage ? (
+          <Text className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+            {placeTeamMessage}
+          </Text>
+        ) : null}
+      </View>
+
+      <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
+        <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+          Permissions d affectation
+        </Text>
         <View className="mt-3 flex-row gap-2">
           <TouchableOpacity
             onPress={() => setNewPermission('EDIT')}
@@ -349,19 +553,83 @@ export default function OrganizerEventTeamScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          disabled={submitting}
-          onPress={() => void handleAdd()}
-          className={`mt-4 rounded-[18px] px-4 py-3 ${
-            submitting ? 'bg-[#92A5C7]' : 'bg-[#4c669f]'
-          }`}
-        >
-          <Text className="text-center font-semibold text-white">
-            {submitting ? t('organizerTeamAdding') : t('organizerTeamAddAction')}
-          </Text>
-        </TouchableOpacity>
       </View>
+
+      {placeTeamSupported ? (
+        <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
+          <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+            Membres du lieu ({placeTeam.length})
+          </Text>
+
+          {placeTeam.length === 0 ? (
+            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              Aucun membre dans l equipe du lieu pour le moment.
+            </Text>
+          ) : (
+            <View className="mt-3">
+              {placeTeam.map((member) => (
+                <View
+                  key={member.userId}
+                  className="mb-3 rounded-[18px] border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                    {member.User.displayName || member.User.username || member.userId}
+                  </Text>
+                  <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    @{member.User.username || 'unknown'}
+                  </Text>
+                  <View className="mt-2 flex-row items-center justify-between">
+                    <TouchableOpacity
+                      disabled={
+                        collaboratorIdSet.has(member.userId) ||
+                        assigningUserId === member.userId
+                      }
+                      onPress={() => {
+                        void handleAssignFromPlace(member.userId);
+                      }}
+                      className={`rounded-full px-3 py-1.5 ${
+                        collaboratorIdSet.has(member.userId)
+                          ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                          : 'bg-[#4c669f]'
+                      }`}
+                    >
+                      {assigningUserId === member.userId ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <Text
+                          className={`text-xs font-semibold ${
+                            collaboratorIdSet.has(member.userId)
+                              ? 'text-emerald-700 dark:text-emerald-300'
+                              : 'text-white'
+                          }`}
+                        >
+                          {collaboratorIdSet.has(member.userId)
+                            ? 'Deja assigne'
+                            : 'Assigner a l evenement'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleRemovePlaceMember(member.userId)}
+                      disabled={removingPlaceMemberId === member.userId}
+                      className="rounded-full bg-red-100 px-3 py-1.5 dark:bg-red-900/30"
+                    >
+                      {removingPlaceMemberId === member.userId ? (
+                        <ActivityIndicator color="#ef4444" size="small" />
+                      ) : (
+                        <Text className="text-xs font-semibold text-red-600 dark:text-red-300">
+                          {t('organizerTeamRemoveAction')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ) : null}
 
       <View className="mt-5 rounded-[24px] bg-white p-5 dark:bg-gray-900">
         <Text className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -392,7 +660,7 @@ export default function OrganizerEventTeamScreen() {
                       : t('organizerTeamPermissionEdit')}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => handleRemove(item.userId)}
+                    onPress={() => handleRemoveCollaborator(item.userId)}
                     className="rounded-full bg-red-100 px-3 py-1.5 dark:bg-red-900/30"
                   >
                     <Text className="text-xs font-semibold text-red-600 dark:text-red-300">
@@ -405,6 +673,14 @@ export default function OrganizerEventTeamScreen() {
           </View>
         )}
       </View>
+
+      {placeTeamSupported && assignablePlaceMembers.length === 0 ? (
+        <View className="mt-5 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800/50 dark:bg-emerald-900/20">
+          <Text className="text-sm text-emerald-700 dark:text-emerald-300">
+            Tous les membres du lieu sont deja assignes ou aucun membre n est disponible.
+          </Text>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }

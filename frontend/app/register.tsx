@@ -66,25 +66,39 @@ const ACCOUNT_OPTIONS: Record<
 
 function getStepTitleKey(step: number) {
   if (step === 1) {
-    return 'registerStepChoosePlace';
+    return 'registerStepSetupBasics';
   }
 
   if (step === 2) {
-    return 'registerStepSetupBasics';
+    return 'registerStepChoosePlace';
+  }
+
+  if (step === 3) {
+    return 'registerStepProFrame';
+  }
+
+  if (step === 4) {
+    return 'registerStepSocialFrame';
   }
 
   return 'registerStepProFrame';
 }
 
-function getStepDescriptionKey(step: number, accountType: AccountType) {
+function getStepDescriptionKey(step: number) {
   if (step === 1) {
-    return 'registerStepDescriptionChoose';
+    return 'registerStepDescriptionBasicsFirst';
   }
 
   if (step === 2) {
-    return accountType === 'USER'
-      ? 'registerStepDescriptionUser'
-      : 'registerStepDescriptionPro';
+    return 'registerStepDescriptionChooseAfterBasics';
+  }
+
+  if (step === 3) {
+    return 'registerStepDescriptionProCore';
+  }
+
+  if (step === 4) {
+    return 'registerStepDescriptionSocialOptional';
   }
 
   return 'registerStepDescriptionProDetails';
@@ -96,7 +110,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
-  const [accountType, setAccountType] = useState<AccountType>('USER');
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [companyName, setCompanyName] = useState('');
   const [ifuNumber, setIfuNumber] = useState('');
   const [payoutInfo, setPayoutInfo] = useState('');
@@ -112,15 +126,26 @@ export default function RegisterScreen() {
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
-  const accentColor = ACCOUNT_OPTIONS[accountType].accentColor;
-  const totalSteps = accountType === 'USER' ? 2 : 3;
+  const selectedAccountType = accountType || 'USER';
+  const accentColor = ACCOUNT_OPTIONS[selectedAccountType].accentColor;
+  const totalSteps = accountType === 'PLACE' || accountType === 'NOMAD' ? 4 : 2;
+  const isStepTwoAwaitingChoice = step === 2 && !accountType;
+  const isCtaDisabled = loading || isStepTwoAwaitingChoice;
 
   const ctaLabel = useMemo(() => {
     if (loading) {
       return '';
     }
 
+    if (step === 1) {
+      return t('registerCtaContinue');
+    }
+
     if (step === 2 && accountType !== 'USER') {
+      return t('registerCtaContinue');
+    }
+
+    if (step === 3) {
       return t('registerCtaContinue');
     }
 
@@ -129,17 +154,17 @@ export default function RegisterScreen() {
       : t('registerCtaSendRequest');
   }, [accountType, loading, step, t]);
 
-  const submitRegistration = async () => {
+  const submitRegistration = async (selectedType: AccountType) => {
     setLoading(true);
 
     try {
-      if (accountType !== 'USER') {
+      if (selectedType !== 'USER') {
         await api.post('/auth/register/organizer', {
           username,
           email,
           phoneNumber,
           password,
-          accountType,
+          accountType: selectedType,
           companyName,
           ifuNumber,
           payoutInfo,
@@ -181,7 +206,7 @@ export default function RegisterScreen() {
   };
 
   const handleNext = () => {
-    if (step === 2) {
+    if (step === 1) {
       if (!username || !email || !password || !phoneNumber) {
         Alert.alert(t('commonErrorTitle'), t('registerCredentialsRequired'));
         return;
@@ -192,8 +217,18 @@ export default function RegisterScreen() {
         return;
       }
 
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      if (!accountType) {
+        Alert.alert(t('commonErrorTitle'), t('registerSelectRoleRequired'));
+        return;
+      }
+
       if (accountType === 'USER') {
-        void submitRegistration();
+        void submitRegistration('USER');
       } else {
         setStep(3);
       }
@@ -201,13 +236,18 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (step === 3) {
+    if (step === 3 && accountType) {
       if (!companyName || !ifuNumber || !payoutInfo || !jobTitle) {
         Alert.alert(t('commonErrorTitle'), t('registerProInfoRequired'));
         return;
       }
 
-      void submitRegistration();
+      setStep(4);
+      return;
+    }
+
+    if (step === 4 && accountType) {
+      void submitRegistration(accountType);
     }
   };
 
@@ -218,7 +258,15 @@ export default function RegisterScreen() {
 
   const goBack = () => {
     if (step > 1) {
-      setStep((previousStep) => previousStep - 1);
+      if (step === 4) {
+        setStep(3);
+        return;
+      }
+      if (step === 3) {
+        setStep(2);
+        return;
+      }
+      setStep(1);
       return;
     }
 
@@ -262,7 +310,7 @@ export default function RegisterScreen() {
                 />
               </TouchableOpacity>
 
-              {step > 1 ? (
+              {step > 2 && accountType ? (
                 <View
                   className="rounded-full px-4 py-2"
                   style={{ backgroundColor: `${accentColor}22` }}
@@ -290,7 +338,7 @@ export default function RegisterScreen() {
                   isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}
               >
-                {t(getStepDescriptionKey(step, accountType))}
+                {t(getStepDescriptionKey(step))}
               </Text>
             </View>
 
@@ -308,38 +356,6 @@ export default function RegisterScreen() {
               />
 
               {step === 1 ? (
-                <View>
-                  <RoleOptionCard
-                    title={t(ACCOUNT_OPTIONS.USER.titleKey)}
-                    description={t(ACCOUNT_OPTIONS.USER.descriptionKey)}
-                    icon={ACCOUNT_OPTIONS.USER.icon}
-                    accentColor={ACCOUNT_OPTIONS.USER.accentColor}
-                    isDark={isDark}
-                    selected={accountType === 'USER'}
-                    onPress={() => selectAccountType('USER')}
-                  />
-                  <RoleOptionCard
-                    title={t(ACCOUNT_OPTIONS.PLACE.titleKey)}
-                    description={t(ACCOUNT_OPTIONS.PLACE.descriptionKey)}
-                    icon={ACCOUNT_OPTIONS.PLACE.icon}
-                    accentColor={ACCOUNT_OPTIONS.PLACE.accentColor}
-                    isDark={isDark}
-                    selected={accountType === 'PLACE'}
-                    onPress={() => selectAccountType('PLACE')}
-                  />
-                  <RoleOptionCard
-                    title={t(ACCOUNT_OPTIONS.NOMAD.titleKey)}
-                    description={t(ACCOUNT_OPTIONS.NOMAD.descriptionKey)}
-                    icon={ACCOUNT_OPTIONS.NOMAD.icon}
-                    accentColor={ACCOUNT_OPTIONS.NOMAD.accentColor}
-                    isDark={isDark}
-                    selected={accountType === 'NOMAD'}
-                    onPress={() => selectAccountType('NOMAD')}
-                  />
-                </View>
-              ) : null}
-
-              {step === 2 ? (
                 <View>
                   <AuthTextField
                     label={t('registerUsernameLabel')}
@@ -377,6 +393,45 @@ export default function RegisterScreen() {
                 </View>
               ) : null}
 
+              {step === 2 ? (
+                <View className="mt-1">
+                  <Text
+                    className={`mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                      isDark ? 'text-slate-400' : 'text-slate-600'
+                    }`}
+                  >
+                    {t('registerStepChoosePlace')}
+                  </Text>
+                  <RoleOptionCard
+                    title={t(ACCOUNT_OPTIONS.USER.titleKey)}
+                    description={t(ACCOUNT_OPTIONS.USER.descriptionKey)}
+                    icon={ACCOUNT_OPTIONS.USER.icon}
+                    accentColor={ACCOUNT_OPTIONS.USER.accentColor}
+                    isDark={isDark}
+                    selected={accountType === 'USER'}
+                    onPress={() => selectAccountType('USER')}
+                  />
+                  <RoleOptionCard
+                    title={t(ACCOUNT_OPTIONS.PLACE.titleKey)}
+                    description={t(ACCOUNT_OPTIONS.PLACE.descriptionKey)}
+                    icon={ACCOUNT_OPTIONS.PLACE.icon}
+                    accentColor={ACCOUNT_OPTIONS.PLACE.accentColor}
+                    isDark={isDark}
+                    selected={accountType === 'PLACE'}
+                    onPress={() => selectAccountType('PLACE')}
+                  />
+                  <RoleOptionCard
+                    title={t(ACCOUNT_OPTIONS.NOMAD.titleKey)}
+                    description={t(ACCOUNT_OPTIONS.NOMAD.descriptionKey)}
+                    icon={ACCOUNT_OPTIONS.NOMAD.icon}
+                    accentColor={ACCOUNT_OPTIONS.NOMAD.accentColor}
+                    isDark={isDark}
+                    selected={accountType === 'NOMAD'}
+                    onPress={() => selectAccountType('NOMAD')}
+                  />
+                </View>
+              ) : null}
+
               {step === 3 ? (
                 <View>
                   <AuthTextField
@@ -408,6 +463,11 @@ export default function RegisterScreen() {
                     placeholder={t('registerPayoutPlaceholder')}
                     hint={t('registerPayoutHint')}
                   />
+                </View>
+              ) : null}
+
+              {step === 4 ? (
+                <View>
                   <View className="mt-4">
                     <Text
                       className={`text-xs font-semibold uppercase tracking-[0.22em] ${
@@ -455,17 +515,21 @@ export default function RegisterScreen() {
                 </View>
               ) : null}
 
-              {step > 1 ? (
+              {step >= 1 ? (
                 <TouchableOpacity
                   onPress={handleNext}
-                  disabled={loading}
+                  disabled={isCtaDisabled}
                   activeOpacity={0.9}
                   className={`mt-4 h-14 self-stretch overflow-hidden rounded-[28px] ${
-                    loading ? 'opacity-70' : ''
+                    isCtaDisabled ? 'opacity-70' : ''
                   }`}
                 >
                   <LinearGradient
-                    colors={[accentColor, '#4c669f']}
+                    colors={
+                      isStepTwoAwaitingChoice
+                        ? ['#94a3b8', '#64748b']
+                        : [accentColor, '#4c669f']
+                    }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={StyleSheet.absoluteFillObject}
@@ -483,8 +547,8 @@ export default function RegisterScreen() {
               ) : null}
             </View>
 
-            {step === 1 ? (
-              <View className="mt-8 flex-row items-center justify-center">
+              {step === 1 ? (
+                <View className="mt-8 flex-row items-center justify-center">
                 <Text
                   className={`text-sm ${
                     isDark ? 'text-slate-300' : 'text-slate-700'
