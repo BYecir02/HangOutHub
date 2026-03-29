@@ -18,6 +18,7 @@ function resolvePreferredPort() {
 function resolveCorsOptions(): CorsOptions {
   const defaultAllowedOrigins = [
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://localhost:3001',
     'https://hang-out-hub-backoffice.vercel.app',
   ];
@@ -27,8 +28,9 @@ function resolveCorsOptions(): CorsOptions {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
-  const allowedOrigins =
-    envOrigins.length > 0 ? envOrigins : defaultAllowedOrigins;
+  const allowedOrigins = Array.from(
+    new Set([...defaultAllowedOrigins, ...envOrigins]),
+  );
 
   const isLocalOrigin = (origin: string) =>
     /^https?:\/\/localhost(?::\d+)?$/i.test(origin) ||
