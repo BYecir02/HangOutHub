@@ -743,17 +743,13 @@ export default function SocialFeed() {
             onPress={handleOpenSearch}
             className="mr-2 h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
           >
-            <Ionicons
-              name="search-outline"
-              size={22}
-              color="#4c669f"
-            />
+            <Ionicons name="search-outline" size={22} color="#4c669f" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleOpenMessages}
-            className="h-12 w-12 items-center justify-center rounded-2xl bg-[#4c669f]"
+            className="h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#ffffff" />
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#4c669f" />
           </TouchableOpacity>
         </View>
       </View>
