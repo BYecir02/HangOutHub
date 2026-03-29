@@ -30,6 +30,10 @@ function resolveCorsOptions(): CorsOptions {
   const allowedOrigins =
     envOrigins.length > 0 ? envOrigins : defaultAllowedOrigins;
 
+  const isLocalOrigin = (origin: string) =>
+    /^https?:\/\/localhost(?::\d+)?$/i.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i.test(origin);
+
   return {
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
@@ -40,7 +44,11 @@ function resolveCorsOptions(): CorsOptions {
         return;
       }
 
-      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      if (
+        allowedOrigins.includes('*') ||
+        allowedOrigins.includes(origin) ||
+        isLocalOrigin(origin)
+      ) {
         callback(null, true);
         return;
       }
