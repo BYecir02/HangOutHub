@@ -1,29 +1,36 @@
 import { Category } from '@/types';
+import type { AnimationObject } from 'lottie-react-native';
+import cultureAnimationJson from '@/assets/lottie/wired-lineal-1953-african-culture-hover-pinch.json';
+import natureAnimationJson from '@/assets/lottie/wired-lineal-1827-growing-plant-hover-pinch.json';
+import barAnimationJson from '@/assets/lottie/wired-lineal-1979-hookah-hover-pinch.json';
+import festivalAnimationJson from '@/assets/lottie/wired-lineal-1103-confetti-hover-pinch.json';
+
+type AnimationSource = AnimationObject | { uri: string };
 
 export type AnimationMeta = {
-  source: number | { uri: string };
+  source: AnimationSource;
   size: number;
   container: number;
 };
 
 const FALLBACK_ANIMATIONS: Record<string, AnimationMeta> = {
   culture: {
-    source: require('@/assets/lottie/wired-lineal-1953-african-culture-hover-pinch.json'),
+    source: cultureAnimationJson as AnimationObject,
     size: 32,
     container: 32,
   },
   nature: {
-    source: require('@/assets/lottie/wired-lineal-1827-growing-plant-hover-pinch.json'),
+    source: natureAnimationJson as AnimationObject,
     size: 32,
     container: 32,
   },
   bar: {
-    source: require('@/assets/lottie/wired-lineal-1979-hookah-hover-pinch.json'),
+    source: barAnimationJson as AnimationObject,
     size: 32,
     container: 32,
   },
   festival: {
-    source: require('@/assets/lottie/wired-lineal-1103-confetti-hover-pinch.json'),
+    source: festivalAnimationJson as AnimationObject,
     size: 32,
     container: 32,
   },
