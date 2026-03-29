@@ -1,9 +1,3 @@
-import { NestFactory } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
-
-import { AppModule } from '../src/app.module';
-import { resolveCorsOptions } from '../src/cors-options';
-
 type RequestHandler = (req: unknown, res: unknown) => unknown;
 type ServerRequest = {
   method?: string;
@@ -22,9 +16,16 @@ async function getHandler(): Promise<RequestHandler> {
     return cachedHandler;
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.enableCors(resolveCorsOptions());
+  const [{ NestFactory }, { AppModule }, { resolveCorsOptions }] =
+    await Promise.all([
+      import('@nestjs/core'),
+      import('../src/app.module'),
+      import('../src/cors-options'),
+    ]);
+
+  const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api/v1');
+  app.enableCors(resolveCorsOptions());
   await app.init();
 
   cachedHandler = app.getHttpAdapter().getInstance() as RequestHandler;
