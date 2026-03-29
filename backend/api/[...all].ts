@@ -19,8 +19,8 @@ async function getHandler(): Promise<RequestHandler> {
   const [{ NestFactory }, { AppModule }, { resolveCorsOptions }] =
     await Promise.all([
       import('@nestjs/core'),
-      import('../src/app.module'),
-      import('../src/cors-options'),
+      import('../src/app.module.js'),
+      import('../src/cors-options.js'),
     ]);
 
   const app = await NestFactory.create(AppModule);
