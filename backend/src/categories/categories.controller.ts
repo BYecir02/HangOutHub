@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -9,8 +10,13 @@ import {
   Patch,
   Request,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import type { Express } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCategoryTagDto } from './dto/create-category-tag.dto';
@@ -63,6 +69,35 @@ export class CategoriesController {
   ) {
     this.ensureAdmin(req);
     return this.categoriesService.updateCategory(id, body);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/animation')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 1_048_576, // 1MB
+      },
+    }),
+  )
+  updateAnimation(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.ensureAdmin(req);
+    return this.categoriesService.uploadCategoryAnimation(id, file);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/animation')
+  removeAnimation(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.ensureAdmin(req);
+    return this.categoriesService.removeCategoryAnimation(id);
   }
 
   @UseGuards(AuthGuard('jwt'))

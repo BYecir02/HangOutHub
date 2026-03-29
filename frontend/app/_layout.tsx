@@ -7,6 +7,15 @@ import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LogBox } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+
+import { useFonts } from 'expo-font';
+
+const poppinsFonts = {
+  Poppins_400Regular: require('../assets/fonts/Poppins_400Regular.ttf'),
+  Poppins_500Medium: require('../assets/fonts/Poppins_500Medium.ttf'),
+  Poppins_600SemiBold: require('../assets/fonts/Poppins_600SemiBold.ttf'),
+};
 
 import '../global.css';
 
@@ -53,6 +62,30 @@ export default function RootLayout() {
     setColorScheme(themePreference);
   }, [setColorScheme, themePreference]);
 
+  const [fontsLoaded] = useFonts(poppinsFonts);
+
+  useEffect(() => {
+    if (!fontsLoaded) {
+      return;
+    }
+
+    if (!Text.defaultProps) {
+      Text.defaultProps = {};
+    }
+    Text.defaultProps.style = {
+      ...(Text.defaultProps.style || {}),
+      fontFamily: 'Poppins_400Regular',
+    };
+
+    if (!TextInput.defaultProps) {
+      TextInput.defaultProps = {};
+    }
+    TextInput.defaultProps.style = {
+      ...(TextInput.defaultProps.style || {}),
+      fontFamily: 'Poppins_400Regular',
+    };
+  }, [fontsLoaded]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -82,6 +115,17 @@ export default function RootLayout() {
       isMounted = false;
     };
   }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
+        <ActivityIndicator size="large" color="#4c669f" />
+        <Text className="mt-2 text-gray-500 dark:text-gray-400">
+          Chargement en cours…
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

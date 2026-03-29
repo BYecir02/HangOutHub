@@ -79,7 +79,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-6">
       <Card className="w-full max-w-md p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+        <img
+          src={theme === 'dark' ? '/2.png' : '/1.png'}
+          alt="HangOutHub"
+          className="h-12 w-auto max-w-[220px] object-contain"
+        />
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
           HangOutHub
         </p>
         <h1 className="mt-3 text-2xl font-bold text-slate-900">

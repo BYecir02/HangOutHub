@@ -48,7 +48,12 @@ export default function Shell() {
         <aside className="flex w-full flex-col justify-between rounded-2xl bg-white p-6 shadow-soft lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-64">
           <div>
             <div className="mb-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+              <img
+                src={theme === 'dark' ? '/2.png' : '/1.png'}
+                alt="HangOutHub"
+                className="h-10 w-auto max-w-[180px] object-contain"
+              />
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
                 HangOutHub
               </p>
               <h1 className="mt-2 text-2xl font-bold text-slate-900">

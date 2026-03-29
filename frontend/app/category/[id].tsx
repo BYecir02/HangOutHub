@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import LottieView from 'lottie-react-native';
 
 import EventCard from '@/components/ui/EventCard';
 import PlaceCard from '@/components/ui/PlaceCard';
@@ -17,6 +18,10 @@ import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
+import {
+  AnimationMeta,
+  getCategoryAnimation,
+} from '@/utils/category-animations';
 
 interface CategoryTag {
   id: number;
@@ -29,6 +34,7 @@ interface CategoryResult {
     name: string;
     icon: string;
     color: string;
+    animationUrl?: string;
     Tag: CategoryTag[];
   };
   events: {
@@ -110,6 +116,9 @@ export default function CategoryDiscoverScreen() {
   const [data, setData] = useState<CategoryResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [badgeAnimation, setBadgeAnimation] = useState<AnimationMeta | null>(
+    null,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -129,6 +138,7 @@ export default function CategoryDiscoverScreen() {
         setData(cached);
         setLoading(false);
         setRefreshing(true);
+        setBadgeAnimation(getCategoryAnimation(cached.category));
       } else if (isMounted) {
         setLoading(true);
       }
@@ -141,10 +151,12 @@ export default function CategoryDiscoverScreen() {
         if (isMounted) {
           setData(response.data);
           setCategoryCache(params.id, response.data);
+        setBadgeAnimation(getCategoryAnimation(response.data.category));
         }
       } catch {
         if (isMounted && !isRefresh) {
           setData(null);
+          setBadgeAnimation(null);
         }
       } finally {
         if (isMounted) {
@@ -199,6 +211,7 @@ export default function CategoryDiscoverScreen() {
                 );
                 setData(response.data);
                 setCategoryCache(categoryId, response.data);
+                setBadgeAnimation(getCategoryAnimation(response.data.category));
               } finally {
                 setRefreshing(false);
               }
@@ -277,13 +290,37 @@ export default function CategoryDiscoverScreen() {
               <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#111827'} />
             </TouchableOpacity>
 
-            <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
-              {t('categoryHeaderLabel')}
-            </Text>
-            <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {data.category.name}
-            </Text>
-            <Text className="mt-3 max-w-[90%] text-base text-gray-600 dark:text-gray-300">
+            <View className="flex-row items-center">
+              <View className="mr-2 flex-shrink">
+                <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
+                  {t('categoryHeaderLabel')}
+                </Text>
+                <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {data.category.name}
+                </Text>
+              </View>
+              {badgeAnimation ? (
+                <View
+                  className="overflow-hidden rounded-full bg-white/30 dark:bg-gray-900/40"
+                  style={{
+                    height: badgeAnimation.container + 8,
+                    width: badgeAnimation.container + 8,
+                  }}
+                >
+                  <LottieView
+                    source={badgeAnimation.source}
+                    autoPlay
+                    loop
+                    style={{
+                      height: badgeAnimation.size + 8,
+                      width: badgeAnimation.size + 8,
+                    }}
+                  />
+                </View>
+              ) : null}
+            </View>
+
+            <Text className="mt-3 text-base text-gray-600 dark:text-gray-300">
               {t('categorySummary', {
                 places: data.places.length,
                 events: data.events.length,

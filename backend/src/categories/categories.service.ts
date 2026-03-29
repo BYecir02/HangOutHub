@@ -1,13 +1,23 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Express } from 'express';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   findAll() {
     return this.prisma.category.findMany({
@@ -60,6 +70,7 @@ export class CategoriesService {
         name,
         color: dto.color?.trim() || undefined,
         icon: dto.icon?.trim() || undefined,
+        animationUrl: dto.animationUrl?.trim() || undefined,
       },
     });
   }
@@ -71,6 +82,9 @@ export class CategoriesService {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.color !== undefined ? { color: dto.color.trim() } : {}),
         ...(dto.icon !== undefined ? { icon: dto.icon.trim() } : {}),
+        ...(dto.animationUrl !== undefined
+          ? { animationUrl: dto.animationUrl.trim() || null }
+          : {}),
       },
     });
   }
@@ -99,6 +113,30 @@ export class CategoriesService {
     return this.prisma.tag.update({
       where: { id: tagId },
       data,
+    });
+  }
+
+  async uploadCategoryAnimation(categoryId: number, file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Le fichier est requis.');
+    }
+
+    if (!file.mimetype?.includes('json')) {
+      throw new BadRequestException('Le fichier doit etre en format JSON.');
+    }
+
+    const url = await this.storage.uploadFile('category-animations', file);
+
+    return this.prisma.category.update({
+      where: { id: categoryId },
+      data: { animationUrl: url },
+    });
+  }
+
+  async removeCategoryAnimation(categoryId: number) {
+    return this.prisma.category.update({
+      where: { id: categoryId },
+      data: { animationUrl: null },
     });
   }
 

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { apiGet, apiPatch, apiPost } from '../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, apiUpload } from '../lib/api';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
 import SearchInput from '../components/SearchInput';
@@ -28,10 +28,148 @@ interface CategoryItem {
   name: string;
   color?: string | null;
   icon?: string | null;
+  animationUrl?: string | null;
   Tag: TagItem[];
 }
 
 const statusOptions = ['PENDING', 'APPROVED', 'REJECTED'];
+const LOTTIE_SCRIPT_ID = 'hangouthub-lottie-web';
+const LOTTIE_SCRIPT_SRC =
+  'https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js';
+
+interface LottieInstance {
+  destroy: () => void;
+}
+
+interface LottieLoader {
+  loadAnimation: (config: {
+    container: Element;
+    renderer: 'svg' | 'canvas' | 'html';
+    loop: boolean;
+    autoplay: boolean;
+    path?: string;
+    animationData?: unknown;
+  }) => LottieInstance;
+}
+
+interface LottieWindow extends Window {
+  lottie?: LottieLoader;
+}
+
+let lottieScriptPromise: Promise<void> | null = null;
+
+function ensureLottieScript() {
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+
+  if ((window as LottieWindow).lottie) {
+    return Promise.resolve();
+  }
+
+  if (lottieScriptPromise) {
+    return lottieScriptPromise;
+  }
+
+  lottieScriptPromise = new Promise<void>((resolve, reject) => {
+    const existingScript = document.getElementById(LOTTIE_SCRIPT_ID);
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(), { once: true });
+      existingScript.addEventListener('error', () => reject(), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = LOTTIE_SCRIPT_ID;
+    script.src = LOTTIE_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Lottie script load failed'));
+    document.body.appendChild(script);
+  });
+
+  return lottieScriptPromise;
+}
+
+function LottiePreview({
+  animationUrl,
+  animationData,
+}: {
+  animationUrl?: string | null;
+  animationData?: unknown;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [previewError, setPreviewError] = useState('');
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || (!animationData && !animationUrl)) {
+      return;
+    }
+
+    let animation: LottieInstance | null = null;
+    let cancelled = false;
+
+    const boot = async () => {
+      try {
+        await ensureLottieScript();
+        if (cancelled) {
+          return;
+        }
+        const lottie = (window as LottieWindow).lottie;
+        if (!lottie) {
+          setPreviewError('Impossible de charger le moteur de previsualisation.');
+          return;
+        }
+        container.innerHTML = '';
+        if (animationData) {
+          animation = lottie.loadAnimation({
+            container,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData,
+          });
+        } else if (animationUrl) {
+          animation = lottie.loadAnimation({
+            container,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            path: animationUrl,
+          });
+        }
+        setPreviewError('');
+      } catch {
+        setPreviewError('Apercu indisponible. Verifie la connexion internet.');
+      }
+    };
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+      animation?.destroy();
+    };
+  }, [animationData, animationUrl]);
+
+  if (!animationData && !animationUrl) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">
+        Aucun fichier a previsualiser.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 p-3">
+      <div ref={containerRef} className="mx-auto h-28 w-28" />
+      {previewError ? (
+        <p className="mt-2 text-center text-xs text-rose-500">{previewError}</p>
+      ) : null}
+    </div>
+  );
+}
 
 function normalizeStatus(status?: string | null) {
   return (status || 'PENDING').toUpperCase();
@@ -64,6 +202,10 @@ export default function CategoriesTagsPage() {
     categoryId: 0,
   });
   const [saving, setSaving] = useState(false);
+  const [animationFile, setAnimationFile] = useState<File | null>(null);
+  const [animationBusy, setAnimationBusy] = useState(false);
+  const [animationPreviewData, setAnimationPreviewData] = useState<unknown>(null);
+  const [animationPreviewError, setAnimationPreviewError] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -118,6 +260,14 @@ export default function CategoriesTagsPage() {
       });
     }
   }, [selectedCategory]);
+
+  useEffect(() => {
+    // Reset local preview state when switching category so the preview
+    // always reflects the currently selected category animation.
+    setAnimationFile(null);
+    setAnimationPreviewData(null);
+    setAnimationPreviewError('');
+  }, [selectedCategoryId]);
 
   const allTags = useMemo(
     () =>
@@ -204,6 +354,60 @@ export default function CategoriesTagsPage() {
       await load();
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAnimationFileChange = (file: File | null) => {
+    setAnimationFile(file);
+    setAnimationPreviewData(null);
+    setAnimationPreviewError('');
+
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        setAnimationPreviewData(parsed);
+      } catch {
+        setAnimationPreviewError('Le fichier JSON est invalide.');
+      }
+    };
+    reader.onerror = () => {
+      setAnimationPreviewError('Impossible de lire ce fichier.');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleUploadAnimation = async () => {
+    if (!selectedCategory || !animationFile) {
+      return;
+    }
+    setAnimationBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', animationFile);
+      await apiUpload(`/categories/${selectedCategory.id}/animation`, formData, 'POST');
+      setAnimationFile(null);
+      await load();
+    } finally {
+      setAnimationBusy(false);
+    }
+  };
+
+  const handleRemoveAnimation = async () => {
+    if (!selectedCategory || !selectedCategory.animationUrl) {
+      return;
+    }
+    setAnimationBusy(true);
+    try {
+      await apiDelete(`/categories/${selectedCategory.id}/animation`);
+      setAnimationFile(null);
+      await load();
+    } finally {
+      setAnimationBusy(false);
     }
   };
 
@@ -466,6 +670,83 @@ export default function CategoriesTagsPage() {
                     aria-label={`Choisir ${color}`}
                   />
                 ))}
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    Animation Lottie
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Fichier JSON (max 1 MB) pour animer la categorie dans l'app.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                  {selectedCategory?.animationUrl ? 'Active' : 'Aucune'}
+                </span>
+              </div>
+
+              {selectedCategory?.animationUrl ? (
+                <a
+                  href={selectedCategory.animationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 block truncate text-xs font-medium text-indigo-600 hover:underline"
+                >
+                  Voir le fichier actuel
+                </a>
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) =>
+                    handleAnimationFileChange(event.target.files?.[0] ?? null)
+                  }
+                  className="max-w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                />
+                <button
+                  type="button"
+                  onClick={handleUploadAnimation}
+                  disabled={
+                    !selectedCategory ||
+                    !animationFile ||
+                    animationBusy ||
+                    !!animationPreviewError
+                  }
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {animationBusy ? 'Upload...' : 'Uploader'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveAnimation}
+                  disabled={!selectedCategory?.animationUrl || animationBusy}
+                  className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                >
+                  Supprimer
+                </button>
+              </div>
+              {animationPreviewError ? (
+                <p className="mt-2 text-xs font-semibold text-rose-500">
+                  {animationPreviewError}
+                </p>
+              ) : null}
+              {animationFile ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Fichier selectionne: {animationFile.name}
+                </p>
+              ) : null}
+              <div className="mt-3">
+                <LottiePreview
+                  animationData={animationPreviewData}
+                  animationUrl={
+                    animationPreviewData ? null : selectedCategory?.animationUrl
+                  }
+                />
               </div>
             </div>
 

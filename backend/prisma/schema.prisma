@@ -28,6 +28,7 @@ model Category {
   name  String @db.VarChar(50)
   color String @default("#4c669f")
   icon  String @default("help-outline")
+  animationUrl String? @db.VarChar(255)
   Tag   Tag[]
 }
 
