@@ -1,5 +1,11 @@
 // c:\Users\Lenovo\Desktop\Git\HangOutHub\HangOutHub\backend\src\auth\dto\register-organizer.dto.ts
-import { IsString, IsNotEmpty, IsIn, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsIn,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
 
 export class RegisterOrganizerDto extends CreateUserDto {

@@ -82,11 +82,14 @@ export class PlacesService {
       );
     }
 
-    const { tagIds: rawTagIds, existingImages: rawExistingImages, ...rest } =
-      updatePlaceDto as UpdatePlaceDto & {
-        tagIds?: string;
-        existingImages?: string;
-      };
+    const {
+      tagIds: rawTagIds,
+      existingImages: rawExistingImages,
+      ...rest
+    } = updatePlaceDto as UpdatePlaceDto & {
+      tagIds?: string;
+      existingImages?: string;
+    };
     const data: Prisma.PlaceUpdateInput = { ...rest };
 
     const tagIds =
@@ -107,8 +110,11 @@ export class PlacesService {
     let existingImages: string[] | null = null;
     if (rawExistingImages !== undefined) {
       try {
-        const parsed = JSON.parse(rawExistingImages);
-        if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
+        const parsed: unknown = JSON.parse(rawExistingImages);
+        if (
+          !Array.isArray(parsed) ||
+          parsed.some((item) => typeof item !== 'string')
+        ) {
           throw new Error('invalid');
         }
         existingImages = parsed;
@@ -118,7 +124,8 @@ export class PlacesService {
     }
 
     if (existingImages !== null || uploadedGalleryUrls.length > 0) {
-      const baseImages = existingImages !== null ? existingImages : place.images;
+      const baseImages =
+        existingImages !== null ? existingImages : place.images;
       data.images = [...baseImages, ...uploadedGalleryUrls];
     }
 
@@ -172,7 +179,9 @@ export class PlacesService {
 
     const normalized = parsed.map((item) => Number(item));
     if (normalized.some((id) => !Number.isInteger(id) || id <= 0)) {
-      throw new BadRequestException('Chaque tag doit etre un id entier positif.');
+      throw new BadRequestException(
+        'Chaque tag doit etre un id entier positif.',
+      );
     }
 
     return Array.from(new Set(normalized));
@@ -394,7 +403,9 @@ export class PlacesService {
     const actorIsAdminOrOwner =
       normalizedActorRole === 'ADMIN' || place.ownerId === userId;
     if (!actorIsAdminOrOwner) {
-      const targetRows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+      const targetRows = await this.prisma.$queryRaw<
+        Array<{ role: string | null }>
+      >`
         SELECT "role"
         FROM "PlaceTeamMember"
         WHERE "placeId" = ${placeId}::uuid
@@ -545,8 +556,14 @@ export class PlacesService {
     });
   }
 
-  async upsertReview(placeId: string, userId: string, dto: CreatePlaceReviewDto) {
-    const place = await this.prisma.place.findUnique({ where: { id: placeId } });
+  async upsertReview(
+    placeId: string,
+    userId: string,
+    dto: CreatePlaceReviewDto,
+  ) {
+    const place = await this.prisma.place.findUnique({
+      where: { id: placeId },
+    });
 
     if (!place) {
       throw new NotFoundException('Lieu introuvable');

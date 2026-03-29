@@ -523,7 +523,9 @@ export class UsersService {
 
   async updateOrganizerStatus(userId: string, status: string) {
     const normalized = status.toUpperCase();
-    if (!['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'].includes(normalized)) {
+    if (
+      !['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'].includes(normalized)
+    ) {
       throw new BadRequestException('Statut organisateur invalide.');
     }
 
@@ -533,10 +535,7 @@ export class UsersService {
     });
   }
 
-  async activateProProfile(
-    userId: string,
-    activateDto: ActivateProProfileDto,
-  ) {
+  async activateProProfile(userId: string, activateDto: ActivateProProfileDto) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -715,7 +714,7 @@ export class UsersService {
     const reminderOffsetsInput = Array.isArray(
       updatePayload.organizerReminderOffsetsMin,
     )
-      ? (updatePayload.organizerReminderOffsetsMin as number[])
+      ? updatePayload.organizerReminderOffsetsMin
       : undefined;
     const normalizedReminderOffsets = reminderOffsetsInput
       ? this.normalizeReminderOffsets(reminderOffsetsInput)

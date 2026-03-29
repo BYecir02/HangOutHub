@@ -30,6 +30,12 @@ const directMessageInclude = Prisma.validator<Prisma.DirectMessageInclude>()({
   },
 });
 
+type ConversationMembership = {
+  id: string;
+  userOneId: string;
+  userTwoId: string;
+};
+
 @Injectable()
 export class DirectChatsService {
   constructor(
@@ -46,7 +52,9 @@ export class DirectChatsService {
 
   private async assertConnected(userId: string, otherUserId: string) {
     if (userId === otherUserId) {
-      throw new ForbiddenException('Vous ne pouvez pas discuter avec vous-meme.');
+      throw new ForbiddenException(
+        'Vous ne pouvez pas discuter avec vous-meme.',
+      );
     }
 
     const connection = await this.prisma.friendship.findFirst({
@@ -69,26 +77,46 @@ export class DirectChatsService {
     conversation: {
       userOneId: string;
       userTwoId: string;
-      UserOne: { id: string; username: string | null; displayName: string | null; avatarUrl: string | null };
-      UserTwo: { id: string; username: string | null; displayName: string | null; avatarUrl: string | null };
+      UserOne: {
+        id: string;
+        username: string | null;
+        displayName: string | null;
+        avatarUrl: string | null;
+      };
+      UserTwo: {
+        id: string;
+        username: string | null;
+        displayName: string | null;
+        avatarUrl: string | null;
+      };
     },
     userId: string,
   ) {
-    return conversation.userOneId === userId ? conversation.UserTwo : conversation.UserOne;
+    return conversation.userOneId === userId
+      ? conversation.UserTwo
+      : conversation.UserOne;
   }
 
-  private async assertMember(userId: string, conversationId: string) {
-    const conversation = await this.prisma.directConversation.findUnique({
+  private async assertMember(
+    userId: string,
+    conversationId: string,
+  ): Promise<ConversationMembership> {
+    const conversation = (await this.prisma.directConversation.findUnique({
       where: { id: conversationId },
       select: { id: true, userOneId: true, userTwoId: true },
-    });
+    })) as ConversationMembership | null;
 
     if (!conversation) {
       throw new NotFoundException('Discussion introuvable.');
     }
 
-    if (conversation.userOneId !== userId && conversation.userTwoId !== userId) {
-      throw new ForbiddenException("Vous n'etes pas autorise a acceder a cette discussion.");
+    if (
+      conversation.userOneId !== userId &&
+      conversation.userTwoId !== userId
+    ) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a acceder a cette discussion.",
+      );
     }
 
     return conversation;
@@ -250,8 +278,13 @@ export class DirectChatsService {
       throw new NotFoundException('Discussion introuvable.');
     }
 
-    if (conversation.userOneId !== userId && conversation.userTwoId !== userId) {
-      throw new ForbiddenException("Vous n'etes pas autorise a acceder a cette discussion.");
+    if (
+      conversation.userOneId !== userId &&
+      conversation.userTwoId !== userId
+    ) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a acceder a cette discussion.",
+      );
     }
 
     return {
@@ -356,16 +389,20 @@ export class DirectChatsService {
       payload.replyToMessageId,
     );
     const sharedPostId = await this.assertSharedPost(payload.sharedPostId);
-    const images = files.length > 0
-      ? await this.storageService.uploadFiles('direct-messages', files)
-      : [];
+    const images =
+      files.length > 0
+        ? await this.storageService.uploadFiles('direct-messages', files)
+        : [];
     if (!content && images.length === 0) {
       throw new ForbiddenException('Message vide.');
     }
 
     const recipientUserId = this.resolvePartnerId(conversation, userId);
     const recipientActiveInConversation =
-      this.directChatsGateway.isUserInConversation(recipientUserId, conversationId);
+      this.directChatsGateway.isUserInConversation(
+        recipientUserId,
+        conversationId,
+      );
     const deliveredAt = recipientActiveInConversation ? new Date() : null;
 
     const message = await this.prisma.directMessage.create({
@@ -386,14 +423,15 @@ export class DirectChatsService {
       where: { id: conversationId },
       data: {
         lastMessageAt: message.sentAt || new Date(),
-        ...(await this.getReadUpdatePayload(userId, conversationId, new Date())),
+        ...(await this.getReadUpdatePayload(
+          userId,
+          conversationId,
+          new Date(),
+        )),
       },
     });
 
-    this.directChatsGateway.emitMessageCreated(
-      conversationId,
-      message,
-    );
+    this.directChatsGateway.emitMessageCreated(conversationId, message);
     this.directChatsGateway.emitChatListUpdated(
       [userId, recipientUserId],
       conversationId,
@@ -427,11 +465,11 @@ export class DirectChatsService {
     }
 
     if (message.senderId !== userId) {
-      throw new ForbiddenException("Vous ne pouvez pas modifier ce message.");
+      throw new ForbiddenException('Vous ne pouvez pas modifier ce message.');
     }
 
     if (message.isDeleted) {
-      throw new ForbiddenException("Ce message a deja ete supprime.");
+      throw new ForbiddenException('Ce message a deja ete supprime.');
     }
 
     const content = payload.content?.trim() || '';
@@ -439,14 +477,8 @@ export class DirectChatsService {
       throw new ForbiddenException('Message vide.');
     }
 
-    const hasReplyToUpdate = Object.prototype.hasOwnProperty.call(
-      payload,
-      'replyToMessageId',
-    );
-    const hasSharedPostUpdate = Object.prototype.hasOwnProperty.call(
-      payload,
-      'sharedPostId',
-    );
+    const hasReplyToUpdate = Object.hasOwn(payload, 'replyToMessageId');
+    const hasSharedPostUpdate = Object.hasOwn(payload, 'sharedPostId');
 
     const replyToMessageId = hasReplyToUpdate
       ? await this.assertReplyTarget(conversationId, payload.replyToMessageId)
@@ -456,7 +488,9 @@ export class DirectChatsService {
       : message.sharedPostId;
 
     if (replyToMessageId && replyToMessageId === messageId) {
-      throw new ForbiddenException('Un message ne peut pas repondre a lui-meme.');
+      throw new ForbiddenException(
+        'Un message ne peut pas repondre a lui-meme.',
+      );
     }
 
     const updated = await this.prisma.directMessage.update({
@@ -500,7 +534,7 @@ export class DirectChatsService {
     }
 
     if (message.senderId !== userId) {
-      throw new ForbiddenException("Vous ne pouvez pas supprimer ce message.");
+      throw new ForbiddenException('Vous ne pouvez pas supprimer ce message.');
     }
 
     if (message.isDeleted) {
@@ -583,7 +617,9 @@ export class DirectChatsService {
     }
 
     if (message.isDeleted) {
-      throw new ForbiddenException("Reaction impossible sur un message supprime.");
+      throw new ForbiddenException(
+        'Reaction impossible sur un message supprime.',
+      );
     }
 
     const reaction = await this.prisma.directMessageReaction.upsert({
@@ -612,7 +648,11 @@ export class DirectChatsService {
     return reaction;
   }
 
-  async removeReaction(userId: string, conversationId: string, messageId: string) {
+  async removeReaction(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+  ) {
     await this.assertMember(userId, conversationId);
 
     const message = await this.prisma.directMessage.findFirst({
@@ -645,7 +685,11 @@ export class DirectChatsService {
 
   private async touchReadAt(userId: string, conversationId: string) {
     const now = new Date();
-    const payload = await this.getReadUpdatePayload(userId, conversationId, now);
+    const payload = await this.getReadUpdatePayload(
+      userId,
+      conversationId,
+      now,
+    );
     await this.prisma.directConversation.update({
       where: { id: conversationId },
       data: payload,

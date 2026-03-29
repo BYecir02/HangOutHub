@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
 
@@ -79,7 +83,9 @@ export class ReportsService {
       } else if (targetType === 'REVIEW') {
         await this.prisma.review.delete({ where: { id: report.targetId } });
       } else {
-        throw new BadRequestException('Suppression non supportee pour ce type.');
+        throw new BadRequestException(
+          'Suppression non supportee pour ce type.',
+        );
       }
     }
 

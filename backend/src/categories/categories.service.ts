@@ -170,11 +170,17 @@ export class CategoriesService {
     });
   }
 
-  async createTagForCategory(categoryId: number, userId: string, rawName: string) {
+  async createTagForCategory(
+    categoryId: number,
+    userId: string,
+    rawName: string,
+  ) {
     const normalizedName = rawName.replace(/\s+/g, ' ').trim();
 
     if (normalizedName.length < 2) {
-      throw new ConflictException('Le tag doit contenir au moins 2 caracteres.');
+      throw new ConflictException(
+        'Le tag doit contenir au moins 2 caracteres.',
+      );
     }
 
     const category = await this.prisma.category.findUnique({

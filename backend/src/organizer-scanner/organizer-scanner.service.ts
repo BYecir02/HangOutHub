@@ -18,13 +18,11 @@ export interface VerifyScanResult {
   status: ScanStatus;
   bookingId: string | null;
   eventId: string | null;
-  checkInWindow:
-    | {
-        opensAt: string;
-        closesAt: string;
-        reason: 'TOO_EARLY' | 'TOO_LATE';
-      }
-    | null;
+  checkInWindow: {
+    opensAt: string;
+    closesAt: string;
+    reason: 'TOO_EARLY' | 'TOO_LATE';
+  } | null;
   attendee: {
     id: string;
     displayName: string | null;
@@ -86,7 +84,8 @@ export class OrganizerScannerService {
         },
       });
 
-      const organizerStatus = scannerUser?.OrganizerProfile?.status || 'PENDING';
+      const organizerStatus =
+        scannerUser?.OrganizerProfile?.status || 'PENDING';
       if (['PENDING', 'REJECTED', 'SUSPENDED'].includes(organizerStatus)) {
         throw new ForbiddenException('UNAUTHORIZED_SCANNER');
       }
@@ -189,8 +188,10 @@ export class OrganizerScannerService {
 
     const isAuthorizedForEvent =
       normalizedRole === 'ADMIN' ||
-      (normalizedRole === 'ORGANIZER' && booking.Event.organizerId === userId) ||
-      (normalizedRole === 'PLACE_OWNER' && booking.Event.Place?.ownerId === userId) ||
+      (normalizedRole === 'ORGANIZER' &&
+        booking.Event.organizerId === userId) ||
+      (normalizedRole === 'PLACE_OWNER' &&
+        booking.Event.Place?.ownerId === userId) ||
       hasPlaceTeamRoleAtLeast(placeTeamRole, 'SCANNER') ||
       ['SCAN', 'EDIT'].includes(
         booking.Event.EventCollaborator[0]?.permission?.toUpperCase() || '',
@@ -205,8 +206,10 @@ export class OrganizerScannerService {
     }
 
     const now = new Date();
-    const checkInOpensAtOffsetMin = booking.Event.checkInOpensAtOffsetMin ?? -60;
-    const checkInClosesAtOffsetMin = booking.Event.checkInClosesAtOffsetMin ?? 180;
+    const checkInOpensAtOffsetMin =
+      booking.Event.checkInOpensAtOffsetMin ?? -60;
+    const checkInClosesAtOffsetMin =
+      booking.Event.checkInClosesAtOffsetMin ?? 180;
     const checkInOpensAt = new Date(
       booking.Event.startTime.getTime() + checkInOpensAtOffsetMin * 60_000,
     );

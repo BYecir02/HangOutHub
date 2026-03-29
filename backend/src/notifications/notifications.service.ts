@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 
 import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
@@ -56,7 +61,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       return true;
     }
 
-    const membershipRows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+    const membershipRows = await this.prisma.$queryRaw<
+      Array<{ role: string | null }>
+    >`
       SELECT "role"
       FROM "PlaceTeamMember"
       WHERE "userId" = ${userId}::uuid
@@ -67,7 +74,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private normalizeReminderOffsets(offsets: number[] | null | undefined): number[] {
+  private normalizeReminderOffsets(
+    offsets: number[] | null | undefined,
+  ): number[] {
     if (!Array.isArray(offsets)) {
       return [];
     }
@@ -84,13 +93,15 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       .slice(0, 3);
   }
 
-  private resolveReminderOffsets(settings?: {
-    organizerReminderMode?: string | null;
-    organizerReminderOffsetsMin?: number[] | null;
-    organizerNotifyReminderD1?: boolean | null;
-    organizerNotifyReminderH3?: boolean | null;
-    organizerNotifyReminderH1?: boolean | null;
-  } | null): number[] {
+  private resolveReminderOffsets(
+    settings?: {
+      organizerReminderMode?: string | null;
+      organizerReminderOffsetsMin?: number[] | null;
+      organizerNotifyReminderD1?: boolean | null;
+      organizerNotifyReminderH3?: boolean | null;
+      organizerNotifyReminderH1?: boolean | null;
+    } | null,
+  ): number[] {
     const customOffsets =
       settings?.organizerReminderMode === 'custom'
         ? this.normalizeReminderOffsets(settings.organizerReminderOffsetsMin)
@@ -116,9 +127,12 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
-    this.remindersInterval = setInterval(() => {
-      void this.emitUpcomingEventReminders();
-    }, 15 * 60 * 1000);
+    this.remindersInterval = setInterval(
+      () => {
+        void this.emitUpcomingEventReminders();
+      },
+      15 * 60 * 1000,
+    );
 
     // Premier passage au boot pour limiter le délai de prise en compte.
     void this.emitUpcomingEventReminders();
@@ -376,7 +390,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         );
         const maxWindowMs = reminderOffsetMs;
         const reminderSeverity =
-          reminderOffsetMin <= 90 ? ('URGENT' as const) : ('IMPORTANT' as const);
+          reminderOffsetMin <= 90
+            ? ('URGENT' as const)
+            : ('IMPORTANT' as const);
         const reminderLabel =
           reminderOffsetMin >= 60
             ? `dans ${Math.floor(reminderOffsetMin / 60)}h`

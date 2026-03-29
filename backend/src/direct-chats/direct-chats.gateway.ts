@@ -32,6 +32,10 @@ type ReactionPayload = {
   emoji: string | null;
 };
 
+type ClientSocketData = {
+  userId?: string;
+};
+
 @WebSocketGateway({
   namespace: '/direct-chats',
   cors: {
@@ -74,8 +78,8 @@ export class DirectChatsGateway
       }
 
       const userId = payload.sub;
-      client.data.userId = userId;
-      client.join(this.getUserRoom(userId));
+      this.setClientUserId(client, userId);
+      await client.join(this.getUserRoom(userId));
 
       if (!this.connectedUsers.has(userId)) {
         this.connectedUsers.set(userId, new Set());
@@ -88,7 +92,7 @@ export class DirectChatsGateway
   }
 
   handleDisconnect(client: Socket) {
-    const userId: string | undefined = client.data?.userId;
+    const userId = this.getClientUserId(client);
     if (!userId) {
       return;
     }
@@ -105,7 +109,7 @@ export class DirectChatsGateway
     client: Socket,
     payload: ConversationJoinPayload,
   ) {
-    const userId: string | undefined = client.data?.userId;
+    const userId = this.getClientUserId(client);
     const conversationId = payload?.conversationId?.trim();
 
     if (!userId || !conversationId) {
@@ -124,7 +128,7 @@ export class DirectChatsGateway
       return { ok: false };
     }
 
-    client.join(this.getConversationRoom(conversationId));
+    await client.join(this.getConversationRoom(conversationId));
 
     const deliveredAt = new Date();
     await this.prisma.directMessage.updateMany({
@@ -152,13 +156,13 @@ export class DirectChatsGateway
       return { ok: false };
     }
 
-    client.leave(this.getConversationRoom(conversationId));
+    await client.leave(this.getConversationRoom(conversationId));
     return { ok: true };
   }
 
   @SubscribeMessage('chat:typing')
   async handleTyping(client: Socket, payload: TypingPayload) {
-    const userId: string | undefined = client.data?.userId;
+    const userId = this.getClientUserId(client);
     const conversationId = payload?.conversationId?.trim();
     const isTyping = Boolean(payload?.isTyping);
 
@@ -185,14 +189,10 @@ export class DirectChatsGateway
     return { ok: true };
   }
 
-  emitMessageCreated(
-    conversationId: string,
-    message: unknown,
-  ) {
-    this.server.to(this.getConversationRoom(conversationId)).emit(
-      'message:new',
-      message,
-    );
+  emitMessageCreated(conversationId: string, message: unknown) {
+    this.server
+      .to(this.getConversationRoom(conversationId))
+      .emit('message:new', message);
   }
 
   emitChatListUpdated(userIds: string[], conversationId: string) {
@@ -205,17 +205,15 @@ export class DirectChatsGateway
   }
 
   emitMessageUpdated(conversationId: string, message: unknown) {
-    this.server.to(this.getConversationRoom(conversationId)).emit(
-      'message:updated',
-      message,
-    );
+    this.server
+      .to(this.getConversationRoom(conversationId))
+      .emit('message:updated', message);
   }
 
   emitReactionUpdated(conversationId: string, payload: ReactionPayload) {
-    this.server.to(this.getConversationRoom(conversationId)).emit(
-      'message:reaction',
-      payload,
-    );
+    this.server
+      .to(this.getConversationRoom(conversationId))
+      .emit('message:reaction', payload);
   }
 
   emitReadUpdated(conversationId: string, userId: string, readAt: Date) {
@@ -225,7 +223,11 @@ export class DirectChatsGateway
     });
   }
 
-  emitDeliveredUpdated(conversationId: string, userId: string, deliveredAt: Date) {
+  emitDeliveredUpdated(
+    conversationId: string,
+    userId: string,
+    deliveredAt: Date,
+  ) {
     this.server
       .to(this.getConversationRoom(conversationId))
       .emit('chat:delivered', {
@@ -279,9 +281,9 @@ export class DirectChatsGateway
       });
       return Boolean(
         session &&
-          session.userId === payload.sub &&
-          !session.revokedAt &&
-          (!session.expiresAt || session.expiresAt > now),
+        session.userId === payload.sub &&
+        !session.revokedAt &&
+        (!session.expiresAt || session.expiresAt > now),
       );
     }
 
@@ -297,5 +299,15 @@ export class DirectChatsGateway
 
   private getConversationRoom(conversationId: string) {
     return `conversation:${conversationId}`;
+  }
+
+  private setClientUserId(client: Socket, userId: string) {
+    const socketData = client.data as ClientSocketData;
+    socketData.userId = userId;
+  }
+
+  private getClientUserId(client: Socket) {
+    const socketData = client.data as ClientSocketData;
+    return socketData.userId;
   }
 }

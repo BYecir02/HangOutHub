@@ -208,7 +208,7 @@ export class PostsService {
         return [];
       }
       try {
-        const parsed = JSON.parse(value);
+        const parsed: unknown = JSON.parse(value);
         return Array.isArray(parsed)
           ? parsed.filter((item): item is string => typeof item === 'string')
           : [];
@@ -841,7 +841,7 @@ export class PostsService {
         return [];
       }
       try {
-        const parsed = JSON.parse(value);
+        const parsed: unknown = JSON.parse(value);
         return Array.isArray(parsed)
           ? parsed.filter((item): item is string => typeof item === 'string')
           : [];
@@ -849,12 +849,8 @@ export class PostsService {
         return [];
       }
     };
-    const {
-      existingImages,
-      visibilityUserIds,
-      publicationScope,
-      ...rest
-    } = updatePostDto;
+    const { existingImages, visibilityUserIds, publicationScope, ...rest } =
+      updatePostDto;
     const nextPublicationScope = this.normalizePublicationScope(
       publicationScope,
       this.normalizePublicationScope(
@@ -866,7 +862,7 @@ export class PostsService {
     let retainedImages: string[] = [];
     if (existingImages) {
       try {
-        const parsed = JSON.parse(existingImages);
+        const parsed: unknown = JSON.parse(existingImages);
         if (Array.isArray(parsed)) {
           retainedImages = parsed.filter((image) => typeof image === 'string');
         }

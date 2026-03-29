@@ -55,4 +55,3 @@ export class ActivateProProfileDto {
   @MaxLength(255)
   websiteUrl?: string;
 }
-

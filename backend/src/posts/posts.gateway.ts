@@ -1,6 +1,4 @@
-import {
-  Logger,
-} from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -16,6 +14,10 @@ type AuthPayload = {
   sub: string;
   sid?: string;
   type?: 'access' | 'refresh';
+};
+
+type ClientSocketData = {
+  userId?: string;
 };
 
 @WebSocketGateway({
@@ -58,8 +60,8 @@ export class PostsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const userId = payload.sub;
-      client.data.userId = userId;
-      client.join(this.getUserRoom(userId));
+      this.setClientUserId(client, userId);
+      await client.join(this.getUserRoom(userId));
 
       if (!this.connectedUsers.has(userId)) {
         this.connectedUsers.set(userId, new Set());
@@ -72,7 +74,7 @@ export class PostsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
-    const userId: string | undefined = client.data?.userId;
+    const userId = this.getClientUserId(client);
     if (!userId) {
       return;
     }
@@ -84,14 +86,17 @@ export class PostsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  emitNewPost(post: {
-    id: string;
-    userId: string;
-    visibility?: string | null;
-    visibilityUserIds?: string[] | null;
-    _count?: { likes?: number; comments?: number };
-    [key: string]: unknown;
-  }, audience: { type: 'public' } | { type: 'users'; userIds: string[] }) {
+  emitNewPost(
+    post: {
+      id: string;
+      userId: string;
+      visibility?: string | null;
+      visibilityUserIds?: string[] | null;
+      _count?: { likes?: number; comments?: number };
+      [key: string]: unknown;
+    },
+    audience: { type: 'public' } | { type: 'users'; userIds: string[] },
+  ) {
     const recipients =
       audience.type === 'public'
         ? Array.from(this.connectedUsers.keys())
@@ -160,5 +165,15 @@ export class PostsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private getUserRoom(userId: string) {
     return `user:${userId}`;
+  }
+
+  private setClientUserId(client: Socket, userId: string) {
+    const socketData = client.data as ClientSocketData;
+    socketData.userId = userId;
+  }
+
+  private getClientUserId(client: Socket) {
+    const socketData = client.data as ClientSocketData;
+    return socketData.userId;
   }
 }

@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -277,8 +281,15 @@ export class AuthService {
       return;
     }
 
-    const decoded = this.jwtService.decode(token) as { sid?: string } | null;
-    const sessionToken = decoded?.sid || token;
+    const decoded: unknown = this.jwtService.decode(token);
+    const sessionToken =
+      typeof decoded === 'object' &&
+      decoded !== null &&
+      'sid' in decoded &&
+      typeof decoded.sid === 'string' &&
+      decoded.sid.trim().length > 0
+        ? decoded.sid
+        : token;
 
     // Le .deleteMany evite une erreur si le token n'existe pas deja.
     await this.prisma.session.deleteMany({ where: { token: sessionToken } });

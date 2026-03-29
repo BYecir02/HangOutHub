@@ -325,9 +325,10 @@ export class EventsService {
       };
 
       const name = (candidate.name || '').trim();
-      const description = typeof candidate.description === 'string'
-        ? candidate.description.trim()
-        : '';
+      const description =
+        typeof candidate.description === 'string'
+          ? candidate.description.trim()
+          : '';
       const price = Number(candidate.price || 0);
       const quantity = Number(candidate.quantity || 0);
 
@@ -355,7 +356,9 @@ export class EventsService {
     for (const ticketType of normalized) {
       const key = ticketType.name.toLowerCase();
       if (dedup.has(key)) {
-        throw new BadRequestException('Les noms de tarifs doivent etre uniques.');
+        throw new BadRequestException(
+          'Les noms de tarifs doivent etre uniques.',
+        );
       }
       dedup.add(key);
     }
@@ -676,7 +679,9 @@ export class EventsService {
     }
 
     if (event.placeId) {
-      const inPlaceTeam = await this.prisma.$queryRaw<Array<{ userId: string }>>`
+      const inPlaceTeam = await this.prisma.$queryRaw<
+        Array<{ userId: string }>
+      >`
         SELECT "userId"
         FROM "PlaceTeamMember"
         WHERE "placeId" = ${event.placeId}::uuid
@@ -825,7 +830,7 @@ export class EventsService {
 
     if (!event.placeId) {
       throw new BadRequestException(
-        "Cet evenement n est pas rattache a un lieu. L equipe de lieu n est pas disponible.",
+        'Cet evenement n est pas rattache a un lieu. L equipe de lieu n est pas disponible.',
       );
     }
 
@@ -857,7 +862,7 @@ export class EventsService {
 
     if (!event.placeId) {
       throw new BadRequestException(
-        "Cet evenement n est pas rattache a un lieu. Impossible de gerer une equipe de lieu.",
+        'Cet evenement n est pas rattache a un lieu. Impossible de gerer une equipe de lieu.',
       );
     }
 
@@ -873,7 +878,7 @@ export class EventsService {
 
     if (!event.placeId) {
       throw new BadRequestException(
-        "Cet evenement n est pas rattache a un lieu. Impossible de gerer une equipe de lieu.",
+        'Cet evenement n est pas rattache a un lieu. Impossible de gerer une equipe de lieu.',
       );
     }
 
@@ -931,7 +936,9 @@ export class EventsService {
       normalizedRole === 'ADMIN' ||
       (normalizedRole === 'PLACE_OWNER' && event.Place?.ownerId === userId);
     if (!actorIsAdminOrOwner) {
-      const targetRows = await this.prisma.$queryRaw<Array<{ role: string | null }>>`
+      const targetRows = await this.prisma.$queryRaw<
+        Array<{ role: string | null }>
+      >`
         SELECT "role"
         FROM "PlaceTeamMember"
         WHERE "placeId" = ${event.placeId}::uuid
@@ -1026,7 +1033,9 @@ export class EventsService {
 
     const normalized = parsed.map((item) => Number(item));
     if (normalized.some((id) => !Number.isInteger(id) || id <= 0)) {
-      throw new BadRequestException('Chaque tag doit avoir un id entier positif.');
+      throw new BadRequestException(
+        'Chaque tag doit avoir un id entier positif.',
+      );
     }
 
     return Array.from(new Set(normalized));
@@ -1076,9 +1085,13 @@ export class EventsService {
       throw new BadRequestException('Le quota du promo code est invalide.');
     }
 
-    const promoEndsAt = payload.promoEndsAt ? new Date(payload.promoEndsAt) : null;
+    const promoEndsAt = payload.promoEndsAt
+      ? new Date(payload.promoEndsAt)
+      : null;
     if (promoEndsAt && Number.isNaN(promoEndsAt.getTime())) {
-      throw new BadRequestException('La date de fin du promo code est invalide.');
+      throw new BadRequestException(
+        'La date de fin du promo code est invalide.',
+      );
     }
 
     return {
@@ -1155,7 +1168,9 @@ export class EventsService {
         ? await this.storageService.uploadFiles('events', files.gallery)
         : [];
 
-    const ticketTypes = this.parseTicketTypesPayload(createEventDto.ticketTypes);
+    const ticketTypes = this.parseTicketTypesPayload(
+      createEventDto.ticketTypes,
+    );
     const tagIds = this.parseTagIdsPayload(createEventDto.tagIds);
     const checkInOpensAtOffsetMin =
       createEventDto.checkInOpensAtOffsetMin ?? -60;
@@ -1285,12 +1300,16 @@ export class EventsService {
 
   async findMine(userId: string, role: string) {
     const normalizedRole = role.toUpperCase();
-    const teamPlaceRows = await this.prisma.$queryRaw<Array<{ placeId: string }>>`
+    const teamPlaceRows = await this.prisma.$queryRaw<
+      Array<{ placeId: string }>
+    >`
       SELECT "placeId"
       FROM "PlaceTeamMember"
       WHERE "userId" = ${userId}::uuid
     `;
-    const teamPlaceIds = Array.from(new Set(teamPlaceRows.map((row) => row.placeId)));
+    const teamPlaceIds = Array.from(
+      new Set(teamPlaceRows.map((row) => row.placeId)),
+    );
 
     const orWhere: Prisma.EventWhereInput[] = [];
     if (normalizedRole === 'ADMIN' || normalizedRole === 'ORGANIZER') {
@@ -1416,7 +1435,9 @@ export class EventsService {
         organizerId: userId,
       };
     } else {
-      const managerPlaceRows = await this.prisma.$queryRaw<Array<{ placeId: string }>>`
+      const managerPlaceRows = await this.prisma.$queryRaw<
+        Array<{ placeId: string }>
+      >`
         SELECT "placeId"
         FROM "PlaceTeamMember"
         WHERE "userId" = ${userId}::uuid
@@ -1478,7 +1499,10 @@ export class EventsService {
     });
 
     const ticketPriceById = new Map<string, number>();
-    const ticketMetaById = new Map<string, { name: string; eventId: string; eventTitle: string }>();
+    const ticketMetaById = new Map<
+      string,
+      { name: string; eventId: string; eventTitle: string }
+    >();
     const salesByTicketMap = new Map<
       string,
       {
@@ -1492,7 +1516,12 @@ export class EventsService {
     >();
     const salesByPeriodMap = new Map<
       string,
-      { period: string; eventsCount: number; bookingsConfirmed: number; revenue: number }
+      {
+        period: string;
+        eventsCount: number;
+        bookingsConfirmed: number;
+        revenue: number;
+      }
     >();
     const attendees = new Set<string>();
 
@@ -1509,7 +1538,9 @@ export class EventsService {
 
     const topEvents = events.map((event) => {
       const eventStartTs = new Date(event.startTime).getTime();
-      const eventEndTs = event.endTime ? new Date(event.endTime).getTime() : Number.NaN;
+      const eventEndTs = event.endTime
+        ? new Date(event.endTime).getTime()
+        : Number.NaN;
 
       if (Number.isFinite(eventStartTs) && eventStartTs > now) {
         upcomingEvents += 1;
@@ -1521,7 +1552,10 @@ export class EventsService {
 
       for (const ticket of event.TicketType) {
         const normalizedPrice = Number(ticket.price || 0);
-        ticketPriceById.set(ticket.id, Number.isFinite(normalizedPrice) ? normalizedPrice : 0);
+        ticketPriceById.set(
+          ticket.id,
+          Number.isFinite(normalizedPrice) ? normalizedPrice : 0,
+        );
         ticketMetaById.set(ticket.id, {
           name: ticket.name,
           eventId: event.id,
@@ -1569,9 +1603,12 @@ export class EventsService {
           attendees.add(booking.userId);
 
           const ticketRevenue = booking.ticketTypeId
-            ? ticketPriceById.get(booking.ticketTypeId) ?? Number(event.entryFee || 0)
+            ? (ticketPriceById.get(booking.ticketTypeId) ??
+              Number(event.entryFee || 0))
             : Number(event.entryFee || 0);
-          const normalizedRevenue = Number.isFinite(ticketRevenue) ? ticketRevenue : 0;
+          const normalizedRevenue = Number.isFinite(ticketRevenue)
+            ? ticketRevenue
+            : 0;
 
           grossRevenue += normalizedRevenue;
           eventRevenue += normalizedRevenue;
@@ -1585,7 +1622,9 @@ export class EventsService {
           if (booking.ticketTypeId) {
             const ticketMeta = ticketMetaById.get(booking.ticketTypeId);
             if (ticketMeta) {
-              const existingTicketSales = salesByTicketMap.get(booking.ticketTypeId) || {
+              const existingTicketSales = salesByTicketMap.get(
+                booking.ticketTypeId,
+              ) || {
                 ticketTypeId: booking.ticketTypeId,
                 name: ticketMeta.name,
                 eventId: ticketMeta.eventId,
@@ -1816,8 +1855,10 @@ export class EventsService {
           promoType:
             payload.promoType !== undefined
               ? payload.promoType
-              : ((event.Promotion[0]?.discountType as 'PERCENT' | 'FIXED' | undefined) ||
-                undefined),
+              : (event.Promotion[0]?.discountType as
+                  | 'PERCENT'
+                  | 'FIXED'
+                  | undefined) || undefined,
           promoValue:
             payload.promoValue !== undefined
               ? payload.promoValue
@@ -1840,10 +1881,7 @@ export class EventsService {
             ...(isAdmin
               ? {}
               : {
-                  OR: [
-                    { status: 'APPROVED' },
-                    { submittedByUserId: userId },
-                  ],
+                  OR: [{ status: 'APPROVED' }, { submittedByUserId: userId }],
                 }),
           },
         });
@@ -1866,8 +1904,11 @@ export class EventsService {
     let existingImages: string[] | null = null;
     if (payload.existingImages !== undefined) {
       try {
-        const parsed = JSON.parse(payload.existingImages);
-        if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
+        const parsed: unknown = JSON.parse(payload.existingImages);
+        if (
+          !Array.isArray(parsed) ||
+          parsed.some((item) => typeof item !== 'string')
+        ) {
           throw new Error('invalid');
         }
         existingImages = parsed;
@@ -1885,7 +1926,8 @@ export class EventsService {
 
     let nextImages: string[] | undefined;
     if (existingImages !== null || uploadedGalleryUrls.length > 0) {
-      const baseImages = existingImages !== null ? existingImages : event.images;
+      const baseImages =
+        existingImages !== null ? existingImages : event.images;
       nextImages = [...baseImages, ...uploadedGalleryUrls];
     }
 
@@ -1948,8 +1990,12 @@ export class EventsService {
           ...(payload.maxTicketsPerUser !== undefined
             ? { maxTicketsPerUser: payload.maxTicketsPerUser }
             : {}),
-          ...(payload.entryFee !== undefined ? { entryFee: payload.entryFee } : {}),
-          ...(payload.placeId !== undefined ? { placeId: payload.placeId } : {}),
+          ...(payload.entryFee !== undefined
+            ? { entryFee: payload.entryFee }
+            : {}),
+          ...(payload.placeId !== undefined
+            ? { placeId: payload.placeId }
+            : {}),
           ...(nextCoverUrl !== undefined ? { coverUrl: nextCoverUrl } : {}),
           ...(nextImages !== undefined ? { images: nextImages } : {}),
           ...(shouldReplaceTicketTypes
@@ -1964,7 +2010,9 @@ export class EventsService {
                 },
                 entryFee:
                   ticketTypes.length > 0
-                    ? Math.min(...ticketTypes.map((ticketType) => ticketType.price))
+                    ? Math.min(
+                        ...ticketTypes.map((ticketType) => ticketType.price),
+                      )
                     : Number(payload.entryFee || 0),
               }
             : {}),
@@ -2076,11 +2124,15 @@ export class EventsService {
 
     const eventEnd = event.endTime || event.startTime;
     if (eventEnd < new Date()) {
-      throw new BadRequestException('Impossible de reserver un evenement termine.');
+      throw new BadRequestException(
+        'Impossible de reserver un evenement termine.',
+      );
     }
 
     const selectedTicketType = payload.ticketTypeId
-      ? event.TicketType.find((ticketType) => ticketType.id === payload.ticketTypeId)
+      ? event.TicketType.find(
+          (ticketType) => ticketType.id === payload.ticketTypeId,
+        )
       : null;
 
     if (!payload.ticketTypeId && event.TicketType.length > 0) {
@@ -2090,7 +2142,9 @@ export class EventsService {
     }
 
     if (payload.ticketTypeId && !selectedTicketType) {
-      throw new BadRequestException('Type de billet invalide pour cet evenement.');
+      throw new BadRequestException(
+        'Type de billet invalide pour cet evenement.',
+      );
     }
 
     if (selectedTicketType && selectedTicketType.quantity <= 0) {
@@ -2120,7 +2174,8 @@ export class EventsService {
 
     if (
       selectedPromotion?.maxRedemptions &&
-      Number(selectedPromotion.redeemedCount || 0) >= selectedPromotion.maxRedemptions
+      Number(selectedPromotion.redeemedCount || 0) >=
+        selectedPromotion.maxRedemptions
     ) {
       throw new BadRequestException('Ce code promo a atteint son quota.');
     }
@@ -2174,9 +2229,12 @@ export class EventsService {
     if (activeBookingsCount >= maxTicketsPerUser) {
       if (maxTicketsPerUser === 1 && existing) {
         const existingStatus = (existing.status || 'PENDING').toUpperCase();
-        const needsQrCode = ['CONFIRMED', 'PAID', 'USED', 'CHECKED_IN'].includes(
-          existingStatus,
-        );
+        const needsQrCode = [
+          'CONFIRMED',
+          'PAID',
+          'USED',
+          'CHECKED_IN',
+        ].includes(existingStatus);
 
         if (!existing.qrCode && needsQrCode) {
           const upgraded = await this.prisma.booking.update({
@@ -2267,16 +2325,21 @@ export class EventsService {
 
     const hasEntryFee = Number(event.entryFee || 0) > 0;
     const ticketPrice = Number(selectedTicketType?.price || 0);
-    const basePrice = ticketPrice > 0 ? ticketPrice : !selectedTicketType && hasEntryFee ? Number(event.entryFee || 0) : 0;
+    const basePrice =
+      ticketPrice > 0
+        ? ticketPrice
+        : !selectedTicketType && hasEntryFee
+          ? Number(event.entryFee || 0)
+          : 0;
     let discountAmount = 0;
 
     if (selectedPromotion) {
       const promoValue = Number(selectedPromotion.discountValue || 0);
-      const promoType = (selectedPromotion.discountType || 'PERCENT').toUpperCase();
+      const promoType = (
+        selectedPromotion.discountType || 'PERCENT'
+      ).toUpperCase();
       discountAmount =
-        promoType === 'FIXED'
-          ? promoValue
-          : (basePrice * promoValue) / 100;
+        promoType === 'FIXED' ? promoValue : (basePrice * promoValue) / 100;
 
       discountAmount = Math.max(0, Math.min(discountAmount, basePrice));
     }

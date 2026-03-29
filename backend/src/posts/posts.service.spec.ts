@@ -73,20 +73,29 @@ describe('PostsService', () => {
       (prisma.post.create as jest.Mock).mockResolvedValue(expectedResult);
 
       // 2. ACT (Action)
-      const result = await service.create(userId, userRole, createPostDto, files);
+      await expect(
+        service.create(userId, userRole, createPostDto, files),
+      ).resolves.toEqual(expectedResult);
 
       // 3. ASSERT (Vérification)
-      expect(result).toEqual(expectedResult); // Le résultat est-il celui attendu ?
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.post.create).toHaveBeenCalledWith({
-        // La méthode create de Prisma a-t-elle été appelée avec les bons arguments ?
-        data: expect.objectContaining({
-          userId,
-          content: 'Hello World',
-          visibility: 'public',
-          images: [],
-        }),
-      });
+      expect(prisma.post.create).toHaveBeenCalledTimes(1);
+
+      const createCalls = (prisma.post.create as jest.Mock).mock
+        .calls as unknown[][];
+      const firstCreateCallArg = createCalls[0]?.[0] as {
+        data?: {
+          userId?: string;
+          content?: string;
+          visibility?: string;
+          images?: unknown[];
+        };
+      };
+
+      expect(firstCreateCallArg.data?.userId).toBe(userId);
+      expect(firstCreateCallArg.data?.content).toBe('Hello World');
+      expect(firstCreateCallArg.data?.visibility).toBe('public');
+      expect(firstCreateCallArg.data?.images).toEqual([]);
     });
   });
 });

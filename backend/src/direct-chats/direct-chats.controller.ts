@@ -43,11 +43,17 @@ export class DirectChatsController {
     @Request() req: AuthenticatedRequest,
     @Param('userId') userId: string,
   ) {
-    return this.directChatsService.getOrCreateConversation(req.user.userId, userId);
+    return this.directChatsService.getOrCreateConversation(
+      req.user.userId,
+      userId,
+    );
   }
 
   @Get(':id')
-  getConversation(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+  getConversation(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     return this.directChatsService.getConversation(req.user.userId, id);
   }
 

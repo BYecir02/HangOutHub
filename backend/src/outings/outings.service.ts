@@ -12,10 +12,7 @@ import { CreateOutingDto } from './dto/create-outing.dto';
 export class OutingsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async getInvitePolicy(
-    inviterId: string,
-    participantIds: string[],
-  ) {
+  private async getInvitePolicy(inviterId: string, participantIds: string[]) {
     if (participantIds.length === 0) {
       return {
         notifiableParticipantIds: [] as string[],
@@ -334,7 +331,10 @@ export class OutingsService {
     });
 
     const notifiableRecipientIds = recipients
-      .filter((participant) => participant.User?.UserSettings?.notificationMessages !== false)
+      .filter(
+        (participant) =>
+          participant.User?.UserSettings?.notificationMessages !== false,
+      )
       .map((participant) => participant.userId);
 
     if (notifiableRecipientIds.length > 0) {

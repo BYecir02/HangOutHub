@@ -55,7 +55,10 @@ export class CategoriesController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
-  createCategory(@Body() body: CreateCategoryDto, @Request() req: AuthenticatedRequest) {
+  createCategory(
+    @Body() body: CreateCategoryDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
     this.ensureAdmin(req);
     return this.categoriesService.createCategory(body);
   }
@@ -124,7 +127,11 @@ export class CategoriesController {
     @Request() req: AuthenticatedRequest,
     @Body() body: CreateCategoryTagDto,
   ) {
-    return this.categoriesService.createTagForCategory(id, req.user.userId, body.name);
+    return this.categoriesService.createTagForCategory(
+      id,
+      req.user.userId,
+      body.name,
+    );
   }
 
   @Get(':id/discover')

@@ -34,7 +34,9 @@ export function hasPlaceTeamRoleAtLeast(
     return false;
   }
 
-  return PLACE_TEAM_ROLE_LEVEL[normalizedRole] >= PLACE_TEAM_ROLE_LEVEL[required];
+  return (
+    PLACE_TEAM_ROLE_LEVEL[normalizedRole] >= PLACE_TEAM_ROLE_LEVEL[required]
+  );
 }
 
 export function getHighestPlaceTeamRole(
@@ -48,7 +50,10 @@ export function getHighestPlaceTeamRole(
       continue;
     }
 
-    if (!current || PLACE_TEAM_ROLE_LEVEL[normalized] > PLACE_TEAM_ROLE_LEVEL[current]) {
+    if (
+      !current ||
+      PLACE_TEAM_ROLE_LEVEL[normalized] > PLACE_TEAM_ROLE_LEVEL[current]
+    ) {
       current = normalized;
     }
   }
