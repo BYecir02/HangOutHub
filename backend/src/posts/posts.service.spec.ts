@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from './posts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { PostsGateway } from './posts.gateway';
 
 describe('PostsService', () => {
   let service: PostsService;
@@ -31,6 +32,9 @@ describe('PostsService', () => {
     uploadFile: jest.fn(),
     uploadFiles: jest.fn(),
   };
+  const mockPostsGateway = {
+    emitNewPost: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -43,6 +47,10 @@ describe('PostsService', () => {
         {
           provide: StorageService,
           useValue: mockStorageService,
+        },
+        {
+          provide: PostsGateway,
+          useValue: mockPostsGateway,
         },
       ],
     }).compile();

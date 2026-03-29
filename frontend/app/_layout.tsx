@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LogBox } from 'react-native';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import type { TextInputProps, TextProps } from 'react-native';
 
 import { useFonts } from 'expo-font';
 
@@ -69,21 +70,29 @@ export default function RootLayout() {
       return;
     }
 
-    if (!Text.defaultProps) {
-      Text.defaultProps = {};
-    }
-    Text.defaultProps.style = {
-      ...(Text.defaultProps.style || {}),
-      fontFamily: 'Poppins_400Regular',
+    const TextWithDefaults = Text as typeof Text & {
+      defaultProps?: TextProps;
     };
+    if (!TextWithDefaults.defaultProps) {
+      TextWithDefaults.defaultProps = {};
+    }
+    const currentTextStyle = TextWithDefaults.defaultProps.style;
+    TextWithDefaults.defaultProps.style = [
+      currentTextStyle,
+      { fontFamily: 'Poppins_400Regular' },
+    ];
 
-    if (!TextInput.defaultProps) {
-      TextInput.defaultProps = {};
-    }
-    TextInput.defaultProps.style = {
-      ...(TextInput.defaultProps.style || {}),
-      fontFamily: 'Poppins_400Regular',
+    const TextInputWithDefaults = TextInput as typeof TextInput & {
+      defaultProps?: TextInputProps;
     };
+    if (!TextInputWithDefaults.defaultProps) {
+      TextInputWithDefaults.defaultProps = {};
+    }
+    const currentTextInputStyle = TextInputWithDefaults.defaultProps.style;
+    TextInputWithDefaults.defaultProps.style = [
+      currentTextInputStyle,
+      { fontFamily: 'Poppins_400Regular' },
+    ];
   }, [fontsLoaded]);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CategoriesService } from './categories.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('CategoriesService', () => {
   let service: CategoriesService;
@@ -15,6 +16,12 @@ describe('CategoriesService', () => {
             category: { findMany: jest.fn(), findUnique: jest.fn() },
             event: { findMany: jest.fn() },
             place: { findMany: jest.fn() },
+          },
+        },
+        {
+          provide: StorageService,
+          useValue: {
+            uploadFile: jest.fn(),
           },
         },
       ],

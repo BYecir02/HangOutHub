@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 
 function resolvePreferredPort() {
   const value = Number(process.env.PORT ?? 3000);
@@ -12,6 +13,41 @@ function resolvePreferredPort() {
   }
 
   return value;
+}
+
+function resolveCorsOptions(): CorsOptions {
+  const defaultAllowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3001',
+    'https://hang-out-hub-backoffice.vercel.app',
+  ];
+
+  const envOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  const allowedOrigins =
+    envOrigins.length > 0 ? envOrigins : defaultAllowedOrigins;
+
+  return {
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin non autorisee par CORS: ${origin}`), false);
+    },
+  };
 }
 
 async function listenWithPortFallback(
@@ -43,7 +79,7 @@ async function listenWithPortFallback(
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.enableCors();
+  app.enableCors(resolveCorsOptions());
 
   // Note : Les fichiers statiques (uploads) sont gérés par ServeStaticModule dans app.module.ts
 
