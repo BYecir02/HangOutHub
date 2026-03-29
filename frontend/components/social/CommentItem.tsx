@@ -2,6 +2,8 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 
+import { useI18n } from '@/hooks/use-i18n';
+
 interface CommentItemProps {
   item: {
     id: string;
@@ -18,17 +20,18 @@ interface CommentItemProps {
 }
 
 export default function CommentItem({ item, onDelete, onReport, onReply }: CommentItemProps) {
+  const { t } = useI18n();
   
   const handleLongPress = () => {
     if (item.isMine) {
       Alert.alert(
-        "Mon commentaire",
-        "Que voulez-vous faire ?",
+        t('commentsActionMineTitle'),
+        t('commentsActionQuestion'),
         [
-          { text: "Annuler", style: "cancel" },
+          { text: t('commentsActionCancel'), style: 'cancel' },
           { 
-            text: "Supprimer", 
-            style: "destructive", 
+            text: t('commentsActionDelete'), 
+            style: 'destructive', 
             onPress: () => onDelete && onDelete(item.id) 
           }
           // On pourra ajouter "Modifier" ici plus tard
@@ -36,13 +39,13 @@ export default function CommentItem({ item, onDelete, onReport, onReply }: Comme
       );
     } else {
       Alert.alert(
-        "Commentaire",
-        "Que voulez-vous faire ?",
+        t('commentsActionGenericTitle'),
+        t('commentsActionQuestion'),
         [
-          { text: "Annuler", style: "cancel" },
+          { text: t('commentsActionCancel'), style: 'cancel' },
           { 
-            text: "Signaler", 
-            style: "destructive", 
+            text: t('commentsActionReport'), 
+            style: 'destructive', 
             onPress: () => onReport && onReport(item.id) 
           }
         ]
@@ -65,7 +68,7 @@ export default function CommentItem({ item, onDelete, onReport, onReply }: Comme
         <View className="flex-row mt-1 ml-1">
           <Text className="text-xs text-gray-400 mr-4">{item.time}</Text>
           <TouchableOpacity onPress={() => onReply && onReply(item)}>
-            <Text className="text-xs text-gray-500 font-bold">Répondre</Text>
+            <Text className="text-xs text-gray-500 font-bold">{t('commentsActionReply')}</Text>
           </TouchableOpacity>
         </View>
       </View>

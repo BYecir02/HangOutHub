@@ -1,0 +1,216 @@
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+
+import PersonActionButton from '../components/social/PersonActionButton';
+import PersonRow from '../components/social/PersonRow';
+import SocialCountChip from '../components/social/SocialCountChip';
+import SocialEmptyState from '../components/social/SocialEmptyState';
+import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/hooks/use-i18n';
+import { getApiErrorMessage } from '@/services/api';
+import {
+  getFriendshipOverview,
+  removeFriendship,
+} from '../services/friendships';
+import { FriendshipOverview } from '../types/social';
+
+const EMPTY_FRIENDSHIPS: FriendshipOverview = {
+  counts: {
+    connections: 0,
+    incomingRequests: 0,
+    outgoingRequests: 0,
+  },
+  connections: [],
+  incomingRequests: [],
+  outgoingRequests: [],
+};
+
+type ConnectionsView = 'connections' | 'outgoing';
+
+export default function ConnectionsScreen() {
+  const router = useRouter();
+  const { t } = useI18n();
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [friendships, setFriendships] =
+    useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
+  const [activeView, setActiveView] = useState<ConnectionsView>('connections');
+
+  const sectionOptions = useMemo<readonly FilterChipOption<ConnectionsView>[]>(
+    () => [
+      { key: 'connections', label: t('connectionsSectionConnections') },
+      { key: 'outgoing', label: t('connectionsSectionOutgoing') },
+    ],
+    [t],
+  );
+
+  const loadConnections = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const friendshipsData = await getFriendshipOverview();
+      setFriendships(friendshipsData);
+      setErrorMessage(null);
+    } catch (error) {
+      console.error('Erreur chargement connexions:', error);
+      setFriendships(EMPTY_FRIENDSHIPS);
+      setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadConnections();
+    }, [loadConnections]),
+  );
+
+  const handleRemoveRelation = async (friendshipId: string) => {
+    try {
+      await removeFriendship(friendshipId);
+      await loadConnections();
+    } catch (error) {
+      console.error(error);
+      Alert.alert(t('commonErrorTitle'), t('searchRelationshipUpdateError'));
+    }
+  };
+
+  const selectedItems =
+    activeView === 'connections'
+      ? friendships.connections
+      : friendships.outgoingRequests;
+
+  return (
+    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
+      <View className="px-5 pb-4">
+        <ScreenHeader title={t('connectionsTitle')} onBack={() => router.back()} />
+      </View>
+
+      <ScrollView
+        className="flex-1 px-5 pb-10 pt-2"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="rounded-[28px] border border-[#4c669f]/20 bg-[#4c669f]/10 p-5">
+          <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
+            {t('connectionsNetworkLabel')}
+          </Text>
+          <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
+            {t('connectionsHeroSubtitle')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/search')}
+            className="mt-4 self-start rounded-full bg-[#4c669f] px-5 py-2.5"
+          >
+            <Text className="font-semibold text-white">{t('connectionsSearchPeople')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View className="mt-5 flex-row gap-2.5">
+          <View className="flex-1">
+            <SocialCountChip
+              label={t('connectionsCountConnections')}
+              value={friendships.counts.connections}
+              color="#4c669f"
+            />
+          </View>
+          <View className="flex-1">
+            <SocialCountChip
+              label={t('connectionsCountSent')}
+              value={friendships.counts.outgoingRequests}
+              color="#2ecc71"
+            />
+          </View>
+        </View>
+
+        <FilterChipsBar
+          options={sectionOptions}
+          activeKey={activeView}
+          onChange={setActiveView}
+          activeColor="#4c669f"
+          textSize="sm"
+          horizontalPadding={0}
+          paddingTop={18}
+          paddingBottom={12}
+        />
+
+        <View className="pb-2">
+          {loading ? (
+            <ScreenState mode="loading" containerClassName="px-0 py-4" />
+          ) : errorMessage ? (
+            <ScreenState
+              mode={activeView === 'connections' ? 'error' : 'warning'}
+              title={errorMessage}
+              actionLabel={t('commonRetry')}
+              onAction={() => {
+                void loadConnections();
+              }}
+              containerClassName="px-0 py-0"
+            />
+          ) : selectedItems.length > 0 ? (
+            selectedItems.map((item) => (
+              <PersonRow
+                key={item.friendshipId}
+                user={item.user}
+                subtitle={
+                  item.user.bio?.trim() ||
+                  (activeView === 'connections'
+                    ? t('connectionsAcceptedSubtitle')
+                    : t('connectionsPendingSubtitle'))
+                }
+                onPress={() =>
+                  router.push({
+                    pathname: '/user/[id]',
+                    params: { id: item.user.id },
+                  })
+                }
+                primaryAction={
+                  <PersonActionButton
+                    label={
+                      activeView === 'connections'
+                        ? t('searchActionConnected')
+                        : t('searchActionSent')
+                    }
+                    disabled
+                  />
+                }
+                secondaryAction={
+                  <PersonActionButton
+                    label={
+                      activeView === 'connections'
+                        ? t('searchActionRemove')
+                        : t('genericCancel')
+                    }
+                    variant="neutral"
+                    onPress={() => handleRemoveRelation(item.friendshipId)}
+                  />
+                }
+              />
+            ))
+          ) : activeView === 'connections' ? (
+            <SocialEmptyState
+              icon="people-outline"
+              title={t('connectionsEmptyTitle')}
+              description={t('connectionsEmptyDescription')}
+            />
+          ) : (
+            <SocialEmptyState
+              icon="paper-plane-outline"
+              title={t('connectionsOutgoingEmptyTitle')}
+              description={t('connectionsOutgoingEmptyDescription')}
+            />
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}

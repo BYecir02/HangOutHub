@@ -1,49 +1,232 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+
+import ScreenHeader from '@/components/ui/ScreenHeader';
+import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/hooks/use-i18n';
 import SearchBar from '../components/ui/SearchBar';
+import PersonActionButton from '../components/social/PersonActionButton';
+import PersonRow from '../components/social/PersonRow';
+import SocialEmptyState from '../components/social/SocialEmptyState';
+import { DiscoverUser } from '../types/social';
+import {
+  acceptFriendRequest,
+  discoverUsers,
+  rejectFriendRequest,
+  removeFriendship,
+  sendFriendRequest,
+} from '../services/friendships';
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [results, setResults] = useState<DiscoverUser[]>([]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const normalizedQuery = query.trim();
+
+      if (normalizedQuery.length < 2) {
+        setResults([]);
+        setSearchLoading(false);
+        setErrorMessage(null);
+        return;
+      }
+
+      const runSearch = async () => {
+        setSearchLoading(true);
+
+        try {
+          const nextResults = await discoverUsers(normalizedQuery);
+          setResults(nextResults);
+          setErrorMessage(null);
+        } catch (error) {
+          console.error('Erreur recherche utilisateurs:', error);
+          setResults([]);
+          setErrorMessage(t('commonErrorTitle'));
+        } finally {
+          setSearchLoading(false);
+        }
+      };
+
+      void runSearch();
+    }, 280);
+
+    return () => clearTimeout(timeout);
+  }, [query, t]);
+
+  const refreshSearch = async () => {
+    const normalizedQuery = query.trim();
+
+    if (normalizedQuery.length < 2) {
+      setResults([]);
+      return;
+    }
+
+    try {
+      const nextResults = await discoverUsers(normalizedQuery);
+      setResults(nextResults);
+      setErrorMessage(null);
+    } catch (error) {
+      console.error('Erreur recherche utilisateurs:', error);
+      setErrorMessage(t('commonErrorTitle'));
+    }
+  };
+
+  const handleSendRequest = async (targetUserId: string) => {
+    try {
+      await sendFriendRequest(targetUserId);
+      await refreshSearch();
+    } catch (error) {
+      console.error(error);
+      Alert.alert(t('commonErrorTitle'), t('searchRequestSendError'));
+    }
+  };
+
+  const handleAcceptRequest = async (friendshipId: string) => {
+    try {
+      await acceptFriendRequest(friendshipId);
+      await refreshSearch();
+    } catch (error) {
+      console.error(error);
+      Alert.alert(t('commonErrorTitle'), t('searchRequestAcceptError'));
+    }
+  };
+
+  const handleRejectRequest = async (friendshipId: string) => {
+    try {
+      await rejectFriendRequest(friendshipId);
+      await refreshSearch();
+    } catch (error) {
+      console.error(error);
+      Alert.alert(t('commonErrorTitle'), t('searchRequestRejectError'));
+    }
+  };
+
+  const handleRemoveRelation = async (friendshipId: string) => {
+    try {
+      await removeFriendship(friendshipId);
+      await refreshSearch();
+    } catch (error) {
+      console.error(error);
+      Alert.alert(t('commonErrorTitle'), t('searchRelationshipUpdateError'));
+    }
+  };
 
   return (
-    <View className="flex-1 bg-white dark:bg-black pt-16">
-      {/* Header simple avec retour */}
-      <View className="flex-row items-center px-5 pb-4">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons name="arrow-back" size={24} color={isDark ? "white" : "black"} />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-900 dark:text-white">Recherche</Text>
+    <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
+      <View className="px-5 pb-4">
+        <ScreenHeader title={t('searchTitle')} onBack={() => router.back()} />
       </View>
 
-      {/* Barre de recherche */}
-      <SearchBar 
-        value={query} 
-        onChangeText={setQuery} 
-        autoFocus={true}
-        placeholder="Événements, lieux, amis..."
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        autoFocus
+        placeholder={t('searchPlaceholder')}
       />
 
-      <ScrollView className="flex-1 px-5 mt-6" showsVerticalScrollIndicator={false}>
-        {/* Contenu vide ou résultats */}
-        {query.length === 0 ? (
-          <View>
-            <Text className="text-gray-500 dark:text-gray-400 font-bold mb-3 uppercase text-xs tracking-wider">Recherches récentes</Text>
-            {['Concert Dadju', 'Plage Fidjrossè', 'Karaoké'].map((item, index) => (
-              <TouchableOpacity key={index} className="flex-row items-center py-4 border-b border-gray-100 dark:border-gray-800">
-                <Ionicons name="time-outline" size={20} color="#9ca3af" />
-                <Text className="ml-3 text-gray-700 dark:text-gray-300 text-base">{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      <ScrollView
+        className="flex-1 px-5 pb-10 pt-6"
+        showsVerticalScrollIndicator={false}
+      >
+        {query.trim().length < 2 ? (
+          <SocialEmptyState
+            icon="search-outline"
+            title={t('searchHintTitle')}
+            description={t('searchHintDescription')}
+          />
+        ) : searchLoading ? (
+          <ScreenState mode="loading" containerClassName="px-0 py-8" />
+        ) : errorMessage ? (
+          <ScreenState
+            mode="error"
+            title={errorMessage}
+            actionLabel={t('commonRetry')}
+            onAction={() => {
+              void refreshSearch();
+            }}
+            containerClassName="px-0 py-4"
+          />
+        ) : results.length > 0 ? (
+          <>
+            <Text className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
+              {t('searchResultsLabel')}
+            </Text>
+
+            {results.map((user) => {
+              const friendshipId = user.friendshipId || undefined;
+
+              return (
+                <PersonRow
+                  key={user.id}
+                  user={user}
+                  subtitle={
+                    user.bio?.trim() ||
+                    (user.role === 'ORGANIZER' || user.role === 'PLACE_OWNER'
+                      ? t('searchOrganizerProfile')
+                      : t('searchReadyToGoOut'))
+                  }
+                  onPress={() =>
+                    router.push({
+                      pathname: '/user/[id]',
+                      params: { id: user.id },
+                    })
+                  }
+                  primaryAction={
+                    user.relationStatus === 'NONE' ? (
+                      <PersonActionButton
+                        label={t('searchActionAdd')}
+                        onPress={() => handleSendRequest(user.id)}
+                      />
+                    ) : user.relationStatus === 'INCOMING_REQUEST' &&
+                      friendshipId ? (
+                      <PersonActionButton
+                        label={t('searchActionAccept')}
+                        onPress={() => handleAcceptRequest(friendshipId)}
+                      />
+                    ) : user.relationStatus === 'OUTGOING_REQUEST' ? (
+                      <PersonActionButton label={t('searchActionSent')} disabled />
+                    ) : (
+                      <PersonActionButton label={t('searchActionConnected')} disabled />
+                    )
+                  }
+                  secondaryAction={
+                    user.relationStatus === 'INCOMING_REQUEST' && friendshipId ? (
+                      <PersonActionButton
+                        label={t('searchActionReject')}
+                        variant="neutral"
+                        onPress={() => handleRejectRequest(friendshipId)}
+                      />
+                    ) : friendshipId &&
+                      (user.relationStatus === 'CONNECTED' ||
+                        user.relationStatus === 'OUTGOING_REQUEST') ? (
+                      <PersonActionButton
+                        label={t('searchActionRemove')}
+                        variant="neutral"
+                        onPress={() => handleRemoveRelation(friendshipId)}
+                      />
+                    ) : null
+                  }
+                />
+              );
+            })}
+          </>
         ) : (
-          <View className="items-center mt-10">
-             <Text className="text-gray-500 dark:text-gray-400">Recherche de "{query}"...</Text>
-          </View>
+          <SocialEmptyState
+            icon="person-outline"
+            title={t('searchNoResultTitle')}
+            description={t('searchNoResultDescription')}
+          />
         )}
       </ScrollView>
     </View>

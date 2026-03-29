@@ -1,223 +1,524 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
-import api from '../../services/api'; 
-import CategoryCard from '../../components/ui/CategoryCard';
-import EventCard from '../../components/ui/EventCard';
-import SuggestionCard from '../../components/ui/SuggestionCard';
-import PlaceCard from '../../components/ui/PlaceCard'; // <--- Import du nouveau composant
-import Header from '../../components/ui/Header';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
+
+import CategoryCard from '@/components/ui/CategoryCard';
+import EventCard from '@/components/ui/EventCard';
+import Header from '@/components/ui/Header';
+import PlaceCard from '@/components/ui/PlaceCard';
+import SuggestionCard from '@/components/ui/SuggestionCard';
+import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
+import api, { getImageUrl, storage } from '@/services/api';
+import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
+import { formatEventDate, formatPrice } from '@/services/formatters';
+import { getFriendshipOverview } from '@/services/friendships';
+import {
+  setStoredLocation,
+  type StoredLocation,
+} from '@/services/location-preferences';
 import { Category } from '@/types';
+import type { OutingInvitation } from '@/types/social';
 
-// --- MOCK DATA : LIEUX POPULAIRES (Plus de choix !) ---
-const POPULAR_PLACES = [
-  {
-    id: 'p1',
-    name: 'Le Code Bar',
-    location: 'Haie Vive',
-    imageUrl: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=400',
-    rating: 4.8
-  },
-  {
-    id: 'p2',
-    name: 'Dream Beach',
-    location: 'Fidjrossè',
-    imageUrl: 'https://images.unsplash.com/photo-1575444758702-4a6b9222336e?w=400',
-    rating: 4.5
-  },
-  {
-    id: 'p3',
-    name: 'Bab\'s Dock',
-    location: 'Abomey-Calavi',
-    imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400',
-    rating: 4.9
-  },
-  {
-    id: 'p4',
-    name: 'Canal Olympia',
-    location: 'Wologuèdè',
-    imageUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400',
-    rating: 4.2
-  },
-  {
-    id: 'p5',
-    name: 'Moussa l\'Africain',
-    location: 'Ganhi',
-    imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400',
-    rating: 4.6
+interface HomeEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  coverUrl: string | null;
+  entryFee: number | string | null;
+  TicketType?: {
+    id: string;
+    price: number | string;
+    quantity: number;
+  }[];
+  Place?: {
+    name?: string | null;
+    City?: {
+      id?: number;
+      name?: string | null;
+      country?: string | null;
+    } | null;
+  } | null;
+  address?: string | null;
+}
+
+interface HomePlace {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  avgRating?: number | null;
+  City?: {
+    id?: number;
+    name?: string | null;
+    country?: string | null;
+  } | null;
+  address?: string | null;
+}
+
+interface NotificationCountResponse {
+  unreadCount: number;
+}
+
+const EVENT_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
+const PLACE_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
+
+function formatEventPriceLabel(
+  event: HomeEvent,
+  locale: string,
+  t: (key: 'homePriceFree' | 'homePriceFrom' | 'homePriceSoldOut', params?: { price: string }) => string,
+) {
+  const ticketTypes = event.TicketType || [];
+  if (ticketTypes.length > 0) {
+    const available = ticketTypes.filter((ticket) => Number(ticket.quantity || 0) > 0);
+    if (available.length === 0) {
+      return t('homePriceSoldOut');
+    }
+
+    const minPrice = Math.min(
+      ...available.map((ticket) => Number(ticket.price || 0)),
+    );
+
+    if (minPrice <= 0) {
+      return t('homePriceFree');
+    }
+
+    return t('homePriceFrom', {
+      price: minPrice.toLocaleString(locale),
+    });
   }
-];
 
-// --- MOCK DATA : À LA UNE ---
-const FEATURED_EVENTS = [
-  {
-    id: '1',
-    title: 'Concert Dadju & Tayc',
-    date: 'SAM. 24 JUIN • 20:00',
-    location: 'Palais des Congrès',
-    imageUrl: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=1000',
-    price: 'Payant'
-  },
-  {
-    id: '2',
-    title: 'Afterwork Tech Bénin',
-    date: 'VEN. 23 JUIN • 18:30',
-    location: 'Sèmè City',
-    imageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=1000',
-    price: 'Gratuit'
-  },
-];
+  return formatPrice(event.entryFee, locale, { freeLabel: t('homePriceFree') });
+}
 
-// --- MOCK DATA : SUGGESTIONS ---
-const SUGGESTIONS = [
-  {
-    id: '101',
-    title: 'Soirée Salsa & Kizomba',
-    category: 'Danse • Le Code Bar',
-    date: 'Ce soir • 21:00',
-    image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
-    reason: 'Parce que tu aimes la Danse'
-  },
-  {
-    id: '102',
-    title: 'Vernissage Expo "Vodun"',
-    category: 'Art & Culture • Fondation Zinsou',
-    date: 'Demain • 10:00',
-    image: 'https://images.unsplash.com/photo-1536924940846-227afb31e2a5?q=80&w=800',
-    reason: 'Populaire chez tes amis'
-  }
-];
+function SectionPlaceholder({ message }: { message: string }) {
+  return (
+    <View className="px-5 py-4">
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        {message}
+      </Text>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
+  const placesRoute = '/places' as Href;
+  const eventsRoute = '/events' as Href;
+  const discoverRoute = '/discover' as Href;
+  const { locale, t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [events, setEvents] = useState<HomeEvent[]>([]);
+  const [places, setPlaces] = useState<HomePlace[]>([]);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const {
+    hydrated: locationHydrated,
+    selectedLocation,
+    filterByLocation,
+    setSelectedLocation,
+    locationValueLabel,
+  } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
 
-  // Charger les catégories depuis le backend
+  const isUnauthorized = useCallback((error: unknown) => {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const response = (error as { response?: { status?: number } }).response;
+    return response?.status === 401;
+  }, []);
+
+  const loadNotificationCount = useCallback(async () => {
+    const token = await storage.getItem('userToken');
+
+    if (!token) {
+      setNotificationCount(0);
+      return;
+    }
+
+    try {
+      const [unreadResult, friendshipsResult, invitationsResult] =
+        await Promise.allSettled([
+          api.get<NotificationCountResponse>('/notifications/unread-count'),
+          getFriendshipOverview(),
+          api.get<OutingInvitation[]>('/outings/invitations'),
+        ]);
+
+      const unreadCount =
+        unreadResult.status === 'fulfilled'
+          ? Number(unreadResult.value.data.unreadCount || 0)
+          : 0;
+      const incomingRequests =
+        friendshipsResult.status === 'fulfilled'
+          ? friendshipsResult.value.counts.incomingRequests || 0
+          : 0;
+      const outingInvites =
+        invitationsResult.status === 'fulfilled'
+          ? invitationsResult.value.data?.length || 0
+          : 0;
+
+      const computedCount = Math.max(unreadCount, incomingRequests + outingInvites);
+
+      setNotificationCount(computedCount);
+    } catch (error) {
+      if (!isUnauthorized(error)) {
+        console.error('Erreur chargement notifications:', error);
+      }
+    }
+  }, [isUnauthorized]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadNotificationCount();
+    }, [loadNotificationCount]),
+  );
+
+  const loadHomeData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.get<Category[]>('/categories'),
+      api.get<HomeEvent[]>('/events'),
+      api.get<HomePlace[]>('/places'),
+    ]);
+
+    const [categoriesResult, eventsResult, placesResult] = results;
+
+    if (categoriesResult.status === 'fulfilled') {
+      setCategories(categoriesResult.value.data);
+      setCache('categories', categoriesResult.value.data);
+    } else {
+      console.error('Erreur chargement categories:', categoriesResult.reason);
+      setCategories([]);
+    }
+
+    if (eventsResult.status === 'fulfilled') {
+      setEvents(eventsResult.value.data);
+      setCache('events', eventsResult.value.data);
+    } else {
+      console.error('Erreur chargement evenements:', eventsResult.reason);
+      setEvents([]);
+    }
+
+    if (placesResult.status === 'fulfilled') {
+      setPlaces(placesResult.value.data);
+      setCache('places', placesResult.value.data);
+    } else {
+      console.error('Erreur chargement lieux:', placesResult.reason);
+      setPlaces([]);
+    }
+
+    if (
+      eventsResult.status === 'fulfilled' &&
+      placesResult.status === 'fulfilled'
+    ) {
+      setCache('discover', {
+        events: eventsResult.value.data,
+        places: placesResult.value.data,
+      });
+    }
+
+    await loadNotificationCount();
+  }, [loadNotificationCount]);
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await api.get('/categories');
-        setCategories(response.data);
-      } catch (error) {
-        console.error("Erreur chargement catégories:", error);
-      } finally {
+    let isMounted = true;
+
+    const initialLoad = async () => {
+      setLoading(true);
+      await loadHomeData();
+
+      if (isMounted) {
         setLoading(false);
       }
     };
-    fetchCategories();
-  }, []);
+
+    void initialLoad();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadHomeData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadHomeData();
+    }, [loadHomeData]),
+  );
+
+  useEffect(() => {
+    if (!locationHydrated) {
+      return;
+    }
+
+    if (selectedLocation) {
+      return;
+    }
+
+    const nextLocation: StoredLocation = {
+      mode: 'city',
+      cityName: 'Cotonou',
+      region: null,
+      country: t('homeLocationCountry'),
+    };
+
+    setSelectedLocation(nextLocation);
+    void setStoredLocation(nextLocation);
+  }, [locationHydrated, selectedLocation, setSelectedLocation, t]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await loadHomeData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadHomeData]);
+
+  const locationFilteredEvents = useMemo(() => {
+    return filterByLocation(events, (event) => ({
+      city: event.Place?.City?.name,
+      country: event.Place?.City?.country,
+      address: event.address,
+    }));
+  }, [events, filterByLocation]);
+
+  const locationFilteredPlaces = useMemo(() => {
+    return filterByLocation(places, (place) => ({
+      city: place.City?.name,
+      country: place.City?.country,
+      address: place.address,
+    }));
+  }, [filterByLocation, places]);
+
+  const featuredEvents = useMemo(
+    () => locationFilteredEvents.slice(0, 5),
+    [locationFilteredEvents],
+  );
+  const popularPlaces = useMemo(
+    () => locationFilteredPlaces.slice(0, 6),
+    [locationFilteredPlaces],
+  );
+  const suggestions = useMemo(
+    () =>
+      featuredEvents.slice(0, 3).map((event, index) => ({
+        id: event.id,
+        title: event.title,
+        category: event.Place?.name || event.address || t('homeLocationToConfirm'),
+        date: formatEventDate(event.startTime, locale),
+        image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
+        reason:
+          index === 0
+            ? t('homeReasonTrending')
+            : index === 1
+              ? t('homeReasonMustSee')
+              : t('homeReasonLocalSelection'),
+      })),
+    [featuredEvents, locale, t],
+  );
+
+  const locationLabel = locationValueLabel;
+
+  const handleCategoryPress = (categoryId: number) => {
+    const id = String(categoryId);
+
+    if (!getCategoryCache(id)) {
+      void api
+        .get(`/categories/${id}/discover`)
+        .then((response) => {
+          setCategoryCache(id, response.data);
+        })
+        .catch(() => {});
+    }
+
+    router.push({
+      pathname: '/category/[id]',
+      params: { id },
+    });
+  };
+
 
   return (
-    <ScrollView className="flex-1 bg-gray-50 dark:bg-black" showsVerticalScrollIndicator={false}>
-      
-      {/* --- HEADER --- */}
-      <Header 
-        onNotificationPress={() => console.log("Notifs")} 
-        onSearchPress={() => router.push('/search')}
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void onRefresh();
+            }}
+            tintColor="#4c669f"
+          />
+        }
+      >
+      <Header
+        notificationCount={notificationCount}
+        location={locationLabel}
+        locationLabel={t('homeLocationLabel')}
+        onLocationPress={() => router.push('/location')}
+        onNotificationPress={() => router.push('/notifications')}
       />
 
-      {/* --- 1. CATÉGORIES --- */}
       <View className="mt-6">
-        <Text className="text-lg font-bold text-gray-800 dark:text-white ml-5 mb-4">Catégories</Text>
+        <View className="mb-4 flex-row items-end justify-between px-5">
+          <Text className="text-lg font-bold text-gray-800 dark:text-white">
+            {t('homeFeatured')}
+          </Text>
+          <TouchableOpacity onPress={() => router.push(eventsRoute)}>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
+          </TouchableOpacity>
+        </View>
+
         {loading ? (
           <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
+        ) : featuredEvents.length > 0 ? (
+          <FlatList
+            data={featuredEvents}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={276}
+            decelerationRate="fast"
+            snapToAlignment="start"
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+            renderItem={({ item }) => (
+              <EventCard
+                title={item.title}
+                date={formatEventDate(item.startTime, locale)}
+                location={item.Place?.name || item.address || t('homeLocationToConfirm')}
+                imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
+                price={formatEventPriceLabel(item, locale, t)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/event/[id]',
+                    params: { id: item.id },
+                  })
+                }
+              />
+            )}
+          />
         ) : (
+          <SectionPlaceholder message={t('homeNoEvents')} />
+        )}
+      </View>
+
+      <View className="mt-8">
+        <Text className="ml-5 mb-4 text-lg font-bold text-gray-800 dark:text-white">
+          {t('homeCategories')}
+        </Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
+        ) : categories.length > 0 ? (
           <FlatList
             data={categories}
             renderItem={({ item }) => (
-              <CategoryCard category={item} onPress={() => console.log(item.name)} />
+              <CategoryCard
+                category={item}
+                onPress={() => handleCategoryPress(item.id)}
+              />
             )}
             keyExtractor={(item) => item.id.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 20 }}
           />
+        ) : (
+          <SectionPlaceholder message={t('homeNoCategories')} />
         )}
       </View>
 
-      {/* --- 2. À LA UNE 🔥 --- */}
       <View className="mt-8">
-        <View className="flex-row justify-between items-end mb-4 px-5">
-          <Text className="text-lg font-bold text-gray-800 dark:text-white">À la une 🔥</Text>
-          <TouchableOpacity onPress={() => router.push('/explore')}>
-            <Text className="text-[#4c669f] font-medium text-xs">Voir tout</Text>
+        <View className="mb-4 flex-row items-end justify-between px-5">
+          <Text className="text-lg font-bold text-gray-800 dark:text-white">
+            {t('homePopularPlaces')}
+          </Text>
+          <TouchableOpacity onPress={() => router.push(placesRoute)}>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
           </TouchableOpacity>
         </View>
-        
-        <FlatList 
-          data={FEATURED_EVENTS}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20 }}
-          renderItem={({ item }) => (
-            <EventCard 
-              title={item.title}
-              date={item.date}
-              location={item.location}
-              imageUrl={item.imageUrl}
-              price={item.price}
-              onPress={() => console.log('Event', item.title)}
-            />
-          )}
-        />
-      </View>
 
-      {/* --- 3. LIEUX POPULAIRES 📍 (Mise à jour) --- */}
-      <View className="mt-8">
-        {/* En-tête avec bouton Voir tout */}
-        <View className="flex-row justify-between items-end mb-4 px-5">
-          <Text className="text-lg font-bold text-gray-800 dark:text-white">Lieux populaires 📍</Text>
-          <TouchableOpacity onPress={() => router.push('/place')}>
-            <Text className="text-[#4c669f] font-medium text-xs">Voir tout</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Liste horizontale des Lieux avec le composant réutilisable */}
-        <FlatList 
-          className='pb-4'
-          data={POPULAR_PLACES}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20 }}
-          renderItem={({ item }) => (
-            <PlaceCard 
-              name={item.name}
-              location={item.location}
-              imageUrl={item.imageUrl}
-              rating={item.rating}
-              onPress={() => console.log('Lieu', item.name)}
-            />
-          )}
-        />
-      </View>
-
-      {/* --- 4. RECOMMANDÉ POUR TOI ✨ (Mise à jour) --- */}
-      <View className="mt-8 px-5 pb-24">
-        <View className="flex-row justify-between items-end mb-4">
-            <View className="flex-row items-center">
-                <Text className="text-lg font-bold text-gray-800 dark:text-white">Recommandé pour toi ✨</Text>
-            </View>
-            <TouchableOpacity onPress={() => console.log('Voir recommandations')}>
-                <Text className="text-[#4c669f] font-medium text-xs">Voir tout</Text>
-            </TouchableOpacity>
-        </View>
-
-        {SUGGESTIONS.map((item) => (
-          <SuggestionCard 
-            key={item.id}
-            title={item.title}
-            category={item.category}
-            date={item.date}
-            image={item.image}
-            reason={item.reason}
-            onPress={() => console.log("Suggestion clic")}
+        {loading ? (
+          <ActivityIndicator size="large" color="#2ecc71" className="mt-4" />
+        ) : popularPlaces.length > 0 ? (
+          <FlatList
+            className="pb-4"
+            data={popularPlaces}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+            renderItem={({ item }) => (
+              <PlaceCard
+                name={item.name}
+                location={item.City?.name || item.address || t('homeAddressToConfirm')}
+                imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
+                rating={item.avgRating ?? undefined}
+                onPress={() =>
+                  router.push({
+                    pathname: '/place/[id]',
+                    params: { id: item.id },
+                  })
+                }
+              />
+            )}
           />
-        ))}
+        ) : (
+          <SectionPlaceholder message={t('homeNoPlaces')} />
+        )}
       </View>
 
+      <View className="mt-8 px-5 pb-24">
+        <View className="mb-4 flex-row items-end justify-between">
+          <Text className="text-lg font-bold text-gray-800 dark:text-white">
+            {t('homeRecommended')}
+          </Text>
+          <TouchableOpacity onPress={() => router.push(discoverRoute)}>
+            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#f39c12" className="mt-4" />
+        ) : suggestions.length > 0 ? (
+          suggestions.map((item) => (
+            <SuggestionCard
+              key={item.id}
+              title={item.title}
+              category={item.category}
+              date={item.date}
+              image={item.image}
+              reason={item.reason}
+              onPress={() =>
+                router.push({
+                  pathname: '/event/[id]',
+                  params: { id: item.id },
+                })
+              }
+            />
+          ))
+        ) : (
+          <SectionPlaceholder message={t('homeNoSuggestions')} />
+        )}
+      </View>
     </ScrollView>
+
+  </View>
   );
 }

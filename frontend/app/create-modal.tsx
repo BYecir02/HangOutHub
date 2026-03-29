@@ -1,130 +1,317 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import Animated, { FadeIn, SlideInDown, FadeOut, SlideOutDown, Easing, useSharedValue, useAnimatedStyle, withSpring, runOnJS, withTiming } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
+import { useI18n } from '@/hooks/use-i18n';
+import type { TranslationKey } from '@/services/i18n';
+import {
+  resolveStoredUserSession,
+  type StoredUserSession,
+} from '@/services/user-session';
+
+type ActionItem = {
+  label: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  path: string;
+  params?: Record<string, string>;
+};
+
+type CreateContext = {
+  placeId?: string;
+  placeName?: string;
+  cityName?: string;
+  sourceLabel?: string;
+  outingTitle?: string;
+  eventId?: string;
+  eventTitle?: string;
+};
+
+function getActionsForUser(
+  user: StoredUserSession | null,
+  t: (key: TranslationKey) => string,
+  context?: CreateContext,
+): ActionItem[] {
+  const postParams: Record<string, string> = {};
+  const outingParams: Record<string, string> = {};
+
+  if (context?.placeId) {
+    postParams.placeId = context.placeId;
+    outingParams.placeId = context.placeId;
+  }
+  if (context?.placeName) {
+    postParams.placeName = context.placeName;
+  }
+  if (context?.cityName) {
+    postParams.cityName = context.cityName;
+  }
+  if (context?.eventId) {
+    postParams.eventId = context.eventId;
+    outingParams.eventId = context.eventId;
+  }
+  if (context?.eventTitle) {
+    postParams.eventTitle = context.eventTitle;
+  }
+  if (context?.sourceLabel) {
+    outingParams.sourceLabel = context.sourceLabel;
+  }
+  if (context?.outingTitle) {
+    outingParams.title = context.outingTitle;
+  }
+
+  const role = user?.role || 'USER';
+
+  if (role === 'ORGANIZER') {
+    return [
+      {
+        label: t('createActionOutingLabel'),
+        description: t('createActionOutingDesc'),
+        icon: 'people-outline',
+        color: '#4c669f',
+        path: '/outing',
+        params: Object.keys(outingParams).length ? outingParams : undefined,
+      },
+      {
+        label: t('createActionEventLabel'),
+        description: t('createActionEventPublishDesc'),
+        icon: 'calendar-outline',
+        color: '#ff4757',
+        path: '/event',
+      },
+      {
+        label: t('createActionPostLabel'),
+        description: t('createActionPostAnnounceDesc'),
+        icon: 'create-outline',
+        color: '#f39c12',
+        path: '/post',
+        params: Object.keys(postParams).length ? postParams : undefined,
+      },
+    ];
+  }
+
+  if (role === 'PLACE_OWNER') {
+    if (!user?.hasPlace) {
+      return [
+        {
+          label: t('createActionOutingLabel'),
+          description: t('createActionOutingDesc'),
+          icon: 'people-outline',
+          color: '#4c669f',
+          path: '/outing',
+          params: Object.keys(outingParams).length ? outingParams : undefined,
+        },
+        {
+          label: t('createActionAddPlaceLabel'),
+          description: t('createActionAddPlaceDesc'),
+          icon: 'location-outline',
+          color: '#2ecc71',
+          path: '/organizer/create-place',
+        },
+        {
+          label: t('createActionPostLabel'),
+          description: t('createActionPostQuickDesc'),
+          icon: 'create-outline',
+          color: '#f39c12',
+          path: '/post',
+          params: Object.keys(postParams).length ? postParams : undefined,
+        },
+      ];
+    }
+
+    return [
+      {
+        label: t('createActionOutingLabel'),
+        description: t('createActionOutingDesc'),
+        icon: 'people-outline',
+        color: '#4c669f',
+        path: '/outing',
+        params: Object.keys(outingParams).length ? outingParams : undefined,
+      },
+      {
+        label: t('createActionEventLabel'),
+        description: t('createActionEventInPlaceDesc'),
+        icon: 'calendar-outline',
+        color: '#ff4757',
+        path: '/event',
+      },
+      {
+        label: t('createActionAddPlaceLabel'),
+        description: t('createActionAddPlaceDesc'),
+        icon: 'location-outline',
+        color: '#2ecc71',
+        path: '/organizer/create-place',
+      },
+      {
+        label: t('createActionPostLabel'),
+        description: t('createActionPostActivityDesc'),
+        icon: 'create-outline',
+        color: '#f39c12',
+        path: '/post',
+        params: Object.keys(postParams).length ? postParams : undefined,
+      },
+    ];
+  }
+
+  return [
+    {
+      label: t('createActionOutingLabel'),
+      description: t('createActionOutingDesc'),
+      icon: 'people-outline',
+      color: '#4c669f',
+      path: '/outing',
+      params: Object.keys(outingParams).length ? outingParams : undefined,
+    },
+    {
+      label: t('createActionPostLabel'),
+      description: t('createActionPostIdeaDesc'),
+      icon: 'create-outline',
+      color: '#f39c12',
+      path: '/post',
+      params: Object.keys(postParams).length ? postParams : undefined,
+    },
+  ];
+}
 
 export default function CreateModalScreen() {
   const router = useRouter();
-  const translateY = useSharedValue(0);
+  const { t } = useI18n();
+  const params = useLocalSearchParams<{
+    placeId?: string;
+    placeName?: string;
+    cityName?: string;
+    sourceLabel?: string;
+    outingTitle?: string;
+    eventId?: string;
+    eventTitle?: string;
+  }>();
+  const [currentUser, setCurrentUser] = useState<StoredUserSession | null>(null);
 
-  // Fonction pour annuler complètement (Fermer le modal)
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const hydrateUser = async () => {
+        try {
+          const resolvedUser = await resolveStoredUserSession();
+          if (!isMounted) {
+            return;
+          }
+          setCurrentUser(resolvedUser || null);
+        } catch {
+          if (!isMounted) {
+            return;
+          }
+          setCurrentUser(null);
+        }
+      };
+
+      void hydrateUser();
+
+      return () => {
+        isMounted = false;
+      };
+    }, []),
+  );
+
+  const actions = useMemo(
+    () =>
+      getActionsForUser(currentUser, t, {
+        placeId: typeof params.placeId === 'string' ? params.placeId : undefined,
+        placeName: typeof params.placeName === 'string' ? params.placeName : undefined,
+        cityName: typeof params.cityName === 'string' ? params.cityName : undefined,
+        sourceLabel: typeof params.sourceLabel === 'string' ? params.sourceLabel : undefined,
+        outingTitle: typeof params.outingTitle === 'string' ? params.outingTitle : undefined,
+        eventId: typeof params.eventId === 'string' ? params.eventId : undefined,
+        eventTitle: typeof params.eventTitle === 'string' ? params.eventTitle : undefined,
+      }),
+    [
+      currentUser,
+      params.cityName,
+      params.eventId,
+      params.eventTitle,
+      params.outingTitle,
+      params.placeId,
+      params.placeName,
+      params.sourceLabel,
+      t,
+    ],
+  );
+
   const handleClose = () => router.back();
 
-  // Geste de glissement (Pan Gesture) - Je l'ai gardé pour pouvoir fermer en glissant
-  const gesture = Gesture.Pan()
-    .onChange((event) => {
-      // On autorise seulement le glissement vers le bas
-      if (event.translationY > 0) {
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd(() => {
-      if (translateY.value > 100) {
-        runOnJS(handleClose)();
-      } else {
-        translateY.value = withSpring(0);
-      }
-    });
-
-  // Fonction pour naviguer vers une page après fermeture du menu
-  const navigateTo = (path: string) => {
-    // On fait glisser le menu vers le bas (hors écran)
-    translateY.value = withTiming(1000, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(router.replace)(path as any);
-      }
+  const navigateTo = (path: string, pathParams?: Record<string, string>) => {
+    router.replace({
+      pathname: path as never,
+      params: pathParams,
     });
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
   return (
-    <View className="flex-1 justify-end"> 
-      {/* FOND NOIR SEMI-TRANSPARENT */}
-      <Animated.View 
-        entering={FadeIn}
-        exiting={FadeOut}
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-      >
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
-      </Animated.View>
-
-      {/* --- LE MENU STYLE PINTEREST (bas de l'écran) --- */}
-      <GestureDetector gesture={gesture}>
-        <Animated.View 
-          entering={SlideInDown}
-          exiting={SlideOutDown}
-          style={animatedStyle}
-          className="bg-white dark:bg-gray-900 rounded-t-3xl p-6 pb-10 shadow-2xl"
+    <BottomSheetModal
+      visible
+      onClose={handleClose}
+      title={t('createModalTitle')}
+      subtitle={t('createModalSubtitle')}
+      maxHeight={680}
+      contentMode="auto"
+      footer={
+        <TouchableOpacity
+          onPress={handleClose}
+          className="items-center rounded-2xl border border-gray-200 py-3 dark:border-gray-700"
         >
-          
-          {/* Petite barre de drag (visuel) */}
-          <View className="items-center mb-6">
-            <View className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full" />
-          </View>
-
-          <Text className="text-xl font-bold text-gray-800 dark:text-white mb-6 text-center">
-            Que souhaitez-vous ajouter ?
+          <Text className="font-semibold text-gray-600 dark:text-gray-300">
+            {t('createModalCancel')}
           </Text>
+        </TouchableOpacity>
+      }
+    >
+      {actions.length > 0 ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 8 }}
+          style={{ maxHeight: 420 }}
+        >
+          <View>
+            {actions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                onPress={() => navigateTo(action.path, action.params)}
+                className="mb-3 flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-800"
+                style={{
+                  borderWidth: 1,
+                  borderColor: `${action.color}2A`,
+                }}
+              >
+                <View
+                  className="mr-4 h-14 w-14 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: `${action.color}18` }}
+                >
+                  <Ionicons name={action.icon} size={26} color={action.color} />
+                </View>
 
-          <View className="flex-row justify-between px-1">
-            {/* OPTION 1 : SORTIE */}
-            <MenuOption 
-              label="Sortie" 
-              icon="people" 
-              color="#4c669f" 
-              onPress={() => navigateTo('/outing')} 
-            />
-
-            {/* OPTION 2 : ÉVÉNEMENT */}
-            <MenuOption 
-              label="Événement" 
-              icon="calendar" 
-              color="#ff4757" 
-              onPress={() => navigateTo('/event')} 
-            />
-
-            {/* OPTION 3 : LIEU */}
-            <MenuOption 
-              label="Lieu" 
-              icon="location" 
-              color="#2ecc71" 
-              onPress={() => navigateTo('/place')} 
-            />
-
-            {/* OPTION 4 : PUBLICATION */}
-            <MenuOption 
-              label="Post" 
-              icon="create" 
-              color="#f39c12" 
-              onPress={() => navigateTo('/post')} 
-            />
+                <View className="flex-1 pr-3">
+                  <Text className="text-base font-bold text-gray-800 dark:text-white">
+                    {action.label}
+                  </Text>
+                  <Text className="mt-1 text-sm leading-5 text-gray-500 dark:text-gray-400">
+                    {action.description}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            ))}
           </View>
-
-          {/* Bouton Annuler en bas */}
-          <TouchableOpacity onPress={handleClose} className="mt-8 items-center">
-            <Text className="text-gray-400 dark:text-gray-500 font-medium">Annuler</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </GestureDetector>
-    </View>
+        </ScrollView>
+      ) : (
+        <View className="py-8">
+          <Text className="text-center text-sm text-gray-500 dark:text-gray-400">
+            Aucune action disponible pour le moment.
+          </Text>
+        </View>
+      )}
+    </BottomSheetModal>
   );
 }
-
-// --- COMPOSANTS UTILITAIRES ---
-
-const MenuOption = ({ label, icon, color, onPress }: { label: string, icon: any, color: string, onPress: () => void }) => (
-  <TouchableOpacity onPress={onPress} className="items-center space-y-2">
-    <View 
-      className="w-20 h-20 rounded-2xl justify-center items-center shadow-sm"
-      style={{ backgroundColor: `${color}15` }} 
-    >
-      <Ionicons name={icon} size={32} color={color} />
-    </View>
-    <Text className="font-bold text-gray-700 dark:text-gray-300 pt-3">{label}</Text>
-  </TouchableOpacity>
-);

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PlacesService } from './places.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('PlacesService', () => {
   let service: PlacesService;
@@ -17,6 +18,19 @@ describe('PlacesService', () => {
               create: jest.fn(),
               findUnique: jest.fn(),
             },
+            savedPlace: {
+              findUnique: jest.fn(),
+              create: jest.fn(),
+              delete: jest.fn(),
+              findMany: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: StorageService,
+          useValue: {
+            uploadFile: jest.fn(),
+            uploadFiles: jest.fn(),
           },
         },
       ],

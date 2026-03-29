@@ -1,0 +1,3 @@
+ALTER TABLE "Event"
+ADD COLUMN "checkInOpensAtOffsetMin" INTEGER DEFAULT -60,
+ADD COLUMN "checkInClosesAtOffsetMin" INTEGER DEFAULT 180;

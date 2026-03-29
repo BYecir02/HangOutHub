@@ -1,29 +1,52 @@
 import {
   IsNotEmpty,
-  IsString,
-  IsOptional,
   IsNumber,
-  Min,
+  IsOptional,
+  IsString,
   Max,
+  MaxLength,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePlaceDto {
   @IsNotEmpty()
   @IsString()
+  @MaxLength(100)
   name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  category?: string;
 
   @IsOptional()
   @IsString()
   description?: string;
 
-  @IsNotEmpty() // Je le laisse obligatoire dans l'API même si nullable en DB, c'est mieux pour une map
+  @IsNotEmpty()
   @IsString()
+  @MaxLength(255)
   address: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  whatsapp?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  openingHours?: string;
 
   @IsNotEmpty()
   @IsNumber()
-  @Type(() => Number) // Convertit "6.37" (string) en 6.37 (float)
+  @Type(() => Number)
   latitude: number;
 
   @IsNotEmpty()
@@ -35,11 +58,11 @@ export class CreatePlaceDto {
   @IsNumber()
   @Type(() => Number)
   @Min(1)
-  @Max(4) // Généralement 1=Peu cher, 4=Très cher
+  @Max(4)
   priceLevel?: number;
 
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
-  cityId?: number; // Si le front ne l'envoie pas, on mettra 1 par défaut côté service
+  cityId?: number;
 }

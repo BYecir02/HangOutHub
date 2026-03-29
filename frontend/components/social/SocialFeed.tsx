@@ -1,242 +1,1045 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  Share,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import EventCard from '../ui/EventCard';
+import * as Linking from 'expo-linking';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-// --- MOCK DATA ---
-const STORIES = [
-  { id: 's1', user: 'Moi', image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200', isAdd: true },
-  { id: 's2', user: 'Alice', image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200' },
-  { id: 's3', user: 'Marc', image: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200' },
-  { id: 's4', user: 'Sophie', image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200' },
-  { id: 's5', user: 'Jean', image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200' },
-];
+import { useI18n } from '@/hooks/use-i18n';
+import PersonRow from './PersonRow';
+import PostItem from './PostItem';
+import { SkeletonBlock } from '../ui/Skeleton';
+import api, { storage } from '../../services/api';
+import { getFriendshipOverview } from '../../services/friendships';
+import { getOrCreateDirectChat, sendDirectMessage } from '../../services/direct-chats';
+import type { SocialUser } from '../../types/social';
 
-// --- NOUVELLES DONNÉES MOCK PLUS RICHES ---
-const POSTS = [
-  {
-    id: 'p1',
-    type: 'plan', // NOUVEAU TYPE : Planification
-    user: 'Jean Dupont',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
-    time: 'Il y a 10 min',
-    content: 'J\'organise un afterwork ce soir, qui est chaud ? 🍻',
-    planDetails: {
-      location: 'Le Code Bar',
-      time: 'Ce soir • 19:00',
-      attendees: ['Alice', 'Marc', 3]
-    },
-    likes: 5,
-    comments: 12
-  },
-  {
-    id: 'p2',
-    type: 'ticket_buy', // NOUVEAU TYPE : Achat Billet
-    user: 'Alice Martin',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-    time: 'Il y a 2h',
-    content: 'Ça y est, j\'ai mes places ! Trop hâte 😍',
-    event: {
-      title: 'Concert Dadju & Tayc',
-      date: 'SAM. 24 JUIN',
-      location: 'Palais des Congrès',
-      image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=1000',
-      price: 'Payant'
-    }
-  },
-  {
-    id: 'p3',
-    type: 'review', // NOUVEAU TYPE : Avis
-    user: 'Marc Z.',
-    avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200',
-    time: 'Il y a 4h',
-    content: 'Superbe ambiance hier soir ! 🔥',
-    placeName: 'Dream Beach',
-    rating: 5,
-    image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
-    likes: 24,
-    comments: 8
-  },
-  {
-    id: 'p4',
-    type: 'standard', // NOUVEAU : Post Texte seul (Question)
-    user: 'Sophie',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
-    time: 'Il y a 5h',
-    content: 'Quelqu\'un a déjà testé le nouveau resto sur la Haie Vive ? J\'hésite à y aller ce soir 🤔',
-    likes: 2,
-    comments: 15
-  },
-  {
-    id: 'p5',
-    type: 'standard', // NOUVEAU : Post Photo + Texte (Souvenir)
-    user: 'Paul',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-    time: 'Il y a 6h',
-    content: 'Retour sur ce week-end de folie ! 🌊☀️',
-    image: 'https://images.unsplash.com/photo-1514525253440-b393452e3383?w=800',
-    likes: 45,
-    comments: 3
-  }
-];
+const FEED_CACHE_KEY = 'socialFeedCache:v2';
+const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt:v2';
+const FEED_CACHE_CURSOR_KEY = 'socialFeedCacheCursor:v2';
+const FEED_CACHE_TTL_MS = 60 * 1000;
+const FEED_PAGE_SIZE = 20;
+const FEED_TOP_THRESHOLD = 12;
 
-export default function SocialFeed() {
-  
-  // Rendu des Stories (En-tête)
-  const renderHeader = () => (
-    <View className="mb-6 mt-6">
-      <Text className="px-5 text-lg font-bold text-gray-800 dark:text-white mb-3">Stories</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
-        {STORIES.map((story) => (
-          <TouchableOpacity key={story.id} className="mr-4 items-center">
-            <View className={`w-16 h-16 rounded-full p-0.5 ${story.isAdd ? 'border-0' : 'border-2 border-[#4c669f]'}`}>
-              <Image source={{ uri: story.image }} className="w-full h-full rounded-full" />
-              {story.isAdd && (
-                <View className="absolute bottom-0 right-0 bg-[#4c669f] rounded-full p-1 border-2 border-white dark:border-black">
-                  <Ionicons name="add" size={12} color="white" />
-                </View>
-              )}
-            </View>
-            <Text className="text-xs text-gray-600 dark:text-gray-400 mt-1">{story.user}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
+type FilterType = 'all' | 'plan' | 'post';
 
-  // Rendu d'un Post
-  const renderPost = ({ item }: { item: any }) => (
-    <View className="bg-white dark:bg-gray-900 p-4 mb-2 border-y border-gray-100 dark:border-gray-800">
-      
-      {/* En-tête du post */}
-      <View className="flex-row items-center mb-3">
-        <Image source={{ uri: item.avatar }} className="w-10 h-10 rounded-full mr-3" />
-        <View>
-          <View className="flex-row items-center">
-            <Text className="font-bold text-gray-800 dark:text-white text-base mr-1">{item.user}</Text>
-            {/* Petit badge d'action contextuel */}
-            {item.type === 'ticket_buy' && <Text className="text-xs text-gray-500">a pris son billet 🎟️</Text>}
-            {item.type === 'plan' && <Text className="text-xs text-gray-500">organise une sortie 📅</Text>}
-            {item.type === 'review' && <Text className="text-xs text-gray-500">a noté un lieu ⭐</Text>}
-          </View>
-          <Text className="text-xs text-gray-500 dark:text-gray-400">{item.time}</Text>
-        </View>
-        <TouchableOpacity className="ml-auto">
-          <Ionicons name="ellipsis-horizontal" size={20} color="#999" />
-        </TouchableOpacity>
-      </View>
+interface CategoryOption {
+  id: number;
+  name: string;
+}
 
-      {/* Contenu Texte */}
-      {item.content && (
-        <Text className="text-gray-800 dark:text-gray-200 mb-3 text-base leading-6">{item.content}</Text>
-      )}
+interface FeedAuthor {
+  id?: string;
+  username?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}
 
-      {/* --- BLOCS SPÉCIFIQUES --- */}
+interface FeedPost {
+  id: string;
+  userId?: string;
+  content?: string | null;
+  images?: string[];
+  publicationScope?: 'personal' | 'structure';
+  postType?: 'post' | 'plan';
+  placeId?: string | null;
+  eventId?: string | null;
+  placeName?: string | null;
+  cityName?: string | null;
+  ambiance?: string | null;
+  visibilityUserIds?: string[] | null;
+  Event?: {
+    id: string;
+    title: string;
+    startTime: string;
+    placeId?: string | null;
+    Place?: {
+      id?: string;
+      name?: string | null;
+      City?: {
+        name?: string | null;
+      } | null;
+    } | null;
+  } | null;
+  visibility?: 'public' | 'friends' | 'private' | 'custom';
+  createdAt?: string;
+  isLiked?: boolean;
+  isOwner?: boolean;
+  User?: FeedAuthor;
+  _count?: {
+    likes?: number;
+    comments?: number;
+  };
+  shareCount?: number | null;
+}
 
-      {/* 1. BLOC PLANIFICATION (Nouveau) */}
-      {item.type === 'plan' && item.planDetails && (
-        <View className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl mb-3 border border-blue-100 dark:border-blue-800">
-          <View className="flex-row justify-between items-center mb-2">
-            <View className="flex-row items-center">
-              <View className="bg-blue-100 dark:bg-blue-800 p-2 rounded-lg mr-3">
-                 <Ionicons name="calendar" size={20} color="#4c669f" />
-              </View>
-              <View>
-                <Text className="font-bold text-gray-800 dark:text-white">{item.planDetails.location}</Text>
-                <Text className="text-xs text-gray-500 dark:text-gray-400">{item.planDetails.time}</Text>
-              </View>
-            </View>
-          </View>
-          
-          {/* Liste des participants (Social Proof) */}
-          <View className="flex-row items-center mt-2 pt-2 border-t border-blue-100 dark:border-blue-800">
-             <Text className="text-xs text-gray-500 mr-2">Déjà partants :</Text>
-             <View className="flex-row">
-                {[1, 2, 3].map((_, i) => (
-                  <View key={i} className="w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 border border-white dark:border-gray-900 -ml-2 first:ml-0 justify-center items-center">
-                    <Ionicons name="person" size={10} color="#fff" />
-                  </View>
-                ))}
-                <View className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 border border-white dark:border-gray-900 -ml-2 justify-center items-center">
-                   <Text className="text-[8px] font-bold text-gray-600 dark:text-gray-300">+3</Text>
-                </View>
-             </View>
-             <TouchableOpacity className="ml-auto bg-[#4c669f] px-3 py-1 rounded-full">
-                <Text className="text-white text-xs font-bold">Je viens !</Text>
-             </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* 2. BLOC BILLET / EVENT (Amélioré) */}
-      {item.type === 'ticket_buy' && item.event && (
-        <View className="mb-3">
-           {/* On réutilise ton EventCard mais on peut ajouter un overlay "J'y vais aussi" */}
-           <EventCard 
-             title={item.event.title}
-             date={item.event.date}
-             location={item.event.location}
-             imageUrl={item.event.image}
-             price={item.event.price}
-             onPress={() => {}}
-           />
-           <TouchableOpacity className="mt-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg items-center">
-              <Text className="text-[#4c669f] font-bold text-sm">Prendre ma place aussi 👉</Text>
-           </TouchableOpacity>
-        </View>
-      )}
-
-      {/* 3. BLOC REVIEW / PHOTO (Amélioré) */}
-      {item.type === 'review' && item.image && (
-        <View className="mb-3">
-          <Image 
-            source={{ uri: item.image }} 
-            className="w-full h-64 rounded-xl mb-2 bg-gray-200 dark:bg-gray-800"
-            resizeMode="cover"
-          />
-          <View className="flex-row items-center bg-gray-50 dark:bg-gray-800 p-2 rounded-lg absolute bottom-4 left-4 right-4 bg-opacity-90">
-             <Ionicons name="location" size={16} color="#4c669f" />
-             <Text className="text-gray-800 dark:text-white font-bold ml-1 flex-1">{item.placeName}</Text>
-             <View className="flex-row">
-               {[1,2,3,4,5].map(star => (
-                 <Ionicons key={star} name="star" size={14} color="#f59e0b" />
-               ))}
-             </View>
-          </View>
-        </View>
-      )}
-
-      {/* 4. BLOC STANDARD (Photo simple sans contexte spécifique) */}
-      {item.type === 'standard' && item.image && (
-        <Image 
-          source={{ uri: item.image }} 
-          className="w-full h-64 rounded-xl mb-3 bg-gray-200 dark:bg-gray-800"
-          resizeMode="cover"
-        />
-      )}
-
-      {/* Actions (Like/Comment) */}
-      <View className="flex-row pt-2 border-t border-gray-50 dark:border-gray-800">
-        <TouchableOpacity className="flex-row items-center mr-6">
-          <Ionicons name="heart-outline" size={22} color={item.likes > 10 ? "#ff4757" : "#666"} />
-          <Text className="ml-1.5 text-gray-500 dark:text-gray-400 font-medium">{item.likes}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="flex-row items-center">
-          <Ionicons name="chatbubble-outline" size={22} color="#666" />
-          <Text className="ml-1.5 text-gray-500 dark:text-gray-400 font-medium">{item.comments}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
-    <FlatList
-      data={POSTS}
-      renderItem={renderPost}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={renderHeader}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 100 }}
-    />
+    <View className="items-center px-6 py-16">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-[#4c669f]/10">
+        <Ionicons name="sparkles-outline" size={28} color="#4c669f" />
+      </View>
+      <Text className="mt-5 text-xl font-bold text-gray-900 dark:text-white">
+        {title}
+      </Text>
+      <Text className="mt-3 text-center text-base leading-7 text-gray-500 dark:text-gray-400">
+        {description}
+      </Text>
+    </View>
   );
 }
+
+function SkeletonPost() {
+  return (
+    <View className="mx-5 mb-4 rounded-3xl bg-white p-4 shadow-sm dark:bg-gray-900">
+      <View className="flex-row items-center">
+        <SkeletonBlock className="h-12 w-12 rounded-full" />
+        <View className="ml-3 flex-1">
+          <SkeletonBlock className="h-4 w-36 rounded-lg" />
+          <SkeletonBlock className="mt-2 h-3 w-20 rounded-lg" />
+        </View>
+      </View>
+      <SkeletonBlock className="mt-4 h-4 w-full rounded-lg" />
+      <SkeletonBlock className="mt-2 h-4 w-5/6 rounded-lg" />
+      <SkeletonBlock className="mt-2 h-4 w-2/3 rounded-lg" />
+      <SkeletonBlock className="mt-4 h-44 w-full rounded-2xl" />
+      <View className="mt-4 flex-row justify-between">
+        <SkeletonBlock className="h-4 w-16 rounded-lg" />
+        <SkeletonBlock className="h-4 w-16 rounded-lg" />
+        <SkeletonBlock className="h-4 w-16 rounded-lg" />
+      </View>
+    </View>
+  );
+}
+
+export default function SocialFeed() {
+  const router = useRouter();
+  const { t } = useI18n();
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchingMore, setFetchingMore] = useState(false);
+  const [cacheHydrated, setCacheHydrated] = useState(false);
+  const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [pendingPosts, setPendingPosts] = useState<FeedPost[]>([]);
+  const postsRef = useRef<FeedPost[]>([]);
+  const nextCursorRef = useRef<string | null>(null);
+  const latestFetchedAtRef = useRef<string | null>(null);
+  const isAtTopRef = useRef(true);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
+  const [connections, setConnections] = useState<SocialUser[]>([]);
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [sendingConnectionId, setSendingConnectionId] = useState<string | null>(
+    null,
+  );
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'category' | 'type' | 'location'>(
+    'category',
+  );
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedType, setSelectedType] = useState<FilterType>('all');
+  const [selectedLocation, setSelectedLocation] = useState('');
+
+  const persistFeedCache = useCallback(
+    async (nextPosts: FeedPost[], nextCursorValue: string | null) => {
+    const timestamp = Date.now();
+    try {
+      await storage.setItem(FEED_CACHE_KEY, JSON.stringify(nextPosts));
+      await storage.setItem(FEED_CACHE_TIME_KEY, String(timestamp));
+      if (nextCursorValue) {
+        await storage.setItem(FEED_CACHE_CURSOR_KEY, nextCursorValue);
+      } else {
+        await storage.removeItem(FEED_CACHE_CURSOR_KEY);
+      }
+      setLastFetchedAt(timestamp);
+    } catch (error) {
+      console.warn('Social feed cache save failed', error);
+    }
+  },
+    [],
+  );
+
+  const getMaxCreatedAt = useCallback((items: FeedPost[]) => {
+    let maxTime = 0;
+    let maxValue: string | null = null;
+    items.forEach((post) => {
+      if (!post.createdAt) {
+        return;
+      }
+      const time = new Date(post.createdAt).getTime();
+      if (time > maxTime) {
+        maxTime = time;
+        maxValue = new Date(post.createdAt).toISOString();
+      }
+    });
+    return maxValue;
+  }, []);
+
+  const hydrateFeedCache = useCallback(async () => {
+    if (cacheHydrated) {
+      return false;
+    }
+
+    try {
+      const cached = await storage.getItem(FEED_CACHE_KEY);
+      const cachedAt = await storage.getItem(FEED_CACHE_TIME_KEY);
+      const cachedCursor = await storage.getItem(FEED_CACHE_CURSOR_KEY);
+
+      if (cached) {
+        const parsed = JSON.parse(cached) as FeedPost[];
+        setPosts(parsed);
+        setLoading(false);
+        const cachedLatest = getMaxCreatedAt(parsed);
+        if (cachedLatest) {
+          latestFetchedAtRef.current = cachedLatest;
+        }
+      }
+
+      if (cachedAt) {
+        const parsedTime = Number(cachedAt);
+        if (!Number.isNaN(parsedTime)) {
+          setLastFetchedAt(parsedTime);
+        }
+      }
+
+      if (cachedCursor) {
+        setNextCursor(cachedCursor);
+      }
+    } catch (error) {
+      console.warn('Social feed cache read failed', error);
+    } finally {
+      setCacheHydrated(true);
+    }
+
+    return true;
+  }, [cacheHydrated, getMaxCreatedAt]);
+
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
+
+  useEffect(() => {
+    nextCursorRef.current = nextCursor;
+  }, [nextCursor]);
+
+  const getLatestPostCreatedAt = useCallback(() => {
+    return latestFetchedAtRef.current;
+  }, []);
+
+  const updateLatestFetchedAt = useCallback((items: FeedPost[]) => {
+    const maxCreatedAt = getMaxCreatedAt(items);
+    if (!maxCreatedAt) {
+      return;
+    }
+    const current = latestFetchedAtRef.current;
+    if (!current) {
+      latestFetchedAtRef.current = maxCreatedAt;
+      return;
+    }
+    if (new Date(maxCreatedAt).getTime() > new Date(current).getTime()) {
+      latestFetchedAtRef.current = maxCreatedAt;
+    }
+  }, [getMaxCreatedAt]);
+
+  const mergePosts = useCallback((incoming: FeedPost[], current: FeedPost[]) => {
+    const map = new Map<string, FeedPost>();
+    [...current, ...incoming].forEach((post) => {
+      map.set(post.id, post);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (aTime === bTime) {
+        return b.id.localeCompare(a.id);
+      }
+      return bTime - aTime;
+    });
+  }, []);
+
+  const fetchFeed = useCallback(
+    async (mode: 'initial' | 'refresh' | 'background' | 'more' = 'initial') => {
+      if (mode === 'refresh') {
+        setRefreshing(true);
+      }
+      if (mode === 'initial') {
+        setLoading(true);
+      }
+      if (mode === 'more') {
+        setFetchingMore(true);
+      }
+
+      try {
+        const params: Record<string, string | number> = {
+          limit: FEED_PAGE_SIZE,
+        };
+
+        if (mode === 'more' && nextCursorRef.current) {
+          params.cursor = nextCursorRef.current;
+        }
+
+        if (mode === 'background') {
+          const latestPostCreatedAt = getLatestPostCreatedAt();
+          if (latestPostCreatedAt) {
+            params.after = latestPostCreatedAt;
+          }
+        }
+
+        const response = await api.get<{
+          items: FeedPost[];
+          nextCursor: string | null;
+        }>('/posts/feed', { params });
+
+        if (mode === 'more') {
+          setPosts((current) => mergePosts(response.data.items, current));
+        } else if (mode === 'background') {
+          if (response.data.items.length > 0) {
+            if (isAtTopRef.current) {
+              setPosts((current) => mergePosts(response.data.items, current));
+            } else {
+              setPendingPosts((current) => mergePosts(response.data.items, current));
+            }
+          }
+        } else {
+          setPosts(response.data.items);
+          setPendingPosts([]);
+        }
+
+        if (mode !== 'more') {
+          updateLatestFetchedAt(response.data.items);
+        }
+
+        if (mode !== 'background') {
+          setNextCursor(response.data.nextCursor);
+        }
+
+        const nextForCache =
+          mode === 'background' || mode === 'more'
+            ? nextCursorRef.current
+            : response.data.nextCursor;
+        const postsForCache =
+          mode === 'initial' || mode === 'refresh'
+            ? response.data.items
+            : mergePosts(response.data.items, postsRef.current);
+        await persistFeedCache(postsForCache, nextForCache || null);
+      } catch (error) {
+        console.error(t('socialFeedLoadError'), error);
+      } finally {
+        if (mode === 'initial') {
+          setLoading(false);
+        }
+        if (mode === 'refresh') {
+          setRefreshing(false);
+        }
+        if (mode === 'more') {
+          setFetchingMore(false);
+        }
+      }
+    },
+    [
+      getLatestPostCreatedAt,
+      mergePosts,
+      persistFeedCache,
+      t,
+      updateLatestFetchedAt,
+    ],
+  );
+
+  const shouldRefreshFeed = useCallback(async () => {
+    if (lastFetchedAt) {
+      return Date.now() - lastFetchedAt > FEED_CACHE_TTL_MS;
+    }
+
+    try {
+      const cachedAt = await storage.getItem(FEED_CACHE_TIME_KEY);
+      if (!cachedAt) {
+        return true;
+      }
+      const parsedTime = Number(cachedAt);
+      if (Number.isNaN(parsedTime)) {
+        return true;
+      }
+      return Date.now() - parsedTime > FEED_CACHE_TTL_MS;
+    } catch {
+      return true;
+    }
+  }, [lastFetchedAt]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const run = async () => {
+        await hydrateFeedCache();
+        const shouldRefresh = await shouldRefreshFeed();
+
+        if (!isActive) {
+          return;
+        }
+
+        if (shouldRefresh) {
+          const latestPostCreatedAt = getLatestPostCreatedAt();
+          if (postsRef.current.length > 0 && latestPostCreatedAt) {
+            await fetchFeed('background');
+          } else {
+            await fetchFeed('initial');
+          }
+        }
+      };
+
+      void run();
+
+      return () => {
+        isActive = false;
+      };
+    }, [
+      fetchFeed,
+      getLatestPostCreatedAt,
+      hydrateFeedCache,
+      shouldRefreshFeed,
+    ]),
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCategories = async () => {
+      try {
+        const response = await api.get<CategoryOption[]>('/categories');
+        if (isMounted) {
+          setCategories(response.data);
+        }
+      } catch {
+        if (isMounted) {
+          setCategories([]);
+        }
+      }
+    };
+    void loadCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const removePostFromLists = useCallback((postId: string) => {
+    setPosts((current) => current.filter((post) => post.id !== postId));
+    setPendingPosts((current) => current.filter((post) => post.id !== postId));
+  }, []);
+
+  const handleDeletePost = useCallback(
+    async (postId: string) => {
+      try {
+        await api.delete(`/posts/${postId}`);
+        removePostFromLists(postId);
+        Alert.alert(
+          t('profileDeletePostSuccessTitle'),
+          t('profileDeletePostSuccessMessage'),
+        );
+      } catch {
+        Alert.alert(t('commonErrorTitle'), t('socialFeedDeleteError'));
+      }
+    },
+    [removePostFromLists, t],
+  );
+
+  const handleEditPost = useCallback(
+    (post: {
+      id: string;
+      content?: string | null;
+      images?: string[];
+      postType?: 'post' | 'plan';
+      publicationScope?: 'personal' | 'structure';
+      placeId?: string | null;
+      eventId?: string | null;
+      Event?: {
+        title?: string | null;
+      } | null;
+      placeName?: string | null;
+      cityName?: string | null;
+      ambiance?: string | null;
+      visibilityUserIds?: string[] | null;
+      visibility?: 'public' | 'friends' | 'private' | 'custom';
+    }) => {
+      router.push({
+        pathname: '/post',
+        params: {
+          postId: post.id,
+          content: post.content || '',
+          images: JSON.stringify(post.images || []),
+          postType: post.postType || 'post',
+          publicationScope: post.publicationScope || 'personal',
+          placeId: post.placeId || '',
+          eventId: post.eventId || '',
+          eventTitle: post.Event?.title || '',
+          placeName: post.placeName || '',
+          cityName: post.cityName || '',
+          ambiance: post.ambiance || '',
+          visibilityUserIds: JSON.stringify(post.visibilityUserIds || []),
+          visibility: post.visibility || 'public',
+        },
+      });
+    },
+    [router],
+  );
+
+  const handleCommentPost = useCallback(
+    (post: { id: string }) => {
+      router.push({
+        pathname: '/comments',
+        params: { postId: post.id },
+      });
+    },
+    [router],
+  );
+
+  const handleOpenMessages = useCallback(() => {
+    router.push('/messages');
+  }, [router]);
+
+  const handleOpenSearch = useCallback(() => {
+    router.push('/search');
+  }, [router]);
+
+  const applyPendingPosts = useCallback(async () => {
+    if (pendingPosts.length === 0) {
+      return;
+    }
+    const nextPosts = mergePosts(pendingPosts, postsRef.current);
+    setPosts(nextPosts);
+    setPendingPosts([]);
+    await persistFeedCache(nextPosts, nextCursorRef.current || null);
+  }, [mergePosts, pendingPosts, persistFeedCache]);
+
+  const handleScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const offsetY = event.nativeEvent.contentOffset.y;
+      const isAtTop = offsetY <= FEED_TOP_THRESHOLD;
+      isAtTopRef.current = isAtTop;
+      if (isAtTop && pendingPosts.length > 0) {
+        void applyPendingPosts();
+      }
+    },
+    [applyPendingPosts, pendingPosts.length],
+  );
+
+  const resolveLocationLabel = useCallback((post: FeedPost) => {
+    const direct = [post.placeName, post.cityName]
+      .map((value) => (value || '').trim())
+      .filter(Boolean)
+      .join(' - ');
+    if (direct) {
+      return direct;
+    }
+    if (post.Event?.Place?.name) {
+      return [post.Event.Place.name, post.Event.Place.City?.name]
+        .filter(Boolean)
+        .join(' - ');
+    }
+    return '';
+  }, []);
+
+  const pendingLabel = useMemo(() => {
+    const label = t('socialFeedNewPosts', { count: pendingPosts.length });
+    if (!label || label === 'socialFeedNewPosts') {
+      return `${pendingPosts.length} nouveau(x) post(s)`;
+    }
+    return label;
+  }, [pendingPosts.length, t]);
+
+  const buildShareMessage = useCallback(
+    (post: FeedPost) => {
+      const title = (post.content || '').split('\n')[0]?.trim();
+      const location = resolveLocationLabel(post);
+      const eventTitle = post.Event?.title?.trim();
+      const parts = [
+        title || t('postItemPlanFallback'),
+        eventTitle,
+        location,
+        Linking.createURL(`/post-view/${post.id}`),
+      ].filter(Boolean);
+      return parts.join('\n');
+    },
+    [resolveLocationLabel, t],
+  );
+
+  const loadConnections = useCallback(async () => {
+    if (connectionsLoaded) {
+      return;
+    }
+    setLoadingConnections(true);
+    try {
+      const overview = await getFriendshipOverview();
+      setConnections(overview.connections.map((item) => item.user));
+      setConnectionsLoaded(true);
+    } catch (error) {
+      console.error('Erreur chargement connexions', error);
+      setConnections([]);
+    } finally {
+      setLoadingConnections(false);
+    }
+  }, [connectionsLoaded]);
+
+  const openShareToConnection = useCallback(
+    async (post: FeedPost) => {
+      setShareTarget(post);
+      setShareModalOpen(true);
+      await loadConnections();
+    },
+    [loadConnections],
+  );
+
+  const bumpShareCount = useCallback((postId: string) => {
+    const bump = (items: FeedPost[]) =>
+      items.map((post) =>
+        post.id === postId
+          ? { ...post, shareCount: (post.shareCount || 0) + 1 }
+          : post,
+      );
+    setPosts((current) => bump(current));
+    setPendingPosts((current) => bump(current));
+  }, []);
+
+  const recordShare = useCallback(async (postId: string) => {
+    bumpShareCount(postId);
+    try {
+      await api.post(`/posts/${postId}/share`);
+    } catch (error) {
+      console.error('Erreur suivi partage:', error);
+    }
+  }, [bumpShareCount]);
+
+  const handleSharePost = useCallback(
+    (post: FeedPost) => {
+      const message = buildShareMessage(post);
+      Alert.alert(t('postShareTitle'), undefined, [
+        {
+          text: t('postShareExternal'),
+          onPress: () => {
+            void Share.share({ message }).then(() => {
+              void recordShare(post.id);
+            });
+          },
+        },
+        {
+          text: t('postShareDirect'),
+          onPress: () => {
+            void openShareToConnection(post);
+          },
+        },
+        { text: t('postItemCancel'), style: 'cancel' },
+      ]);
+    },
+    [buildShareMessage, openShareToConnection, recordShare, t],
+  );
+
+  const handleSendToConnection = useCallback(
+    async (user: SocialUser) => {
+      if (!shareTarget) {
+        return;
+      }
+      setSendingConnectionId(user.id);
+      try {
+        const chat = await getOrCreateDirectChat(user.id);
+        await sendDirectMessage(chat.id, {
+          content: buildShareMessage(shareTarget),
+          sharedPostId: shareTarget.id,
+        });
+        await recordShare(shareTarget.id);
+        setShareModalOpen(false);
+        setShareTarget(null);
+        router.push({
+          pathname: '/direct-chat/[id]',
+          params: { id: chat.id },
+        });
+      } catch (error) {
+        Alert.alert(t('commonErrorTitle'), t('postShareSendError'));
+        console.error('Erreur partage direct:', error);
+      } finally {
+        setSendingConnectionId(null);
+      }
+    },
+    [buildShareMessage, recordShare, router, shareTarget, t],
+  );
+
+  const locationOptions = useMemo(() => {
+    const values = new Set<string>();
+    posts.forEach((post) => {
+      const label = resolveLocationLabel(post);
+      if (label) {
+        values.add(label);
+      }
+    });
+    return Array.from(values);
+  }, [posts, resolveLocationLabel]);
+
+  const filteredPosts = useMemo(() => {
+    return posts.filter((post) => {
+      if (selectedCategory && post.ambiance !== selectedCategory) {
+        return false;
+      }
+
+      if (selectedType !== 'all') {
+        const isPlan = post.visibility === 'friends' || post.postType === 'plan';
+        if (selectedType === 'plan' && !isPlan) {
+          return false;
+        }
+        if (selectedType === 'post' && isPlan) {
+          return false;
+        }
+      }
+
+      if (selectedLocation) {
+        const label = resolveLocationLabel(post);
+        if (label !== selectedLocation) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [posts, resolveLocationLabel, selectedCategory, selectedLocation, selectedType]);
+
+  const typeLabel =
+    selectedType === 'plan'
+      ? t('socialFeedFilterPlans')
+      : selectedType === 'post'
+      ? t('socialFeedFilterPosts')
+      : t('socialFeedFilterAll');
+
+  const renderHeader = () => (
+    <View className="mb-4 border-b border-gray-100 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-black">
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-4">
+          <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
+            {t('socialFeedHeaderLabel')}
+          </Text>
+          <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+            {t('socialFeedHeaderTitle')}
+          </Text>
+          <Text className="mt-3 text-base leading-7 text-gray-500 dark:text-gray-400">
+            {t('socialFeedHeaderSubtitle')}
+          </Text>
+        </View>
+
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={handleOpenSearch}
+            className="mr-2 h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
+          >
+            <Ionicons
+              name="search-outline"
+              size={22}
+              color="#4c669f"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleOpenMessages}
+            className="h-12 w-12 items-center justify-center rounded-2xl bg-[#4c669f]"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-5"
+        contentContainerStyle={{ paddingRight: 16 }}
+      >
+        <TouchableOpacity
+          onPress={() => {
+            setActiveFilter('category');
+            setFiltersOpen(true);
+          }}
+          className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
+        >
+          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+            {selectedCategory || t('socialFeedFilterCategory')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            setActiveFilter('type');
+            setFiltersOpen(true);
+          }}
+          className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
+        >
+          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+            {typeLabel}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            setActiveFilter('location');
+            setFiltersOpen(true);
+          }}
+          className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
+        >
+          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+            {selectedLocation || t('socialFeedFilterLocation')}
+          </Text>
+        </TouchableOpacity>
+        {(selectedCategory || selectedLocation || selectedType !== 'all') ? (
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedCategory('');
+              setSelectedType('all');
+              setSelectedLocation('');
+            }}
+            className="rounded-full bg-[#ff4757]/10 px-4 py-2"
+          >
+            <Text className="text-xs font-semibold text-[#ff4757]">
+              {t('socialFeedFilterClear')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
+      {pendingPosts.length > 0 ? (
+        <TouchableOpacity
+          onPress={() => void applyPendingPosts()}
+          className="mt-4 rounded-2xl border border-[#4c669f]/20 bg-[#4c669f]/10 px-4 py-2"
+        >
+          <Text className="text-xs font-semibold text-[#4c669f]">
+            {pendingLabel}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+
+  if (loading && posts.length === 0) {
+    return (
+      <FlatList
+        data={[0, 1, 2]}
+        keyExtractor={(item) => `skeleton-${item}`}
+        renderItem={() => <SkeletonPost />}
+        ListHeaderComponent={renderHeader}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        contentContainerStyle={{ paddingBottom: 120 }}
+        className="flex-1 bg-gray-50 dark:bg-black"
+      />
+    );
+  }
+
+  return (
+    <>
+      <FlatList
+        data={filteredPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <PostItem
+            item={item}
+            showDateColumn={false}
+            onDelete={item.isOwner ? handleDeletePost : undefined}
+            onEdit={item.isOwner ? handleEditPost : undefined}
+            onComment={handleCommentPost}
+            onShare={handleSharePost}
+          />
+        )}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={
+          <EmptyState
+            title={t('socialFeedEmptyTitle')}
+            description={t('socialFeedEmptyDescription')}
+          />
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void fetchFeed('refresh')}
+            tintColor="#4c669f"
+          />
+        }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onEndReached={() => {
+          if (!fetchingMore && nextCursor) {
+            void fetchFeed('more');
+          }
+        }}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          fetchingMore ? (
+            <View className="items-center py-6">
+              <ActivityIndicator color="#4c669f" />
+            </View>
+          ) : null
+        }
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        className="flex-1 bg-gray-50 dark:bg-black"
+      />
+
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => setFiltersOpen(false)}
+        className={`absolute inset-0 bg-black/50 ${filtersOpen ? 'flex' : 'hidden'}`}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          className="absolute bottom-0 w-full rounded-t-3xl bg-white p-5 pb-8 dark:bg-gray-900"
+        >
+          <View className="mb-4 items-center">
+            <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+          </View>
+          <Text className="mb-4 text-center text-lg font-bold text-gray-800 dark:text-white">
+            {activeFilter === 'category'
+              ? t('socialFeedFilterCategoryTitle')
+              : activeFilter === 'type'
+              ? t('socialFeedFilterTypeTitle')
+              : t('socialFeedFilterLocationTitle')}
+          </Text>
+
+          <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              onPress={() => {
+                if (activeFilter === 'category') {
+                  setSelectedCategory('');
+                } else if (activeFilter === 'type') {
+                  setSelectedType('all');
+                } else {
+                  setSelectedLocation('');
+                }
+                setFiltersOpen(false);
+              }}
+              className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
+            >
+              <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                {t('socialFeedFilterAll')}
+              </Text>
+            </TouchableOpacity>
+
+            {activeFilter === 'category'
+              ? categories.map((category) => (
+                  <TouchableOpacity
+                    key={category.id}
+                    onPress={() => {
+                      setSelectedCategory(category.name);
+                      setFiltersOpen(false);
+                    }}
+                    className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
+                  >
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              : activeFilter === 'type'
+              ? [
+                  { id: 'plan', label: t('socialFeedFilterPlans') },
+                  { id: 'post', label: t('socialFeedFilterPosts') },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    onPress={() => {
+                      setSelectedType(option.id as FilterType);
+                      setFiltersOpen(false);
+                    }}
+                    className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
+                  >
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              : locationOptions.map((location) => (
+                  <TouchableOpacity
+                    key={location}
+                    onPress={() => {
+                      setSelectedLocation(location);
+                      setFiltersOpen(false);
+                    }}
+                    className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
+                  >
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      {location}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+          </ScrollView>
+        </TouchableOpacity>
+      </TouchableOpacity>
+
+      {shareModalOpen ? (
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShareModalOpen(false)}
+          className="absolute inset-0 z-50 bg-black/60"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            className="absolute bottom-0 w-full rounded-t-3xl bg-white p-5 pb-8 dark:bg-gray-900"
+          >
+            <View className="mb-4 items-center">
+              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+            </View>
+            <Text className="mb-1 text-center text-lg font-bold text-gray-800 dark:text-white">
+              {t('postShareConnectionsTitle')}
+            </Text>
+            <Text className="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t('postShareConnectionsSubtitle')}
+            </Text>
+
+            {loadingConnections ? (
+              <View className="items-center py-10">
+                <ActivityIndicator color="#4c669f" />
+              </View>
+            ) : connections.length === 0 ? (
+              <Text className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                {t('postShareConnectionsEmpty')}
+              </Text>
+            ) : (
+              <ScrollView
+                style={{ maxHeight: 360 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {connections.map((user) => (
+                  <PersonRow
+                    key={user.id}
+                    user={user}
+                    subtitle={t('postShareConnectionsHint')}
+                    onPress={() => void handleSendToConnection(user)}
+                    primaryAction={
+                      sendingConnectionId === user.id ? (
+                        <ActivityIndicator color="#4c669f" />
+                      ) : (
+                        <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
+                          <Text className="text-xs font-semibold text-[#4c669f]">
+                            {t('postShareSend')}
+                          </Text>
+                        </View>
+                      )
+                    }
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      ) : null}
+    </>
+  );
+}
+
+
+

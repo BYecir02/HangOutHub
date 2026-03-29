@@ -12,7 +12,9 @@ describe('CategoriesService', () => {
         {
           provide: PrismaService,
           useValue: {
-            category: { findMany: jest.fn() },
+            category: { findMany: jest.fn(), findUnique: jest.fn() },
+            event: { findMany: jest.fn() },
+            place: { findMany: jest.fn() },
           },
         },
       ],

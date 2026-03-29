@@ -1,112 +1,225 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import EventCard from '@/components/ui/EventCard';
+import LocationScopeBar from '@/components/ui/LocationScopeBar';
+import SearchBar from '@/components/ui/SearchBar';
+import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
+import { useScreenAsync } from '@/hooks/useScreenAsync';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import { getCache, setCache } from '@/services/dataCache';
+import { formatEventDate, formatPrice } from '@/services/formatters';
+import { SkeletonBlock } from '@/components/ui/Skeleton';
 
-export default function TabTwoScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
-  );
+interface EventItem {
+  id: string;
+  title: string;
+  startTime: string;
+  coverUrl: string | null;
+  entryFee: number | string | null;
+  Place?: {
+    name?: string | null;
+    address?: string | null;
+    City?: {
+      name?: string | null;
+      country?: string | null;
+    } | null;
+  } | null;
+  address?: string | null;
 }
 
-const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-});
+export default function ExploreScreen() {
+  const router = useRouter();
+  const { locale, t } = useI18n();
+  const cachedEvents = getCache<EventItem[]>('events');
+  const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
+  const [query, setQuery] = useState('');
+  const {
+    loading,
+    refreshing,
+    error,
+    runInitial,
+    runRefresh,
+  } = useScreenAsync({
+    initialLoading: !cachedEvents,
+  });
+  const { filterByLocation, locationLabel } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
+
+  const fetchEvents = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      const runner = mode === 'refresh' ? runRefresh : runInitial;
+      const nextEvents = await runner(
+        async () => {
+          const response = await api.get<EventItem[]>('/events');
+          setCache('events', response.data);
+          return response.data;
+        },
+        {
+          mapError: (errorValue) =>
+            getApiErrorMessage(errorValue, t('commonErrorTitle')),
+        },
+      );
+
+      if (nextEvents) {
+        setEvents(nextEvents);
+        return;
+      }
+
+      if (!getCache('events')) {
+        setEvents([]);
+      }
+    },
+    [runRefresh, runInitial, t],
+  );
+
+  useEffect(() => {
+    void fetchEvents('initial');
+  }, [fetchEvents]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchEvents('refresh');
+    }, [fetchEvents]),
+  );
+
+  const filteredEvents = useMemo(() => {
+    const locationFilteredEvents = filterByLocation(events, (event) => ({
+      city: event.Place?.City?.name || event.Place?.name,
+      country: event.Place?.City?.country,
+      address: event.Place?.address || event.address,
+    }));
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return locationFilteredEvents;
+    }
+
+    return locationFilteredEvents.filter((event) =>
+      `${event.title} ${event.Place?.name || ''} ${event.address || ''}`
+        .toLowerCase()
+        .includes(normalizedQuery),
+    );
+  }, [events, filterByLocation, query]);
+
+  return (
+    <View className="flex-1 bg-gray-50 dark:bg-black pt-16">
+      <View className="flex-row items-center px-5 pb-4">
+        <TouchableOpacity onPress={() => router.back()} className="mr-4">
+          <Ionicons name="arrow-back" size={24} color="#4c669f" />
+        </TouchableOpacity>
+        <View>
+          <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-widest">
+            {t('exploreLabel')}
+          </Text>
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('exploreTitle')}
+          </Text>
+        </View>
+      </View>
+
+      <LocationScopeBar
+        locationLabel={locationLabel}
+        actionLabel={t('homeLocationChangeCta')}
+        onPressAction={() => router.push('/location')}
+      />
+
+      <SearchBar
+        placeholder={t('exploreSearchPlaceholder')}
+        value={query}
+        onChangeText={setQuery}
+      />
+
+      {!loading && error && events.length === 0 ? (
+        <ScreenState
+          mode="error"
+          title={t('commonErrorTitle')}
+          description={error}
+          actionLabel={t('commonRetry')}
+          onAction={() => {
+            void fetchEvents('refresh');
+          }}
+          containerClassName="px-5 py-6"
+        />
+      ) : null}
+
+      {loading && events.length === 0 ? (
+        <FlatList
+          data={[0, 1, 2]}
+          keyExtractor={(item) => `skeleton-${item}`}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ListEmptyComponent={null}
+          renderItem={() => (
+            <View className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+              <SkeletonBlock className="h-52 w-full" />
+              <View className="p-5">
+                <SkeletonBlock className="h-5 w-40 rounded-lg" />
+                <SkeletonBlock className="mt-2 h-4 w-24 rounded-lg" />
+                <SkeletonBlock className="mt-3 h-4 w-32 rounded-lg" />
+              </View>
+            </View>
+          )}
+        />
+      ) : (
+        <FlatList
+          data={filteredEvents}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ListEmptyComponent={
+            <View className="items-center py-16">
+              <Text className="text-lg font-semibold text-gray-800 dark:text-white">
+                {t('exploreEmptyTitle')}
+              </Text>
+              <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+                {t('exploreEmptyDescription')}
+              </Text>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                void fetchEvents('refresh');
+              }}
+              tintColor="#4c669f"
+            />
+          }
+          renderItem={({ item }) => (
+            <EventCard
+              title={item.title}
+              date={formatEventDate(item.startTime, locale)}
+              location={item.Place?.name || item.address || t('homeLocationToConfirm')}
+              imageUrl={
+                getImageUrl(item.coverUrl) ||
+                'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200'
+              }
+              price={formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
+              onPress={() =>
+                router.push({
+                  pathname: '/event/[id]',
+                  params: { id: item.id },
+                })
+              }
+            />
+          )}
+        />
+      )}
+    </View>
+  );
+}

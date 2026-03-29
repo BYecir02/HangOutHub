@@ -1,155 +1,622 @@
-import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator, Modal, useColorScheme, Alert } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Tabs from '../../components/ui/Tabs';
-import PostItem from '../../components/social/PostItem';
+import { useRouter } from 'expo-router';
+
 import ProfileHeader from '../../components/profile/ProfileHeader';
 import ProfileStats from '../../components/profile/ProfileStats';
+import PostItem from '../../components/social/PostItem';
+import { SkeletonBlock } from '../../components/ui/Skeleton';
+import Tabs from '../../components/ui/Tabs';
+import { getImageUrl } from '../../services/api';
+import {
+  canAccessOrganizerPanel,
+  getOrganizerEntryPath,
+  isOrganizerPending,
+  isOrganizerRejected,
+  isOrganizerSuspended,
+  normalizeTeamWorkspaceRole,
+} from '../../services/organizer-access';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { useRouter } from 'expo-router';
+import { useI18n } from '@/hooks/use-i18n';
+
+const PLACE_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
+const EVENT_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
+
+function formatEventDate(value: string, locale: string) {
+  return new Date(value).toLocaleString(locale, {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function EmptyPanel({
+  icon,
+  color,
+  title,
+  description,
+  actionLabel,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onPress?: () => void;
+}) {
+  return (
+    <View className="items-center rounded-[28px] bg-gray-50 px-6 py-12 dark:bg-gray-900">
+      <View
+        className="h-14 w-14 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${color}20` }}
+      >
+        <Ionicons name={icon} size={24} color={color} />
+      </View>
+      <Text className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">
+        {title}
+      </Text>
+      <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+        {description}
+      </Text>
+      {actionLabel && onPress ? (
+        <TouchableOpacity
+          onPress={onPress}
+          className="mt-5 rounded-full px-5 py-3"
+          style={{ backgroundColor: color }}
+        >
+          <Text className="font-semibold text-white">{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('sorties');
-  
-  // Utilisation du Hook personnalisé
-  const { user, posts, loading, deletePost } = useUserProfile();
-  
-  // États pour les Modals
-  const [previewImage, setPreviewImage] = useState<string | null>(null); // Pour l'avatar/cover
-  
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { locale, t } = useI18n();
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const {
+    user,
+    posts,
+    outings,
+    savedPlaces,
+    organizerEvents,
+    ownedPlaces,
+    connectionsCount,
+    loading,
+    deletePost,
+  } = useUserProfile();
 
-  const tabItems = [
-    { id: 'sorties', label: 'Mes Sorties' },
-    { id: 'posts', label: 'Posts' },
-    { id: 'avis', label: 'Avis' },
-  ];
+  const isProfessionalAccount =
+    user?.role === 'ORGANIZER' || user?.role === 'PLACE_OWNER';
+  const isPendingOrganizer = isOrganizerPending(user);
+  const isRejectedOrganizer = isOrganizerRejected(user);
+  const isSuspendedOrganizer = isOrganizerSuspended(user);
+  const isOrganizer =
+    isProfessionalAccount &&
+    !isPendingOrganizer &&
+    !isRejectedOrganizer &&
+    !isSuspendedOrganizer;
+  const normalizedTeamRole = normalizeTeamWorkspaceRole(user?.teamRole);
+  const canAccessProPanel = canAccessOrganizerPanel(user);
+  const canActivateProPanel = !canAccessProPanel && user?.role === 'USER';
+  const [activeTab, setActiveTab] = useState('');
+  const proAccessStatusCard = useMemo(() => {
+    if (!isProfessionalAccount || canAccessProPanel) {
+      return null;
+    }
+
+    if (isPendingOrganizer) {
+      return {
+        icon: 'time-outline' as const,
+        accentColor: '#f59e0b',
+        title: t('organizerGuardPendingTitle'),
+        message: t('organizerGuardPendingMessage'),
+      };
+    }
+
+    if (isRejectedOrganizer) {
+      return {
+        icon: 'close-circle-outline' as const,
+        accentColor: '#ef4444',
+        title: t('organizerGuardRejectedTitle'),
+        message: t('organizerGuardRejectedMessage'),
+      };
+    }
+
+    if (isSuspendedOrganizer) {
+      return {
+        icon: 'pause-circle-outline' as const,
+        accentColor: '#f97316',
+        title: t('organizerGuardSuspendedTitle'),
+        message: t('organizerGuardSuspendedMessage'),
+      };
+    }
+
+    return null;
+  }, [
+    canAccessProPanel,
+    isPendingOrganizer,
+    isProfessionalAccount,
+    isRejectedOrganizer,
+    isSuspendedOrganizer,
+    t,
+  ]);
+  const proPanelLabel = useMemo(() => {
+    if (normalizedTeamRole === 'MANAGER') {
+      return t('profileTeamManagerPanel');
+    }
+    if (normalizedTeamRole === 'STAFF') {
+      return t('profileTeamStaffPanel');
+    }
+    if (normalizedTeamRole === 'SCANNER') {
+      return t('profileTeamScannerPanel');
+    }
+
+    return user?.role === 'PLACE_OWNER'
+      ? t('profilePlaceOwnerPanel')
+      : t('profileOrganizerPanel');
+  }, [normalizedTeamRole, t, user?.role]);
+
+  const organizerPublicProfileLabel = useMemo(() => {
+    if (user?.role === 'PLACE_OWNER') {
+      return t('profileOrganizerPublicLabelPlaceOwner');
+    }
+
+    return t('profileOrganizerPublicLabelOrganizer');
+  }, [t, user?.role]);
+
+  React.useEffect(() => {
+    if (!user || activeTab) {
+      return;
+    }
+
+    setActiveTab(isOrganizer ? 'overview' : 'outings');
+  }, [activeTab, isOrganizer, user]);
+
+  const displayUser = useMemo(() => {
+    if (isOrganizer && user?.OrganizerProfile) {
+      return {
+        ...user,
+        displayName: user.OrganizerProfile.companyName,
+        username:
+          user.displayName || user.username
+            ? `${user.displayName || user.username} · ${
+                user.OrganizerProfile.jobTitle || t('profileOrganizerRoleFallback')
+              }`
+            : user.username,
+      };
+    }
+
+    return user;
+  }, [isOrganizer, t, user]);
+
+  const sortedOutings = useMemo(
+    () =>
+      [...outings].sort(
+        (left, right) =>
+          new Date(left.scheduledDate).getTime() -
+          new Date(right.scheduledDate).getTime(),
+      ),
+    [outings],
+  );
+  const featuredOuting = sortedOutings[0] ?? null;
+  const tabItems = isOrganizer
+    ? [
+        { id: 'overview', label: t('profileTabOverview') },
+        { id: 'places', label: t('profileTabPlaces') },
+        { id: 'events', label: t('profileTabEvents') },
+      ]
+    : [
+        { id: 'outings', label: t('profileTabOutings') },
+        { id: 'saved', label: t('profileTabSaved') },
+        { id: 'posts', label: t('profileTabPosts') },
+      ];
 
   const handleDeletePost = async (postId: string) => {
     try {
       await deletePost(postId);
-      Alert.alert("Succès", "Post supprimé.");
-    } catch (error) {
-      Alert.alert("Erreur", "Impossible de supprimer le post.");
+      Alert.alert(t('profileDeletePostSuccessTitle'), t('profileDeletePostSuccessMessage'));
+    } catch {
+      Alert.alert(t('commonErrorTitle'), t('profileDeletePostErrorMessage'));
     }
   };
 
-  const handleEditPost = (post: any) => {
-    // Navigation vers l'écran de création en mode édition
+  const handleEditPost = (post: {
+    id: string;
+    content?: string | null;
+    visibility?: 'public' | 'friends' | 'private' | 'custom';
+    publicationScope?: 'personal' | 'structure';
+  }) => {
     router.push({
       pathname: '/post',
-      params: { 
-        postId: post.id, 
+      params: {
+        postId: post.id,
         content: post.content,
-        visibility: post.visibility
-      }
+        visibility: post.visibility,
+        publicationScope: post.publicationScope || 'personal',
+      },
     });
   };
 
-  const handleCommentPost = (post: any) => {
-    router.push({
-      pathname: '/comments',
-      params: { postId: post.id }
-    });
+  const handleCommentPost = (post: { id: string }) => {
+    router.push({ pathname: '/comments', params: { postId: post.id } });
   };
 
-  if (loading) {
+  if (loading && !user) {
     return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-      </View>
+      <ScrollView className="flex-1 bg-white dark:bg-black" showsVerticalScrollIndicator={false}>
+        <View className="h-44 bg-gray-200 dark:bg-gray-800" />
+        <View className="-mt-10 px-5">
+          <SkeletonBlock className="h-20 w-20 rounded-full border-4 border-white dark:border-black" />
+          <SkeletonBlock className="mt-4 h-6 w-40 rounded-lg" />
+          <SkeletonBlock className="mt-2 h-4 w-56 rounded-lg" />
+        </View>
+
+        <View className="mt-6 flex-row justify-between px-5">
+          {[0, 1, 2, 3].map((item) => (
+            <View key={`stat-${item}`} className="items-center">
+              <SkeletonBlock className="h-6 w-12 rounded-lg" />
+              <SkeletonBlock className="mt-2 h-3 w-16 rounded-lg" />
+            </View>
+          ))}
+        </View>
+
+        <View className="mt-8 px-5">
+          <SkeletonBlock className="h-10 w-full rounded-full" />
+          <View className="mt-6">
+            <SkeletonBlock className="h-28 w-full rounded-[28px]" />
+            <SkeletonBlock className="mt-4 h-28 w-full rounded-[28px]" />
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
   return (
     <ScrollView className="flex-1 bg-white dark:bg-black" showsVerticalScrollIndicator={false}>
-      
-      {/* 1. Header (Couverture, Avatar, Infos, Boutons) */}
-      <ProfileHeader user={user} onImagePress={setPreviewImage} />
-
-      {/* 2. Statistiques */}
-      <ProfileStats postsCount={posts.length} />
-
-      {/* 4. Actions rapides */}
-      <View className="flex-row px-5 mt-6 justify-between">
-        <TouchableOpacity className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl items-center w-[48%] border border-blue-100 dark:border-blue-900/50 active:bg-blue-100">
-          <Ionicons name="ticket-outline" size={26} color="#4c669f" />
-          <Text className="text-blue-800 font-bold mt-1">Mes Tickets</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl items-center w-[48%] border border-red-100 dark:border-red-900/50 active:bg-red-100">
-          <Ionicons name="heart-outline" size={26} color="#ff4757" />
-          <Text className="text-red-800 font-bold mt-1">Favoris</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 5. ONGLETS DE CONTENU (TABS) */}
-      <View className="mt-8 pb-10">
-        <Tabs 
-          items={tabItems} 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
-        />
-
-        {/* CONTENU DYNAMIQUE DES ONGLETS */}
-        <View className="min-h-[200px]">
-          {activeTab === 'sorties' && (
-            <View className="items-center justify-center py-10">
-              <Ionicons name="calendar-outline" size={48} color={isDark ? "#333" : "#eee"} />
-              <Text className="text-gray-400 dark:text-gray-600 mt-2">Aucune sortie prévue</Text>
+      <ProfileHeader
+        user={displayUser}
+        isOrganizer={isOrganizer}
+        canAccessProPanel={canAccessProPanel}
+        canActivateProPanel={canActivateProPanel}
+        proPanelLabel={proPanelLabel}
+        onOpenProPanel={() => router.push(getOrganizerEntryPath(user))}
+        onActivateProPanel={() => router.push('/activate-pro')}
+        onImagePress={setPreviewImage}
+      />
+      {proAccessStatusCard ? (
+        <View className="mt-4 px-5">
+          <View
+            className="rounded-3xl border p-4"
+            style={{
+              borderColor: `${proAccessStatusCard.accentColor}66`,
+              backgroundColor: `${proAccessStatusCard.accentColor}14`,
+            }}
+          >
+            <View className="flex-row items-start">
+              <View
+                className="mr-3 h-9 w-9 items-center justify-center rounded-full"
+                style={{
+                  backgroundColor: `${proAccessStatusCard.accentColor}24`,
+                }}
+              >
+                <Ionicons
+                  name={proAccessStatusCard.icon}
+                  size={18}
+                  color={proAccessStatusCard.accentColor}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {proAccessStatusCard.title}
+                </Text>
+                <Text className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {proAccessStatusCard.message}
+                </Text>
+              </View>
             </View>
-          )}
+          </View>
+        </View>
+      ) : null}
 
-          {/* --- LISTE DES POSTS (FEED) --- */}
-          {activeTab === 'posts' && (
-            <View>
-              {posts.length > 0 ? (
-                posts.map((post) => (
-                  <PostItem 
-                    key={post.id} 
-                    item={post} 
-                    onDelete={handleDeletePost}
-                    onEdit={handleEditPost}
-                    onComment={handleCommentPost}
-                  />
-                ))
+      <ProfileStats
+        postsCount={posts.length}
+        outingsCount={outings.length}
+        connectionsCount={connectionsCount}
+        savedCount={savedPlaces.length}
+        isOrganizer={isOrganizer}
+        placesCount={ownedPlaces.length}
+        eventsCount={organizerEvents.length}
+        onConnectionsPress={() => router.push('/connections')}
+      />
+
+      <View className="mt-8 pb-10">
+        <Tabs items={tabItems} activeTab={activeTab} onTabChange={setActiveTab} />
+        <View className="min-h-[220px] pt-5">
+          {!isOrganizer && activeTab === 'outings' ? (
+            <View className="px-5">
+              {featuredOuting ? (
+                <>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: '/outing/[id]',
+                      params: { id: featuredOuting.id },
+                    })
+                  }
+                  className="rounded-[28px] bg-[#4c669f]/10 p-5"
+                >
+                  <Text className="text-xs uppercase tracking-widest text-[#4c669f]">
+                    {t('profileFeaturedOutingLabel')}
+                  </Text>
+                  <Text className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                    {featuredOuting.title}
+                  </Text>
+                  <View className="mt-4 rounded-3xl bg-white p-4 dark:bg-gray-900">
+                    <Text className="text-sm text-gray-700 dark:text-gray-200">
+                      {formatEventDate(featuredOuting.scheduledDate, locale)}
+                    </Text>
+                    <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      {featuredOuting.Place?.name ||
+                        featuredOuting.Place?.City?.name ||
+                        featuredOuting.Place?.address ||
+                        t('profileFeaturedOutingLocationFallback')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => router.push('/outing')}
+                  className="mt-4 items-center rounded-full bg-[#4c669f] px-5 py-3"
+                >
+                  <Text className="font-semibold text-white">{t('profileCreateOutingCta')}</Text>
+                </TouchableOpacity>
+                </>
               ) : (
-                <View className="w-full items-center py-10">
-                    <Text className="text-gray-400">Aucune publication pour le moment.</Text>
-                </View>
+                <EmptyPanel
+                  icon="calendar-outline"
+                  color="#4c669f"
+                  title={t('profileEmptyOutingsTitle')}
+                  description={t('profileEmptyOutingsDescription')}
+                  actionLabel={t('profileOrganizeOutingCta')}
+                  onPress={() => router.push('/outing')}
+                />
               )}
             </View>
-          )}
+          ) : null}
 
-          {activeTab === 'avis' && (
-            <View>
-              <Text className="text-gray-400 italic text-center py-10">Aucun avis laissé.</Text>
+          {!isOrganizer && activeTab === 'saved' ? (
+            <View className="px-5">
+              {savedPlaces.length > 0 ? (
+                <>
+                <View className="mb-5 rounded-[28px] bg-[#2ecc71]/10 p-5">
+                  <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-[#2ecc71]">
+                    {t('profileSavedIntroLabel')}
+                  </Text>
+                  <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
+                    {t('profileSavedIntroTitle')}
+                  </Text>
+                </View>
+                {savedPlaces.map((place) => (
+                  <TouchableOpacity
+                    key={place.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/place/[id]',
+                        params: { id: place.id },
+                      })
+                    }
+                    className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
+                  >
+                    <Image
+                      source={{
+                        uri: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER,
+                      }}
+                      className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                      resizeMode="cover"
+                    />
+                    <View className="ml-4 flex-1 justify-center">
+                      <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                        {place.name}
+                      </Text>
+                      <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        {place.City?.name || place.address || t('homeAddressToConfirm')}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                  </TouchableOpacity>
+                ))}
+                </>
+              ) : (
+                <EmptyPanel
+                  icon="heart-outline"
+                  color="#2ecc71"
+                  title={t('profileEmptySavedTitle')}
+                  description={t('profileEmptySavedDescription')}
+                  actionLabel={t('profileExplorePlacesCta')}
+                  onPress={() => router.push('/(tabs)/home')}
+                />
+              )}
             </View>
-          )}
+          ) : null}
+
+          {!isOrganizer && activeTab === 'posts' ? (
+            posts.length > 0 ? (
+              posts.map((post) => (
+                <PostItem
+                  key={post.id}
+                  item={post}
+                  showDateColumn={false}
+                  onDelete={handleDeletePost}
+                  onEdit={handleEditPost}
+                  onComment={handleCommentPost}
+                />
+              ))
+            ) : (
+              <EmptyPanel
+                icon="create-outline"
+                color="#f39c12"
+                title={t('profileEmptyPostsTitle')}
+                description={t('profileEmptyPostsDescription')}
+              />
+            )
+          ) : null}
+
+          {isOrganizer && activeTab === 'overview' ? (
+            <View className="px-5">
+              <View className="rounded-3xl bg-gray-50 p-5 dark:bg-gray-900">
+                <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  {organizerPublicProfileLabel}
+                </Text>
+                <Text className="mt-2 text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                  {t('profileStructureLabel')}
+                </Text>
+                <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
+                  {user?.OrganizerProfile?.companyName || t('profileOrganizationFallback')}
+                </Text>
+                <Text className="mt-2 text-base text-gray-600 dark:text-gray-300">
+                  {user?.bio || t('profileOrganizerBioFallback')}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {isOrganizer && activeTab === 'places'
+            ? (
+              <View className="px-5">
+                {ownedPlaces.length > 0 ? (
+                  ownedPlaces.map((place) => (
+                    <TouchableOpacity
+                      key={place.id}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/place/[id]',
+                          params: { id: place.id },
+                        })
+                      }
+                      className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER }}
+                        className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        resizeMode="cover"
+                      />
+                      <View className="ml-4 flex-1 justify-center">
+                        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                          {place.name}
+                        </Text>
+                        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {place.City?.name || place.address || t('homeAddressToConfirm')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <EmptyPanel
+                    icon="business-outline"
+                    color="#2ecc71"
+                    title={t('profileOrganizerEmptyPlacesTitle')}
+                    description={t('profileOrganizerEmptyPlacesDescription')}
+                    actionLabel={
+                      user?.role === 'PLACE_OWNER'
+                        ? t('profileOrganizerEmptyPlacesActionCreate')
+                        : t('profileOrganizerEmptyPlacesActionManageEvents')
+                    }
+                    onPress={() =>
+                      router.push(
+                        user?.role === 'PLACE_OWNER'
+                          ? '/organizer/create-place'
+                          : '/organizer/events',
+                      )
+                    }
+                  />
+                )}
+              </View>
+            )
+            : null}
+
+          {isOrganizer && activeTab === 'events'
+            ? (
+              <View className="px-5">
+                {organizerEvents.length > 0 ? (
+                  organizerEvents.map((event) => (
+                    <TouchableOpacity
+                      key={event.id}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/event/[id]',
+                          params: { id: event.id },
+                        })
+                      }
+                      className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER }}
+                        className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        resizeMode="cover"
+                      />
+                      <View className="ml-4 flex-1 justify-center">
+                        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                          {event.title}
+                        </Text>
+                        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          {formatEventDate(event.startTime, locale)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <EmptyPanel
+                    icon="ticket-outline"
+                    color="#ff4757"
+                    title={t('profileOrganizerEmptyEventsTitle')}
+                    description={t('profileOrganizerEmptyEventsDescription')}
+                    actionLabel={t('profileOrganizerEmptyEventsActionCreate')}
+                    onPress={() => router.push('/event')}
+                  />
+                )}
+              </View>
+            )
+            : null}
         </View>
       </View>
 
-      {/* MODAL DE PRÉVISUALISATION D'IMAGE (Avatar/Cover) */}
-      <Modal visible={!!previewImage} transparent={true} onRequestClose={() => setPreviewImage(null)} animationType="fade">
-        <View className="flex-1 bg-black justify-center items-center">
-          <TouchableOpacity 
-            className="absolute top-12 right-5 z-10 p-2 bg-gray-800/50 rounded-full"
+      <Modal
+        visible={!!previewImage}
+        transparent
+        onRequestClose={() => setPreviewImage(null)}
+        animationType="fade"
+      >
+        <View className="flex-1 items-center justify-center bg-black">
+          <TouchableOpacity
+            className="absolute right-5 top-12 z-10 rounded-full bg-gray-800/50 p-2"
             onPress={() => setPreviewImage(null)}
           >
             <Ionicons name="close" size={28} color="white" />
           </TouchableOpacity>
-          
-          {previewImage && (
-            <Image 
-              source={{ uri: previewImage }} 
+          {previewImage ? (
+            <Image
+              source={{ uri: previewImage }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="contain"
             />
-          )}
+          ) : null}
         </View>
       </Modal>
-
     </ScrollView>
   );
 }

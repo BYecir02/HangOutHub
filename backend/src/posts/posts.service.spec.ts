@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from './posts.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 describe('PostsService', () => {
   let service: PostsService;
@@ -16,6 +17,19 @@ describe('PostsService', () => {
       delete: jest.fn(),
       update: jest.fn(),
     },
+    postLike: {
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+      create: jest.fn(),
+    },
+    postComment: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+  const mockStorageService = {
+    uploadFile: jest.fn(),
+    uploadFiles: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,6 +39,10 @@ describe('PostsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService, // On injecte notre mock ici
+        },
+        {
+          provide: StorageService,
+          useValue: mockStorageService,
         },
       ],
     }).compile();
@@ -41,6 +59,7 @@ describe('PostsService', () => {
     it('doit créer un post et retourner le résultat', async () => {
       // 1. ARRANGE (Préparation)
       const userId = 'user-123';
+      const userRole = 'USER';
       const createPostDto = { content: 'Hello World', visibility: 'public' };
       const files = []; // Pas d'images pour ce test
       const expectedResult = {
@@ -54,20 +73,29 @@ describe('PostsService', () => {
       (prisma.post.create as jest.Mock).mockResolvedValue(expectedResult);
 
       // 2. ACT (Action)
-      const result = await service.create(userId, createPostDto, files);
+      await expect(
+        service.create(userId, userRole, createPostDto, files),
+      ).resolves.toEqual(expectedResult);
 
       // 3. ASSERT (Vérification)
-      expect(result).toEqual(expectedResult); // Le résultat est-il celui attendu ?
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.post.create).toHaveBeenCalledWith({
-        // La méthode create de Prisma a-t-elle été appelée avec les bons arguments ?
-        data: {
-          userId,
-          content: 'Hello World',
-          visibility: 'public',
-          images: [],
-        },
-      });
+      expect(prisma.post.create).toHaveBeenCalledTimes(1);
+
+      const createCalls = (prisma.post.create as jest.Mock).mock
+        .calls as unknown[][];
+      const firstCreateCallArg = createCalls[0]?.[0] as {
+        data?: {
+          userId?: string;
+          content?: string;
+          visibility?: string;
+          images?: unknown[];
+        };
+      };
+
+      expect(firstCreateCallArg.data?.userId).toBe(userId);
+      expect(firstCreateCallArg.data?.content).toBe('Hello World');
+      expect(firstCreateCallArg.data?.visibility).toBe('public');
+      expect(firstCreateCallArg.data?.images).toEqual([]);
     });
   });
 });

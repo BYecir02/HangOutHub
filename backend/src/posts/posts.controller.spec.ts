@@ -13,6 +13,7 @@ describe('PostsController', () => {
           provide: PostsService,
           useValue: {
             create: jest.fn(),
+            findFeed: jest.fn(),
             findAllByUser: jest.fn(),
             remove: jest.fn(),
             update: jest.fn(),

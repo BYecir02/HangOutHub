@@ -11,6 +11,14 @@ import { PostsModule } from './posts/posts.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { CommentsModule } from './comments/comments.module';
+import { StorageModule } from './storage/storage.module';
+import { OutingsModule } from './outings/outings.module';
+import { FriendshipsModule } from './friendships/friendships.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { OrganizerScannerModule } from './organizer-scanner/organizer-scanner.module';
+import { CitiesModule } from './cities/cities.module';
+import { DirectChatsModule } from './direct-chats/direct-chats.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -20,12 +28,20 @@ import { CommentsModule } from './comments/comments.module';
     }),
     UsersModule,
     PrismaModule,
+    StorageModule,
     AuthModule,
     CategoriesModule,
     EventsModule,
     PlacesModule,
     PostsModule,
+    CitiesModule,
     CommentsModule,
+    OutingsModule,
+    FriendshipsModule,
+    DirectChatsModule,
+    NotificationsModule,
+    OrganizerScannerModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,6 +5,9 @@ import {
   IsDateString,
   IsUUID,
   IsNumber,
+  IsInt,
+  IsIn,
+  Max,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -17,6 +20,14 @@ export class CreateEventDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  cancellationPolicy?: string;
+
+  @IsOptional()
+  @IsString()
+  refundPolicy?: string;
 
   @IsNotEmpty()
   @IsDateString()
@@ -36,6 +47,52 @@ export class CreateEventDto {
   @IsUUID()
   placeId?: string; // Si l'événement se passe dans un lieu référencé (Bar, etc.)
 
-  // Note : Dans ton schéma, l'Event n'est pas lié directement à Category,
-  // mais via des Tags. On verra ça après, restons simple pour la création.
+  @IsOptional()
+  @IsString()
+  ticketTypes?: string;
+
+  @IsOptional()
+  @IsString()
+  tagIds?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  checkInOpensAtOffsetMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  checkInClosesAtOffsetMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  maxTicketsPerUser?: number;
+
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
+
+  @IsOptional()
+  @IsIn(['PERCENT', 'FIXED'])
+  promoType?: 'PERCENT' | 'FIXED';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  promoValue?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  promoMaxRedemptions?: number;
+
+  @IsOptional()
+  @IsDateString()
+  promoEndsAt?: string;
 }

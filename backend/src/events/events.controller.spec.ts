@@ -14,6 +14,8 @@ describe('EventsController', () => {
           useValue: {
             create: jest.fn(),
             findAll: jest.fn(),
+            findMine: jest.fn(),
+            findOne: jest.fn(),
           },
         },
       ],

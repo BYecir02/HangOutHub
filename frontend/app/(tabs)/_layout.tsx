@@ -1,7 +1,9 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { View, useColorScheme } from 'react-native';
+import { View } from 'react-native';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const router = useRouter();
@@ -94,15 +96,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* --- ROUTES CACHÉES (Auth) --- */}
-      <Tabs.Screen 
-        name="index" 
-        options={{ href: null, tabBarStyle: { display: 'none' } }} 
-      />
-      <Tabs.Screen 
-        name="register" 
-        options={{ href: null, tabBarStyle: { display: 'none' } }} 
-      />
       <Tabs.Screen 
         name="explore" 
         options={{ href: null }} 

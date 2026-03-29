@@ -6,6 +6,7 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
   extensions = [uuid_ossp(map: "uuid-ossp")]
 }
 
@@ -18,7 +19,7 @@ model Booking {
   qrCode       String?     @db.VarChar(255)
   Event        Event?      @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   TicketType   TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User         User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User         User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Payment      Payment[]
 }
 
@@ -27,6 +28,7 @@ model Category {
   name  String @db.VarChar(50)
   color String @default("#4c669f")
   icon  String @default("help-outline")
+  animationUrl String? @db.VarChar(255)
   Tag   Tag[]
 }
 
@@ -37,7 +39,67 @@ model ChatMessage {
   content  String
   sentAt   DateTime? @default(now()) @db.Timestamp(6)
   Outing   Outing    @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User      @relation(fields: [senderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User      @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model DirectConversation {
+  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userOneId        String         @db.Uuid
+  userTwoId        String         @db.Uuid
+  lastMessageAt    DateTime?      @db.Timestamp(6)
+  userOneLastReadAt DateTime?     @db.Timestamp(6)
+  userTwoLastReadAt DateTime?     @db.Timestamp(6)
+  createdAt        DateTime?      @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime?      @updatedAt @db.Timestamp(6)
+  UserOne          User           @relation("DirectConversationUserOne", fields: [userOneId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  UserTwo          User           @relation("DirectConversationUserTwo", fields: [userTwoId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  DirectMessage    DirectMessage[]
+
+  @@unique([userOneId, userTwoId])
+  @@index([userOneId])
+  @@index([userTwoId])
+}
+
+model DirectMessage {
+  id             String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  conversationId String             @db.Uuid
+  senderId       String             @db.Uuid
+  clientId       String?            @db.VarChar(64)
+  replyToMessageId String?          @db.Uuid
+  sharedPostId   String?            @db.Uuid
+  content        String
+  images         String[]           @default([])
+  deliveredAt    DateTime?          @db.Timestamp(6)
+  readAt         DateTime?          @db.Timestamp(6)
+  editedAt       DateTime?          @db.Timestamp(6)
+  deletedAt      DateTime?          @db.Timestamp(6)
+  isDeleted      Boolean            @default(false)
+  sentAt         DateTime?          @default(now()) @db.Timestamp(6)
+  Conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User           User               @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ReplyToMessage DirectMessage?     @relation("DirectMessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  Replies        DirectMessage[]    @relation("DirectMessageReplies")
+  SharedPost     Post?              @relation("DirectMessageSharedPost", fields: [sharedPostId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  Reactions      DirectMessageReaction[]
+
+  @@index([conversationId, sentAt])
+  @@index([senderId])
+  @@index([replyToMessageId])
+  @@index([sharedPostId])
+  @@unique([conversationId, senderId, clientId])
+}
+
+model DirectMessageReaction {
+  id        String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  messageId String        @db.Uuid
+  userId    String        @db.Uuid
+  emoji     String        @db.VarChar(16)
+  createdAt DateTime?     @default(now()) @db.Timestamp(6)
+  Message   DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User      User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
 
 model City {
@@ -46,6 +108,9 @@ model City {
   slug             String             @unique @db.VarChar(100)
   imageUrl         String?            @db.VarChar(255)
   region           String?            @db.VarChar(100)
+  country          String?            @db.VarChar(100)
+  latitude         Float?
+  longitude        Float?
   Place            Place[]
   User             User[]
   UserCityInterest UserCityInterest[]
@@ -56,7 +121,7 @@ model DeviceToken {
   userId   String  @db.Uuid
   token    String  @unique @db.VarChar(255)
   platform String? @db.VarChar(10)
-  User     User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model Event {
@@ -67,16 +132,50 @@ model Event {
   description String?
   startTime   DateTime     @db.Timestamp(6)
   endTime     DateTime?    @db.Timestamp(6)
+  checkInOpensAtOffsetMin  Int? @default(-60)
+  checkInClosesAtOffsetMin Int? @default(180)
+  maxTicketsPerUser        Int? @default(1)
+  cancellationPolicy String?
+  refundPolicy       String?
   coverUrl    String?      @db.VarChar(255)
   entryFee    Decimal?     @default(0) @db.Decimal(10, 2)
   images      String[]     @default([])
   address     String?      @db.VarChar(255)
   Booking     Booking[]
-  User        User         @relation(fields: [organizerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User         @relation(fields: [organizerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Place       Place?       @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   EventTag    EventTag[]
+  EventCollaborator EventCollaborator[]
+  EventRevision EventRevision[]
   Promotion   Promotion[]
   TicketType  TicketType[]
+  Post        Post[]
+}
+
+model EventRevision {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  eventId     String    @db.Uuid
+  actorUserId String?   @db.Uuid
+  action      String    @db.VarChar(32)
+  snapshot    Json
+  createdAt   DateTime? @default(now()) @db.Timestamp(6)
+  Event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Actor       User?     @relation("EventRevisionActor", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([eventId, createdAt])
+  @@index([actorUserId])
+}
+
+model EventCollaborator {
+  eventId    String    @db.Uuid
+  userId     String    @db.Uuid
+  permission String?   @default("EDIT") @db.VarChar(16)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  Event      Event     @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([eventId, userId])
+  @@index([userId])
 }
 
 model EventTag {
@@ -94,8 +193,8 @@ model Friendship {
   receiverId                        String    @db.Uuid
   status                            String?   @default("PENDING") @db.VarChar(20)
   createdAt                         DateTime? @default(now()) @db.Timestamp(6)
-  User_Friendship_receiverIdToUser  User      @relation("Friendship_receiverIdToUser", fields: [receiverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User_Friendship_requesterIdToUser User      @relation("Friendship_requesterIdToUser", fields: [requesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User_Friendship_receiverIdToUser  User      @relation("Friendship_receiverIdToUser", fields: [receiverId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User_Friendship_requesterIdToUser User      @relation("Friendship_requesterIdToUser", fields: [requesterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model Notification {
@@ -103,10 +202,18 @@ model Notification {
   userId                          String    @db.Uuid
   actorId                         String?   @db.Uuid
   type                            String    @db.VarChar(50)
+  title                           String?   @db.VarChar(120)
+  message                         String?
+  severity                        String?   @default("INFO") @db.VarChar(16)
+  payload                         Json?
+  targetPath                      String?   @db.VarChar(255)
   isRead                          Boolean?  @default(false)
   createdAt                       DateTime? @default(now()) @db.Timestamp(6)
   User_Notification_actorIdToUser User?     @relation("Notification_actorIdToUser", fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User_Notification_userIdToUser  User      @relation("Notification_userIdToUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User_Notification_userIdToUser  User      @relation("Notification_userIdToUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, type, createdAt])
 }
 
 model Outing {
@@ -117,7 +224,7 @@ model Outing {
   scheduledDate     DateTime            @db.Timestamp(6)
   status            String?             @default("DRAFT") @db.VarChar(20)
   ChatMessage       ChatMessage[]
-  User              User                @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User              User                @relation(fields: [creatorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Place             Place?              @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   OutingMedia       OutingMedia[]
   OutingParticipant OutingParticipant[]
@@ -131,7 +238,7 @@ model OutingMedia {
   type               String?              @db.VarChar(10)
   createdAt          DateTime?            @default(now()) @db.Timestamp(6)
   Outing             Outing               @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User               User                 @relation(fields: [uploaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User               User                 @relation(fields: [uploaderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   OutingMediaComment OutingMediaComment[]
   OutingMediaLike    OutingMediaLike[]
 }
@@ -142,14 +249,14 @@ model OutingMediaComment {
   mediaId     String      @db.Uuid
   content     String
   OutingMedia OutingMedia @relation(fields: [mediaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model OutingMediaLike {
   userId      String      @db.Uuid
   mediaId     String      @db.Uuid
   OutingMedia OutingMedia @relation(fields: [mediaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, mediaId])
 }
@@ -159,8 +266,9 @@ model OutingParticipant {
   userId   String   @db.Uuid
   status   String?  @default("INVITED") @db.VarChar(20)
   isAdmin  Boolean? @default(false)
+  chatLastReadAt DateTime? @db.Timestamp(6)
   Outing   Outing   @relation(fields: [outingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User     User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([outingId, userId])
 }
@@ -184,9 +292,14 @@ model Permission {
 model Place {
   id           String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   cityId       Int
+  ownerId      String?        @db.Uuid // ✅ Le propriétaire du lieu
   name         String         @db.VarChar(100)
+  category     String?        @db.VarChar(32)
   description  String?
   address      String?        @db.VarChar(255)
+  phone        String?        @db.VarChar(30)
+  whatsapp     String?        @db.VarChar(30)
+  openingHours String?        @db.VarChar(255)
   latitude     Float
   longitude    Float
   priceLevel   Int?           @default(1)
@@ -197,13 +310,29 @@ model Place {
   Event        Event[]
   Outing       Outing[]
   City         City           @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Owner        User?          @relation("PlaceOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   PlaceClaim   PlaceClaim[]
   PlaceTag     PlaceTag[]
+  PlaceTeamMember PlaceTeamMember[]
   Promotion    Promotion[]
   Review       Review[]
   SavedPlace   SavedPlace[]
   Story        Story[]
   Subscription Subscription[]
+  Post         Post[]
+
+}
+
+model PlaceTeamMember {
+  placeId    String    @db.Uuid
+  userId     String    @db.Uuid
+  role       String?   @default("STAFF") @db.VarChar(20)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  Place      Place     @relation(fields: [placeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([placeId, userId])
+  @@index([userId])
 }
 
 model PlaceClaim {
@@ -213,7 +342,7 @@ model PlaceClaim {
   documentUrl String  @db.VarChar(255)
   status      String? @default("PENDING") @db.VarChar(20)
   Place       Place   @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User        User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model PlaceTag {
@@ -226,13 +355,20 @@ model PlaceTag {
 }
 
 model Promotion {
-  id      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  placeId String?   @db.Uuid
-  eventId String?   @db.Uuid
-  budget  Decimal?  @db.Decimal(10, 2)
-  endDate DateTime? @db.Timestamp(6)
-  Event   Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  Place   Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId        String?   @db.Uuid
+  eventId        String?   @db.Uuid
+  budget         Decimal?  @db.Decimal(10, 2)
+  endDate        DateTime? @db.Timestamp(6)
+  code           String?   @db.VarChar(32)
+  discountType   String?   @default("PERCENT") @db.VarChar(16)
+  discountValue  Decimal?  @db.Decimal(10, 2)
+  maxRedemptions Int?
+  redeemedCount  Int?      @default(0)
+  Event          Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Place          Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([eventId, code])
 }
 
 model Post {
@@ -240,22 +376,42 @@ model Post {
   userId     String    @db.Uuid
   content    String?
   images     String[]  @default([])
+  publicationScope String? @default("personal") @db.VarChar(20)
   visibility String?   @default("public") @db.VarChar(20)
+  postType   String?   @default("post") @db.VarChar(20)
+  visibilityUserIds String[] @default([])
+  placeId    String?   @db.Uuid
+  eventId    String?   @db.Uuid
+  placeName  String?   @db.VarChar(120)
+  cityName   String?   @db.VarChar(120)
+  ambiance   String?   @db.VarChar(50)
+  shareCount Int       @default(0)
   createdAt  DateTime? @default(now()) @db.Timestamp(6)
   updatedAt  DateTime? @updatedAt @db.Timestamp(6)
   User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Place      Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Event      Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments   PostComment[]
   likes      PostLike[]
+  SharedDirectMessage DirectMessage[] @relation("DirectMessageSharedPost")
+
+  @@index([visibilityUserIds], type: Gin)
 }
 
 model Report {
-  id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  reporterId String  @db.Uuid
-  targetId   String  @db.Uuid
-  reason     String  @db.VarChar(255)
-  status     String? @default("PENDING") @db.VarChar(20)
-  User       User    @relation(fields: [reporterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
+    id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+    reporterId String  @db.Uuid
+    targetId   String  @db.Uuid
+    targetType String  @db.VarChar(30)
+    reason     String  @db.VarChar(255)
+    status     String? @default("PENDING") @db.VarChar(20)
+    createdAt  DateTime @default(now()) @db.Timestamp(6)
+    actionTaken String? @db.VarChar(40)
+    moderatorNote String? @db.VarChar(255)
+    resolvedByUserId String? @db.Uuid
+    resolvedAt DateTime? @db.Timestamp(6)
+    User       User    @relation(fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  }
 
 model Review {
   id            String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
@@ -266,7 +422,7 @@ model Review {
   photos        String?
   createdAt     DateTime?       @default(now()) @db.Timestamp(6)
   Place         Place           @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User          User            @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User          User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   ReviewComment ReviewComment[]
   ReviewLike    ReviewLike[]
 }
@@ -276,15 +432,15 @@ model ReviewComment {
   userId   String @db.Uuid
   reviewId String @db.Uuid
   content  String
-  Review   Review @relation(fields: [reviewId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User     User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model ReviewLike {
   userId   String @db.Uuid
   reviewId String @db.Uuid
-  Review   Review @relation(fields: [reviewId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User     User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User     User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, reviewId])
 }
@@ -311,7 +467,7 @@ model SavedPlace {
   placeId String    @db.Uuid
   savedAt DateTime? @default(now()) @db.Timestamp(6)
   Place   Place     @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User    User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User    User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, placeId])
 }
@@ -323,7 +479,7 @@ model Story {
   mediaUrl  String      @db.VarChar(255)
   expiresAt DateTime    @db.Timestamp(6)
   Place     Place?      @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User      User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   StoryLike StoryLike[]
   StoryView StoryView[]
 }
@@ -331,8 +487,8 @@ model Story {
 model StoryLike {
   userId  String @db.Uuid
   storyId String @db.Uuid
-  Story   Story  @relation(fields: [storyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User    User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User    User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, storyId])
 }
@@ -341,8 +497,8 @@ model StoryView {
   userId  String    @db.Uuid
   storyId String    @db.Uuid
   seenAt  DateTime? @default(now()) @db.Timestamp(6)
-  Story   Story     @relation(fields: [storyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User    User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Story   Story     @relation(fields: [storyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User    User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, storyId])
 }
@@ -359,16 +515,22 @@ model Tag {
   id              Int               @id @default(autoincrement())
   name            String            @db.VarChar(50)
   categoryId      Int?
+  status          String            @default("APPROVED") @db.VarChar(16)
+  submittedByUserId String?         @db.Uuid
   EventTag        EventTag[]
   PlaceTag        PlaceTag[]
   Category        Category?         @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   UserTagInterest UserTagInterest[]
+
+  @@index([categoryId, status])
+  @@index([submittedByUserId])
 }
 
 model TicketType {
   id       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   eventId  String    @db.Uuid
   name     String    @db.VarChar(50)
+  description String?
   price    Decimal   @db.Decimal(10, 2)
   quantity Int
   Booking  Booking[]
@@ -397,12 +559,84 @@ model PostLike {
   @@id([userId, postId])
 }
 
+model OrganizerProfile {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String   @unique @db.Uuid
+  accountType String   @db.VarChar(20) // "PLACE" (Lieu physique) ou "NOMAD" (Promoteur)
+  companyName String   @db.VarChar(100)
+  ifuNumber   String   @db.VarChar(50) // Identifiant Fiscal Unique
+  payoutInfo  String   @db.VarChar(100) // Numéro Mobile Money ou IBAN
+  jobTitle    String   @db.VarChar(50) // Patron, Manager, Chargé de Com'
+  instagramUrl String? @db.VarChar(255)
+  tiktokUrl    String? @db.VarChar(255)
+  facebookUrl  String? @db.VarChar(255)
+  xUrl         String? @db.VarChar(255)
+  websiteUrl   String? @db.VarChar(255)
+  status      String   @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique // On stocke le token (ou un hash) pour pouvoir le révoquer
+  refreshTokenHash String?  @unique @db.VarChar(255)
+  expiresAt DateTime? @db.Timestamp(6)
+  lastUsedAt DateTime? @db.Timestamp(6)
+  revokedAt DateTime? @db.Timestamp(6)
+  device    String?  @db.VarChar(100) // Ex: "iPhone 13", "Android"
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSettings {
+  id                               String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId                           String   @unique @db.Uuid
+  notificationMessages             Boolean  @default(true)
+  notificationOutingInvites        Boolean  @default(true)
+  notificationFriendRequests       Boolean  @default(true)
+  notificationSavedPlacesActivity  Boolean  @default(true)
+  organizerNotifyBookings          Boolean  @default(true)
+  organizerNotifyTeamUpdates       Boolean  @default(true)
+  organizerNotifyReminderD1        Boolean  @default(true)
+  organizerNotifyReminderH3        Boolean  @default(true)
+  organizerNotifyReminderH1        Boolean  @default(true)
+  organizerReminderMode            String   @default("preset") @db.VarChar(16)
+  organizerReminderOffsetsMin      Int[]    @default([])
+  organizerNotificationPriorityMin String   @default("IMPORTANT") @db.VarChar(16)
+  organizerScannerOfflineAuto      Boolean  @default(true)
+  organizerScannerAutoSync         Boolean  @default(true)
+  organizerScannerHaptics          Boolean  @default(true)
+  organizerScannerSound            Boolean  @default(true)
+  organizerScannerStrictWindow     Boolean  @default(true)
+  organizerDefaultCheckInOpenOffsetMin  Int  @default(-60)
+  organizerDefaultCheckInCloseOffsetMin Int  @default(180)
+  organizerDefaultMaxTicketsPerUser     Int  @default(1)
+  organizerDefaultCancellationPolicy    String?
+  organizerDefaultRefundPolicy          String?
+  organizerTeamInviteScope         String   @default("OWNER_ONLY") @db.VarChar(24)
+  organizerTeamDefaultPermission   String   @default("EDIT") @db.VarChar(16)
+  organizerTeamRequireRemovalConfirm Boolean @default(true)
+  profilePublic                    Boolean  @default(true)
+  defaultPostVisibility            String   @default("public") @db.VarChar(20)
+  allowOutingInvitesFrom           String   @default("connections") @db.VarChar(20)
+  theme                            String   @default("system") @db.VarChar(20)
+  language                         String   @default("fr") @db.VarChar(10)
+  dataSaver                        Boolean  @default(false)
+  createdAt                        DateTime @default(now()) @db.Timestamp(6)
+  updatedAt                        DateTime @updatedAt @db.Timestamp(6)
+  User                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
   id                                      String               @id @default(uuid()) @db.Uuid
   username                                String               @unique @db.VarChar(50)
   phoneNumber                             String               @unique @db.VarChar(20)
   email                                   String?              @unique @db.VarChar(255)
   displayName                             String?              @db.VarChar(100)
+  isSuspended                            Boolean              @default(false)
   passwordHash                            String?              @db.VarChar(255)
   isVerified                              Boolean?             @default(false)
   bio                                     String?
@@ -419,14 +653,21 @@ model User {
   updatedAt                               DateTime?            @updatedAt @db.Timestamp(6)
   Booking                                 Booking[]
   ChatMessage                             ChatMessage[]
+  DirectConversationAsUserOne             DirectConversation[] @relation("DirectConversationUserOne")
+  DirectConversationAsUserTwo             DirectConversation[] @relation("DirectConversationUserTwo")
+  DirectMessage                           DirectMessage[]
+  DirectMessageReaction                   DirectMessageReaction[]
   DeviceToken                             DeviceToken[]
   Event                                   Event[]
+  EventCollaborator                       EventCollaborator[]
+  EventRevisionActor                      EventRevision[]      @relation("EventRevisionActor")
   Friendship_Friendship_receiverIdToUser  Friendship[]         @relation("Friendship_receiverIdToUser")
   Friendship_Friendship_requesterIdToUser Friendship[]         @relation("Friendship_requesterIdToUser")
   Notification_Notification_actorIdToUser Notification[]       @relation("Notification_actorIdToUser")
   Notification_Notification_userIdToUser  Notification[]       @relation("Notification_userIdToUser")
   Outing                                  Outing[]
   OutingMedia                             OutingMedia[]
+  OwnedPlaces                             Place[]              @relation("PlaceOwner") // ✅ Liste des lieux possédés
   Post                                    Post[]
   PostComment                             PostComment[]
   PostLike                                PostLike[]
@@ -434,6 +675,7 @@ model User {
   OutingMediaLike                         OutingMediaLike[]
   OutingParticipant                       OutingParticipant[]
   PlaceClaim                              PlaceClaim[]
+  PlaceTeamMember                         PlaceTeamMember[]
   Report                                  Report[]
   Review                                  Review[]
   ReviewComment                           ReviewComment[]
@@ -444,6 +686,9 @@ model User {
   StoryView                               StoryView[]
   City                                    City?                @relation(fields: [residenceCityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   UserCityInterest                        UserCityInterest[]
+  OrganizerProfile                        OrganizerProfile?
+  Session                                 Session[]
+  UserSettings                            UserSettings?
   UserRole                                UserRole[]
   UserTagInterest                         UserTagInterest[]
 }
@@ -452,7 +697,7 @@ model UserCityInterest {
   userId String @db.Uuid
   cityId Int
   City   City   @relation(fields: [cityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, cityId])
 }
@@ -462,7 +707,7 @@ model UserRole {
   roleId     Int
   assignedAt DateTime? @default(now()) @db.Timestamp(6)
   Role       Role      @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User       User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, roleId])
 }
@@ -471,7 +716,7 @@ model UserTagInterest {
   userId String @db.Uuid
   tagId  Int
   Tag    Tag    @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  User   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, tagId])
 }
