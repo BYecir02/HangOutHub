@@ -6,6 +6,7 @@ import MapView, { Callout, Marker, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 
 import { useI18n } from '@/hooks/use-i18n';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import api, { getImageUrl } from '@/services/api';
 
@@ -65,6 +66,8 @@ const PLACE_PLACEHOLDER =
 
 export default function MapScreen() {
   const { t } = useI18n();
+  const colorScheme = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
   const router = useRouter();
   const mapRef = useRef<MapView | null>(null);
   const { selectedLocation, filterByLocation, locationValueLabel } = useLocationScope({
@@ -92,6 +95,13 @@ export default function MapScreen() {
     ...BENIN_CENTER,
     ...COUNTRY_DELTA,
   });
+  const headerSurfaceStyle = useMemo(
+    () => ({
+      backgroundColor: isDarkMode ? 'rgba(17,24,39,0.94)' : 'rgba(255,255,255,0.96)',
+      borderColor: isDarkMode ? 'rgba(75,85,99,0.72)' : 'rgba(229,231,235,0.92)',
+    }),
+    [isDarkMode],
+  );
 
   useEffect(() => {
     if (
@@ -478,7 +488,10 @@ export default function MapScreen() {
 
       <View className="absolute inset-x-0 top-0 px-5 pt-14">
         {headerCollapsed ? (
-          <View className="flex-row items-center justify-between rounded-full bg-white/95 px-4 py-2 shadow-lg dark:bg-gray-900/95">
+          <View
+            className="flex-row items-center justify-between rounded-full border px-4 py-2 shadow-lg"
+            style={headerSurfaceStyle}
+          >
             <View className="flex-row items-center">
               <Ionicons name="location-outline" size={16} color="#2ecc71" />
               <Text className="ml-2 text-sm font-semibold text-gray-900 dark:text-white">
@@ -495,7 +508,7 @@ export default function MapScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View className="rounded-3xl bg-white/95 p-4 shadow-lg dark:bg-gray-900/95">
+          <View className="rounded-3xl border p-4 shadow-lg" style={headerSurfaceStyle}>
           <Text className="text-xs uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
             {t('mapTitle')}
           </Text>
