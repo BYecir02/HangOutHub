@@ -6,6 +6,6 @@ interface TableRowActionsProps {
 }
 
 export default function TableRowActions({ children }: TableRowActionsProps) {
-  return <div className="flex flex-wrap justify-end gap-2">{children}</div>;
+  return <div className="flex flex-wrap justify-start gap-2 sm:justify-end">{children}</div>;
 }
 

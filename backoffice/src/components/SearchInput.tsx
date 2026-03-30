@@ -33,7 +33,7 @@ export default function SearchInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-64 rounded-xl border border-slate-200 bg-white px-9 py-2 text-sm text-slate-700"
+        className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-sm text-slate-700 sm:w-64"
       />
     </div>
   );

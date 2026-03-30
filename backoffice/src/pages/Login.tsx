@@ -77,8 +77,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <Card className="w-full max-w-md p-8">
+    <div className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
+      <Card className="w-full max-w-md p-5 sm:p-8">
         <img
           src={theme === 'dark' ? '/2.png' : '/1.png'}
           alt="HangOutHub"
@@ -87,7 +87,7 @@ export default function LoginPage() {
         <p className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
           HangOutHub
         </p>
-        <h1 className="mt-3 text-2xl font-bold text-slate-900">
+        <h1 className="mt-3 text-xl font-bold text-slate-900 sm:text-2xl">
           Acces Backoffice
         </h1>
         <p className="mt-2 text-sm text-slate-500">

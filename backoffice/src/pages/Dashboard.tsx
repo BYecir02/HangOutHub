@@ -314,12 +314,12 @@ function DashboardKpiCard({
 
   const content = (
     <div
-      className={`group rounded-2xl border border-slate-100 p-6 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 ${toneStyles[tone]}`}
+      className={`group rounded-2xl border border-slate-100 p-4 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lg sm:p-6 dark:border-slate-800 ${toneStyles[tone]}`}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
         {label}
       </p>
-      <p className="mt-3 text-4xl font-bold text-slate-900 dark:text-slate-100">
+      <p className="mt-3 text-3xl font-bold text-slate-900 sm:text-4xl dark:text-slate-100">
         {value}
       </p>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{hint}</p>

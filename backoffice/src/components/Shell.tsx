@@ -97,7 +97,7 @@ export default function Shell() {
           {toggleLabel}
         </button>
 
-        <nav className="mt-6 grid grid-cols-2 gap-2 lg:grid-cols-1 lg:space-y-2 lg:gap-0">
+        <nav className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-0 lg:space-y-2">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -186,9 +186,9 @@ export default function Shell() {
         />
       ) : null}
 
-      <div className="flex min-h-screen w-full flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
+      <div className="flex min-h-screen w-full flex-col gap-4 px-3 py-4 sm:px-4 sm:py-6 lg:flex-row lg:items-start lg:px-6">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-[85vw] max-w-sm flex-col justify-between rounded-r-2xl bg-white p-6 shadow-2xl transition-transform duration-300 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-64 lg:max-w-none lg:translate-x-0 lg:rounded-2xl lg:shadow-soft dark:bg-slate-950 dark:shadow-black/30 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-[90vw] max-w-sm flex-col justify-between rounded-r-2xl bg-white p-5 shadow-2xl transition-transform duration-300 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-64 lg:max-w-none lg:translate-x-0 lg:rounded-2xl lg:shadow-soft dark:bg-slate-950 dark:shadow-black/30 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
         >

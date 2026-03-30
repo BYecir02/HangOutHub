@@ -183,7 +183,7 @@ export default function PlaceViewPage() {
                 <img
                   src={heroImage}
                   alt={place.name}
-                  className="h-72 w-full object-cover"
+                  className="h-56 w-full object-cover sm:h-72"
                 />
               </div>
               <div className="space-y-4">
@@ -237,7 +237,7 @@ export default function PlaceViewPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-2xl border border-slate-100 p-4">
                 <SectionTitle label="Proprietaire" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
@@ -293,7 +293,7 @@ export default function PlaceViewPage() {
             {gallery.length > 0 ? (
               <div>
                 <SectionTitle label="Galerie" />
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-3 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {gallery.map((image, index) => (
                     <div
                       key={`${place.id}-gallery-${index}`}
@@ -317,7 +317,7 @@ export default function PlaceViewPage() {
                   {place.Event.map((event) => (
                     <div
                       key={event.id}
-                      className="flex items-center gap-4 rounded-2xl border border-slate-100 p-4"
+                      className="flex flex-col gap-4 rounded-2xl border border-slate-100 p-4 sm:flex-row sm:items-center"
                     >
                       <img
                         src={resolveImageUrl(event.coverUrl) || PLACE_PLACEHOLDER}
@@ -335,7 +335,7 @@ export default function PlaceViewPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/events/${event.id}`)}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 sm:ml-auto"
                       >
                         Voir
                       </button>

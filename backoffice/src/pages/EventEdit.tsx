@@ -945,7 +945,7 @@ export default function EventEditPage() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-600">Galerie actuelle</p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {galleryImages.map((image) => (
                 <button
                   key={image}
@@ -967,7 +967,7 @@ export default function EventEditPage() {
                 </button>
               ))}
               {galleryImages.length === 0 ? (
-                <div className="col-span-3 rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                <div className="col-span-1 rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 sm:col-span-3">
                   Aucune image
                 </div>
               ) : null}
@@ -982,7 +982,7 @@ export default function EventEditPage() {
               className="mt-3 text-sm text-slate-600"
             />
             {galleryPreviews.length > 0 ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {galleryPreviews.map((preview) => (
                   <img
                     key={preview}

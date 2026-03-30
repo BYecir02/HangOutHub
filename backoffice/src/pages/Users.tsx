@@ -483,19 +483,19 @@ export default function UsersPage() {
       {selectedSummary ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-[1px]">
           <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-slate-50 shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
+            <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
                   Utilisateur
                 </p>
-                <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                <h3 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">
                   {selectedSummary.displayName || selectedSummary.username || 'Profil'}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   {selectedSummary.email || selectedSummary.phoneNumber || 'Sans contact'}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <button
                   type="button"
                   onClick={handleCloseDetails}
@@ -513,7 +513,7 @@ export default function UsersPage() {
                       : 'border-amber-200 text-amber-700 hover:bg-amber-50'
                   }`}
                 >
-                  {selectedSummary.isSuspended ? 'Reactivier' : 'Suspendre'}
+                  {selectedSummary.isSuspended ? 'Réactiver' : 'Suspendre'}
                 </button>
                 <button
                   type="button"
@@ -526,7 +526,7 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
               {detailLoading ? (
                 <LoadingState />
               ) : (
@@ -537,7 +537,7 @@ export default function UsersPage() {
                     </div>
                   ) : null}
 
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 lg:grid-cols-2">
                     <SectionCard>
                       <SectionTitle subtitle="Informations du compte." />
                       <div className="mt-4 space-y-3 text-sm text-slate-600">
@@ -594,7 +594,7 @@ export default function UsersPage() {
                   {detailUser?.OrganizerProfile ? (
                     <SectionCard>
                       <SectionTitle subtitle="Profil organisateur." />
-                      <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm text-slate-600">
+                      <div className="mt-4 grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
                         <p>
                           <span className="font-semibold text-slate-800">Type:</span>{' '}
                           {detailUser.OrganizerProfile.accountType || '-'}
@@ -650,7 +650,7 @@ export default function UsersPage() {
                   ) : null}
 
                   <SectionCard>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                       <SectionTitle subtitle="Sessions actives et recentes." />
                       <button
                         type="button"
@@ -696,7 +696,7 @@ export default function UsersPage() {
                                     <p>Expire le {formatDate(session.expiresAt)}</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <span
                                     className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                                       session.isActive

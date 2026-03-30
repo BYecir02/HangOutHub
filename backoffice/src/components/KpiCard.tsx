@@ -38,11 +38,11 @@ interface KpiCardProps {
 export default function KpiCard({ label, value, hint, tone = 'slate' }: KpiCardProps) {
   const styles = toneStyles[tone];
   return (
-    <div className={`rounded-2xl p-6 ${styles.box}`}>
+    <div className={`rounded-2xl p-4 sm:p-6 ${styles.box}`}>
       <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${styles.label}`}>
         {label}
       </p>
-      <p className={`mt-3 text-4xl font-bold ${styles.value}`}>{value}</p>
+      <p className={`mt-3 text-3xl font-bold sm:text-4xl ${styles.value}`}>{value}</p>
       <p className={`mt-2 text-sm ${styles.hint}`}>{hint}</p>
     </div>
   );

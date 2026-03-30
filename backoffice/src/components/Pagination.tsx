@@ -31,11 +31,11 @@ export default function Pagination({
   );
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-slate-400">
+    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <p className="text-center text-xs text-slate-400 sm:text-left">
         Page {safePage} / {totalPages}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
         <button
           onClick={() => onPageChange(Math.max(1, safePage - 1))}
           className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"

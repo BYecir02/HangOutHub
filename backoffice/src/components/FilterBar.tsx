@@ -1,5 +1,5 @@
 
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 
 interface FilterBarProps {
   children: ReactNode;
@@ -8,8 +8,10 @@ interface FilterBarProps {
 
 export default function FilterBar({ children, className = '' }: FilterBarProps) {
   return (
-    <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      {children}
+    <div className={`flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center ${className}`}>
+      {Children.map(children, (child) => (
+        <div className="w-full sm:w-auto">{child}</div>
+      ))}
     </div>
   );
 }

@@ -642,7 +642,7 @@ export default function PlaceEditPage() {
                 <p className="mt-2 text-xs text-emerald-600">
                   Apercu des nouvelles images.
                 </p>
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {galleryPreviews.map((preview) => (
                     <img
                       key={preview}
@@ -654,7 +654,7 @@ export default function PlaceEditPage() {
                 </div>
               </>
             ) : null}
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {galleryImages.map((image) => (
                 <button
                   key={image}
@@ -676,7 +676,7 @@ export default function PlaceEditPage() {
                 </button>
               ))}
               {galleryImages.length === 0 ? (
-                <div className="col-span-3 rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                <div className="col-span-1 rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 sm:col-span-3">
                   Aucune image
                 </div>
               ) : null}

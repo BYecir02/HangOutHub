@@ -224,12 +224,12 @@ export default function ReportsPage() {
                       <td className="py-4 text-xs text-slate-500">
                         <span
                           title={report.targetId}
-                          className="inline-block max-w-[180px] truncate font-mono"
+                          className="inline-block max-w-[120px] truncate font-mono sm:max-w-[180px]"
                         >
                           {shortenId(report.targetId)}
                         </span>
                       </td>
-                      <td className="py-4 max-w-xs text-sm text-slate-600">
+                      <td className="py-4 max-w-[180px] text-sm text-slate-600 sm:max-w-xs">
                         {report.reason}
                       </td>
                       <td className="py-4 text-xs text-slate-500">

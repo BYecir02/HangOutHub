@@ -21,7 +21,7 @@ export default function SelectField<T extends string | number>({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value as T)}
-      className={`rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 ${className}`}
+      className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 sm:w-auto ${className}`}
     >
       {options.map((option) => (
         <option key={String(option.value)} value={option.value}>

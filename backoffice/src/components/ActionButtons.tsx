@@ -13,7 +13,7 @@ export default function ActionButtons({
   disabled = false,
 }: ActionButtonsProps) {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
+    <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
       <button
         onClick={onApprove}
         disabled={disabled}

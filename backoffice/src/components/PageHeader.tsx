@@ -19,19 +19,23 @@ export default function PageHeader({
 }: PageHeaderProps) {
   return (
     <Card className={className}>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           {eyebrow ? (
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               {eyebrow}
             </p>
           ) : null}
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">{title}</h2>
+          <h2 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">{title}</h2>
           {subtitle ? (
             <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
           ) : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? (
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
+            {actions}
+          </div>
+        ) : null}
       </div>
     </Card>
   );
