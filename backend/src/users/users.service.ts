@@ -25,6 +25,16 @@ interface OrganizerDetailsInput {
   websiteUrl?: string;
 }
 
+interface UserSessionItem {
+  id: string;
+  device: string | null;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  isActive: boolean;
+}
+
 type SanitizedUser<T extends { passwordHash?: string | null }> = Omit<
   T,
   'passwordHash'
@@ -80,6 +90,16 @@ export interface UserSettingsResponse {
   theme: 'light' | 'dark' | 'system';
   language: 'fr' | 'en';
   dataSaver: boolean;
+}
+
+export interface AdminUserSessionResponse {
+  id: string;
+  device: string | null;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  isActive: boolean;
 }
 
 type StoredUserSettings = {
@@ -326,10 +346,20 @@ export class UsersService {
   }
 
   async findAllAdmin() {
+    const now = new Date();
     const users = await this.prisma.user.findMany({
       include: {
         UserRole: { include: { Role: true } },
         OrganizerProfile: true,
+        Session: {
+          select: {
+            id: true,
+            lastUsedAt: true,
+            createdAt: true,
+            expiresAt: true,
+            revokedAt: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -337,9 +367,24 @@ export class UsersService {
     return users.map((user) => ({
       ...this.sanitizeUser(user),
       role: user.UserRole[0]?.Role?.name || 'USER',
+      isSuspended: user.isSuspended,
+      lastLoginAt: user.lastLoginAt,
+      updatedAt: user.updatedAt,
       organizerStatus: user.OrganizerProfile?.status || null,
       organizerAccountType: user.OrganizerProfile?.accountType || null,
       organizerCompanyName: user.OrganizerProfile?.companyName || null,
+      sessionCount: user.Session.filter(
+        (session) =>
+          !session.revokedAt &&
+          (!session.expiresAt || session.expiresAt.getTime() > now.getTime()),
+      ).length,
+      lastActiveAt: (() => {
+        const sessionDates = user.Session.map((session) =>
+          session.lastUsedAt || session.createdAt,
+        ).filter((date): date is Date => Boolean(date));
+        sessionDates.sort((a, b) => b.getTime() - a.getTime());
+        return user.lastLoginAt || sessionDates[0] || null;
+      })(),
     }));
   }
 
@@ -349,6 +394,17 @@ export class UsersService {
       include: {
         OrganizerProfile: true,
         UserRole: { include: { Role: true } },
+        Session: {
+          select: {
+            id: true,
+            device: true,
+            createdAt: true,
+            lastUsedAt: true,
+            expiresAt: true,
+            revokedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
         OwnedPlaces: {
           select: {
             id: true,
@@ -368,6 +424,75 @@ export class UsersService {
     });
 
     return user ? this.sanitizeUser(user) : null;
+  }
+
+  async listAdminSessions(userId: string): Promise<AdminUserSessionResponse[]> {
+    const now = new Date();
+    const sessions = await this.prisma.session.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        device: true,
+        createdAt: true,
+        lastUsedAt: true,
+        expiresAt: true,
+        revokedAt: true,
+      },
+    });
+
+    return sessions.map((session) => ({
+      ...session,
+      isActive:
+        !session.revokedAt &&
+        (!session.expiresAt || session.expiresAt.getTime() > now.getTime()),
+    }));
+  }
+
+  async revokeAdminSession(userId: string, sessionId: string) {
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session introuvable');
+    }
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date(),
+        refreshTokenHash: null,
+      },
+    });
+
+    return {
+      success: true,
+      id: session.id,
+    };
+  }
+
+  async revokeAllAdminSessions(userId: string) {
+    await this.prisma.session.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        refreshTokenHash: null,
+      },
+    });
+
+    return {
+      success: true,
+    };
   }
 
   async findPublicProfile(id: string) {

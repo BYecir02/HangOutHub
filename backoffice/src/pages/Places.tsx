@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { apiGet } from '../lib/api';
+import { apiDelete, apiGet } from '../lib/api';
 import Pagination from '../components/Pagination';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
@@ -23,15 +23,20 @@ interface CityOption {
 interface PlaceItem {
   id: string;
   name: string;
+  category?: string | null;
   description?: string | null;
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   priceLevel?: number | null;
+  updatedAt?: string | null;
   City?: CityOption | null;
   PlaceTag?: {
     Tag?: {
       name?: string | null;
+      Category?: {
+        name?: string | null;
+      } | null;
     } | null;
   }[];
 }
@@ -42,9 +47,12 @@ export default function PlacesPage() {
   const [cities, setCities] = useState<CityOption[]>([]);
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState<number | 'all'>('all');
+  const [countryFilter, setCountryFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'name_asc' | 'name_desc' | 'city_asc'>('name_asc');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [deletingPlaceId, setDeletingPlaceId] = useState<string | null>(null);
   const pageSize = 10;
 
   useEffect(() => {
@@ -75,6 +83,31 @@ export default function PlacesPage() {
     };
   }, []);
 
+  const countryOptions = useMemo(() => {
+    const countries = Array.from(
+      new Set(cities.map((city) => city.country).filter(Boolean)),
+    ).sort((a, b) => a.localeCompare(b));
+
+    return countries;
+  }, [cities]);
+
+  const categoryOptions = useMemo(() => {
+    const categories = Array.from(
+      new Set(
+        places
+          .flatMap((place) => [
+            place.category?.trim(),
+            ...(place.PlaceTag || [])
+              .map((entry) => entry.Tag?.Category?.name?.trim())
+              .filter((value): value is string => Boolean(value)),
+          ])
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+
+    return categories;
+  }, [places]);
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     const filtered = places.filter((place) => {
@@ -83,7 +116,30 @@ export default function PlacesPage() {
       }
 
       if (cityFilter !== 'all') {
-        return place.City?.id === cityFilter;
+        if (place.City?.id !== cityFilter) {
+          return false;
+        }
+      }
+
+      if (countryFilter !== 'all') {
+        if ((place.City?.country || '').toLowerCase() !== countryFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      if (categoryFilter !== 'all') {
+        const placeCategories = [
+          place.category,
+          ...(place.PlaceTag || [])
+            .map((entry) => entry.Tag?.Category?.name)
+            .filter((value): value is string => Boolean(value)),
+        ]
+          .filter((value): value is string => Boolean(value))
+          .map((value) => value.toLowerCase());
+
+        if (!placeCategories.includes(categoryFilter.toLowerCase())) {
+          return false;
+        }
       }
 
       return true;
@@ -98,11 +154,18 @@ export default function PlacesPage() {
       }
       return a.name.localeCompare(b.name);
     });
-  }, [places, search, cityFilter, sortOrder]);
+  }, [places, search, cityFilter, countryFilter, categoryFilter, sortOrder]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, cityFilter, sortOrder]);
+  }, [search, cityFilter, countryFilter, categoryFilter, sortOrder]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [filtered.length, page, pageSize]);
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -116,6 +179,51 @@ export default function PlacesPage() {
     return tags.join(', ');
   };
 
+  const resolveCategory = (place: PlaceItem) => {
+    return (
+      place.category ||
+      place.PlaceTag?.find((entry) => entry.Tag?.Category?.name)?.Tag?.Category?.name ||
+      '-'
+    );
+  };
+
+  const formatUpdatedAt = (value?: string | null) => {
+    if (!value) {
+      return '-';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '-';
+    }
+
+    return new Intl.DateTimeFormat('fr-FR', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
+  };
+
+  const handleDelete = async (place: PlaceItem) => {
+    const confirmed = window.confirm(
+      `Supprimer le lieu "${place.name}" ? Cette action est irreversible.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingPlaceId(place.id);
+    try {
+      await apiDelete(`/places/${place.id}`);
+      setPlaces((current) => current.filter((item) => item.id !== place.id));
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : 'Impossible de supprimer le lieu.',
+      );
+    } finally {
+      setDeletingPlaceId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -123,39 +231,69 @@ export default function PlacesPage() {
         title="Lieux"
         subtitle="Edite les informations essentielles des lieux."
         actions={
-          <FilterBar>
-            <SelectField
-              value={cityFilter}
-              onChange={(value) =>
-                setCityFilter(value === 'all' ? 'all' : Number(value))
-              }
-              options={[
-                { label: 'Toutes les villes', value: 'all' },
-                ...cities.map((city) => ({ label: city.name, value: city.id })),
-              ]}
-            />
-            <SelectField
-              value={sortOrder}
-              onChange={(value) =>
-                setSortOrder(value as 'name_asc' | 'name_desc' | 'city_asc')
-              }
-              options={[
-                { label: 'Nom A-Z', value: 'name_asc' },
-                { label: 'Nom Z-A', value: 'name_desc' },
-                { label: 'Ville A-Z', value: 'city_asc' },
-              ]}
-            />
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Rechercher un lieu..."
-            />
-          </FilterBar>
+          <>
+            <button
+              onClick={() => navigate('/places/new')}
+              className="rounded-xl border border-brand-200 bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
+            >
+              Ajouter un lieu
+            </button>
+            <FilterBar>
+              <SelectField
+                value={cityFilter}
+                onChange={(value) =>
+                  setCityFilter(value === 'all' ? 'all' : Number(value))
+                }
+                options={[
+                  { label: 'Toutes les villes', value: 'all' },
+                  ...cities.map((city) => ({ label: city.name, value: city.id })),
+                ]}
+              />
+              <SelectField
+                value={countryFilter}
+                onChange={setCountryFilter}
+                options={[
+                  { label: 'Tous les pays', value: 'all' },
+                  ...countryOptions.map((country) => ({
+                    label: country,
+                    value: country,
+                  })),
+                ]}
+              />
+              <SelectField
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+                options={[
+                  { label: 'Toutes les categories', value: 'all' },
+                  ...categoryOptions.map((category) => ({
+                    label: category,
+                    value: category,
+                  })),
+                ]}
+              />
+              <SelectField
+                value={sortOrder}
+                onChange={(value) =>
+                  setSortOrder(value as 'name_asc' | 'name_desc' | 'city_asc')
+                }
+                options={[
+                  { label: 'Nom A-Z', value: 'name_asc' },
+                  { label: 'Nom Z-A', value: 'name_desc' },
+                  { label: 'Ville A-Z', value: 'city_asc' },
+                ]}
+              />
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Rechercher un lieu..."
+              />
+            </FilterBar>
+          </>
         }
       />
 
       <SectionCard>
-        <SectionTitle label="Lieux" subtitle="Liste des lieux disponibles." />
+        <SectionTitle subtitle="Liste des lieux disponibles." />
         {loading ? (
           <LoadingState />
         ) : (
@@ -164,6 +302,8 @@ export default function PlacesPage() {
               columns={[
                 { label: 'Lieu' },
                 { label: 'Ville' },
+                { label: 'Categorie' },
+                { label: 'Derniere maj' },
                 { label: 'Tags' },
                 { label: 'Action', className: 'text-right' },
               ]}
@@ -176,15 +316,46 @@ export default function PlacesPage() {
                       {place.City?.name || '-'}
                     </td>
                     <td className="py-4 text-xs text-slate-500">
+                      {resolveCategory(place)}
+                    </td>
+                    <td className="py-4 text-xs text-slate-500">
+                      {formatUpdatedAt(place.updatedAt)}
+                    </td>
+                    <td className="py-4 text-xs text-slate-500">
                       {resolveTags(place) || '-'}
                     </td>
                     <td className="py-4 text-right">
                       <TableRowActions>
                         <button
+                          type="button"
+                          onClick={() => navigate(`/places/view/${place.id}`)}
+                          className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                        >
+                          Voir la fiche
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => navigate(`/places/${place.id}`)}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                         >
                           Modifier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/places/new?duplicateFrom=${place.id}`)
+                          }
+                          className="rounded-lg border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-600 hover:bg-brand-50"
+                        >
+                          Dupliquer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(place)}
+                          disabled={deletingPlaceId === place.id}
+                          className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                        >
+                          {deletingPlaceId === place.id ? 'Suppression...' : 'Supprimer'}
                         </button>
                       </TableRowActions>
                     </td>
@@ -192,7 +363,7 @@ export default function PlacesPage() {
                 ))}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={6}>
                       <EmptyState title="Aucun lieu trouve." />
                     </td>
                   </tr>

@@ -103,6 +103,19 @@ export class PlacesController {
     );
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.placesService.remove(
+      id,
+      req.user.userId,
+      req.user.role || 'USER',
+    );
+  }
+
   @Get()
   findAll() {
     return this.placesService.findAll();

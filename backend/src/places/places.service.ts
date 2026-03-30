@@ -161,6 +161,153 @@ export class PlacesService {
     return updated;
   }
 
+  async remove(id: string, userId: string, role: string) {
+    const place = await this.prisma.place.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        ownerId: true,
+      },
+    });
+
+    if (!place) {
+      throw new NotFoundException('Lieu introuvable');
+    }
+
+    const normalizedRole = role.toUpperCase();
+    if (place.ownerId !== userId && normalizedRole !== 'ADMIN') {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a supprimer ce lieu.",
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.placeTeamMember.deleteMany({
+        where: {
+          placeId: id,
+        },
+      });
+
+      await tx.placeTag.deleteMany({
+        where: {
+          placeId: id,
+        },
+      });
+
+      await tx.placeClaim.deleteMany({
+        where: {
+          placeId: id,
+        },
+      });
+
+      await tx.savedPlace.deleteMany({
+        where: {
+          placeId: id,
+        },
+      });
+
+      await tx.review.deleteMany({
+        where: {
+          placeId: id,
+        },
+      });
+
+      await tx.subscription.deleteMany({
+        where: {
+          placeId: id,
+        },
+      });
+
+      await tx.event.updateMany({
+        where: {
+          placeId: id,
+        },
+        data: {
+          placeId: null,
+        },
+      });
+
+      await tx.outing.updateMany({
+        where: {
+          placeId: id,
+        },
+        data: {
+          placeId: null,
+        },
+      });
+
+      await tx.post.updateMany({
+        where: {
+          placeId: id,
+        },
+        data: {
+          placeId: null,
+        },
+      });
+
+      await tx.story.updateMany({
+        where: {
+          placeId: id,
+        },
+        data: {
+          placeId: null,
+        },
+      });
+
+      const placePromotions = await tx.promotion.findMany({
+        where: {
+          placeId: id,
+        },
+        select: {
+          id: true,
+          eventId: true,
+        },
+      });
+
+      const placeOnlyPromotionIds = placePromotions
+        .filter((promotion) => !promotion.eventId)
+        .map((promotion) => promotion.id);
+
+      if (placeOnlyPromotionIds.length > 0) {
+        await tx.promotion.deleteMany({
+          where: {
+            id: {
+              in: placeOnlyPromotionIds,
+            },
+          },
+        });
+      }
+
+      const eventLinkedPromotionIds = placePromotions
+        .filter((promotion) => Boolean(promotion.eventId))
+        .map((promotion) => promotion.id);
+
+      if (eventLinkedPromotionIds.length > 0) {
+        await tx.promotion.updateMany({
+          where: {
+            id: {
+              in: eventLinkedPromotionIds,
+            },
+          },
+          data: {
+            placeId: null,
+          },
+        });
+      }
+
+      await tx.place.delete({
+        where: {
+          id,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      id,
+    };
+  }
+
   private parseTagIdsPayload(raw?: string) {
     if (!raw) {
       return [] as number[];
@@ -448,7 +595,7 @@ export class PlacesService {
     return this.prisma.place.findMany({
       include: {
         City: true,
-        PlaceTag: { include: { Tag: true } },
+        PlaceTag: { include: { Tag: { include: { Category: true } } } },
       },
     });
   }
@@ -516,7 +663,7 @@ export class PlacesService {
       where: { id },
       include: {
         City: true,
-        PlaceTag: { include: { Tag: true } },
+        PlaceTag: { include: { Tag: { include: { Category: true } } } },
         Owner: {
           select: {
             id: true,

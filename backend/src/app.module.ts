@@ -19,6 +19,7 @@ import { OrganizerScannerModule } from './organizer-scanner/organizer-scanner.mo
 import { CitiesModule } from './cities/cities.module';
 import { DirectChatsModule } from './direct-chats/direct-chats.module';
 import { ReportsModule } from './reports/reports.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ReportsModule } from './reports/reports.module';
     NotificationsModule,
     OrganizerScannerModule,
     ReportsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

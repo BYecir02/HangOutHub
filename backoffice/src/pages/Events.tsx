@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { apiGet } from '../lib/api';
+import { apiDelete, apiGet } from '../lib/api';
 import Pagination from '../components/Pagination';
 import PageHeader from '../components/PageHeader';
 import FilterBar from '../components/FilterBar';
@@ -41,6 +41,7 @@ export default function EventsPage() {
   >('date_desc');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const pageSize = 10;
 
   const filtered = useMemo(() => {
@@ -81,6 +82,13 @@ export default function EventsPage() {
     setPage(1);
   }, [search, sortOrder, statusFilter]);
 
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [filtered.length, page, pageSize]);
+
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
@@ -107,6 +115,25 @@ export default function EventsPage() {
     };
   }, []);
 
+  const handleDelete = async (event: EventItem) => {
+    const confirmed = window.confirm(
+      `Supprimer l'evenement "${event.title}" ? Cette action est irreversible.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingEventId(event.id);
+    try {
+      await apiDelete(`/events/${event.id}`);
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+    } catch {
+      window.alert("Impossible de supprimer l'evenement.");
+    } finally {
+      setDeletingEventId(null);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -115,43 +142,51 @@ export default function EventsPage() {
         title="Evenements"
         subtitle="Modifie rapidement les evenements publics."
         actions={
-          <FilterBar>
-            <SelectField
-              value={statusFilter}
-              onChange={(value) =>
-                setStatusFilter(value as 'all' | 'upcoming' | 'past')
-              }
-              options={[
-                { label: 'Tous', value: 'all' },
-                { label: 'A venir', value: 'upcoming' },
-                { label: 'Passe', value: 'past' },
-              ]}
-            />
-            <SelectField
-              value={sortOrder}
-              onChange={(value) =>
-                setSortOrder(
-                  value as 'date_desc' | 'date_asc' | 'price_desc' | 'price_asc',
-                )
-              }
-              options={[
-                { label: 'Date recente', value: 'date_desc' },
-                { label: 'Date ancienne', value: 'date_asc' },
-                { label: 'Prix descendant', value: 'price_desc' },
-                { label: 'Prix croissant', value: 'price_asc' },
-              ]}
-            />
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Rechercher un evenement..."
-            />
-          </FilterBar>
+          <>
+            <button
+              onClick={() => navigate('/events/new')}
+              className="rounded-xl border border-brand-200 bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
+            >
+              Ajouter un evenement
+            </button>
+            <FilterBar>
+              <SelectField
+                value={statusFilter}
+                onChange={(value) =>
+                  setStatusFilter(value as 'all' | 'upcoming' | 'past')
+                }
+                options={[
+                  { label: 'Tous', value: 'all' },
+                  { label: 'A venir', value: 'upcoming' },
+                  { label: 'Passe', value: 'past' },
+                ]}
+              />
+              <SelectField
+                value={sortOrder}
+                onChange={(value) =>
+                  setSortOrder(
+                    value as 'date_desc' | 'date_asc' | 'price_desc' | 'price_asc',
+                  )
+                }
+                options={[
+                  { label: 'Date recente', value: 'date_desc' },
+                  { label: 'Date ancienne', value: 'date_asc' },
+                  { label: 'Prix descendant', value: 'price_desc' },
+                  { label: 'Prix croissant', value: 'price_asc' },
+                ]}
+              />
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Rechercher un evenement..."
+              />
+            </FilterBar>
+          </>
         }
       />
 
       <SectionCard>
-        <SectionTitle label="Evenements" subtitle="Liste des evenements." />
+        <SectionTitle subtitle="Liste des evenements." />
         {loading ? (
           <LoadingState />
         ) : (
@@ -179,10 +214,30 @@ export default function EventsPage() {
                     <td className="py-4 text-right">
                       <TableRowActions>
                         <button
+                          type="button"
                           onClick={() => navigate(`/events/${event.id}`)}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                         >
                           Modifier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/events/new?duplicateFrom=${event.id}`)
+                          }
+                          className="rounded-lg border border-brand-200 px-3 py-2 text-xs font-semibold text-brand-600 hover:bg-brand-50"
+                        >
+                          Dupliquer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(event)}
+                          disabled={deletingEventId === event.id}
+                          className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                        >
+                          {deletingEventId === event.id
+                            ? 'Suppression...'
+                            : 'Supprimer'}
                         </button>
                       </TableRowActions>
                     </td>

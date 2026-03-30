@@ -26,12 +26,12 @@ export default function PlaceCard({ name, location, imageUrl, rating, onPress }:
         />
         
         {/* Badge Note (Si rating existe) */}
-        {rating && (
+        {typeof rating === 'number' && !Number.isNaN(rating) ? (
           <View className="absolute top-2 right-2 bg-white/90 dark:bg-black/60 px-1.5 py-0.5 rounded-md flex-row items-center shadow-sm">
             <Ionicons name="star" size={10} color="#f59e0b" />
             <Text className="text-[10px] font-bold ml-0.5 text-gray-800 dark:text-white">{rating}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {/* Textes */}

@@ -197,7 +197,7 @@ export default function ReportsPage() {
       />
 
       <SectionCard>
-        <SectionTitle label="Signalements" subtitle="Liste des signalements." />
+        <SectionTitle subtitle="Liste des signalements." />
         {loading ? (
           <LoadingState />
         ) : (

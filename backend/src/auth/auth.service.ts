@@ -33,6 +33,10 @@ interface RefreshTokenPayload {
   type: 'refresh';
 }
 
+interface DecodedSessionToken {
+  sid?: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -143,10 +147,7 @@ export class AuthService {
     });
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
-    const normalizedDevice =
-      typeof device === 'string' && device.trim().length > 0
-        ? device.trim().slice(0, 100)
-        : 'Mobile';
+    const normalizedDevice = this.formatDeviceLabel(device);
 
     // 2. Sauvegarder la session active
     await this.prisma.session.create({
@@ -281,17 +282,158 @@ export class AuthService {
       return;
     }
 
-    const decoded: unknown = this.jwtService.decode(token);
-    const sessionToken =
-      typeof decoded === 'object' &&
-      decoded !== null &&
-      'sid' in decoded &&
-      typeof decoded.sid === 'string' &&
-      decoded.sid.trim().length > 0
-        ? decoded.sid
-        : token;
+    const sessionToken = this.extractSessionToken(token);
 
     // Le .deleteMany evite une erreur si le token n'existe pas deja.
     await this.prisma.session.deleteMany({ where: { token: sessionToken } });
+  }
+
+  async listSessions(userId: string, authorization?: string) {
+    const currentSessionToken =
+      this.extractSessionTokenFromAuthorization(authorization);
+    const now = new Date();
+
+    const sessions = await this.prisma.session.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        token: true,
+        device: true,
+        createdAt: true,
+        lastUsedAt: true,
+        expiresAt: true,
+        revokedAt: true,
+      },
+    });
+
+    return sessions.map((session) => ({
+      id: session.id,
+      device: this.formatDeviceLabel(session.device),
+      createdAt: session.createdAt,
+      lastUsedAt: session.lastUsedAt,
+      expiresAt: session.expiresAt,
+      revokedAt: session.revokedAt,
+      isCurrent: currentSessionToken
+        ? session.token === currentSessionToken
+        : false,
+      isActive:
+        !session.revokedAt &&
+        (!session.expiresAt || session.expiresAt.getTime() > now.getTime()),
+    }));
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('Session introuvable');
+    }
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date(),
+        refreshTokenHash: null,
+      },
+    });
+
+    return {
+      success: true,
+      id: session.id,
+    };
+  }
+
+  async revokeOtherSessions(userId: string, authorization?: string) {
+    const currentSessionToken =
+      this.extractSessionTokenFromAuthorization(authorization);
+
+    if (!currentSessionToken) {
+      throw new UnauthorizedException('Session active introuvable');
+    }
+
+    await this.prisma.session.updateMany({
+      where: {
+        userId,
+        token: {
+          not: currentSessionToken,
+        },
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        refreshTokenHash: null,
+      },
+    });
+
+    return {
+      success: true,
+    };
+  }
+
+  private extractSessionToken(rawToken: string) {
+    const decoded = this.jwtService.decode(rawToken) as
+      | DecodedSessionToken
+      | null;
+    const sid = decoded?.sid?.trim();
+    return sid ? sid : rawToken;
+  }
+
+  private extractSessionTokenFromAuthorization(authorization?: string) {
+    if (!authorization || !authorization.startsWith('Bearer ')) {
+      return null;
+    }
+
+    return this.extractSessionToken(authorization.slice(7));
+  }
+
+  private formatDeviceLabel(device?: string | null) {
+    const raw = typeof device === 'string' ? device.trim() : '';
+    if (!raw) {
+      return 'Appareil inconnu';
+    }
+
+    const browser =
+      raw.includes('Edg/') || raw.includes('Edge/')
+        ? 'Edge'
+        : raw.includes('Firefox/')
+          ? 'Firefox'
+          : raw.includes('Chrome/')
+            ? 'Chrome'
+            : raw.includes('Safari/')
+              ? 'Safari'
+              : raw.includes('Opera/') || raw.includes('OPR/')
+                ? 'Opera'
+                : raw.includes('Mobile Safari')
+                  ? 'Safari'
+                  : 'Navigateur';
+
+    const platform =
+      raw.includes('iPhone') || raw.includes('iPad')
+        ? 'iPhone'
+        : raw.includes('Android')
+          ? 'Android'
+          : raw.includes('Windows')
+            ? 'Windows'
+            : raw.includes('Mac OS X') || raw.includes('Macintosh')
+              ? 'Mac'
+              : raw.includes('Linux')
+                ? 'Linux'
+                : '';
+
+    const parts = [browser, platform].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(' sur ');
+    }
+
+    return raw.length > 70 ? `${raw.slice(0, 67)}...` : raw;
   }
 }

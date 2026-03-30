@@ -532,16 +532,24 @@ export class PostsService {
 
   async incrementShareCount(id: string, currentUserId: string) {
     await this.findOneForUser(id, currentUserId);
-    const updated = await this.prisma.post.update({
-      where: { id },
-      data: {
-        shareCount: { increment: 1 },
-      },
-      select: {
-        shareCount: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({
+        where: { id },
+        data: {
+          shareCount: { increment: 1 },
+        },
+        select: {
+          shareCount: true,
+        },
+      });
+
+      await tx.$executeRaw`
+        INSERT INTO "PostShareEvent" ("postId", "userId")
+        VALUES (${id}::uuid, ${currentUserId}::uuid)
+      `;
+
+      return updated;
     });
-    return updated;
   }
 
   async findOneAdmin(id: string) {

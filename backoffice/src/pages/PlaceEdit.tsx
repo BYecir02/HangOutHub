@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { apiGet, apiPatch, apiPost, apiUpload, resolveImageUrl } from '../lib/api';
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiUpload,
+  resolveImageUrl,
+} from '../lib/api';
 import PageHeader from '../components/PageHeader';
 import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
@@ -19,8 +26,12 @@ interface CityOption {
 interface PlaceDetails {
   id: string;
   name: string;
+  category?: string | null;
   description?: string | null;
   address?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  openingHours?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   priceLevel?: number | null;
@@ -46,9 +57,53 @@ interface CategoryOption {
   }>;
 }
 
+interface DuplicatePlaceSource {
+  id: string;
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  openingHours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  priceLevel?: number | null;
+  coverUrl?: string | null;
+  images?: string[];
+  City?: CityOption | null;
+  PlaceTag?: Array<{
+    Tag?: {
+      id: number;
+      name: string;
+      status?: string | null;
+    } | null;
+  }>;
+}
+
+const EMPTY_PLACE: PlaceDetails = {
+  id: '',
+  name: '',
+  category: '',
+  description: '',
+  address: '',
+  phone: '',
+  whatsapp: '',
+  openingHours: '',
+  latitude: 0,
+  longitude: 0,
+  priceLevel: 1,
+  images: [],
+  City: null,
+  coverUrl: null,
+  PlaceTag: [],
+};
+
 export default function PlaceEditPage() {
   const navigate = useNavigate();
   const params = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const isCreateMode = !params.id;
   const [place, setPlace] = useState<PlaceDetails | null>(null);
   const [cities, setCities] = useState<CityOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -68,29 +123,65 @@ export default function PlaceEditPage() {
   );
   const [error, setError] = useState('');
 
+  const buildCreateDraft = (source: DuplicatePlaceSource): PlaceDetails => ({
+    ...EMPTY_PLACE,
+    name: source.name ? `${source.name} (copie)` : 'Nouveau lieu',
+    category: source.category ?? '',
+    description: source.description ?? '',
+    address: source.address ?? '',
+    phone: source.phone ?? '',
+    whatsapp: source.whatsapp ?? '',
+    openingHours: source.openingHours ?? '',
+    latitude: source.latitude ?? 0,
+    longitude: source.longitude ?? 0,
+    priceLevel: source.priceLevel ?? 1,
+    City: source.City ?? null,
+  });
+
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
-      if (!params.id) {
-        return;
-      }
       setLoading(true);
       try {
+        const duplicateFrom = searchParams.get('duplicateFrom');
         const [placeData, cityData, categoryData] = await Promise.all([
-          apiGet<PlaceDetails>(`/places/${params.id}`),
+          params.id
+            ? apiGet<PlaceDetails>(`/places/${params.id}`)
+            : duplicateFrom
+              ? apiGet<DuplicatePlaceSource>(`/places/${duplicateFrom}`)
+              : Promise.resolve(EMPTY_PLACE),
           apiGet<CityOption[]>('/cities'),
           apiGet<CategoryOption[]>('/categories'),
         ]);
 
         if (isMounted) {
-          setPlace(placeData);
+          if (params.id) {
+            setPlace(placeData);
+          } else if (duplicateFrom) {
+            const source = placeData as DuplicatePlaceSource;
+            setPlace(buildCreateDraft(source));
+            setGalleryImages([]);
+            setSelectedTagIds(
+              source.PlaceTag?.map((entry) => entry.Tag?.id || 0).filter(Boolean) ||
+                [],
+            );
+          } else {
+            setPlace(placeData);
+            setGalleryImages(placeData.images || []);
+            setSelectedTagIds(
+              placeData.PlaceTag?.map((entry) => entry.Tag?.id || 0).filter(Boolean) ||
+                [],
+            );
+          }
           setCities(cityData);
           setCategories(categoryData);
-          setGalleryImages(placeData.images || []);
-          setSelectedTagIds(
-            placeData.PlaceTag?.map((entry) => entry.Tag?.id || 0).filter(Boolean) ||
-              [],
-          );
+          setCoverFile(null);
+          setGalleryFiles([]);
+          setCoverPreview(null);
+          setGalleryPreviews([]);
+          setOpenCategoryId(null);
+          setTagSearch('');
+          setTagCreationError('');
         }
       } finally {
         if (isMounted) {
@@ -102,7 +193,7 @@ export default function PlaceEditPage() {
     return () => {
       isMounted = false;
     };
-  }, [params.id]);
+  }, [params.id, searchParams]);
 
   useEffect(() => {
     if (!coverFile) {
@@ -215,10 +306,40 @@ export default function PlaceEditPage() {
         galleryFiles.forEach((file) => formData.append('gallery', file));
       }
 
+      if (isCreateMode) {
+        const created = await apiUpload<PlaceDetails>('/places', formData, 'POST');
+        navigate(`/places/${created.id}`);
+        return;
+      }
+
       await apiUpload(`/places/${place.id}`, formData, 'PATCH');
       navigate('/places');
-    } catch {
-      setError('Impossible de sauvegarder le lieu.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de sauvegarder le lieu.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!place || isCreateMode) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Supprimer le lieu "${place.name}" ? Cette action est irreversible.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await apiDelete(`/places/${place.id}`);
+      navigate('/places');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer le lieu.');
     } finally {
       setSaving(false);
     }
@@ -236,15 +357,46 @@ export default function PlaceEditPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Lieu"
-        title={`Modifier ${place.name}`}
-        subtitle={`Ville: ${place.City?.name || 'Non definie'}`}
+        title={isCreateMode ? 'Creer un lieu' : `Modifier ${place.name}`}
+        subtitle={
+          isCreateMode
+            ? 'Ajoute un nouveau lieu au catalogue.'
+            : `Ville: ${place.City?.name || 'Non definie'}`
+        }
         actions={
-          <button
-            onClick={() => navigate('/places')}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-          >
-            Retour
-          </button>
+          <>
+            {!isCreateMode ? (
+              <button
+                onClick={() => navigate(`/places/view/${place.id}`)}
+                className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+              >
+                Voir la fiche
+              </button>
+            ) : null}
+            {!isCreateMode ? (
+              <button
+                onClick={() => void handleDelete()}
+                disabled={saving}
+                className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              >
+                Supprimer
+              </button>
+            ) : null}
+            {!isCreateMode ? (
+              <button
+                onClick={() => navigate(`/places/new?duplicateFrom=${place.id}`)}
+                className="rounded-xl border border-brand-200 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50"
+              >
+                Dupliquer
+              </button>
+            ) : null}
+            <button
+              onClick={() => navigate('/places')}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+            >
+              Retour
+            </button>
+          </>
         }
       />
 
@@ -563,10 +715,15 @@ export default function PlaceEditPage() {
           disabled={saving}
           className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
         >
-          {saving ? 'Sauvegarde...' : 'Enregistrer'}
+          {saving
+            ? 'Sauvegarde...'
+            : isCreateMode
+              ? 'Creer le lieu'
+              : 'Enregistrer'}
         </button>
       </div>
     </div>
   );
 }
+
 

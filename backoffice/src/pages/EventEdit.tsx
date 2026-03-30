@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { apiGet, apiPatch, apiPost, apiUpload, resolveImageUrl } from '../lib/api';
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiUpload,
+  resolveImageUrl,
+} from '../lib/api';
 import PageHeader from '../components/PageHeader';
 import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
@@ -66,6 +73,58 @@ interface PlaceOption {
   name?: string | null;
 }
 
+interface DuplicateEventSource {
+  id: string;
+  title: string;
+  description?: string | null;
+  startTime: string;
+  endTime?: string | null;
+  entryFee?: number | null;
+  cancellationPolicy?: string | null;
+  refundPolicy?: string | null;
+  placeId?: string | null;
+  Place?: {
+    id: string;
+  } | null;
+  TicketType?: Array<{
+    id?: string;
+    name: string;
+    description?: string | null;
+    price: number;
+    quantity: number;
+  }>;
+  EventTag?: Array<{
+    tagId: number;
+  }>;
+  Promotion?: Array<{
+    code?: string | null;
+    discountType?: 'PERCENT' | 'FIXED' | null;
+    discountValue?: number | null;
+    maxRedemptions?: number | null;
+    endDate?: string | null;
+  }>;
+}
+
+function createEmptyEvent(): EventDetails {
+  return {
+    id: '',
+    title: '',
+    description: '',
+    startTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    endTime: null,
+    entryFee: 0,
+    cancellationPolicy: '',
+    refundPolicy: '',
+    coverUrl: null,
+    images: [],
+    placeId: null,
+    TicketType: [],
+    Promotion: [],
+    EventTag: [],
+    Place: null,
+  };
+}
+
 function toDateTimeLocal(value: string | null | undefined) {
   if (!value) {
     return '';
@@ -79,9 +138,12 @@ function toDateTimeLocal(value: string | null | undefined) {
 export default function EventEditPage() {
   const navigate = useNavigate();
   const params = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const isCreateMode = !params.id;
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -114,47 +176,84 @@ export default function EventEditPage() {
   const [promoEndsAt, setPromoEndsAt] = useState('');
   const [error, setError] = useState('');
 
+  const buildCreateDraft = (source: DuplicateEventSource): EventDetails => ({
+    ...createEmptyEvent(),
+    title: source.title ? `${source.title} (copie)` : 'Nouvel evenement',
+    description: source.description ?? '',
+    startTime: source.startTime,
+    endTime: source.endTime ?? null,
+    entryFee: source.entryFee ?? 0,
+    cancellationPolicy: source.cancellationPolicy ?? '',
+    refundPolicy: source.refundPolicy ?? '',
+  });
+
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
-      if (!params.id) {
-        return;
-      }
       setLoading(true);
       try {
+        const duplicateFrom = searchParams.get('duplicateFrom');
         const [data, categoryData, placeData] = await Promise.all([
-          apiGet<EventDetails>(`/events/${params.id}`),
+          params.id
+            ? apiGet<EventDetails>(`/events/${params.id}`)
+            : duplicateFrom
+              ? apiGet<DuplicateEventSource>(`/events/${duplicateFrom}`)
+              : Promise.resolve(createEmptyEvent()),
           apiGet<CategoryOption[]>('/categories'),
           apiGet<PlaceOption[]>('/places'),
         ]);
         if (isMounted) {
-          setEvent(data);
+          if (params.id) {
+            setEvent(data as EventDetails);
+          } else if (duplicateFrom) {
+            const source = data as DuplicateEventSource;
+            setEvent(buildCreateDraft(source));
+            setGalleryImages([]);
+            setTicketTypes(
+              source.TicketType?.map((ticket) => ({
+                id: ticket.id,
+                name: ticket.name,
+                description: ticket.description ?? '',
+                price: Number(ticket.price || 0),
+                quantity: Number(ticket.quantity || 0),
+              })) || [],
+            );
+            setSelectedTagIds(source.EventTag?.map((item) => item.tagId) || []);
+            setPlaceId(source.placeId || source.Place?.id || '');
+
+            const promo = source.Promotion?.[0];
+            if (promo?.code) {
+              setPromoEnabled(true);
+              setPromoCode(promo.code);
+              setPromoType((promo.discountType as 'PERCENT' | 'FIXED') || 'PERCENT');
+              setPromoValue(promo.discountValue ? String(promo.discountValue) : '');
+              setPromoMaxRedemptions(
+                promo.maxRedemptions ? String(promo.maxRedemptions) : '',
+              );
+              setPromoEndsAt(promo.endDate ? toDateTimeLocal(promo.endDate) : '');
+            } else {
+              setPromoEnabled(false);
+              setPromoCode('');
+              setPromoType('PERCENT');
+              setPromoValue('');
+              setPromoMaxRedemptions('');
+              setPromoEndsAt('');
+            }
+          } else {
+            setEvent(createEmptyEvent());
+            setGalleryImages([]);
+            setTicketTypes([]);
+            setSelectedTagIds([]);
+            setPlaceId('');
+            setPromoEnabled(false);
+            setPromoCode('');
+            setPromoType('PERCENT');
+            setPromoValue('');
+            setPromoMaxRedemptions('');
+            setPromoEndsAt('');
+          }
           setCategories(categoryData);
           setPlaces(placeData);
-          setGalleryImages(data.images || []);
-          setTicketTypes(
-            data.TicketType?.map((ticket) => ({
-              id: ticket.id,
-              name: ticket.name,
-              description: ticket.description ?? '',
-              price: Number(ticket.price || 0),
-              quantity: Number(ticket.quantity || 0),
-            })) || [],
-          );
-          setSelectedTagIds(data.EventTag?.map((item) => item.tagId) || []);
-          setPlaceId(data.placeId || data.Place?.id || '');
-
-          const promo = data.Promotion?.[0];
-          if (promo?.code) {
-            setPromoEnabled(true);
-            setPromoCode(promo.code);
-            setPromoType((promo.discountType as 'PERCENT' | 'FIXED') || 'PERCENT');
-            setPromoValue(promo.discountValue ? String(promo.discountValue) : '');
-            setPromoMaxRedemptions(
-              promo.maxRedemptions ? String(promo.maxRedemptions) : '',
-            );
-            setPromoEndsAt(promo.endDate ? toDateTimeLocal(promo.endDate) : '');
-          }
         }
       } finally {
         if (isMounted) {
@@ -166,7 +265,7 @@ export default function EventEditPage() {
     return () => {
       isMounted = false;
     };
-  }, [params.id]);
+  }, [params.id, searchParams]);
 
   useEffect(() => {
     if (!coverFile) {
@@ -269,6 +368,16 @@ export default function EventEditPage() {
       return;
     }
 
+    if (!event.title.trim()) {
+      setError('Le titre de l evenement est obligatoire.');
+      return;
+    }
+
+    if (!event.startTime) {
+      setError('La date de debut est obligatoire.');
+      return;
+    }
+
     setSaving(true);
     try {
       const formData = new FormData();
@@ -316,12 +425,42 @@ export default function EventEditPage() {
         galleryFiles.forEach((file) => formData.append('gallery', file));
       }
 
+      if (isCreateMode) {
+        const created = await apiUpload<EventDetails>('/events', formData, 'POST');
+        navigate(`/events/${created.id}`);
+        return;
+      }
+
       await apiUpload(`/events/${event.id}`, formData, 'PATCH');
       navigate('/events');
     } catch {
       setError('Impossible de sauvegarder. Verifie les tarifs ou la promo.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!event || isCreateMode) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Supprimer l'evenement "${event.title}" ? Cette action est irreversible.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleting(true);
+    setError('');
+    try {
+      await apiDelete(`/events/${event.id}`);
+      navigate('/events');
+    } catch {
+      setError("Impossible de supprimer l'evenement.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -337,15 +476,38 @@ export default function EventEditPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Evenement"
-        title={`Modifier ${event.title}`}
-        subtitle={`Lieu: ${event.Place?.name || 'Non rattache'}`}
+        title={isCreateMode ? 'Creer un evenement' : `Modifier ${event.title}`}
+        subtitle={
+          isCreateMode
+            ? 'Ajoute un nouvel evenement au catalogue.'
+            : `Lieu: ${event.Place?.name || 'Non rattache'}`
+        }
         actions={
-          <button
-            onClick={() => navigate('/events')}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-          >
-            Retour
-          </button>
+          <>
+            {!isCreateMode ? (
+              <button
+                onClick={() => void handleDelete()}
+                disabled={saving || deleting}
+                className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              >
+                {deleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            ) : null}
+            {!isCreateMode ? (
+              <button
+                onClick={() => navigate(`/events/new?duplicateFrom=${event.id}`)}
+                className="rounded-xl border border-brand-200 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50"
+              >
+                Dupliquer
+              </button>
+            ) : null}
+            <button
+              onClick={() => navigate('/events')}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+            >
+              Retour
+            </button>
+          </>
         }
       />
 
@@ -856,7 +1018,11 @@ export default function EventEditPage() {
           disabled={saving}
           className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
         >
-          {saving ? 'Sauvegarde...' : 'Enregistrer'}
+          {saving
+            ? 'Sauvegarde...'
+            : isCreateMode
+              ? 'Creer l evenement'
+              : 'Enregistrer'}
         </button>
       </div>
     </div>

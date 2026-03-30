@@ -7,6 +7,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Request,
@@ -205,6 +206,37 @@ export class UsersController {
   findAllAdmin(@Request() req: AuthenticatedRequest) {
     this.ensureAdmin(req);
     return this.usersService.findAllAdmin();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('admin/:id/sessions')
+  listAdminSessions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.ensureAdmin(req);
+    return this.usersService.listAdminSessions(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('admin/:id/sessions')
+  revokeAdminSessions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.ensureAdmin(req);
+    return this.usersService.revokeAllAdminSessions(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('admin/:id/sessions/:sessionId')
+  revokeAdminSession(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.ensureAdmin(req);
+    return this.usersService.revokeAdminSession(id, sessionId);
   }
 
   @UseGuards(AuthGuard('jwt'))

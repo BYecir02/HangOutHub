@@ -4,6 +4,10 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const DEMO_PASSWORD = 'Demo12345!';
 
+function shouldRunDemoSeed() {
+  return process.argv.includes('--force-demo');
+}
+
 function slugify(text: string) {
   return text
     .toString()
@@ -304,6 +308,13 @@ async function getTagsByNames(names: string[]) {
 }
 
 async function main() {
+  if (!shouldRunDemoSeed()) {
+    console.log(
+      'Seed demo ignoree. Utilise `npm run prisma:seed` pour charger les donnees de demo.',
+    );
+    return;
+  }
+
   console.log('Debut du seed HangOutHub demo...');
 
   await seedRoles();
@@ -3572,11 +3583,15 @@ async function main() {
   console.log(`- ${seededReports.count} signalements`);
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
+
+export { main };

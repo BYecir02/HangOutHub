@@ -1,17 +1,21 @@
 
 interface SectionTitleProps {
-  label: string;
+  label?: string;
   subtitle?: string;
 }
 
 export default function SectionTitle({ label, subtitle }: SectionTitleProps) {
   return (
     <div className="mb-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-        {label}
-      </p>
+      {label ? (
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+          {label}
+        </p>
+      ) : null}
       {subtitle ? (
-        <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
+        <p className={label ? 'mt-2 text-sm text-slate-500' : 'text-sm text-slate-500'}>
+          {subtitle}
+        </p>
       ) : null}
     </div>
   );

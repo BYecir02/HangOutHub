@@ -1,7 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
   HttpCode,
+  ParseUUIDPipe,
+  Param,
   Post,
   Request,
   UseGuards,
@@ -44,6 +48,35 @@ export class AuthController {
   @HttpCode(200)
   refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refresh(refreshTokenDto.refreshToken);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('sessions')
+  listSessions(@Request() req: LogoutRequest & { user: { userId: string } }) {
+    return this.authService.listSessions(
+      req.user.userId,
+      req.headers.authorization,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('sessions/others')
+  revokeOtherSessions(
+    @Request() req: LogoutRequest & { user: { userId: string } },
+  ) {
+    return this.authService.revokeOtherSessions(
+      req.user.userId,
+      req.headers.authorization,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('sessions/:id')
+  revokeSession(
+    @Param('id', ParseUUIDPipe) sessionId: string,
+    @Request() req: LogoutRequest & { user: { userId: string } },
+  ) {
+    return this.authService.revokeSession(req.user.userId, sessionId);
   }
 
   @UseGuards(AuthGuard('jwt'))

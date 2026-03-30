@@ -171,7 +171,7 @@ export default function ApprovalsPage() {
       />
 
       <SectionCard>
-        <SectionTitle label="Validations" subtitle="Demandes a traiter." />
+        <SectionTitle subtitle="Demandes a traiter." />
         {loading ? (
           <LoadingState />
         ) : (
