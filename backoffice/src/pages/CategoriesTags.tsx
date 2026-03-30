@@ -480,8 +480,8 @@ export default function CategoriesTagsPage() {
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
           <SectionCard>
             <SectionTitle label="Categories" subtitle="Choisis une categorie." />
             <div className="mt-4 space-y-2">
@@ -589,7 +589,7 @@ export default function CategoriesTagsPage() {
           </SectionCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <SectionCard>
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <SectionTitle
@@ -619,17 +619,17 @@ export default function CategoriesTagsPage() {
                 />
               </FormField>
               <FormField label="Couleur">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={categoryDraft.color || '#FF5C8A'}
-                    onChange={(event) =>
-                      setCategoryDraft((prev) => ({
-                        ...prev,
-                        color: event.target.value,
-                      }))
-                    }
-                    className="h-10 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  type="color"
+                  value={categoryDraft.color || '#FF5C8A'}
+                  onChange={(event) =>
+                    setCategoryDraft((prev) => ({
+                      ...prev,
+                      color: event.target.value,
+                    }))
+                  }
+                    className="h-10 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1 sm:w-12"
                   />
                   <input
                     value={categoryDraft.color}
@@ -706,7 +706,7 @@ export default function CategoriesTagsPage() {
                   onChange={(event) =>
                     handleAnimationFileChange(event.target.files?.[0] ?? null)
                   }
-                  className="max-w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                  className="w-full max-w-full min-w-0 overflow-hidden text-sm text-slate-700 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50 sm:w-auto"
                 />
                 <button
                   type="button"
