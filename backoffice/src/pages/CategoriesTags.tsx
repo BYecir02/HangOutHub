@@ -480,7 +480,7 @@ export default function CategoriesTagsPage() {
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
         <div className="space-y-6">
           <SectionCard>
             <SectionTitle label="Categories" subtitle="Choisis une categorie." />
@@ -496,14 +496,14 @@ export default function CategoriesTagsPage() {
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategoryId(category.id)}
-                    className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-semibold ${
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-semibold sm:px-4 ${
                       selectedCategoryId === category.id
                         ? 'border-slate-900 bg-slate-900 text-white'
                         : 'border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <span>{category.name}</span>
-                    <span className="text-xs opacity-70">
+                    <span className="min-w-0 truncate">{category.name}</span>
+                    <span className="shrink-0 text-xs opacity-70">
                       {category.Tag.length} tags
                     </span>
                   </button>
@@ -529,7 +529,7 @@ export default function CategoriesTagsPage() {
                 />
               </FormField>
               <FormField label="Couleur">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <input
                     type="color"
                     value={newCategory.color || '#FF5C8A'}
@@ -539,7 +539,7 @@ export default function CategoriesTagsPage() {
                         color: event.target.value,
                       }))
                     }
-                    className="h-10 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                    className="h-10 w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-1 sm:w-12"
                   />
                   <input
                     value={newCategory.color}
@@ -554,7 +554,7 @@ export default function CategoriesTagsPage() {
                   />
                 </div>
               </FormField>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
                 {colorPresets.map((color) => (
                   <button
                     key={color}
@@ -591,7 +591,7 @@ export default function CategoriesTagsPage() {
 
         <div className="space-y-6">
           <SectionCard>
-            <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <SectionTitle
                 label="Edition"
                 subtitle="Mets a jour la categorie et ses tags."
@@ -604,7 +604,7 @@ export default function CategoriesTagsPage() {
                 Enregistrer
               </button>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
               <FormField label="Nom">
                 <input
                   value={categoryDraft.name}
@@ -657,7 +657,7 @@ export default function CategoriesTagsPage() {
                   className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                 />
               </FormField>
-              <div className="flex flex-wrap gap-2 sm:col-span-3">
+              <div className="grid grid-cols-4 gap-2 md:col-span-3 md:flex md:flex-wrap">
                 {colorPresets.map((color) => (
                   <button
                     key={`edit-${color}`}
@@ -674,7 +674,7 @@ export default function CategoriesTagsPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-200 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">
                     Animation Lottie
@@ -699,7 +699,7 @@ export default function CategoriesTagsPage() {
                 </a>
               ) : null}
 
-              <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <input
                   type="file"
                   accept=".json,application/json"
@@ -752,12 +752,12 @@ export default function CategoriesTagsPage() {
 
             <div className="mt-6 rounded-xl border border-slate-200 p-4">
               <FormField label="Ajouter un tag">
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <input
                     value={newTag}
                     onChange={(event) => setNewTag(event.target.value)}
                     placeholder="Ajouter un tag..."
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
+                    className="w-full flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
                   />
                   <button
                     onClick={handleAddTag}
@@ -843,7 +843,7 @@ export default function CategoriesTagsPage() {
 
           {selectedTagId ? (
             <SectionCard>
-              <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <SectionTitle label="Tag selectionne" subtitle="Modifier ce tag." />
                 <button
                   onClick={() => setSelectedTagId(null)}
@@ -852,7 +852,7 @@ export default function CategoriesTagsPage() {
                   Fermer
                 </button>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <FormField label="Nom du tag">
                   <input
                     value={tagDraft.name}
