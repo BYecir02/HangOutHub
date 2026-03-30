@@ -129,13 +129,21 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.remindersInterval = setInterval(
       () => {
-        void this.emitUpcomingEventReminders();
+        void this.emitUpcomingEventReminders().catch((error: unknown) => {
+          this.logger.warn(
+            `Reminder sweep skipped after startup: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       },
       15 * 60 * 1000,
     );
 
     // Premier passage au boot pour limiter le délai de prise en compte.
-    void this.emitUpcomingEventReminders();
+    void this.emitUpcomingEventReminders().catch((error: unknown) => {
+      this.logger.warn(
+        `Reminder sweep skipped at startup: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
   }
 
   onModuleDestroy() {
