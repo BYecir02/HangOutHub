@@ -1,3 +1,7 @@
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from '../src/app.module.js';
+import { resolveCorsOptions } from '../src/cors-options.js';
+
 type RequestHandler = (req: unknown, res: unknown) => unknown;
 type ServerRequest = {
   method?: string;
@@ -9,28 +13,29 @@ type ServerResponse = {
   end: (chunk?: string) => void;
 };
 
-let cachedHandler: RequestHandler | null = null;
+let cachedHandler: Promise<RequestHandler> | null = null;
 
 async function getHandler(): Promise<RequestHandler> {
-  if (cachedHandler) {
-    return cachedHandler;
+  if (!cachedHandler) {
+    cachedHandler = (async () => {
+      const app = await NestFactory.create(AppModule);
+      app.setGlobalPrefix('api/v1');
+      app.enableCors(resolveCorsOptions());
+      await app.init();
+
+      return app.getHttpAdapter().getInstance() as RequestHandler;
+    })();
   }
 
-  const [{ NestFactory }, { AppModule }, { resolveCorsOptions }] =
-    await Promise.all([
-      import('@nestjs/core'),
-      import('../src/app.module.js'),
-      import('../src/cors-options.js'),
-    ]);
-
-  const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api/v1');
-  app.enableCors(resolveCorsOptions());
-  await app.init();
-
-  cachedHandler = app.getHttpAdapter().getInstance() as RequestHandler;
   return cachedHandler;
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+  },
+};
 
 const allowedOrigins = new Set([
   'https://hang-out-hub-backoffice.vercel.app',
@@ -54,7 +59,10 @@ function applyCorsHeaders(req: ServerRequest, res: ServerResponse) {
     'Access-Control-Allow-Methods',
     'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   );
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, Origin, X-Requested-With, Accept',
+  );
 }
 
 export default async function handler(req: unknown, res: unknown) {
