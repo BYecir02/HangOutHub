@@ -6,7 +6,7 @@ interface SectionTitleProps {
 
 export default function SectionTitle({ label, subtitle }: SectionTitleProps) {
   return (
-    <div>
+    <div className="mb-4">
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
         {label}
       </p>

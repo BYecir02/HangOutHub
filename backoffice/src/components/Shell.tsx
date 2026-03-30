@@ -44,7 +44,7 @@ export default function Shell() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
+      <div className="flex min-h-screen w-full flex-col gap-6 px-4 py-6 lg:flex-row lg:items-start lg:px-6">
         <aside className="flex w-full flex-col justify-between rounded-2xl bg-white p-6 shadow-soft lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-64">
           <div>
             <div className="mb-8">
@@ -100,7 +100,7 @@ export default function Shell() {
           </div>
         </aside>
 
-        <main className="flex-1">
+        <main className="min-w-0 flex-1">
           <Outlet />
         </main>
       </div>
