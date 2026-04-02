@@ -39,12 +39,21 @@ export interface PostItemData {
     title: string;
     startTime: string;
     placeId?: string | null;
+    coverUrl?: string | null;
     Place?: {
       id?: string;
       name?: string | null;
       City?: {
         name?: string | null;
       } | null;
+    } | null;
+  } | null;
+  Place?: {
+    id?: string;
+    name?: string | null;
+    coverUrl?: string | null;
+    City?: {
+      name?: string | null;
     } | null;
   } | null;
   isLiked?: boolean;
@@ -66,6 +75,7 @@ interface PostItemProps {
   onComment?: (post: PostItemData) => void;
   onShare?: (post: PostItemData) => void;
   showDateColumn?: boolean;
+  authorDisplayMode?: 'place' | 'user' | 'auto';
 }
 
 export default function PostItem({
@@ -75,6 +85,7 @@ export default function PostItem({
   onComment,
   onShare,
   showDateColumn = true,
+  authorDisplayMode = 'place',
 }: PostItemProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -82,6 +93,8 @@ export default function PostItem({
   const { locale, t } = useI18n();
   const avatarUri =
     getImageUrl(item.User?.avatarUrl) || 'https://i.pravatar.cc/150';
+  const placeAvatarUri =
+    getImageUrl(item.Place?.coverUrl) || avatarUri;
   const postImageUri = getImageUrl(item.images?.[0]);
 
   const [isLiked, setIsLiked] = useState(Boolean(item.isLiked));
@@ -187,6 +200,15 @@ export default function PostItem({
   })();
   const categoryLabel = (item.ambiance || '').trim();
   const eventLabel = item.Event?.title?.trim() || '';
+  const displayAsPlace =
+    authorDisplayMode === 'user'
+      ? false
+      : item.publicationScope === 'structure' &&
+        Boolean(item.Place?.name?.trim());
+  const authorLabel = displayAsPlace
+    ? item.Place?.name?.trim() || item.User?.displayName || item.User?.username || t('postItemUserFallback')
+    : item.User?.displayName || item.User?.username || t('postItemUserFallback');
+  const authorAvatarUri = displayAsPlace ? placeAvatarUri : avatarUri;
 
   useEffect(() => {
     setIsLiked(Boolean(item.isLiked));
@@ -332,14 +354,12 @@ export default function PostItem({
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center flex-1">
               <Image
-                source={{ uri: avatarUri }}
+                source={{ uri: authorAvatarUri }}
                 className="h-9 w-9 rounded-full mr-3"
               />
               <View className="flex-1">
                 <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {item.User?.displayName ||
-                    item.User?.username ||
-                    t('postItemUserFallback')}
+                  {authorLabel}
                 </Text>
                 {!showDateColumn ? (
                   <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">

@@ -410,6 +410,7 @@ export class PostsService {
           select: {
             id: true,
             name: true,
+            coverUrl: true,
             City: {
               select: {
                 name: true,
@@ -463,6 +464,71 @@ export class PostsService {
     };
   }
 
+  async findAllByPlace(placeId: string, userId: string, userRole: string) {
+    await this.ensureStructurePublicationPermission(userId, userRole, placeId);
+
+    const posts = await this.prisma.post.findMany({
+      where: {
+        placeId,
+        publicationScope: 'structure',
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        Place: {
+          select: {
+            id: true,
+            name: true,
+            coverUrl: true,
+            City: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        Event: {
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            placeId: true,
+            Place: {
+              select: {
+                id: true,
+                name: true,
+                City: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+        likes: {
+          where: { userId },
+          select: { userId: true },
+        },
+      },
+    });
+
+    return posts.map((post) => this.serializePost(post, userId));
+  }
+
   async findOneForUser(id: string, currentUserId: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
@@ -479,6 +545,7 @@ export class PostsService {
           select: {
             id: true,
             name: true,
+            coverUrl: true,
             City: {
               select: {
                 name: true,
@@ -568,6 +635,7 @@ export class PostsService {
           select: {
             id: true,
             name: true,
+            coverUrl: true,
             City: {
               select: {
                 name: true,
@@ -677,6 +745,7 @@ export class PostsService {
             select: {
               id: true,
               name: true,
+              coverUrl: true,
               City: {
                 select: {
                   name: true,
@@ -757,6 +826,7 @@ export class PostsService {
           select: {
             id: true,
             name: true,
+            coverUrl: true,
             City: {
               select: {
                 name: true,
@@ -774,6 +844,7 @@ export class PostsService {
               select: {
                 id: true,
                 name: true,
+                coverUrl: true,
                 City: {
                   select: {
                     name: true,

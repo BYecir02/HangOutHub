@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -83,6 +84,19 @@ export class PostsController {
       limit: parsedLimit,
       after,
     });
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('place/:placeId')
+  findAllByPlace(
+    @Param('placeId', ParseUUIDPipe) placeId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.postsService.findAllByPlace(
+      placeId,
+      req.user.userId,
+      req.user.role || 'USER',
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -13,15 +13,17 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import Tabs, { type TabItem } from '@/components/ui/Tabs';
+import PostItem, { type PostItemData } from '@/components/social/PostItem';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import api, { getImageUrl } from '@/services/api';
+import { getPlacePosts } from '@/services/posts';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-type OrganizerPlaceTabId = 'overview' | 'events' | 'reviews';
+type OrganizerPlaceTabId = 'overview' | 'posts' | 'events' | 'reviews';
 
 interface RelatedEvent {
   id: string;
@@ -91,8 +93,11 @@ export default function OrganizerPlaceProfileScreen() {
   const { user, loading, error, refetch } = useUserProfile();
   const [place, setPlace] = useState<PlaceDetail | null>(null);
   const [reviews, setReviews] = useState<PlaceReview[]>([]);
+  const [posts, setPosts] = useState<PostItemData[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(false);
   const [pageError, setPageError] = useState(false);
   const [activeTab, setActiveTab] = useState<OrganizerPlaceTabId>('overview');
 
@@ -114,6 +119,8 @@ export default function OrganizerPlaceProfileScreen() {
 
     setPageLoading(true);
     setReviewsLoading(true);
+    setPosts([]);
+    setPostsLoaded(false);
     setPageError(false);
 
     try {
@@ -166,11 +173,37 @@ export default function OrganizerPlaceProfileScreen() {
   const tabItems = useMemo<TabItem[]>(
     () => [
       { id: 'overview', label: t('organizerPlaceProfileTabInfo') },
+      { id: 'posts', label: t('organizerPlaceProfileTabPosts') },
       { id: 'events', label: t('organizerPlaceProfileTabEvents') },
       { id: 'reviews', label: t('organizerPlaceProfileTabReviews') },
     ],
     [t],
   );
+
+  const loadPosts = useCallback(async () => {
+    if (!place?.id || postsLoaded) {
+      return;
+    }
+
+    setPostsLoading(true);
+    try {
+      const response = await getPlacePosts(place.id);
+      setPosts(response || []);
+      setPostsLoaded(true);
+    } catch {
+      setPosts([]);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [place?.id, postsLoaded]);
+
+  useEffect(() => {
+    if (activeTab !== 'posts' || !place?.id || postsLoaded) {
+      return;
+    }
+
+    void loadPosts();
+  }, [activeTab, loadPosts, place?.id, postsLoaded]);
 
   const handleOpenPublicPlace = () => {
     if (!place?.id) {
@@ -407,6 +440,34 @@ export default function OrganizerPlaceProfileScreen() {
                 ))}
               </ScrollView>
             </View>
+          </View>
+        ) : null}
+
+        {activeTab === 'posts' ? (
+          <View className="pt-4">
+            {postsLoading ? (
+              <View className="py-6">
+                <ActivityIndicator color="#4c669f" />
+              </View>
+            ) : posts.length > 0 ? (
+              <View className="pb-2">
+                {posts.map((post) => (
+                  <PostItem
+                    key={post.id}
+                    item={post}
+                    showDateColumn={false}
+                    authorDisplayMode="user"
+                  />
+                ))}
+              </View>
+            ) : (
+              <ScreenState
+                mode="empty"
+                title={t('organizerPlaceProfilePostsEmptyTitle')}
+                description={t('organizerPlaceProfilePostsEmptyDescription')}
+                containerClassName="px-0 py-2"
+              />
+            )}
           </View>
         ) : null}
 
