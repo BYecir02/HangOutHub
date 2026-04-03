@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Image,
   RefreshControl,
   ScrollView,
   Text,
@@ -11,8 +12,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 
-import EventCard from '@/components/ui/EventCard';
-import PlaceCard from '@/components/ui/PlaceCard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
@@ -81,15 +80,6 @@ function formatEventDate(value: string, locale: string) {
   });
 }
 
-function formatEventPrice(
-  value: number | string | null,
-  locale: string,
-  freeLabel: string,
-) {
-  const amount = Number(value || 0);
-  return amount > 0 ? `${amount.toLocaleString(locale)} FCFA` : freeLabel;
-}
-
 function EmptyBlock({
   title,
   message,
@@ -107,6 +97,120 @@ function EmptyBlock({
   );
 }
 
+type CategoryInspirationItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  meta: string;
+  image: string;
+  targetId: string;
+  metaIcon: keyof typeof Ionicons.glyphMap;
+};
+
+function estimateCategoryCardHeight(index: number) {
+  const imageHeights = [182, 238, 204, 258, 194, 228];
+  return imageHeights[index % imageHeights.length] + 124;
+}
+
+function CategoryInspirationCard({
+  item,
+  imageHeight,
+  accentColor,
+  onPress,
+}: {
+  item: CategoryInspirationItem;
+  imageHeight: number;
+  accentColor: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="mb-4 overflow-hidden rounded-[30px] border bg-white dark:bg-gray-900"
+      activeOpacity={0.92}
+      style={{
+        borderColor: accentColor,
+        borderWidth: 2,
+      }}
+    >
+      <View className="relative">
+        <Image
+          source={{ uri: item.image }}
+          className="w-full bg-gray-200 dark:bg-gray-800"
+          style={{ height: imageHeight }}
+          resizeMode="cover"
+        />
+
+        <View className="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1.5">
+          <View className="flex-row items-center">
+            <Ionicons name={item.metaIcon} size={10} color="#ffffff" />
+            <Text className="ml-1 text-[10px] font-semibold text-white">
+              {item.meta}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View className="p-4">
+        <Text className="text-base font-bold text-gray-900 dark:text-white" numberOfLines={2}>
+          {item.title}
+        </Text>
+
+        {item.subtitle ? (
+          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400" numberOfLines={2}>
+            {item.subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function CategoryInspirationMasonry({
+  items,
+  accentColor,
+  onPressItem,
+}: {
+  items: CategoryInspirationItem[];
+  accentColor: string;
+  onPressItem: (item: CategoryInspirationItem) => void;
+}) {
+  const columns = useMemo(() => {
+    const nextColumns: Array<Array<{ item: CategoryInspirationItem; imageHeight: number }>> = [
+      [],
+      [],
+    ];
+    const columnHeights = [0, 0];
+
+    items.forEach((item, index) => {
+      const imageHeight = [182, 238, 204, 258, 194, 228][index % 6];
+      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
+      nextColumns[targetColumn].push({ item, imageHeight });
+      columnHeights[targetColumn] += estimateCategoryCardHeight(index);
+    });
+
+    return nextColumns;
+  }, [items]);
+
+  return (
+    <View className="flex-row items-start gap-3">
+      {columns.map((column, columnIndex) => (
+        <View key={`category-column-${columnIndex}`} className="min-w-0 flex-1">
+          {column.map(({ item, imageHeight }) => (
+            <CategoryInspirationCard
+              key={item.id}
+              item={item}
+              imageHeight={imageHeight}
+              accentColor={accentColor}
+              onPress={() => onPressItem(item)}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function CategoryDiscoverScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -119,6 +223,7 @@ export default function CategoryDiscoverScreen() {
   const [badgeAnimation, setBadgeAnimation] = useState<AnimationMeta | null>(
     null,
   );
+  const [activeTab, setActiveTab] = useState<'events' | 'places'>('events');
 
   useEffect(() => {
     let isMounted = true;
@@ -151,7 +256,7 @@ export default function CategoryDiscoverScreen() {
         if (isMounted) {
           setData(response.data);
           setCategoryCache(params.id, response.data);
-        setBadgeAnimation(getCategoryAnimation(response.data.category));
+          setBadgeAnimation(getCategoryAnimation(response.data.category));
         }
       } catch {
         if (isMounted && !isRefresh) {
@@ -188,6 +293,40 @@ export default function CategoryDiscoverScreen() {
       </View>
     );
   }
+
+  const eventItems = useMemo<CategoryInspirationItem[]>(
+    () =>
+      (data?.events || []).map((item) => ({
+        id: `event-${item.id}`,
+        title: item.title,
+        subtitle: item.Place?.name || item.Place?.City?.name || item.address || '',
+        meta: formatEventDate(item.startTime, locale),
+        image: getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER,
+        targetId: item.id,
+        metaIcon: 'time-outline',
+      })),
+    [data?.events, locale],
+  );
+
+  const placeItems = useMemo<CategoryInspirationItem[]>(
+    () =>
+      (data?.places || []).map((item) => ({
+        id: `place-${item.id}`,
+        title: item.name,
+        subtitle: item.City?.name || item.address || '',
+        meta:
+          typeof item.avgRating === 'number' && item.avgRating > 0
+            ? item.avgRating.toFixed(1)
+            : t('discoverPlaceMetaDiscover'),
+        image: getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER,
+        targetId: item.id,
+        metaIcon:
+          typeof item.avgRating === 'number' && item.avgRating > 0
+            ? 'star'
+            : 'sparkles',
+      })),
+    [data?.places, t],
+  );
 
   return (
     <ScrollView
@@ -290,34 +429,34 @@ export default function CategoryDiscoverScreen() {
               <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#111827'} />
             </TouchableOpacity>
 
-            <View className="flex-row items-center">
-              <View className="mr-2 flex-shrink">
-                <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
-                  {t('categoryHeaderLabel')}
-                </Text>
-                <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {data.category.name}
-                </Text>
-              </View>
-              {badgeAnimation ? (
-                <View
-                  className="overflow-hidden rounded-full bg-white/30 dark:bg-gray-900/40"
+          <View className="flex-row items-center">
+            <View className="mr-2 flex-shrink">
+              <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
+                {t('categoryHeaderLabel')}
+              </Text>
+              <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                {data.category.name}
+              </Text>
+            </View>
+            {badgeAnimation ? (
+              <View
+                className="overflow-hidden rounded-full bg-white/30 dark:bg-gray-900/40"
+                style={{
+                  height: badgeAnimation.container + 8,
+                  width: badgeAnimation.container + 8,
+                }}
+              >
+                <LottieView
+                  source={badgeAnimation.source}
+                  autoPlay
+                  loop
                   style={{
-                    height: badgeAnimation.container + 8,
-                    width: badgeAnimation.container + 8,
+                    height: badgeAnimation.size + 8,
+                    width: badgeAnimation.size + 8,
                   }}
-                >
-                  <LottieView
-                    source={badgeAnimation.source}
-                    autoPlay
-                    loop
-                    style={{
-                      height: badgeAnimation.size + 8,
-                      width: badgeAnimation.size + 8,
-                    }}
-                  />
-                </View>
-              ) : null}
+                />
+              </View>
+            ) : null}
             </View>
 
             <Text className="mt-3 text-base text-gray-600 dark:text-gray-300">
@@ -326,6 +465,53 @@ export default function CategoryDiscoverScreen() {
                 events: data.events.length,
               })}
             </Text>
+
+            <View className="mt-4 flex-row rounded-full border border-white/70 bg-white/70 p-1 dark:border-gray-800 dark:bg-gray-900/70">
+              {[
+                {
+                  key: 'events' as const,
+                  label: t('categoryEventsTitle'),
+                  count: data.events.length,
+                  activeColor: '#ff4757',
+                },
+                {
+                  key: 'places' as const,
+                  label: t('categoryPlacesTitle'),
+                  count: data.places.length,
+                  activeColor: '#2ecc71',
+                },
+              ].map((option) => {
+                const active = activeTab === option.key;
+
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    onPress={() => setActiveTab(option.key)}
+                    className="flex-1 items-center rounded-full px-3 py-2"
+                    style={
+                      active
+                        ? {
+                            backgroundColor: option.activeColor,
+                            shadowColor: option.activeColor,
+                            shadowOpacity: 0.12,
+                            shadowRadius: 8,
+                            shadowOffset: { width: 0, height: 3 },
+                            elevation: 2,
+                          }
+                        : undefined
+                    }
+                  >
+                    <Text
+                      className={`text-xs font-semibold ${
+                        active ? 'text-white' : 'text-gray-600 dark:text-gray-300'
+                      }`}
+                    >
+                      {option.label} ({option.count})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             {data.category.Tag.length > 0 ? (
               <FlatList
@@ -346,82 +532,34 @@ export default function CategoryDiscoverScreen() {
           </View>
 
           <View className="px-5 pb-24 pt-6">
-            <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-gray-900 dark:text-white">
-                {t('categoryEventsTitle')}
-              </Text>
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                {data.events.length}
-              </Text>
-            </View>
-
-            {data.events.length > 0 ? (
-              <FlatList
-                data={data.events}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 8 }}
-                renderItem={({ item }) => (
-                  <EventCard
-                    title={item.title}
-                    date={formatEventDate(item.startTime, locale)}
-                    location={
-                      item.Place?.name ||
-                      item.Place?.City?.name ||
-                      item.address ||
-                      t('homeLocationToConfirm')
-                    }
-                    imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                    price={formatEventPrice(item.entryFee, locale, t('homePriceFree'))}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/event/[id]',
-                        params: { id: item.id },
-                      })
-                    }
-                  />
-                )}
-              />
-            ) : (
-              <EmptyBlock
-                title={t('categoryEmptyEventsTitle')}
-                message={t('categoryEmptyEventsDescription')}
-              />
-            )}
-
-            <View className="mb-4 mt-8 flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-gray-900 dark:text-white">
-                {t('categoryPlacesTitle')}
-              </Text>
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                {data.places.length}
-              </Text>
-            </View>
-
-            {data.places.length > 0 ? (
-              <FlatList
-                data={data.places}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 8 }}
-                renderItem={({ item }) => (
-                  <PlaceCard
-                    name={item.name}
-                    location={
-                      item.City?.name || item.address || t('homeAddressToConfirm')
-                    }
-                    imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
-                    rating={item.avgRating ?? undefined}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/place/[id]',
-                        params: { id: item.id },
-                      })
-                    }
-                  />
-                )}
+            {activeTab === 'events' ? (
+              eventItems.length > 0 ? (
+                <CategoryInspirationMasonry
+                  items={eventItems}
+                  accentColor={data.category.color}
+                  onPressItem={(item) =>
+                    router.push({
+                      pathname: '/event/[id]',
+                      params: { id: item.targetId },
+                    })
+                  }
+                />
+              ) : (
+                <EmptyBlock
+                  title={t('categoryEmptyEventsTitle')}
+                  message={t('categoryEmptyEventsDescription')}
+                />
+              )
+            ) : placeItems.length > 0 ? (
+              <CategoryInspirationMasonry
+                items={placeItems}
+                accentColor={data.category.color}
+                onPressItem={(item) =>
+                  router.push({
+                    pathname: '/place/[id]',
+                    params: { id: item.targetId },
+                  })
+                }
               />
             ) : (
               <EmptyBlock

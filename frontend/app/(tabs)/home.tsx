@@ -8,13 +8,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import CategoryCard from '@/components/ui/CategoryCard';
-import EventCard from '@/components/ui/EventCard';
+import EventInspirationCard from '@/components/ui/EventInspirationCard';
 import Header from '@/components/ui/Header';
-import PlaceCard from '@/components/ui/PlaceCard';
-import SuggestionCard from '@/components/ui/SuggestionCard';
+import InspirationCard from '@/components/ui/InspirationCard';
+import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import api, { getImageUrl, storage } from '@/services/api';
@@ -66,6 +67,32 @@ interface HomePlace {
 interface NotificationCountResponse {
   unreadCount: number;
 }
+
+type HomeRecommendationItem =
+  | {
+      id: string;
+      type: 'event';
+      title: string;
+      subtitle: string;
+      imageUrl: string;
+      accentColor: string;
+      badgeLabel: string;
+      metaLabel: string;
+      metaIcon: keyof typeof Ionicons.glyphMap;
+      targetId: string;
+    }
+  | {
+      id: string;
+      type: 'place';
+      title: string;
+      subtitle: string;
+      imageUrl: string;
+      accentColor: string;
+      badgeLabel: string;
+      metaLabel: string;
+      metaIcon: keyof typeof Ionicons.glyphMap;
+      targetId: string;
+    };
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
@@ -314,23 +341,73 @@ export default function HomeScreen() {
     () => locationFilteredPlaces.slice(0, 6),
     [locationFilteredPlaces],
   );
-  const suggestions = useMemo(
+  const featuredInspiration = useMemo(
     () =>
-      featuredEvents.slice(0, 3).map((event, index) => ({
-        id: event.id,
-        title: event.title,
-        category: event.Place?.name || event.address || t('homeLocationToConfirm'),
-        date: formatEventDate(event.startTime, locale),
-        image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
-        reason:
-          index === 0
-            ? t('homeReasonTrending')
-            : index === 1
-              ? t('homeReasonMustSee')
-              : t('homeReasonLocalSelection'),
+      featuredEvents.map((event) => ({
+        event,
+        cityLabel: event.Place?.City?.name || '',
+        placeLabel: event.Place?.name || event.address || t('homeLocationToConfirm'),
+        dateLabel: formatEventDate(event.startTime, locale),
+        priceLabel: formatEventPriceLabel(event, locale, t),
       })),
     [featuredEvents, locale, t],
   );
+
+  const recommendedInspiration = useMemo<HomeRecommendationItem[]>(() => {
+    const eventSuggestions: HomeRecommendationItem[] = featuredEvents
+      .slice(0, 3)
+      .map((event) => ({
+        id: `event-${event.id}`,
+        type: 'event' as const,
+        title: event.title,
+        subtitle: event.Place?.name || event.address || t('homeLocationToConfirm'),
+        imageUrl: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
+        accentColor: '#ff4757',
+        badgeLabel:
+          Number(event.entryFee || 0) > 0
+            ? t('discoverEventBadge')
+            : t('discoverEventBadgeFree'),
+        metaLabel: formatEventDate(event.startTime, locale),
+        metaIcon: 'time-outline',
+        targetId: event.id,
+      }));
+
+    const placeSuggestions: HomeRecommendationItem[] = popularPlaces
+      .slice(0, 3)
+      .map((place) => ({
+        id: `place-${place.id}`,
+        type: 'place' as const,
+        title: place.name,
+        subtitle: place.City?.name || place.address || t('homeAddressToConfirm'),
+        imageUrl: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER,
+        accentColor: '#2ecc71',
+        badgeLabel: t('discoverPlaceBadge'),
+        metaLabel:
+          typeof place.avgRating === 'number' && place.avgRating > 0
+            ? t('discoverPlaceMetaRated', { rating: place.avgRating.toFixed(1) })
+            : t('discoverPlaceMetaDiscover'),
+        metaIcon:
+          typeof place.avgRating === 'number' && place.avgRating > 0
+            ? ('star' as const)
+            : ('sparkles' as const),
+        targetId: place.id,
+      }));
+
+    const nextItems: HomeRecommendationItem[] = [];
+    const maxLength = Math.max(eventSuggestions.length, placeSuggestions.length);
+
+    for (let index = 0; index < maxLength; index += 1) {
+      if (eventSuggestions[index]) {
+        nextItems.push(eventSuggestions[index]);
+      }
+
+      if (placeSuggestions[index]) {
+        nextItems.push(placeSuggestions[index]);
+      }
+    }
+
+    return nextItems.slice(0, 6);
+  }, [featuredEvents, locale, popularPlaces, t]);
 
   const locationLabel = locationValueLabel;
 
@@ -388,10 +465,10 @@ export default function HomeScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
-        ) : featuredEvents.length > 0 ? (
+        ) : featuredInspiration.length > 0 ? (
           <FlatList
-            data={featuredEvents}
-            keyExtractor={(item) => item.id}
+            data={featuredInspiration}
+            keyExtractor={(item) => item.event.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             snapToInterval={276}
@@ -399,18 +476,20 @@ export default function HomeScreen() {
             snapToAlignment="start"
             contentContainerStyle={{ paddingHorizontal: 20 }}
             renderItem={({ item }) => (
-              <EventCard
-                title={item.title}
-                date={formatEventDate(item.startTime, locale)}
-                location={item.Place?.name || item.address || t('homeLocationToConfirm')}
-                imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-                price={formatEventPriceLabel(item, locale, t)}
+              <EventInspirationCard
+                event={item.event}
+                imageHeight={178}
+                cityLabel={item.cityLabel}
+                placeLabel={item.placeLabel}
+                dateLabel={item.dateLabel}
+                priceLabel={item.priceLabel}
                 onPress={() =>
                   router.push({
                     pathname: '/event/[id]',
-                    params: { id: item.id },
+                    params: { id: item.event.id },
                   })
                 }
+                style={{ width: 288, marginRight: 16 }}
               />
             )}
           />
@@ -419,7 +498,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View className="mt-8">
+      <View className="mt-1">
         <Text className="ml-5 mb-4 text-lg font-bold text-gray-800 dark:text-white">
           {t('homeCategories')}
         </Text>
@@ -465,17 +544,18 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 20 }}
             renderItem={({ item }) => (
-              <PlaceCard
-                name={item.name}
-                location={item.City?.name || item.address || t('homeAddressToConfirm')}
-                imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
-                rating={item.avgRating ?? undefined}
+              <PlaceInspirationCard
+                place={item}
+                imageHeight={178}
+                fallbackNewLabel={t('placesNewBadge')}
                 onPress={() =>
                   router.push({
                     pathname: '/place/[id]',
                     params: { id: item.id },
                   })
                 }
+                showSaveButton={false}
+                style={{ width: 288, marginRight: 16 }}
               />
             )}
           />
@@ -496,23 +576,34 @@ export default function HomeScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#f39c12" className="mt-4" />
-        ) : suggestions.length > 0 ? (
-          suggestions.map((item) => (
-            <SuggestionCard
-              key={item.id}
-              title={item.title}
-              category={item.category}
-              date={item.date}
-              image={item.image}
-              reason={item.reason}
-              onPress={() =>
-                router.push({
-                  pathname: '/event/[id]',
-                  params: { id: item.id },
-                })
-              }
-            />
-          ))
+        ) : recommendedInspiration.length > 0 ? (
+          <FlatList
+            data={recommendedInspiration}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={276}
+            decelerationRate="fast"
+            snapToAlignment="start"
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+            renderItem={({ item }) => (
+              <InspirationCard
+                title={item.title}
+                subtitle={item.subtitle || undefined}
+                imageUrl={item.imageUrl}
+                accentColor={item.accentColor}
+                badgeLabel={item.badgeLabel}
+                metaLabel={item.metaLabel}
+                metaIcon={item.metaIcon}
+                onPress={() =>
+                  router.push({
+                    pathname: item.type === 'event' ? '/event/[id]' : '/place/[id]',
+                    params: { id: item.targetId },
+                  })
+                }
+              />
+            )}
+          />
         ) : (
           <SectionPlaceholder message={t('homeNoSuggestions')} />
         )}

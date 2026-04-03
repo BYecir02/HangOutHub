@@ -309,6 +309,7 @@ export default function PlaceDetailScreen() {
       ? place.images.map((image) => getImageUrl(image) || PLACE_PLACEHOLDER)
       : [heroImage];
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const heroBadgeBottom = Math.max(44, Math.min(68, Math.round(screenHeight * 0.055)));
   const myReview = currentUserId
     ? reviews.find((review) => review.User?.id === currentUserId)
     : undefined;
@@ -339,6 +340,10 @@ export default function PlaceDetailScreen() {
   const handleToggleSave = async () => {
     if (!canSave) {
       Alert.alert(t('placeDetailLoginRequiredTitle'), t('placeDetailLoginRequiredMessage'));
+      return;
+    }
+
+    if (saveLoading) {
       return;
     }
 
@@ -449,17 +454,41 @@ export default function PlaceDetailScreen() {
       >
       <View className="relative">
         <Image source={{ uri: heroImage }} className="h-80 w-full" resizeMode="cover" />
-        <View className="absolute inset-x-0 top-0 flex-row items-center justify-between px-5 pt-14">
+        <View className="absolute inset-x-0 top-0 flex-row items-start px-5 pt-14">
           <TouchableOpacity
             onPress={() => router.back()}
             className="rounded-full bg-black/45 p-3"
           >
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View className="rounded-full bg-black/45 px-3 py-2">
-            <Text className="text-xs font-semibold uppercase tracking-widest text-white">
-              {placeCategoryLabel}
-            </Text>
+        </View>
+        <View className="absolute inset-x-0 px-5" style={{ bottom: heroBadgeBottom }}>
+          <View className="max-w-[90%] flex-row flex-wrap gap-2">
+            <View className="rounded-full bg-black/55 px-3 py-2">
+              <Text className="text-xs font-semibold text-white">
+                {place.City?.name || t('placeDetailCityUnknown')}
+              </Text>
+            </View>
+            <View className="rounded-full bg-black/55 px-3 py-2">
+              <Text className="text-xs font-semibold text-white">
+                {formatPriceLevel(place.priceLevel, t)}
+              </Text>
+            </View>
+            {place.category ? (
+              <View className="rounded-full bg-black/55 px-3 py-2">
+                <Text className="text-xs font-semibold text-white">
+                  {placeCategoryLabel}
+                </Text>
+              </View>
+            ) : null}
+            {typeof place.avgRating === 'number' && place.avgRating > 0 ? (
+              <View className="flex-row items-center rounded-full bg-black/55 px-3 py-2">
+                <Ionicons name="star" size={12} color="#f59e0b" />
+                <Text className="ml-1 text-xs font-semibold text-white">
+                  {place.avgRating.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -470,82 +499,51 @@ export default function PlaceDetailScreen() {
         </Text>
 
         <View className="mt-4 flex-row flex-wrap gap-2">
-          <View className="rounded-full bg-green-100 px-3 py-2 dark:bg-green-900/30">
-            <Text className="text-xs font-semibold text-green-700 dark:text-green-300">
-              {place.City?.name || t('placeDetailCityUnknown')}
-            </Text>
-          </View>
-          <View className="rounded-full bg-gray-200 px-3 py-2 dark:bg-gray-800">
-            <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-              {formatPriceLevel(place.priceLevel, t)}
-            </Text>
-          </View>
-          {place.category ? (
-            <View className="rounded-full bg-sky-100 px-3 py-2 dark:bg-sky-900/30">
-              <Text className="text-xs font-semibold text-sky-700 dark:text-sky-300">
-                {placeCategoryLabel}
-              </Text>
-            </View>
-          ) : null}
-          {typeof place.avgRating === 'number' && place.avgRating > 0 ? (
-            <View className="flex-row items-center rounded-full bg-yellow-100 px-3 py-2 dark:bg-yellow-900/30">
-              <Ionicons name="star" size={12} color="#f59e0b" />
-              <Text className="ml-1 text-xs font-semibold text-yellow-700 dark:text-yellow-300">
-                {place.avgRating.toFixed(1)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
-          <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-            {t('placeDetailActionTitle')}
-          </Text>
-          <Text className="mt-2 text-base leading-7 text-gray-700 dark:text-gray-200">
-            {t('placeDetailActionDescription')}
-          </Text>
-
-            <View className="mt-4 flex-row items-center gap-3">
-              <TouchableOpacity
-                onPress={handleToggleSave}
-                disabled={saveLoading}
-              className={`h-12 w-12 items-center justify-center rounded-2xl border ${
-                isSaved
-                  ? 'border-[#2ecc71] bg-green-50 dark:bg-green-900/20'
-                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+          <TouchableOpacity
+            onPress={handleToggleSave}
+            disabled={saveLoading}
+            className={`flex-row items-center rounded-full border px-3 py-2 ${
+              isSaved
+                ? 'border-[#2ecc71] bg-green-50 dark:bg-green-900/20'
+                : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+            }`}
+          >
+            {saveLoading ? (
+              <ActivityIndicator size="small" color={isSaved ? '#2ecc71' : '#4c669f'} />
+            ) : (
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={13}
+                color={isSaved ? '#2ecc71' : '#4c669f'}
+              />
+            )}
+            <Text
+              className={`ml-1.5 text-xs font-semibold ${
+                isSaved ? 'text-[#2ecc71]' : 'text-gray-700 dark:text-gray-200'
               }`}
             >
-              {saveLoading ? (
-                <ActivityIndicator color={isSaved ? '#2ecc71' : '#4c669f'} />
-              ) : (
-                <Ionicons
-                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                  size={22}
-                  color={isSaved ? '#2ecc71' : '#4c669f'}
-                />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleOpenCreateModal}
-              className="flex-1 flex-row items-center justify-center rounded-2xl bg-[#4c669f] px-4 py-4"
-            >
-              <Ionicons name="add" size={20} color="#fff" />
-                <Text className="ml-2 text-sm font-semibold text-white">
-                  {t('placeDetailCreateCta')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              onPress={handleReportPlace}
-              className="mt-3 flex-row items-center self-start rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5"
-            >
-              <Ionicons name="flag-outline" size={14} color="#e11d48" />
-              <Text className="ml-2 text-xs font-semibold text-rose-600">
-                {t('reportAction')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              {isSaved ? t('placeDetailSaveActive') : t('placeDetailSaveIdle')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleOpenCreateModal}
+            className="flex-row items-center rounded-full bg-[#4c669f] px-3 py-2"
+          >
+            <Ionicons name="add" size={13} color="#fff" />
+            <Text className="ml-1.5 text-xs font-semibold text-white">
+              {t('placeDetailCreateCta')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleReportPlace}
+            className="flex-row items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-900/30 dark:bg-rose-900/20"
+          >
+            <Ionicons name="flag-outline" size={13} color="#e11d48" />
+            <Text className="ml-1.5 text-xs font-semibold text-rose-600">
+              {t('reportAction')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View className="mt-6 rounded-3xl bg-white p-4 dark:bg-gray-900">
           <Tabs

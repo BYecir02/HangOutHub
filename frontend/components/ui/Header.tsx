@@ -28,7 +28,7 @@ export default function Header({
   const hasSearchAction = typeof onSearchPress === 'function';
 
   return (
-    <View className="bg-white dark:bg-black px-5 pt-14 pb-4 shadow-sm flex-row justify-between items-center border-b border-gray-100 dark:border-gray-800">
+    <View className="bg-white dark:bg-black px-5 pt-14 pb-4 shadow-sm flex-row justify-between items-center">
       {/* Espace vide pour ÃƒÂ©quilibrer le header et garder le titre centrÃƒÂ© */}
       <View className={hasSearchAction ? 'w-20' : 'w-10'} />
 

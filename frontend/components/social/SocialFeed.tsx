@@ -716,15 +716,8 @@ export default function SocialFeed() {
     });
   }, [posts, resolveLocationLabel, selectedCategory, selectedLocation, selectedType]);
 
-  const typeLabel =
-    selectedType === 'plan'
-      ? t('socialFeedFilterPlans')
-      : selectedType === 'post'
-      ? t('socialFeedFilterPosts')
-      : t('socialFeedFilterAll');
-
   const renderHeader = () => (
-    <View className="mb-4 border-b border-gray-100 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-black">
+    <View className="mb-4 bg-white px-5 pb-5 pt-5 dark:bg-black">
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-4">
           <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
@@ -732,9 +725,6 @@ export default function SocialFeed() {
           </Text>
           <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
             {t('socialFeedHeaderTitle')}
-          </Text>
-          <Text className="mt-3 text-base leading-7 text-gray-500 dark:text-gray-400">
-            {t('socialFeedHeaderSubtitle')}
           </Text>
         </View>
 
@@ -746,6 +736,12 @@ export default function SocialFeed() {
             <Ionicons name="search-outline" size={22} color="#4c669f" />
           </TouchableOpacity>
           <TouchableOpacity
+            onPress={() => setFiltersOpen(true)}
+            className="mr-2 h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
+          >
+            <Ionicons name="options-outline" size={22} color="#4c669f" />
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={handleOpenMessages}
             className="h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
           >
@@ -753,61 +749,6 @@ export default function SocialFeed() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="mt-5"
-        contentContainerStyle={{ paddingRight: 16 }}
-      >
-        <TouchableOpacity
-          onPress={() => {
-            setActiveFilter('category');
-            setFiltersOpen(true);
-          }}
-          className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            {selectedCategory || t('socialFeedFilterCategory')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            setActiveFilter('type');
-            setFiltersOpen(true);
-          }}
-          className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            {typeLabel}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            setActiveFilter('location');
-            setFiltersOpen(true);
-          }}
-          className="mr-3 rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
-        >
-          <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            {selectedLocation || t('socialFeedFilterLocation')}
-          </Text>
-        </TouchableOpacity>
-        {(selectedCategory || selectedLocation || selectedType !== 'all') ? (
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedCategory('');
-              setSelectedType('all');
-              setSelectedLocation('');
-            }}
-            className="rounded-full bg-[#ff4757]/10 px-4 py-2"
-          >
-            <Text className="text-xs font-semibold text-[#ff4757]">
-              {t('socialFeedFilterClear')}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-      </ScrollView>
       {pendingPosts.length > 0 ? (
         <TouchableOpacity
           onPress={() => void applyPendingPosts()}
@@ -906,16 +847,44 @@ export default function SocialFeed() {
               : t('socialFeedFilterLocationTitle')}
           </Text>
 
+          <View className="mb-4 flex-row rounded-2xl bg-gray-100 p-1 dark:bg-gray-800">
+            {[
+              { key: 'category', label: t('socialFeedFilterCategory') },
+              { key: 'type', label: t('socialFeedFilterType') },
+              { key: 'location', label: t('socialFeedFilterLocation') },
+            ].map((option) => {
+              const active = activeFilter === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  onPress={() => setActiveFilter(option.key as 'category' | 'type' | 'location')}
+                  className="flex-1 items-center rounded-xl px-3 py-3"
+                  style={
+                    active
+                      ? {
+                          backgroundColor: '#4c669f',
+                        }
+                      : undefined
+                  }
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      active ? 'text-white' : 'text-gray-600 dark:text-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
             <TouchableOpacity
               onPress={() => {
-                if (activeFilter === 'category') {
-                  setSelectedCategory('');
-                } else if (activeFilter === 'type') {
-                  setSelectedType('all');
-                } else {
-                  setSelectedLocation('');
-                }
+                setSelectedCategory('');
+                setSelectedType('all');
+                setSelectedLocation('');
                 setFiltersOpen(false);
               }}
               className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"

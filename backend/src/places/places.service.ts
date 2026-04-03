@@ -620,24 +620,35 @@ export class PlacesService {
     });
 
     if (existingSave) {
-      await this.prisma.savedPlace.delete({
+      await this.prisma.savedPlace.deleteMany({
         where: {
-          userId_placeId: {
-            userId,
-            placeId: id,
-          },
+          userId,
+          placeId: id,
         },
       });
 
       return { placeId: id, saved: false };
     }
 
-    await this.prisma.savedPlace.create({
-      data: {
-        userId,
-        placeId: id,
-      },
-    });
+    try {
+      await this.prisma.savedPlace.create({
+        data: {
+          userId,
+          placeId: id,
+        },
+      });
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === 'P2002'
+      ) {
+        return { placeId: id, saved: true };
+      }
+
+      throw error;
+    }
 
     return { placeId: id, saved: true };
   }

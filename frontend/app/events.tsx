@@ -1,17 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Image,
   RefreshControl,
+  ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import EntityCard from '@/components/ui/EntityCard';
 import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import EventInspirationCard from '@/components/ui/EventInspirationCard';
 import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
 import ScreenState from '@/components/ui/ScreenState';
@@ -39,6 +45,7 @@ interface EventItem {
 }
 
 type EventFilter = 'all' | 'upcoming' | 'free' | 'week';
+type EventViewMode = 'list' | 'inspiration';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
@@ -67,6 +74,206 @@ function isWithinNextWeek(value: string) {
   return eventTime >= nowTime && eventTime <= endOfWeek.getTime();
 }
 
+function estimateEventCardHeight(index: number) {
+  const imageHeights = [184, 242, 208, 264, 196, 232];
+  return imageHeights[index % imageHeights.length] + 116;
+}
+
+function EventFiltersModal({
+  visible,
+  onClose,
+  query,
+  onChangeQuery,
+  activeFilter,
+  onChangeFilter,
+  viewMode,
+  onChangeViewMode,
+  filterOptions,
+  viewOptions,
+  searchPlaceholder,
+  resetLabel,
+  closeLabel,
+  title,
+  description,
+  searchSectionLabel,
+  filterSectionLabel,
+  viewSectionLabel,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  query: string;
+  onChangeQuery: (text: string) => void;
+  activeFilter: EventFilter;
+  onChangeFilter: (next: EventFilter) => void;
+  viewMode: EventViewMode;
+  onChangeViewMode: (next: EventViewMode) => void;
+  filterOptions: readonly FilterChipOption<EventFilter>[];
+  viewOptions: readonly FilterChipOption<EventViewMode>[];
+  searchPlaceholder: string;
+  resetLabel: string;
+  closeLabel: string;
+  title: string;
+  description: string;
+  searchSectionLabel: string;
+  filterSectionLabel: string;
+  viewSectionLabel: string;
+}) {
+  return (
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      subtitle={description}
+      maxHeight={760}
+      contentMode="auto"
+      footer={
+        <View className="flex-row gap-3">
+          <TouchableOpacity
+            onPress={() => {
+              onChangeQuery('');
+              onChangeFilter('upcoming');
+              onChangeViewMode('inspiration');
+            }}
+            className="flex-1 items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900"
+          >
+            <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {resetLabel}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onClose}
+            className="flex-1 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">{closeLabel}</Text>
+          </TouchableOpacity>
+        </View>
+      }
+    >
+      <View className="gap-5">
+        <View className="mb-5">
+          <Text className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            {searchSectionLabel}
+          </Text>
+          <SearchBar
+            placeholder={searchPlaceholder}
+            value={query}
+            onChangeText={onChangeQuery}
+          />
+        </View>
+
+        <View className="mb-5">
+          <Text className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            {filterSectionLabel}
+          </Text>
+          <FilterChipsBar
+            options={filterOptions}
+            activeKey={activeFilter}
+            onChange={onChangeFilter}
+            activeColor="#4c669f"
+            horizontalPadding={0}
+            paddingTop={0}
+            paddingBottom={0}
+          />
+        </View>
+
+        <View className="mb-1">
+          <Text className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+            {viewSectionLabel}
+          </Text>
+          <View className="flex-row rounded-2xl bg-gray-100 p-1 dark:bg-gray-900">
+            {viewOptions.map((option) => {
+              const active = viewMode === option.key;
+
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  onPress={() => onChangeViewMode(option.key)}
+                  className="flex-1 items-center rounded-xl px-3 py-3"
+                  style={
+                    active
+                      ? {
+                          backgroundColor:
+                            option.key === 'list' ? '#2ecc71' : '#4c669f',
+                        }
+                      : undefined
+                  }
+                >
+                  <Text
+                    className={`text-sm font-semibold ${
+                      active ? 'text-white' : 'text-gray-600 dark:text-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </BottomSheetModal>
+  );
+}
+
+function EventInspirationMasonry({
+  events,
+  onPressEvent,
+  fallbackCityLabel,
+  fallbackPlaceLabel,
+  locale,
+  freeLabel,
+}: {
+  events: EventItem[];
+  onPressEvent: (event: EventItem) => void;
+  fallbackCityLabel: string;
+  fallbackPlaceLabel: string;
+  locale: 'en-US' | 'fr-FR';
+  freeLabel: string;
+}) {
+  const columns = useMemo(() => {
+    const nextColumns: Array<Array<{ event: EventItem; imageHeight: number }>> = [
+      [],
+      [],
+    ];
+    const columnHeights = [0, 0];
+    const imageHeights = [184, 242, 208, 264, 196, 232];
+
+    events.forEach((event, index) => {
+      const imageHeight = imageHeights[index % imageHeights.length];
+      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
+      nextColumns[targetColumn].push({ event, imageHeight });
+      columnHeights[targetColumn] += estimateEventCardHeight(index);
+    });
+
+    return nextColumns;
+  }, [events]);
+
+  return (
+    <View className="flex-row items-start gap-3">
+      {columns.map((column, columnIndex) => (
+        <View key={`column-${columnIndex}`} className="min-w-0 flex-1">
+          {column.map(({ event, imageHeight }) => (
+            <EventInspirationCard
+              key={event.id}
+              event={event}
+              imageHeight={imageHeight}
+              cityLabel={event.Place?.City?.name || fallbackCityLabel}
+              placeLabel={event.Place?.name || event.address || fallbackPlaceLabel}
+              dateLabel={formatEventDate(event.startTime, locale, {
+                includeWeekday: true,
+              })}
+              priceLabel={formatPrice(event.entryFee, locale, {
+                freeLabel,
+              })}
+              onPress={() => onPressEvent(event)}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function EventsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
@@ -77,37 +284,42 @@ export default function EventsScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<EventFilter>('upcoming');
-  const { filterByLocation, locationLabel } = useLocationScope({
+  const [viewMode, setViewMode] = useState<EventViewMode>('inspiration');
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const { filterByLocation, locationValueLabel } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
     allCitiesLabel: t('homeLocationAllCities'),
     allCountriesLabel: t('homeLocationAllCountries'),
   });
 
-  const fetchEvents = useCallback(async (forceRefresh = false) => {
-    const isRefresh = forceRefresh || getCache('events') !== null;
+  const fetchEvents = useCallback(
+    async (forceRefresh = false) => {
+      const isRefresh = forceRefresh || getCache('events') !== null;
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const response = await api.get<EventItem[]>('/events');
-      setEvents(response.data);
-      setCache('events', response.data);
-      setErrorMessage(null);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
-      if (!getCache('events')) {
-        setEvents([]);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [t]);
+
+      try {
+        const response = await api.get<EventItem[]>('/events');
+        setEvents(response.data);
+        setCache('events', response.data);
+        setErrorMessage(null);
+      } catch (error) {
+        setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
+        if (!getCache('events')) {
+          setEvents([]);
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     void fetchEvents();
@@ -125,6 +337,14 @@ export default function EventsScreen() {
       { key: 'upcoming', label: t('eventsFilterUpcoming') },
       { key: 'free', label: t('eventsFilterFree') },
       { key: 'week', label: t('eventsFilterWeek') },
+    ],
+    [t],
+  );
+
+  const viewOptions = useMemo<readonly FilterChipOption<EventViewMode>[]>(
+    () => [
+      { key: 'list', label: t('eventsViewList') },
+      { key: 'inspiration', label: t('eventsViewInspiration') },
     ],
     [t],
   );
@@ -176,6 +396,51 @@ export default function EventsScreen() {
       );
   }, [activeFilter, events, filterByLocation, query]);
 
+  const renderListEventItem = useCallback(
+    ({ item }: { item: EventItem }) => (
+      <EntityCard
+        variant="cover"
+        imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
+        title={item.title}
+        onPress={() =>
+          router.push({
+            pathname: '/event/[id]',
+            params: { id: item.id },
+          })
+        }
+        topContent={
+          <View className="flex-row flex-wrap items-center gap-2">
+            <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
+              <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
+                {formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
+              </Text>
+            </View>
+            {item.Place?.City?.name ? (
+              <View className="rounded-full bg-gray-100 px-3 py-2 dark:bg-gray-800">
+                <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                  {item.Place.City.name}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        }
+        metaRows={[
+          {
+            icon: 'time-outline',
+            iconColor: '#ff4757',
+            text: formatEventDate(item.startTime, locale, { includeWeekday: true }),
+          },
+          {
+            icon: 'location-outline',
+            iconColor: '#4c669f',
+            text: item.Place?.name || item.address || t('homeLocationToConfirm'),
+          },
+        ]}
+      />
+    ),
+    [locale, router, t],
+  );
+
   return (
     <CatalogScreenLayout
       label={t('eventsLabel')}
@@ -184,28 +449,44 @@ export default function EventsScreen() {
       onBack={() => router.back()}
       locationScopeBar={
         <LocationScopeBar
-          locationLabel={locationLabel}
+          locationLabel={locationValueLabel}
           actionLabel={t('homeLocationChangeCta')}
           onPressAction={() => router.push('/location')}
-        />
-      }
-      searchBar={
-        <SearchBar
-          placeholder={t('eventsSearchPlaceholder')}
-          value={query}
-          onChangeText={setQuery}
-        />
-      }
-      filterBar={
-        <FilterChipsBar
-          options={filterOptions}
-          activeKey={activeFilter}
-          onChange={setActiveFilter}
-          activeColor="#4c669f"
-          textSize="sm"
+          rightSlot={
+            <TouchableOpacity
+              onPress={() => setFiltersVisible(true)}
+              className="flex-row items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <Ionicons name="options-outline" size={14} color="#4c669f" />
+              <Text className="ml-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200">
+                {t('eventsFiltersQuickAction')}
+              </Text>
+            </TouchableOpacity>
+          }
         />
       }
     >
+      <EventFiltersModal
+        visible={filtersVisible}
+        onClose={() => setFiltersVisible(false)}
+        query={query}
+        onChangeQuery={setQuery}
+        activeFilter={activeFilter}
+        onChangeFilter={setActiveFilter}
+        viewMode={viewMode}
+        onChangeViewMode={setViewMode}
+        filterOptions={filterOptions}
+        viewOptions={viewOptions}
+        searchPlaceholder={t('eventsSearchPlaceholder')}
+        resetLabel={t('eventsFiltersReset')}
+        closeLabel={t('eventsFiltersClose')}
+        title={t('eventsFiltersTitle')}
+        description={t('eventsFiltersDescription')}
+        searchSectionLabel={t('eventsFiltersSearchSection')}
+        filterSectionLabel={t('eventsFiltersSection')}
+        viewSectionLabel={t('eventsFiltersViewSection')}
+      />
+
       {!loading && errorMessage && events.length === 0 ? (
         <ScreenState
           mode="error"
@@ -252,6 +533,52 @@ export default function EventsScreen() {
             </View>
           )}
         />
+      ) : viewMode === 'inspiration' ? (
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                void fetchEvents(true);
+              }}
+              tintColor="#4c669f"
+            />
+          }
+          contentContainerStyle={{
+            paddingHorizontal: uiTokens.spacing.screenX,
+            paddingBottom: 120,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
+            {t('eventsResultsCount', { count: filteredEvents.length })}
+          </Text>
+
+          {filteredEvents.length === 0 ? (
+            <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
+              <Text className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('eventsEmptyTitle')}
+              </Text>
+              <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+                {t('eventsEmptyDescription')}
+              </Text>
+            </View>
+        ) : (
+            <EventInspirationMasonry
+              events={filteredEvents}
+              fallbackCityLabel=""
+              fallbackPlaceLabel={t('homeLocationToConfirm')}
+              locale={locale}
+              freeLabel={t('homePriceFree')}
+              onPressEvent={(event) =>
+                router.push({
+                  pathname: '/event/[id]',
+                  params: { id: event.id },
+                })
+              }
+            />
+          )}
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredEvents}
@@ -285,48 +612,9 @@ export default function EventsScreen() {
               tintColor="#4c669f"
             />
           }
-          renderItem={({ item }) => (
-            <EntityCard
-              variant="cover"
-              imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
-              title={item.title}
-              onPress={() =>
-                router.push({
-                  pathname: '/event/[id]',
-                  params: { id: item.id },
-                })
-              }
-              topContent={
-                <View className="flex-row flex-wrap items-center gap-2">
-                  <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
-                    <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-                      {formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
-                    </Text>
-                  </View>
-                  <View className="rounded-full bg-gray-100 px-3 py-2 dark:bg-gray-800">
-                    <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                      {item.Place?.City?.name || t('eventsCityToConfirm')}
-                    </Text>
-                  </View>
-                </View>
-              }
-              metaRows={[
-                {
-                  icon: 'time-outline',
-                  iconColor: '#ff4757',
-                  text: formatEventDate(item.startTime, locale, { includeWeekday: true }),
-                },
-                {
-                  icon: 'location-outline',
-                  iconColor: '#4c669f',
-                  text: item.Place?.name || item.address || t('homeLocationToConfirm'),
-                },
-              ]}
-            />
-          )}
+          renderItem={renderListEventItem}
         />
       )}
     </CatalogScreenLayout>
   );
 }
-
