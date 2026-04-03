@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Image,
   RefreshControl,
   ScrollView,
   Text,
@@ -12,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 
+import MediaFrame from '@/components/ui/MediaFrame';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getImageUrl } from '@/services/api';
@@ -21,6 +21,7 @@ import {
   AnimationMeta,
   getCategoryAnimation,
 } from '@/utils/category-animations';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 
 interface CategoryTag {
   id: number;
@@ -116,11 +117,13 @@ function CategoryInspirationCard({
   item,
   imageHeight,
   accentColor,
+  shouldPlay = false,
   onPress,
 }: {
   item: CategoryInspirationItem;
   imageHeight: number;
   accentColor: string;
+  shouldPlay?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -134,11 +137,11 @@ function CategoryInspirationCard({
       }}
     >
       <View className="relative">
-        <Image
-          source={{ uri: item.image }}
+        <MediaFrame
+          source={item.image}
           className="w-full bg-gray-200 dark:bg-gray-800"
           style={{ height: imageHeight }}
-          resizeMode="cover"
+          shouldPlay={shouldPlay}
         />
 
         <View className="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1.5">
@@ -169,10 +172,14 @@ function CategoryInspirationCard({
 function CategoryInspirationMasonry({
   items,
   accentColor,
+  activeItemId,
+  registerLayout,
   onPressItem,
 }: {
   items: CategoryInspirationItem[];
   accentColor: string;
+  activeItemId: string | null;
+  registerLayout: (id: string, layout: { y: number; height: number }) => void;
   onPressItem: (item: CategoryInspirationItem) => void;
 }) {
   const columns = useMemo(() => {
@@ -197,13 +204,20 @@ function CategoryInspirationMasonry({
       {columns.map((column, columnIndex) => (
         <View key={`category-column-${columnIndex}`} className="min-w-0 flex-1">
           {column.map(({ item, imageHeight }) => (
-            <CategoryInspirationCard
+            <View
               key={item.id}
-              item={item}
-              imageHeight={imageHeight}
-              accentColor={accentColor}
-              onPress={() => onPressItem(item)}
-            />
+              onLayout={(event) => {
+                registerLayout(item.id, event.nativeEvent.layout);
+              }}
+            >
+              <CategoryInspirationCard
+                item={item}
+                imageHeight={imageHeight}
+                accentColor={accentColor}
+                shouldPlay={activeItemId === item.id}
+                onPress={() => onPressItem(item)}
+              />
+            </View>
           ))}
         </View>
       ))}
@@ -328,10 +342,16 @@ export default function CategoryDiscoverScreen() {
     [data?.places, t],
   );
 
+  const activeItems = activeTab === 'events' ? eventItems : placeItems;
+  const categoryAutoplay = useVisibleItemAutoplay(activeItems, (item) => item.id);
+
   return (
     <ScrollView
       className="flex-1 bg-gray-50 dark:bg-black"
       showsVerticalScrollIndicator={false}
+      onLayout={categoryAutoplay.onLayout}
+      onScroll={categoryAutoplay.onScroll}
+      scrollEventThrottle={16}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -537,6 +557,8 @@ export default function CategoryDiscoverScreen() {
                 <CategoryInspirationMasonry
                   items={eventItems}
                   accentColor={data.category.color}
+                  activeItemId={categoryAutoplay.activeId}
+                  registerLayout={categoryAutoplay.registerLayout}
                   onPressItem={(item) =>
                     router.push({
                       pathname: '/event/[id]',
@@ -554,6 +576,8 @@ export default function CategoryDiscoverScreen() {
               <CategoryInspirationMasonry
                 items={placeItems}
                 accentColor={data.category.color}
+                activeItemId={categoryAutoplay.activeId}
+                registerLayout={categoryAutoplay.registerLayout}
                 onPressItem={(item) =>
                   router.push({
                     pathname: '/place/[id]',

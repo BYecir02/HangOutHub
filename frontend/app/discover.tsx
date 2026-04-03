@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Image,
   RefreshControl,
   ScrollView,
   Text,
@@ -13,6 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
+import MediaFrame from '@/components/ui/MediaFrame';
 import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import EntityCard from '@/components/ui/EntityCard';
@@ -25,6 +25,7 @@ import { getCache, setCache } from '@/services/dataCache';
 import { formatEventDate } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 
 interface DiscoverEvent {
   id: string;
@@ -95,10 +96,12 @@ function estimateDiscoverCardHeight(index: number) {
 function DiscoverInspirationCard({
   item,
   imageHeight,
+  shouldPlay = false,
   onPress,
 }: {
   item: DiscoverItem;
   imageHeight: number;
+  shouldPlay?: boolean;
   onPress: () => void;
 }) {
   const isEvent = item.type === 'event';
@@ -115,11 +118,11 @@ function DiscoverInspirationCard({
       }}
     >
       <View className="relative">
-        <Image
-          source={{ uri: item.image }}
+        <MediaFrame
+          source={item.image}
           className="w-full bg-gray-200 dark:bg-gray-800"
           style={{ height: imageHeight }}
-          resizeMode="cover"
+          shouldPlay={shouldPlay}
         />
 
         {isEvent ? (
@@ -291,9 +294,13 @@ function DiscoverFiltersModal({
 
 function DiscoverInspirationMasonry({
   items,
+  activeItemId,
+  registerLayout,
   onPressItem,
 }: {
   items: DiscoverItem[];
+  activeItemId: string | null;
+  registerLayout: (id: string, layout: { y: number; height: number }) => void;
   onPressItem: (item: DiscoverItem) => void;
 }) {
   const columns = useMemo(() => {
@@ -318,12 +325,19 @@ function DiscoverInspirationMasonry({
       {columns.map((column, columnIndex) => (
         <View key={`discover-column-${columnIndex}`} className="min-w-0 flex-1">
           {column.map(({ item, imageHeight }) => (
-            <DiscoverInspirationCard
+            <View
               key={item.id}
-              item={item}
-              imageHeight={imageHeight}
-              onPress={() => onPressItem(item)}
-            />
+              onLayout={(event) => {
+                registerLayout(item.id, event.nativeEvent.layout);
+              }}
+            >
+              <DiscoverInspirationCard
+                item={item}
+                imageHeight={imageHeight}
+                shouldPlay={activeItemId === item.id}
+                onPress={() => onPressItem(item)}
+              />
+            </View>
           ))}
         </View>
       ))}
@@ -498,6 +512,8 @@ export default function DiscoverScreen() {
     });
   }, [activeFilter, discoverItems, query]);
 
+  const discoverAutoplay = useVisibleItemAutoplay(filteredItems, (item) => item.id);
+
   const handlePressItem = useCallback(
     (item: DiscoverItem) => {
       router.push(
@@ -605,6 +621,9 @@ export default function DiscoverScreen() {
         />
       ) : viewMode === 'inspiration' ? (
         <ScrollView
+          onLayout={discoverAutoplay.onLayout}
+          onScroll={discoverAutoplay.onScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -636,6 +655,8 @@ export default function DiscoverScreen() {
           ) : (
             <DiscoverInspirationMasonry
               items={filteredItems}
+              activeItemId={discoverAutoplay.activeId}
+              registerLayout={discoverAutoplay.registerLayout}
               onPressItem={handlePressItem}
             />
           )}

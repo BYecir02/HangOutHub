@@ -26,6 +26,7 @@ import { getCache, setCache } from '@/services/dataCache';
 import { formatEventDate, formatPrice } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 
 interface EventItem {
   id: string;
@@ -222,6 +223,8 @@ function EventInspirationMasonry({
   fallbackPlaceLabel,
   locale,
   freeLabel,
+  activeItemId,
+  registerLayout,
 }: {
   events: EventItem[];
   onPressEvent: (event: EventItem) => void;
@@ -229,6 +232,8 @@ function EventInspirationMasonry({
   fallbackPlaceLabel: string;
   locale: 'en-US' | 'fr-FR';
   freeLabel: string;
+  activeItemId: string | null;
+  registerLayout: (id: string, layout: { y: number; height: number }) => void;
 }) {
   const columns = useMemo(() => {
     const nextColumns: Array<Array<{ event: EventItem; imageHeight: number }>> = [
@@ -253,20 +258,27 @@ function EventInspirationMasonry({
       {columns.map((column, columnIndex) => (
         <View key={`column-${columnIndex}`} className="min-w-0 flex-1">
           {column.map(({ event, imageHeight }) => (
-            <EventInspirationCard
+            <View
               key={event.id}
-              event={event}
-              imageHeight={imageHeight}
-              cityLabel={event.Place?.City?.name || fallbackCityLabel}
-              placeLabel={event.Place?.name || event.address || fallbackPlaceLabel}
-              dateLabel={formatEventDate(event.startTime, locale, {
-                includeWeekday: true,
-              })}
-              priceLabel={formatPrice(event.entryFee, locale, {
-                freeLabel,
-              })}
-              onPress={() => onPressEvent(event)}
-            />
+              onLayout={(eventLayout) => {
+                registerLayout(event.id, eventLayout.nativeEvent.layout);
+              }}
+            >
+              <EventInspirationCard
+                event={event}
+                imageHeight={imageHeight}
+                cityLabel={event.Place?.City?.name || fallbackCityLabel}
+                placeLabel={event.Place?.name || event.address || fallbackPlaceLabel}
+                dateLabel={formatEventDate(event.startTime, locale, {
+                  includeWeekday: true,
+                })}
+                priceLabel={formatPrice(event.entryFee, locale, {
+                  freeLabel,
+                })}
+                onPress={() => onPressEvent(event)}
+                shouldPlay={activeItemId === event.id}
+              />
+            </View>
           ))}
         </View>
       ))}
@@ -395,6 +407,8 @@ export default function EventsScreen() {
           new Date(left.startTime).getTime() - new Date(right.startTime).getTime(),
       );
   }, [activeFilter, events, filterByLocation, query]);
+
+  const inspirationAutoplay = useVisibleItemAutoplay(filteredEvents, (event) => event.id);
 
   const renderListEventItem = useCallback(
     ({ item }: { item: EventItem }) => (
@@ -535,6 +549,9 @@ export default function EventsScreen() {
         />
       ) : viewMode === 'inspiration' ? (
         <ScrollView
+          onLayout={inspirationAutoplay.onLayout}
+          onScroll={inspirationAutoplay.onScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -563,13 +580,15 @@ export default function EventsScreen() {
                 {t('eventsEmptyDescription')}
               </Text>
             </View>
-        ) : (
+          ) : (
             <EventInspirationMasonry
               events={filteredEvents}
               fallbackCityLabel=""
               fallbackPlaceLabel={t('homeLocationToConfirm')}
               locale={locale}
               freeLabel={t('homePriceFree')}
+              activeItemId={inspirationAutoplay.activeId}
+              registerLayout={inspirationAutoplay.registerLayout}
               onPressEvent={(event) =>
                 router.push({
                   pathname: '/event/[id]',

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { apiGet, resolveImageUrl } from '../lib/api';
+import MediaPreview from '../components/MediaPreview';
 import PageHeader from '../components/PageHeader';
 import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
@@ -180,10 +181,11 @@ export default function PlaceViewPage() {
           <div className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="overflow-hidden rounded-3xl border border-slate-100">
-                <img
+                <MediaPreview
                   src={heroImage}
                   alt={place.name}
                   className="h-56 w-full object-cover sm:h-72"
+                  controls
                 />
               </div>
               <div className="space-y-4">
@@ -299,10 +301,11 @@ export default function PlaceViewPage() {
                       key={`${place.id}-gallery-${index}`}
                       className="overflow-hidden rounded-2xl border border-slate-100"
                     >
-                      <img
+                      <MediaPreview
                         src={image}
                         alt={`${place.name} ${index + 1}`}
                         className="h-40 w-full object-cover"
+                        controls={false}
                       />
                     </div>
                   ))}
@@ -319,10 +322,11 @@ export default function PlaceViewPage() {
                       key={event.id}
                       className="flex flex-col gap-4 rounded-2xl border border-slate-100 p-4 sm:flex-row sm:items-center"
                     >
-                      <img
+                      <MediaPreview
                         src={resolveImageUrl(event.coverUrl) || PLACE_PLACEHOLDER}
                         alt={event.title || 'Evenement'}
                         className="h-16 w-16 rounded-xl object-cover"
+                        controls={false}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-slate-700">

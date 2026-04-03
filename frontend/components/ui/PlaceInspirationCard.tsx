@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Image,
   StyleProp,
   Text,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import MediaFrame from '@/components/ui/MediaFrame';
 import { getImageUrl } from '@/services/api';
 
 export interface PlaceInspirationCardPlace {
@@ -34,6 +34,7 @@ interface PlaceInspirationCardProps {
   saving?: boolean;
   showSaveButton?: boolean;
   style?: StyleProp<ViewStyle>;
+  shouldPlay?: boolean;
 }
 
 export default function PlaceInspirationCard({
@@ -46,6 +47,7 @@ export default function PlaceInspirationCard({
   saving = false,
   showSaveButton = true,
   style,
+  shouldPlay = false,
 }: PlaceInspirationCardProps) {
   const cityLabel = place.City?.name || '';
   const ratingLabel =
@@ -61,11 +63,17 @@ export default function PlaceInspirationCard({
       activeOpacity={0.92}
     >
       <View className="relative">
-        <Image
-          source={{ uri: getImageUrl(place.coverUrl) || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200' }}
+        <MediaFrame
+          source={
+            getImageUrl(place.coverUrl) ||
+            'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200'
+          }
           className="w-full bg-gray-200 dark:bg-gray-800"
+          shouldPlay={shouldPlay}
+          muted
+          loop
+          showControls={false}
           style={{ height: imageHeight }}
-          resizeMode="cover"
         />
         {cityLabel ? (
           <View className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5">

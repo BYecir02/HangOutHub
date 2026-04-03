@@ -2,9 +2,15 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
+
+import {
+  MAX_MEDIA_FILE_SIZE_BYTES,
+  MAX_MEDIA_FILE_SIZE_MESSAGE,
+} from './media-limits';
 
 @Injectable()
 export class StorageService {
@@ -51,6 +57,10 @@ export class StorageService {
   async uploadFile(folder: string, file: Express.Multer.File) {
     this.ensureConfigured();
 
+    if (typeof file.size === 'number' && file.size > MAX_MEDIA_FILE_SIZE_BYTES) {
+      throw new PayloadTooLargeException(MAX_MEDIA_FILE_SIZE_MESSAGE);
+    }
+
     if (!file.buffer) {
       throw new InternalServerErrorException(
         'Le fichier upload n est pas disponible en memoire.',
@@ -76,6 +86,16 @@ export class StorageService {
       this.logger.error(
         `Echec upload Supabase (${response.status}): ${errorBody}`,
       );
+
+      const normalizedErrorBody = errorBody.toLowerCase();
+      if (
+        response.status === 413 ||
+        normalizedErrorBody.includes('payload too large') ||
+        normalizedErrorBody.includes('"statuscode":"413"')
+      ) {
+        throw new PayloadTooLargeException(MAX_MEDIA_FILE_SIZE_MESSAGE);
+      }
+
       throw new InternalServerErrorException(
         'Impossible d envoyer le fichier vers Supabase Storage.',
       );

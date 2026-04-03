@@ -99,6 +99,54 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
+function useCarouselAutoplay<T>(items: T[], getId: (item: T) => string) {
+  const [activeId, setActiveId] = useState<string | null>(
+    items[0] ? getId(items[0]) : null,
+  );
+  const getIdRef = React.useRef(getId);
+
+  useEffect(() => {
+    getIdRef.current = getId;
+  }, [getId]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setActiveId(null);
+      return;
+    }
+
+    setActiveId((current) => {
+      if (current && items.some((item) => getIdRef.current(item) === current)) {
+        return current;
+      }
+
+      return getIdRef.current(items[0]);
+    });
+  }, [items]);
+
+  const viewabilityConfig = React.useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current;
+
+  const onViewableItemsChanged = React.useRef(
+    ({
+      viewableItems,
+    }: {
+      viewableItems: Array<{ item: T; isViewable?: boolean }>;
+    }) => {
+      const firstVisible = viewableItems.find(
+        (token) => token.isViewable && token.item,
+      );
+
+      if (firstVisible) {
+        setActiveId(getIdRef.current(firstVisible.item));
+      }
+    },
+  ).current;
+
+  return { activeId, onViewableItemsChanged, viewabilityConfig };
+}
+
 function formatEventPriceLabel(
   event: HomeEvent,
   locale: string,
@@ -353,6 +401,12 @@ export default function HomeScreen() {
     [featuredEvents, locale, t],
   );
 
+  const featuredCarousel = useCarouselAutoplay(
+    featuredInspiration,
+    (item) => item.event.id,
+  );
+  const popularCarousel = useCarouselAutoplay(popularPlaces, (item) => item.id);
+
   const recommendedInspiration = useMemo<HomeRecommendationItem[]>(() => {
     const eventSuggestions: HomeRecommendationItem[] = featuredEvents
       .slice(0, 3)
@@ -408,6 +462,11 @@ export default function HomeScreen() {
 
     return nextItems.slice(0, 6);
   }, [featuredEvents, locale, popularPlaces, t]);
+
+  const recommendedCarousel = useCarouselAutoplay(
+    recommendedInspiration,
+    (item) => item.id,
+  );
 
   const locationLabel = locationValueLabel;
 
@@ -471,6 +530,8 @@ export default function HomeScreen() {
             keyExtractor={(item) => item.event.id}
             horizontal
             showsHorizontalScrollIndicator={false}
+            viewabilityConfig={featuredCarousel.viewabilityConfig}
+            onViewableItemsChanged={featuredCarousel.onViewableItemsChanged}
             snapToInterval={276}
             decelerationRate="fast"
             snapToAlignment="start"
@@ -483,6 +544,7 @@ export default function HomeScreen() {
                 placeLabel={item.placeLabel}
                 dateLabel={item.dateLabel}
                 priceLabel={item.priceLabel}
+                shouldPlay={featuredCarousel.activeId === item.event.id}
                 onPress={() =>
                   router.push({
                     pathname: '/event/[id]',
@@ -542,12 +604,15 @@ export default function HomeScreen() {
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
+            viewabilityConfig={popularCarousel.viewabilityConfig}
+            onViewableItemsChanged={popularCarousel.onViewableItemsChanged}
             contentContainerStyle={{ paddingHorizontal: 20 }}
             renderItem={({ item }) => (
               <PlaceInspirationCard
                 place={item}
                 imageHeight={178}
                 fallbackNewLabel={t('placesNewBadge')}
+                shouldPlay={popularCarousel.activeId === item.id}
                 onPress={() =>
                   router.push({
                     pathname: '/place/[id]',
@@ -582,6 +647,8 @@ export default function HomeScreen() {
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
+            viewabilityConfig={recommendedCarousel.viewabilityConfig}
+            onViewableItemsChanged={recommendedCarousel.onViewableItemsChanged}
             snapToInterval={276}
             decelerationRate="fast"
             snapToAlignment="start"
@@ -595,6 +662,7 @@ export default function HomeScreen() {
                 badgeLabel={item.badgeLabel}
                 metaLabel={item.metaLabel}
                 metaIcon={item.metaIcon}
+                shouldPlay={recommendedCarousel.activeId === item.id}
                 onPress={() =>
                   router.push({
                     pathname: item.type === 'event' ? '/event/[id]' : '/place/[id]',

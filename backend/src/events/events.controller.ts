@@ -18,6 +18,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
+import { MAX_MEDIA_FILE_SIZE_BYTES } from '../storage/media-limits';
 import { CreateEventBookingDto } from './dto/create-event-booking.dto';
 import { CreateEventCollaboratorDto } from './dto/create-event-collaborator.dto';
 import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
@@ -59,10 +60,16 @@ export class EventsController {
       ],
       {
         storage: memoryStorage(),
+        limits: {
+          fileSize: MAX_MEDIA_FILE_SIZE_BYTES,
+        },
         fileFilter: (_req, file, cb) => {
-          if (!file.mimetype.startsWith('image/')) {
+          if (
+            !file.mimetype.startsWith('image/') &&
+            !file.mimetype.startsWith('video/')
+          ) {
             return cb(
-              new BadRequestException('Seules les images sont autorisees.'),
+              new BadRequestException('Seules les images et videos sont autorisees.'),
               false,
             );
           }
@@ -113,10 +120,16 @@ export class EventsController {
       ],
       {
         storage: memoryStorage(),
+        limits: {
+          fileSize: MAX_MEDIA_FILE_SIZE_BYTES,
+        },
         fileFilter: (_req, file, cb) => {
-          if (!file.mimetype.startsWith('image/')) {
+          if (
+            !file.mimetype.startsWith('image/') &&
+            !file.mimetype.startsWith('video/')
+          ) {
             return cb(
-              new BadRequestException('Seules les images sont autorisees.'),
+              new BadRequestException('Seules les images et videos sont autorisees.'),
               false,
             );
           }

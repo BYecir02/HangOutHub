@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -19,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import ContactAction from '@/components/ui/ContactAction';
+import MediaFrame from '@/components/ui/MediaFrame';
 import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import Tabs, { type TabItem } from '@/components/ui/Tabs';
 import { useI18n } from '@/hooks/use-i18n';
@@ -453,7 +453,14 @@ export default function PlaceDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
       <View className="relative">
-        <Image source={{ uri: heroImage }} className="h-80 w-full" resizeMode="cover" />
+        <MediaFrame
+          source={heroImage}
+          className="h-80 w-full"
+          shouldPlay
+          muted
+          loop
+          showControls
+        />
         <View className="absolute inset-x-0 top-0 flex-row items-start px-5 pt-14">
           <TouchableOpacity
             onPress={() => router.back()}
@@ -673,10 +680,9 @@ export default function PlaceDetailScreen() {
                       className="mr-3"
                       activeOpacity={0.9}
                     >
-                      <Image
-                        source={{ uri: image }}
+                      <MediaFrame
+                        source={image}
                         className="h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                        resizeMode="cover"
                       />
                     </TouchableOpacity>
                   ))}
@@ -702,12 +708,9 @@ export default function PlaceDetailScreen() {
                     }
                     className="mt-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-800"
                   >
-                    <Image
-                      source={{
-                        uri: getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER,
-                      }}
+                    <MediaFrame
+                      source={getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER}
                       className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                      resizeMode="cover"
                     />
                     <View className="ml-4 flex-1 justify-center">
                       <Text
@@ -835,10 +838,13 @@ export default function PlaceDetailScreen() {
               style={{ width: screenWidth, height: screenHeight }}
               className="items-center justify-center"
             >
-              <Image
-                source={{ uri: image }}
-                style={{ width: screenWidth, height: screenHeight }}
-                resizeMode="contain"
+              <MediaFrame
+                source={image}
+                className="h-full w-full bg-black"
+                shouldPlay={index === galleryIndex}
+                muted
+                loop
+                showControls
               />
             </View>
           ))}

@@ -1,6 +1,8 @@
 import React from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import MediaFrame from '@/components/ui/MediaFrame';
 
 interface InspirationCardProps {
   title: string;
@@ -13,6 +15,7 @@ interface InspirationCardProps {
   onPress: () => void;
   imageHeight?: number;
   cardWidthClassName?: string;
+  shouldPlay?: boolean;
 }
 
 export default function InspirationCard({
@@ -26,6 +29,7 @@ export default function InspirationCard({
   onPress,
   imageHeight = 178,
   cardWidthClassName = 'w-72',
+  shouldPlay = false,
 }: InspirationCardProps) {
   return (
     <TouchableOpacity
@@ -35,11 +39,14 @@ export default function InspirationCard({
       style={{ borderColor: `${accentColor}30`, borderWidth: 1.5 }}
     >
       <View className="relative">
-        <Image
-          source={{ uri: imageUrl }}
+        <MediaFrame
+          source={imageUrl}
           className="w-full bg-gray-200 dark:bg-gray-800"
+          shouldPlay={shouldPlay}
+          muted
+          loop
+          showControls={false}
           style={{ height: imageHeight }}
-          resizeMode="cover"
         />
 
         <View

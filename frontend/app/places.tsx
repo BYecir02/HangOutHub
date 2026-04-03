@@ -26,6 +26,7 @@ import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 
 interface PlaceItem {
   id: string;
@@ -194,6 +195,8 @@ function PlaceInspirationMasonry({
   isPlaceSaved,
   isSavingPlace,
   onToggleSavePlace,
+  activeItemId,
+  registerLayout,
 }: {
   places: PlaceItem[];
   onPressPlace: (place: PlaceItem) => void;
@@ -201,6 +204,8 @@ function PlaceInspirationMasonry({
   isPlaceSaved: (placeId: string) => boolean;
   isSavingPlace: (placeId: string) => boolean;
   onToggleSavePlace: (placeId: string) => void;
+  activeItemId: string | null;
+  registerLayout: (id: string, layout: { y: number; height: number }) => void;
 }) {
   const columns = useMemo(() => {
     const nextColumns: Array<Array<{ place: PlaceItem; imageHeight: number }>> = [
@@ -225,16 +230,23 @@ function PlaceInspirationMasonry({
       {columns.map((column, columnIndex) => (
         <View key={`column-${columnIndex}`} className="min-w-0 flex-1">
           {column.map(({ place, imageHeight }) => (
-            <PlaceInspirationCard
+            <View
               key={place.id}
-              place={place}
-              imageHeight={imageHeight}
-              fallbackNewLabel={fallbackNewLabel}
-              onPress={() => onPressPlace(place)}
-              isSaved={isPlaceSaved(place.id)}
-              onToggleSave={() => onToggleSavePlace(place.id)}
-              saving={isSavingPlace(place.id)}
-            />
+              onLayout={(event) => {
+                registerLayout(place.id, event.nativeEvent.layout);
+              }}
+            >
+              <PlaceInspirationCard
+                place={place}
+                imageHeight={imageHeight}
+                fallbackNewLabel={fallbackNewLabel}
+                onPress={() => onPressPlace(place)}
+                isSaved={isPlaceSaved(place.id)}
+                onToggleSave={() => onToggleSavePlace(place.id)}
+                saving={isSavingPlace(place.id)}
+                shouldPlay={activeItemId === place.id}
+              />
+            </View>
           ))}
         </View>
       ))}
@@ -392,6 +404,8 @@ export default function PlacesScreen() {
       })
       .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0));
   }, [activeFilter, filterByLocation, places, query]);
+
+  const inspirationAutoplay = useVisibleItemAutoplay(filteredPlaces, (place) => place.id);
 
   const handleTogglePlaceSave = useCallback(
     async (placeId: string) => {
@@ -648,6 +662,9 @@ export default function PlacesScreen() {
         />
       ) : viewMode === 'inspiration' ? (
         <ScrollView
+          onLayout={inspirationAutoplay.onLayout}
+          onScroll={inspirationAutoplay.onScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -689,6 +706,8 @@ export default function PlacesScreen() {
               isPlaceSaved={(placeId) => savedPlaceIds.has(placeId)}
               isSavingPlace={(placeId) => savingPlaceIds.has(placeId)}
               onToggleSavePlace={handleTogglePlaceSave}
+              activeItemId={inspirationAutoplay.activeId}
+              registerLayout={inspirationAutoplay.registerLayout}
             />
           )}
         </ScrollView>

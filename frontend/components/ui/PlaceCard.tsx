@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import MediaFrame from '@/components/ui/MediaFrame';
 
 interface PlaceCardProps {
   name: string;
@@ -19,10 +21,9 @@ export default function PlaceCard({ name, location, imageUrl, rating, onPress }:
     >
       {/* Conteneur Image avec Badge Note */}
       <View className="relative">
-        <Image 
-          source={{ uri: imageUrl }} 
-          className="w-full h-28 rounded-xl mb-2 bg-gray-200 dark:bg-gray-800" 
-          resizeMode="cover"
+        <MediaFrame
+          source={imageUrl}
+          className="w-full h-28 rounded-xl mb-2 bg-gray-200 dark:bg-gray-800"
         />
         
         {/* Badge Note (Si rating existe) */}

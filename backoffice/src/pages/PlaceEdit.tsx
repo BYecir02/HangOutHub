@@ -14,8 +14,10 @@ import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
 import FormField from '../components/FormField';
 import LoadingState from '../components/LoadingState';
+import MediaPreview from '../components/MediaPreview';
 import SelectField from '../components/SelectField';
 import Card from '../components/Card';
+import { getMediaUploadErrorMessage } from '../lib/media';
 
 interface CityOption {
   id: number;
@@ -276,6 +278,15 @@ export default function PlaceEditPage() {
 
   const handleSubmit = async () => {
     if (!place) {
+      return;
+    }
+
+    const mediaError = getMediaUploadErrorMessage([
+      ...(coverFile ? [coverFile] : []),
+      ...galleryFiles,
+    ]);
+    if (mediaError) {
+      setError(mediaError);
       return;
     }
 
@@ -613,10 +624,12 @@ export default function PlaceEditPage() {
               Couverture actuelle
             </p>
             {coverPreview || place.coverUrl ? (
-              <img
+              <MediaPreview
                 src={coverPreview || resolveImageUrl(place.coverUrl) || ''}
                 alt="cover"
                 className="mt-2 h-40 w-full rounded-xl object-cover"
+                isVideo={coverFile?.type.startsWith('video/')}
+                controls={false}
               />
             ) : (
               <div className="mt-2 rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
@@ -630,7 +643,7 @@ export default function PlaceEditPage() {
             ) : null}
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={(evt) => setCoverFile(evt.target.files?.[0] || null)}
               className="mt-3 text-sm text-slate-600"
             />
@@ -643,12 +656,14 @@ export default function PlaceEditPage() {
                   Apercu des nouvelles images.
                 </p>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {galleryPreviews.map((preview) => (
-                    <img
+                  {galleryPreviews.map((preview, index) => (
+                    <MediaPreview
                       key={preview}
                       src={preview}
                       alt="preview"
                       className="h-24 w-full rounded-lg object-cover"
+                      isVideo={galleryFiles[index]?.type.startsWith('video/')}
+                      controls={false}
                     />
                   ))}
                 </div>
@@ -665,10 +680,11 @@ export default function PlaceEditPage() {
                   }
                   className="group relative overflow-hidden rounded-lg"
                 >
-                  <img
+                  <MediaPreview
                     src={resolveImageUrl(image) || image}
                     alt="gallery"
                     className="h-24 w-full rounded-lg object-cover"
+                    controls={false}
                   />
                   <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100">
                     Retirer
@@ -683,7 +699,7 @@ export default function PlaceEditPage() {
             </div>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               onChange={(evt) =>
                 setGalleryFiles(Array.from(evt.target.files || []))

@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import MediaFrame from '@/components/ui/MediaFrame';
 
 interface EventCardProps {
   title: string;
@@ -19,10 +21,9 @@ export default function EventCard({ title, date, location, imageUrl, price, onPr
     >
       {/* Image avec Badge de prix */}
       <View className="relative">
-        <Image 
-          source={{ uri: imageUrl }} 
+        <MediaFrame
+          source={imageUrl}
           className="w-full h-36"
-          resizeMode="cover"
         />
         <View className="absolute top-3 right-3 rounded-lg bg-[#4c669f] px-2 py-1">
           <Text className="text-xs font-bold text-white">{price}</Text>

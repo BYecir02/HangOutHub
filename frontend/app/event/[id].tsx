@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 
 import ContactAction from '@/components/ui/ContactAction';
+import MediaFrame from '@/components/ui/MediaFrame';
 import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
@@ -341,7 +341,14 @@ export default function EventDetailScreen() {
       >
         {/* Hero Image */}
         <View className="relative">
-          <Image source={{ uri: heroImage }} className="h-80 w-full" resizeMode="cover" />
+          <MediaFrame
+            source={heroImage}
+            className="h-80 w-full"
+            shouldPlay
+            muted
+            loop
+            showControls
+          />
           <View className="absolute inset-x-0 top-0 flex-row items-center justify-between px-5 pt-14">
             <TouchableOpacity
               onPress={() => router.back()}
@@ -452,11 +459,10 @@ export default function EventDetailScreen() {
               contentContainerStyle={{ paddingTop: 16, paddingBottom: 8 }}
             >
               {gallery.map((image, index) => (
-                <Image
+                <MediaFrame
                   key={`${event.id}-gallery-${index}`}
-                  source={{ uri: image }}
+                  source={image}
                   className="mr-3 h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                  resizeMode="cover"
                 />
               ))}
             </ScrollView>

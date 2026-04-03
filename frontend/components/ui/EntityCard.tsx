@@ -1,6 +1,8 @@
 import React, { type ReactNode } from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import MediaFrame from '@/components/ui/MediaFrame';
 
 type EntityCardBadge = {
   label: string;
@@ -47,10 +49,9 @@ export default function EntityCard(props: EntityCardProps) {
         onPress={onPress}
         className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
       >
-        <Image
-          source={{ uri: imageUrl }}
+        <MediaFrame
+          source={imageUrl}
           className="h-52 w-full bg-gray-200 dark:bg-gray-800"
-          resizeMode="cover"
         />
 
         <View className="p-5">
@@ -99,10 +100,9 @@ export default function EntityCard(props: EntityCardProps) {
       onPress={onPress}
       className="flex-row overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
     >
-      <Image
-        source={{ uri: imageUrl }}
+      <MediaFrame
+        source={imageUrl}
         className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
-        resizeMode="cover"
       />
 
       <View className="ml-4 flex-1 justify-between py-1">

@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Image,
   StyleProp,
   Text,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import MediaFrame from '@/components/ui/MediaFrame';
 import { getImageUrl } from '@/services/api';
 
 export interface EventInspirationCardEvent {
@@ -26,6 +26,7 @@ interface EventInspirationCardProps {
   dateLabel: string;
   priceLabel: string;
   style?: StyleProp<ViewStyle>;
+  shouldPlay?: boolean;
 }
 
 const EVENT_PLACEHOLDER =
@@ -40,6 +41,7 @@ export default function EventInspirationCard({
   dateLabel,
   priceLabel,
   style,
+  shouldPlay = false,
 }: EventInspirationCardProps) {
   return (
     <TouchableOpacity
@@ -49,11 +51,14 @@ export default function EventInspirationCard({
       activeOpacity={0.92}
     >
       <View className="relative">
-        <Image
-          source={{ uri: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER }}
+        <MediaFrame
+          source={getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER}
           className="w-full bg-gray-200 dark:bg-gray-800"
+          shouldPlay={shouldPlay}
+          muted
+          loop
+          showControls={false}
           style={{ height: imageHeight }}
-          resizeMode="cover"
         />
 
         {cityLabel ? (
