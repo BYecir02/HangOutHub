@@ -26,6 +26,19 @@ EXPO_PUBLIC_API_URL=http://192.168.1.XX:3000
 Use your local backend IP for same-network testing.
 If you are on a different network, use an ngrok URL instead.
 
+The app resolves the API URL in this order:
+
+1. `HANGOUTHUB_API_URL` if provided
+2. the public backend URL on Android `preview` / `production` builds
+3. `EXPO_PUBLIC_API_URL` from your local `.env`
+
+This means:
+- local Expo Go or LAN dev keeps using your private backend IP
+- installed Android builds point to `https://hang-out-hub.vercel.app`
+
+Maps now use MapLibre, so there is no Google Maps API key to manage for the frontend.
+Because MapLibre is native, the map now needs an EAS/dev build for testing; Expo Go is no longer the right path for the map screen.
+
 ## Run locally
 
 ```bash
@@ -58,7 +71,7 @@ npx eas update:configure
 
 ```bash
 cd frontend
-npx eas build -p android --profile preview
+npm run eas:build:preview
 ```
 
 Android package:
@@ -76,7 +89,7 @@ For JS/UI changes, publish an EAS update:
 
 ```bash
 cd frontend
-npx eas update --channel preview --message "Small fix"
+npm run eas:update:preview
 ```
 
 This is for:
@@ -111,10 +124,10 @@ We are focusing the installed test-build flow on Android.
 npm run start
 
 # Android test build
-npx eas build -p android --profile preview
+npm run eas:build:preview
 
 # publish a JS/UI update
-npx eas update --channel preview --message "Small fix"
+npm run eas:update:preview
 ```
 
 ## Project structure

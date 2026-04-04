@@ -1,12 +1,17 @@
 import axios, { InternalAxiosRequestConfig, isAxiosError } from 'axios';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
 import { getCurrentDataSaver } from './app-preferences';
 
-export const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const runtimeApiUrl =
+  (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ||
+  process.env.EXPO_PUBLIC_API_URL ||
+  'http://localhost:3000';
+
+export const BASE_URL = runtimeApiUrl.replace(/\/+$/, '');
 const API_URL = `${BASE_URL}/api/v1`;
 const isNgrokBaseUrl =
   BASE_URL.includes('ngrok-free.app') ||

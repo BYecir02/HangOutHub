@@ -26,14 +26,21 @@ export default function ScreenHeader({
 }: ScreenHeaderProps) {
   const isDark = useColorScheme() === 'dark';
   const backButtonColor = isDark ? '#93a8d0' : '#4c669f';
+  const hasSubtitle = Boolean(subtitle?.trim());
+  const hasLabel = Boolean(label?.trim());
+  const hasMeta = hasSubtitle || hasLabel;
 
   return (
-    <View className={`flex-row items-start ${containerClassName}`.trim()}>
-      <View className="flex-1 flex-row items-start">
+    <View
+      className={`flex-row ${hasMeta ? 'items-start' : 'items-center'} ${containerClassName}`.trim()}
+    >
+      <View className={`flex-1 flex-row ${hasMeta ? 'items-start' : 'items-center'}`}>
         {onBack ? (
           <TouchableOpacity
             onPress={onBack}
-            className="mr-3 mt-0.5 h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"
+            className={`mr-3 h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800 ${
+              hasMeta ? 'mt-0.5' : ''
+            }`}
             style={{
               width: uiTokens.size.backButton,
               height: uiTokens.size.backButton,
@@ -44,13 +51,13 @@ export default function ScreenHeader({
             <Ionicons name={backIcon} size={uiTokens.size.iconMd} color={backButtonColor} />
           </TouchableOpacity>
         ) : null}
-        <View className="flex-1">
+        <View className={`flex-1 ${hasMeta ? '' : 'justify-center'}`}>
           {label ? (
             <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
               {label}
             </Text>
           ) : null}
-          <Text className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+          <Text className={`${hasMeta ? 'mt-1' : ''} text-2xl font-bold text-gray-900 dark:text-white`}>
             {title}
           </Text>
           {subtitle ? (
@@ -61,7 +68,14 @@ export default function ScreenHeader({
         </View>
       </View>
 
-      {rightSlot ? <View style={{ marginLeft: uiTokens.spacing.rowY }}>{rightSlot}</View> : null}
+      {rightSlot ? (
+        <View
+          style={{ marginLeft: uiTokens.spacing.rowY }}
+          className={hasMeta ? 'self-start' : 'self-center'}
+        >
+          {rightSlot}
+        </View>
+      ) : null}
     </View>
   );
 }

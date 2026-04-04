@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import ProfileHeader from '../../components/profile/ProfileHeader';
 import ProfileStats from '../../components/profile/ProfileStats';
 import PostItem from '../../components/social/PostItem';
+import PlaceInspirationCard from '../../components/ui/PlaceInspirationCard';
 import { SkeletonBlock } from '../../components/ui/Skeleton';
 import Tabs from '../../components/ui/Tabs';
 import { getImageUrl } from '../../services/api';
@@ -114,6 +115,9 @@ export default function ProfileScreen() {
   const canAccessProPanel = canAccessOrganizerPanel(user);
   const canActivateProPanel = !canAccessProPanel && user?.role === 'USER';
   const [activeTab, setActiveTab] = useState('');
+  const [outingFilter, setOutingFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'past'>(
+    'all',
+  );
   const proAccessStatusCard = useMemo(() => {
     if (!isProfessionalAccount || canAccessProPanel) {
       return null;
@@ -213,7 +217,48 @@ export default function ProfileScreen() {
       ),
     [outings],
   );
-  const featuredOuting = sortedOutings[0] ?? null;
+  const filteredOutings = useMemo(() => {
+    const now = Date.now();
+    const ongoingWindowMs = 3 * 60 * 60 * 1000;
+
+    return sortedOutings.filter((outing) => {
+      const scheduledAt = new Date(outing.scheduledDate).getTime();
+      if (Number.isNaN(scheduledAt)) {
+        return outingFilter === 'all';
+      }
+
+      if (outingFilter === 'upcoming') {
+        return scheduledAt > now;
+      }
+
+      if (outingFilter === 'ongoing') {
+        return scheduledAt <= now && now <= scheduledAt + ongoingWindowMs;
+      }
+
+      if (outingFilter === 'past') {
+        return now > scheduledAt + ongoingWindowMs;
+      }
+
+      return true;
+    });
+  }, [outingFilter, sortedOutings]);
+
+  const featuredOuting = filteredOutings[0] ?? null;
+  const savedPlaceColumns = useMemo(() => {
+    const nextColumns: Array<Array<{ place: (typeof savedPlaces)[number]; imageHeight: number }>> =
+      [[], []];
+    const columnHeights = [0, 0];
+    const imageHeights = [184, 242, 208, 264, 196, 232];
+
+    savedPlaces.forEach((place, index) => {
+      const imageHeight = imageHeights[index % imageHeights.length];
+      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
+      nextColumns[targetColumn].push({ place, imageHeight });
+      columnHeights[targetColumn] += imageHeight + 120;
+    });
+
+    return nextColumns;
+  }, [savedPlaces]);
   const tabItems = isOrganizer
     ? [
         { id: 'overview', label: t('profileTabOverview') },
@@ -255,6 +300,16 @@ export default function ProfileScreen() {
   const handleCommentPost = (post: { id: string }) => {
     router.push({ pathname: '/comments', params: { postId: post.id } });
   };
+
+  const outingFilterOptions = useMemo(
+    () => [
+      { key: 'all', label: t('profileOutingsFilterAll') },
+      { key: 'upcoming', label: t('profileOutingsFilterUpcoming') },
+      { key: 'ongoing', label: t('profileOutingsFilterOngoing') },
+      { key: 'past', label: t('profileOutingsFilterPast') },
+    ],
+    [t],
+  );
 
   if (loading && !user) {
     return (
@@ -349,42 +404,71 @@ export default function ProfileScreen() {
         <View className="min-h-[220px] pt-5">
           {!isOrganizer && activeTab === 'outings' ? (
             <View className="px-5">
-              {featuredOuting ? (
-                <>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: '/outing/[id]',
-                      params: { id: featuredOuting.id },
-                    })
-                  }
-                  className="rounded-[28px] bg-[#4c669f]/10 p-5"
-                >
-                  <Text className="text-xs uppercase tracking-widest text-[#4c669f]">
-                    {t('profileFeaturedOutingLabel')}
-                  </Text>
-                  <Text className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                    {featuredOuting.title}
-                  </Text>
-                  <View className="mt-4 rounded-3xl bg-white p-4 dark:bg-gray-900">
-                    <Text className="text-sm text-gray-700 dark:text-gray-200">
-                      {formatEventDate(featuredOuting.scheduledDate, locale)}
-                    </Text>
-                    <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      {featuredOuting.Place?.name ||
-                        featuredOuting.Place?.City?.name ||
-                        featuredOuting.Place?.address ||
-                        t('profileFeaturedOutingLocationFallback')}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+              <View className="mb-4 flex-row rounded-full bg-gray-100 p-1 dark:bg-gray-900">
+                {outingFilterOptions.map((option) => {
+                  const active = outingFilter === option.key;
 
-                <TouchableOpacity
-                  onPress={() => router.push('/outing')}
-                  className="mt-4 items-center rounded-full bg-[#4c669f] px-5 py-3"
-                >
-                  <Text className="font-semibold text-white">{t('profileCreateOutingCta')}</Text>
-                </TouchableOpacity>
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      onPress={() => setOutingFilter(option.key as typeof outingFilter)}
+                      className={`flex-1 items-center rounded-full px-3 py-2 ${
+                        active ? 'bg-[#4c669f]' : 'bg-transparent'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-semibold ${
+                          active ? 'text-white' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {filteredOutings.length > 0 ? (
+                <>
+                  <View className="gap-3">
+                    {filteredOutings.map((outing) => (
+                      <TouchableOpacity
+                        key={outing.id}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/outing/[id]',
+                            params: { id: outing.id },
+                          })
+                        }
+                        className="flex-row items-center rounded-3xl bg-gray-50 p-4 dark:bg-gray-900"
+                      >
+                        <View className="flex-1 pr-4">
+                          <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                            {outing.title}
+                          </Text>
+                          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {formatEventDate(outing.scheduledDate, locale)}
+                          </Text>
+                          <Text className="mt-1 text-sm text-gray-400 dark:text-gray-500">
+                            {outing.Place?.name ||
+                              outing.Place?.City?.name ||
+                              outing.Place?.address ||
+                              t('profileFeaturedOutingLocationFallback')}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => router.push('/outing')}
+                    className="mt-4 items-center rounded-full bg-[#4c669f] px-5 py-3"
+                  >
+                    <Text className="font-semibold text-white">
+                      {t('profileCreateOutingCta')}
+                    </Text>
+                  </TouchableOpacity>
                 </>
               ) : (
                 <EmptyPanel
@@ -403,43 +487,28 @@ export default function ProfileScreen() {
             <View className="px-5">
               {savedPlaces.length > 0 ? (
                 <>
-                <View className="mb-5 rounded-[28px] bg-[#2ecc71]/10 p-5">
-                  <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-[#2ecc71]">
-                    {t('profileSavedIntroLabel')}
-                  </Text>
-                  <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-                    {t('profileSavedIntroTitle')}
-                  </Text>
-                </View>
-                {savedPlaces.map((place) => (
-                  <TouchableOpacity
-                    key={place.id}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/place/[id]',
-                        params: { id: place.id },
-                      })
-                    }
-                    className="mb-4 flex-row rounded-3xl bg-gray-50 p-3 dark:bg-gray-900"
-                  >
-                    <Image
-                      source={{
-                        uri: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER,
-                      }}
-                      className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                      resizeMode="cover"
-                    />
-                    <View className="ml-4 flex-1 justify-center">
-                      <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                        {place.name}
-                      </Text>
-                      <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {place.City?.name || place.address || t('homeAddressToConfirm')}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-                  </TouchableOpacity>
-                ))}
+                  <View className="flex-row items-start gap-3">
+                    {savedPlaceColumns.map((column, columnIndex) => (
+                      <View key={`saved-column-${columnIndex}`} className="min-w-0 flex-1">
+                        {column.map(({ place, imageHeight }) => (
+                          <PlaceInspirationCard
+                            key={place.id}
+                            place={{ ...place, coverUrl: place.coverUrl ?? null }}
+                            imageHeight={imageHeight}
+                            fallbackNewLabel={t('discoverPlaceMetaDiscover')}
+                            onPress={() =>
+                              router.push({
+                                pathname: '/place/[id]',
+                                params: { id: place.id },
+                              })
+                            }
+                            showSaveButton={false}
+                            shouldPlay={false}
+                          />
+                        ))}
+                      </View>
+                    ))}
+                  </View>
                 </>
               ) : (
                 <EmptyPanel

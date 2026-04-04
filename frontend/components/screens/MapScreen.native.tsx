@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Callout, Marker, type Region } from 'react-native-maps';
+import {
+  Camera,
+  MapView,
+  PointAnnotation,
+  UserLocation,
+  type CameraRef,
+} from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 
 import { useI18n } from '@/hooks/use-i18n';
@@ -58,10 +64,14 @@ interface EventPin {
 }
 
 type MapLayer = 'all' | 'places' | 'events';
+type MapCenter = {
+  latitude: number;
+  longitude: number;
+};
 
 const BENIN_CENTER = { latitude: 9.3077, longitude: 2.3158 };
-const COUNTRY_DELTA = { latitudeDelta: 5.2, longitudeDelta: 5.2 };
-const CITY_DELTA = { latitudeDelta: 0.15, longitudeDelta: 0.15 };
+const COUNTRY_CENTER_ZOOM = 5.2;
+const CITY_CENTER_ZOOM = 12;
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200';
 
@@ -70,7 +80,7 @@ export default function MapScreen() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const router = useRouter();
-  const mapRef = useRef<MapView | null>(null);
+  const cameraRef = useRef<CameraRef | null>(null);
   const { selectedLocation, filterByLocation, locationValueLabel } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
@@ -92,10 +102,8 @@ export default function MapScreen() {
   } | null>(null);
   const [locating, setLocating] = useState(false);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
-  const [mapRegion, setMapRegion] = useState<Region>({
-    ...BENIN_CENTER,
-    ...COUNTRY_DELTA,
-  });
+  const [mapCenter, setMapCenter] = useState<MapCenter>(BENIN_CENTER);
+  const [mapZoom, setMapZoom] = useState(COUNTRY_CENTER_ZOOM);
   const headerSurfaceStyle = useMemo(
     () => ({
       backgroundColor: isDarkMode ? 'rgba(17,24,39,0.94)' : 'rgba(255,255,255,0.96)',
@@ -104,26 +112,36 @@ export default function MapScreen() {
     [isDarkMode],
   );
 
+  const updateMapCamera = useCallback((center: MapCenter, zoom: number) => {
+    setMapCenter(center);
+    setMapZoom(zoom);
+    cameraRef.current?.setCamera({
+      centerCoordinate: [center.longitude, center.latitude],
+      zoomLevel: zoom,
+      animationDuration: 600,
+      animationMode: 'flyTo',
+    });
+  }, []);
+
   useEffect(() => {
     if (
       typeof selectedLocation?.latitude === 'number' &&
       typeof selectedLocation?.longitude === 'number'
     ) {
-      setMapRegion({
-        latitude: selectedLocation.latitude,
-        longitude: selectedLocation.longitude,
-        ...CITY_DELTA,
-      });
+      updateMapCamera(
+        {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+        },
+        CITY_CENTER_ZOOM,
+      );
       return;
     }
 
     if (selectedLocation?.country) {
-      setMapRegion({
-        ...BENIN_CENTER,
-        ...COUNTRY_DELTA,
-      });
+      updateMapCamera(BENIN_CENTER, COUNTRY_CENTER_ZOOM);
     }
-  }, [selectedLocation]);
+  }, [selectedLocation, updateMapCamera]);
 
   const fetchPlaces = useCallback(async () => {
     try {
@@ -288,13 +306,13 @@ export default function MapScreen() {
       return;
     }
 
-    const nextRegion = {
-      latitude: place.latitude,
-      longitude: place.longitude,
-      ...CITY_DELTA,
-    };
-    mapRef.current?.animateToRegion(nextRegion, 600);
-    setMapRegion(nextRegion);
+    updateMapCamera(
+      {
+        latitude: place.latitude,
+        longitude: place.longitude,
+      },
+      CITY_CENTER_ZOOM,
+    );
     setSelectedPlace(place);
   };
 
@@ -306,13 +324,13 @@ export default function MapScreen() {
       return;
     }
 
-    const nextRegion = {
-      latitude,
-      longitude,
-      ...CITY_DELTA,
-    };
-    mapRef.current?.animateToRegion(nextRegion, 600);
-    setMapRegion(nextRegion);
+    updateMapCamera(
+      {
+        latitude,
+        longitude,
+      },
+      CITY_CENTER_ZOOM,
+    );
     setSelectedEvent(event);
   };
 
@@ -343,12 +361,7 @@ export default function MapScreen() {
       };
       setUserCoords(coords);
       setUseMyLocation(true);
-      const nextRegion = {
-        ...coords,
-        ...CITY_DELTA,
-      };
-      mapRef.current?.animateToRegion(nextRegion, 600);
-      setMapRegion(nextRegion);
+      updateMapCamera(coords, CITY_CENTER_ZOOM);
     } catch {
       Alert.alert(t('commonErrorTitle'), t('mapLocationFailed'));
     } finally {
@@ -361,13 +374,13 @@ export default function MapScreen() {
       typeof selectedLocation?.latitude === 'number' &&
       typeof selectedLocation?.longitude === 'number'
     ) {
-      const nextRegion = {
-        latitude: selectedLocation.latitude,
-        longitude: selectedLocation.longitude,
-        ...CITY_DELTA,
-      };
-      mapRef.current?.animateToRegion(nextRegion, 600);
-      setMapRegion(nextRegion);
+      updateMapCamera(
+        {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+        },
+        CITY_CENTER_ZOOM,
+      );
       Alert.alert(
         t('mapRecenterTitle'),
         t('mapRecenterMessage', { location: locationLabel }),
@@ -376,12 +389,7 @@ export default function MapScreen() {
     }
 
     if (selectedLocation?.country) {
-      const nextRegion = {
-        ...BENIN_CENTER,
-        ...COUNTRY_DELTA,
-      };
-      mapRef.current?.animateToRegion(nextRegion, 600);
-      setMapRegion(nextRegion);
+      updateMapCamera(BENIN_CENTER, COUNTRY_CENTER_ZOOM);
       Alert.alert(
         t('mapRecenterTitle'),
         t('mapRecenterMessage', { location: locationLabel }),
@@ -392,57 +400,65 @@ export default function MapScreen() {
     Alert.alert(t('mapRecenterTitle'), t('mapRecenterMissingCoords'));
   };
 
+  const handleRegionDidChange = useCallback((feature: any) => {
+    const coordinates = feature?.geometry?.coordinates;
+    if (Array.isArray(coordinates) && coordinates.length >= 2) {
+      const [longitude, latitude] = coordinates;
+      if (typeof latitude === 'number' && typeof longitude === 'number') {
+        setMapCenter({ latitude, longitude });
+      }
+    }
+
+    const zoomLevel = feature?.properties?.zoomLevel;
+    if (typeof zoomLevel === 'number') {
+      setMapZoom(zoomLevel);
+    }
+  }, []);
+
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <MapView
-        ref={mapRef}
         style={{ flex: 1 }}
-        region={mapRegion}
-        onRegionChangeComplete={setMapRegion}
         onPress={() => {
           setSelectedPlace(null);
           setSelectedEvent(null);
         }}
-        showsUserLocation={useMyLocation}
-        showsMyLocationButton={false}
-        showsCompass={true}
+        onRegionDidChange={handleRegionDidChange}
+        compassEnabled
       >
+        <Camera
+          ref={cameraRef}
+          defaultSettings={{
+            centerCoordinate: [mapCenter.longitude, mapCenter.latitude],
+            zoomLevel: mapZoom,
+          }}
+        />
+        <UserLocation visible={useMyLocation} />
         {(activeLayer === 'all' || activeLayer === 'places'
           ? filteredPlaces
           : []
         ).map((place) => (
-          <Marker
+          <PointAnnotation
             key={place.id}
-            coordinate={{
-              latitude: place.latitude as number,
-              longitude: place.longitude as number,
-            }}
-            onPress={() => setSelectedPlace(place)}
-            title={place.name}
-            description={place.address || place.City?.name || undefined}
-            pinColor="#2ecc71"
+            id={`place-${place.id}`}
+            coordinate={[place.longitude as number, place.latitude as number]}
+            selected={selectedPlace?.id === place.id}
+            onSelected={() => setSelectedPlace(place)}
+            anchor={{ x: 0.5, y: 1 }}
           >
-            <Callout
-              onPress={() =>
-                router.push({
-                  pathname: '/place/[id]',
-                  params: { id: place.id },
-                })
-              }
-            >
-              <View className="w-48">
-                <Text className="text-sm font-semibold text-gray-900">
-                  {place.name}
-                </Text>
-                <Text className="mt-1 text-xs text-gray-500">
-                  {place.address || place.City?.name || t('homeAddressToConfirm')}
-                </Text>
-                <Text className="mt-2 text-xs font-semibold text-[#4c669f]">
-                  {t('mapOpenPlaceCta')}
-                </Text>
+            <View className="items-center justify-center">
+              <View
+                className="h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg"
+                style={{ backgroundColor: '#2ecc71' }}
+              >
+                <Ionicons name="location" size={16} color="#fff" />
               </View>
-            </Callout>
-          </Marker>
+              <View
+                className="-mt-1 h-2.5 w-2.5 rounded-full border border-white"
+                style={{ backgroundColor: '#2ecc71' }}
+              />
+            </View>
+          </PointAnnotation>
         ))}
         {(activeLayer === 'all' || activeLayer === 'events'
           ? filteredEvents
@@ -454,35 +470,27 @@ export default function MapScreen() {
             return null;
           }
           return (
-            <Marker
+            <PointAnnotation
               key={event.id}
-              coordinate={{ latitude, longitude }}
-              onPress={() => setSelectedEvent(event)}
-              title={event.title}
-              description={event.Place?.name || event.Place?.address || undefined}
-              pinColor="#f39c12"
+              id={`event-${event.id}`}
+              coordinate={[longitude, latitude]}
+              selected={selectedEvent?.id === event.id}
+              onSelected={() => setSelectedEvent(event)}
+              anchor={{ x: 0.5, y: 1 }}
             >
-              <Callout
-                onPress={() =>
-                  router.push({
-                    pathname: '/event/[id]',
-                    params: { id: event.id },
-                  })
-                }
-              >
-                <View className="w-48">
-                  <Text className="text-sm font-semibold text-gray-900">
-                    {event.title}
-                  </Text>
-                  <Text className="mt-1 text-xs text-gray-500">
-                    {event.Place?.name || event.Place?.City?.name || t('homeLocationToConfirm')}
-                  </Text>
-                  <Text className="mt-2 text-xs font-semibold text-[#4c669f]">
-                    {t('mapOpenEventCta')}
-                  </Text>
+              <View className="items-center justify-center">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg"
+                  style={{ backgroundColor: '#f39c12' }}
+                >
+                  <Ionicons name="calendar" size={16} color="#fff" />
                 </View>
-              </Callout>
-            </Marker>
+                <View
+                  className="-mt-1 h-2.5 w-2.5 rounded-full border border-white"
+                  style={{ backgroundColor: '#f39c12' }}
+                />
+              </View>
+            </PointAnnotation>
           );
         })}
       </MapView>
@@ -672,8 +680,8 @@ export default function MapScreen() {
           <View className="mt-3 flex-row items-center justify-between">
             <View className="rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800">
               <Text className="text-xs font-semibold text-gray-600 dark:text-gray-100">
-                {t('mapCenterLabel')}: {mapRegion.latitude.toFixed(3)},{' '}
-                {mapRegion.longitude.toFixed(3)}
+                {t('mapCenterLabel')}: {mapCenter.latitude.toFixed(3)},{' '}
+                {mapCenter.longitude.toFixed(3)}
               </Text>
             </View>
             <TouchableOpacity

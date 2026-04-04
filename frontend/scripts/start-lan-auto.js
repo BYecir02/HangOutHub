@@ -41,6 +41,7 @@ const child = spawn('npx expo start --lan -c', {
   shell: true,
   env: {
     ...process.env,
+    HANGOUTHUB_API_URL: apiUrl,
     EXPO_PUBLIC_API_URL: apiUrl,
   },
 });

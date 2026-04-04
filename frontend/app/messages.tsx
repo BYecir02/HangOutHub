@@ -17,6 +17,7 @@ import OutingConversationCard, {
   type OutingConversationSummary,
 } from '@/components/messages/OutingConversationCard';
 import PersonRow from '@/components/social/PersonRow';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import BottomSheetListModal from '@/components/ui/BottomSheetListModal';
 import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
 import ScreenHeader from '@/components/ui/ScreenHeader';
@@ -67,6 +68,7 @@ export default function MessagesScreen() {
     null,
   );
   const [filter, setFilter] = useState<OutingFilter>('all');
+  const [searchSheetOpen, setSearchSheetOpen] = useState(false);
 
   const loadChats = useCallback(
     async ({ isRefresh = false, silent = false } = {}) => {
@@ -344,10 +346,16 @@ export default function MessagesScreen() {
   const hasError = tab === 'outings' ? errorMessage : directErrorMessage;
   const showSyncWarning = tab === 'outings' ? syncWarning : directSyncWarning;
   const emptyListLength = tab === 'outings' ? chats.length : directChats.length;
+  const shouldShowLoading = isLoading && emptyListLength === 0;
   const searchPlaceholder =
     tab === 'outings'
       ? t('messagesSearchPlaceholder')
       : t('directChatSearchPlaceholder');
+  const normalizedQuery = query.trim();
+  const headerSubtitle =
+    normalizedQuery.length >= 2
+      ? `${t('searchResultsLabel')} - ${normalizedQuery}`
+      : undefined;
   const outingFilterOptions = useMemo<FilterChipOption<OutingFilter>[]>(
     () => [
       { key: 'all', label: t('messagesFilterAll') },
@@ -358,7 +366,7 @@ export default function MessagesScreen() {
     [t],
   );
 
-  if (isLoading) {
+  if (shouldShowLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
         <ActivityIndicator color="#4c669f" />
@@ -403,17 +411,26 @@ export default function MessagesScreen() {
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
       <ScreenHeader
         title={t('messagesTitle')}
+        subtitle={headerSubtitle}
         onBack={() => router.back()}
         containerClassName="px-5 pb-4"
         rightSlot={
-          tab === 'direct' ? (
+          <View className="flex-row items-center">
             <TouchableOpacity
-              onPress={() => void openConnectionPicker()}
-              className="h-10 w-10 items-center justify-center rounded-full bg-[#4c669f]"
+              onPress={() => setSearchSheetOpen(true)}
+              className="mr-2 h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
             >
-              <Ionicons name="add" size={20} color="#ffffff" />
+              <Ionicons name="search-outline" size={20} color="#4c669f" />
             </TouchableOpacity>
-          ) : null
+            {tab === 'direct' ? (
+              <TouchableOpacity
+                onPress={() => void openConnectionPicker()}
+                className="h-10 w-10 items-center justify-center rounded-full bg-[#4c669f]"
+              >
+                <Ionicons name="add" size={20} color="#ffffff" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         }
       />
 
@@ -459,11 +476,6 @@ export default function MessagesScreen() {
       ) : null}
 
       <View className="pb-4">
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          placeholder={searchPlaceholder}
-        />
         {tab === 'outings' ? (
           <FilterChipsBar
             options={outingFilterOptions}
@@ -556,6 +568,22 @@ export default function MessagesScreen() {
             }}
           />
       )}
+
+      <BottomSheetModal
+        visible={searchSheetOpen}
+        onClose={() => setSearchSheetOpen(false)}
+        title={t('messagesTitle')}
+        subtitle={searchPlaceholder}
+        maxHeight={320}
+        contentMode="auto"
+      >
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          autoFocus
+          placeholder={searchPlaceholder}
+        />
+      </BottomSheetModal>
 
       <BottomSheetListModal
         visible={connectionPickerOpen}

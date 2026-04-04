@@ -1,6 +1,17 @@
 import React, { type ReactNode } from 'react';
-import { Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { uiTokens } from '@/theme/tokens';
 
 type BottomSheetModalProps = {
@@ -26,6 +37,29 @@ export default function BottomSheetModal({
   closeOnOverlayPress = true,
   contentMode = 'fill',
 }: BottomSheetModalProps) {
+  const isDark = useColorScheme() === 'dark';
+  const backdropClassName = isDark ? 'bg-black/60' : 'bg-gray-100/90';
+  const sheetBackgroundColor = isDark ? '#111827' : '#ffffff';
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return undefined;
+    }
+
+    const showEvent = Keyboard.addListener('keyboardWillShow', (event) => {
+      setKeyboardHeight(event.endCoordinates?.height || 0);
+    });
+    const hideEvent = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showEvent.remove();
+      hideEvent.remove();
+    };
+  }, []);
+
   return (
     <Modal
       visible={visible}
@@ -35,14 +69,31 @@ export default function BottomSheetModal({
     >
       <View className="flex-1 justify-end">
         <Pressable
-          className="absolute inset-0 bg-black/60"
+          className={`absolute inset-0 ${backdropClassName}`}
           onPress={closeOnOverlayPress ? onClose : undefined}
         />
-        <Pressable>
+        {Platform.OS === 'ios' && keyboardHeight > 0 ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: keyboardHeight,
+              backgroundColor: sheetBackgroundColor,
+            }}
+          />
+        ) : null}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
           <View
             className="w-full rounded-t-3xl border-t border-gray-200 bg-white px-5 pb-8 pt-4 dark:border-gray-800 dark:bg-gray-900"
             style={{
               maxHeight,
+              backgroundColor: sheetBackgroundColor,
               borderTopLeftRadius: uiTokens.radius.xl,
               borderTopRightRadius: uiTokens.radius.xl,
               borderTopWidth: uiTokens.borderWidth.hairline,
@@ -92,7 +143,7 @@ export default function BottomSheetModal({
             </View>
             {footer ? <View className="mt-4">{footer}</View> : null}
           </View>
-        </Pressable>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

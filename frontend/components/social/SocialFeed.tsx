@@ -563,6 +563,14 @@ export default function SocialFeed() {
     return label;
   }, [pendingPosts.length, t]);
 
+  const visiblePosts = useMemo(() => {
+    if (pendingPosts.length === 0) {
+      return posts;
+    }
+
+    return mergePosts(pendingPosts, posts);
+  }, [mergePosts, pendingPosts, posts]);
+
   const buildShareMessage = useCallback(
     (post: FeedPost) => {
       const title = (post.content || '').split('\n')[0]?.trim();
@@ -680,17 +688,17 @@ export default function SocialFeed() {
 
   const locationOptions = useMemo(() => {
     const values = new Set<string>();
-    posts.forEach((post) => {
+    visiblePosts.forEach((post) => {
       const label = resolveLocationLabel(post);
       if (label) {
         values.add(label);
       }
     });
     return Array.from(values);
-  }, [posts, resolveLocationLabel]);
+  }, [resolveLocationLabel, visiblePosts]);
 
   const filteredPosts = useMemo(() => {
-    return posts.filter((post) => {
+    return visiblePosts.filter((post) => {
       if (selectedCategory && post.ambiance !== selectedCategory) {
         return false;
       }
@@ -714,7 +722,13 @@ export default function SocialFeed() {
 
       return true;
     });
-  }, [posts, resolveLocationLabel, selectedCategory, selectedLocation, selectedType]);
+  }, [
+    resolveLocationLabel,
+    selectedCategory,
+    selectedLocation,
+    selectedType,
+    visiblePosts,
+  ]);
 
   const renderHeader = () => (
     <View className="mb-4 bg-white px-5 pb-5 pt-5 dark:bg-black">
