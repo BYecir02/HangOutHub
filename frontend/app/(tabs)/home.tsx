@@ -540,6 +540,7 @@ export default function HomeScreen() {
               <EventInspirationCard
                 event={item.event}
                 imageHeight={178}
+                adaptiveHeight={false}
                 cityLabel={item.cityLabel}
                 placeLabel={item.placeLabel}
                 dateLabel={item.dateLabel}
@@ -611,6 +612,7 @@ export default function HomeScreen() {
               <PlaceInspirationCard
                 place={item}
                 imageHeight={178}
+                adaptiveHeight={false}
                 fallbackNewLabel={t('placesNewBadge')}
                 shouldPlay={popularCarousel.activeId === item.id}
                 onPress={() =>
@@ -662,6 +664,7 @@ export default function HomeScreen() {
                 badgeLabel={item.badgeLabel}
                 metaLabel={item.metaLabel}
                 metaIcon={item.metaIcon}
+                adaptiveHeight={false}
                 shouldPlay={recommendedCarousel.activeId === item.id}
                 onPress={() =>
                   router.push({

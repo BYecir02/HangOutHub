@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Callout, Marker, type Region } from 'react-native-maps';
@@ -8,6 +8,7 @@ import * as Location from 'expo-location';
 import { useI18n } from '@/hooks/use-i18n';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocationScope } from '@/hooks/useLocationScope';
+import MediaFrame from '@/components/ui/MediaFrame';
 import api, { getImageUrl } from '@/services/api';
 
 interface PlacePin {
@@ -702,12 +703,12 @@ export default function MapScreen() {
                 onPress={() => focusOnPlace(place)}
                 className="mr-3 w-48 overflow-hidden rounded-2xl bg-white p-2 shadow-lg dark:bg-gray-900"
               >
-                <Image
-                  source={{
-                    uri: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER,
-                  }}
+                <MediaFrame
+                  source={getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER}
                   className="h-20 w-full rounded-xl bg-gray-200 dark:bg-gray-800"
-                  resizeMode="cover"
+                  shouldPlay
+                  muted
+                  loop
                 />
                 <Text
                   className="mt-2 text-sm font-semibold text-gray-900 dark:text-white"
@@ -735,12 +736,12 @@ export default function MapScreen() {
                 onPress={() => focusOnEvent(event)}
                 className="mr-3 w-48 overflow-hidden rounded-2xl bg-white p-2 shadow-lg dark:bg-gray-900"
               >
-                <Image
-                  source={{
-                    uri: getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER,
-                  }}
+                <MediaFrame
+                  source={getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER}
                   className="h-20 w-full rounded-xl bg-gray-200 dark:bg-gray-800"
-                  resizeMode="cover"
+                  shouldPlay
+                  muted
+                  loop
                 />
                 <Text
                   className="mt-2 text-sm font-semibold text-gray-900 dark:text-white"
@@ -775,12 +776,12 @@ export default function MapScreen() {
               }
               className="flex-row items-center rounded-[28px] bg-white p-3 shadow-xl dark:bg-gray-900"
             >
-              <Image
-                source={{
-                  uri: getImageUrl(selectedPlace.coverUrl) || PLACE_PLACEHOLDER,
-                }}
+              <MediaFrame
+                source={getImageUrl(selectedPlace.coverUrl) || PLACE_PLACEHOLDER}
                 className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
+                shouldPlay
+                muted
+                loop
               />
               <View className="ml-4 flex-1">
                 <Text className="text-base font-semibold text-gray-900 dark:text-white">
@@ -836,12 +837,12 @@ export default function MapScreen() {
               }
               className="flex-row items-center rounded-[28px] bg-white p-3 shadow-xl dark:bg-gray-900"
             >
-              <Image
-                source={{
-                  uri: getImageUrl(selectedEvent.coverUrl) || PLACE_PLACEHOLDER,
-                }}
+              <MediaFrame
+                source={getImageUrl(selectedEvent.coverUrl) || PLACE_PLACEHOLDER}
                 className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
+                shouldPlay
+                muted
+                loop
               />
               <View className="ml-4 flex-1">
                 <Text className="text-base font-semibold text-gray-900 dark:text-white">

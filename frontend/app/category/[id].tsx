@@ -142,6 +142,9 @@ function CategoryInspirationCard({
           className="w-full bg-gray-200 dark:bg-gray-800"
           style={{ height: imageHeight }}
           shouldPlay={shouldPlay}
+          adaptiveHeight
+          minHeight={imageHeight}
+          maxHeight={380}
         />
 
         <View className="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1.5">

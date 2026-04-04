@@ -8,6 +8,9 @@
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -19,7 +22,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.taiwo.hangouthub"
     },
     "web": {
       "output": "static",
@@ -40,11 +44,22 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8db2c21f-2d83-43a4-9248-29d370051d9c"
+      }
+    },
+    "owner": "ricey",
+    "updates": {
+      "url": "https://u.expo.dev/8db2c21f-2d83-43a4-9248-29d370051d9c"
     }
   }
 }

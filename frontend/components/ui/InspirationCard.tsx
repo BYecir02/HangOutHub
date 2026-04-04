@@ -16,6 +16,7 @@ interface InspirationCardProps {
   imageHeight?: number;
   cardWidthClassName?: string;
   shouldPlay?: boolean;
+  adaptiveHeight?: boolean;
 }
 
 export default function InspirationCard({
@@ -30,6 +31,7 @@ export default function InspirationCard({
   imageHeight = 178,
   cardWidthClassName = 'w-72',
   shouldPlay = false,
+  adaptiveHeight = true,
 }: InspirationCardProps) {
   return (
     <TouchableOpacity
@@ -46,6 +48,9 @@ export default function InspirationCard({
           muted
           loop
           showControls={false}
+          adaptiveHeight={adaptiveHeight}
+          minHeight={imageHeight}
+          maxHeight={380}
           style={{ height: imageHeight }}
         />
 

@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import ContactAction from '@/components/ui/ContactAction';
@@ -26,6 +27,7 @@ import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
 import { createReport } from '@/services/reports';
 import { resolveStoredUserSession } from '@/services/user-session';
 import { getOrCreateDirectChat } from '@/services/direct-chats';
+import { isVideoUrl } from '@/services/media';
 
 interface RelatedEvent {
   id: string;
@@ -165,6 +167,14 @@ export default function PlaceDetailScreen() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<PlaceDetailTab>('info');
+  const [heroMuted, setHeroMuted] = useState(true);
+
+  const heroImage = getImageUrl(place?.coverUrl) || PLACE_PLACEHOLDER;
+  const heroIsVideo = isVideoUrl(heroImage);
+
+  useEffect(() => {
+    setHeroMuted(true);
+  }, [heroImage]);
 
   useEffect(() => {
     let isMounted = true;
@@ -303,7 +313,6 @@ export default function PlaceDetailScreen() {
     );
   }
 
-  const heroImage = getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER;
   const gallery =
     place.images?.length > 0
       ? place.images.map((image) => getImageUrl(image) || PLACE_PLACEHOLDER)
@@ -452,60 +461,94 @@ export default function PlaceDetailScreen() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
       >
-      <View className="relative">
-        <MediaFrame
-          source={heroImage}
-          className="h-80 w-full"
-          shouldPlay
-          muted
-          loop
-          showControls
-        />
-        <View className="absolute inset-x-0 top-0 flex-row items-start px-5 pt-14">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="rounded-full bg-black/45 p-3"
-          >
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <View className="absolute inset-x-0 px-5" style={{ bottom: heroBadgeBottom }}>
-          <View className="max-w-[90%] flex-row flex-wrap gap-2">
-            <View className="rounded-full bg-black/55 px-3 py-2">
-              <Text className="text-xs font-semibold text-white">
-                {place.City?.name || t('placeDetailCityUnknown')}
-              </Text>
+        <View className="relative overflow-hidden rounded-b-[34px] bg-black">
+          <MediaFrame
+            source={heroImage}
+            className="w-full"
+            shouldPlay
+            muted={heroMuted}
+            loop
+            showControls
+            adaptiveHeight
+            minHeight={280}
+            maxHeight={480}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.82)']}
+            locations={[0, 0.62, 1]}
+            className="absolute inset-x-0 bottom-0 h-44"
+          />
+          <View className="absolute inset-x-0 top-0 flex-row items-start justify-between px-5 pt-14">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="rounded-full bg-black/45 p-3"
+            >
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </TouchableOpacity>
+            <View className="flex-row items-center gap-2">
+              {heroIsVideo ? (
+                <TouchableOpacity
+                  onPress={() => setHeroMuted((value) => !value)}
+                  className="rounded-full bg-black/45 p-3"
+                  accessibilityRole="button"
+                  accessibilityLabel={heroMuted ? t('mediaUnmute') : t('mediaMute')}
+                >
+                  <Ionicons
+                    name={heroMuted ? 'volume-mute' : 'volume-high'}
+                    size={20}
+                    color="#fff"
+                  />
+                </TouchableOpacity>
+              ) : null}
+              <View className="rounded-full bg-black/45 px-3 py-2">
+                <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-white">
+                  {t('placeDetailTypeLabel')}
+                </Text>
+              </View>
             </View>
-            <View className="rounded-full bg-black/55 px-3 py-2">
-              <Text className="text-xs font-semibold text-white">
-                {formatPriceLevel(place.priceLevel, t)}
-              </Text>
-            </View>
-            {place.category ? (
+          </View>
+          <View className="absolute inset-x-0 px-5" style={{ bottom: heroBadgeBottom }}>
+            <View className="max-w-[90%] flex-row flex-wrap gap-2">
               <View className="rounded-full bg-black/55 px-3 py-2">
                 <Text className="text-xs font-semibold text-white">
-                  {placeCategoryLabel}
+                  {place.City?.name || t('placeDetailCityUnknown')}
                 </Text>
               </View>
-            ) : null}
-            {typeof place.avgRating === 'number' && place.avgRating > 0 ? (
-              <View className="flex-row items-center rounded-full bg-black/55 px-3 py-2">
-                <Ionicons name="star" size={12} color="#f59e0b" />
-                <Text className="ml-1 text-xs font-semibold text-white">
-                  {place.avgRating.toFixed(1)}
+              <View className="rounded-full bg-black/55 px-3 py-2">
+                <Text className="text-xs font-semibold text-white">
+                  {formatPriceLevel(place.priceLevel, t)}
                 </Text>
               </View>
-            ) : null}
+              {place.category ? (
+                <View className="rounded-full bg-black/55 px-3 py-2">
+                  <Text className="text-xs font-semibold text-white">
+                    {placeCategoryLabel}
+                  </Text>
+                </View>
+              ) : null}
+              {typeof place.avgRating === 'number' && place.avgRating > 0 ? (
+                <View className="flex-row items-center rounded-full bg-black/55 px-3 py-2">
+                  <Ionicons name="star" size={12} color="#f59e0b" />
+                  <Text className="ml-1 text-xs font-semibold text-white">
+                    {place.avgRating.toFixed(1)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
-      </View>
 
       <View className="-mt-8 rounded-t-[28px] bg-gray-50 px-5 pt-6 dark:bg-black">
-        <Text className="text-3xl font-bold text-gray-900 dark:text-white">
-          {place.name}
-        </Text>
-
-        <View className="mt-4 flex-row flex-wrap gap-2">
+        <View className="flex-row items-start justify-between gap-4">
+          <View className="flex-1">
+            <Text className="text-3xl font-bold text-gray-900 dark:text-white">
+              {place.name}
+            </Text>
+            <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {place.City?.name || t('placeDetailCityUnknown')}
+              {place.address ? ` • ${place.address}` : ''}
+            </Text>
+          </View>
           <TouchableOpacity
             onPress={handleToggleSave}
             disabled={saveLoading}
@@ -532,9 +575,12 @@ export default function PlaceDetailScreen() {
               {isSaved ? t('placeDetailSaveActive') : t('placeDetailSaveIdle')}
             </Text>
           </TouchableOpacity>
+        </View>
+
+        <View className="mt-4 flex-row flex-wrap gap-2">
           <TouchableOpacity
             onPress={handleOpenCreateModal}
-            className="flex-row items-center rounded-full bg-[#4c669f] px-3 py-2"
+            className="flex-1 min-w-[140px] flex-row items-center justify-center rounded-full bg-[#4c669f] px-3 py-3"
           >
             <Ionicons name="add" size={13} color="#fff" />
             <Text className="ml-1.5 text-xs font-semibold text-white">
@@ -543,7 +589,7 @@ export default function PlaceDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleReportPlace}
-            className="flex-row items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-900/30 dark:bg-rose-900/20"
+            className="flex-1 min-w-[120px] flex-row items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900/30 dark:bg-rose-900/20"
           >
             <Ionicons name="flag-outline" size={13} color="#e11d48" />
             <Text className="ml-1.5 text-xs font-semibold text-rose-600">
@@ -682,7 +728,10 @@ export default function PlaceDetailScreen() {
                     >
                       <MediaFrame
                         source={image}
-                        className="h-28 w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        className="w-40 rounded-2xl bg-gray-200 dark:bg-gray-800"
+                        adaptiveHeight
+                        minHeight={112}
+                        maxHeight={200}
                       />
                     </TouchableOpacity>
                   ))}

@@ -35,6 +35,7 @@ interface PlaceInspirationCardProps {
   showSaveButton?: boolean;
   style?: StyleProp<ViewStyle>;
   shouldPlay?: boolean;
+  adaptiveHeight?: boolean;
 }
 
 export default function PlaceInspirationCard({
@@ -48,6 +49,7 @@ export default function PlaceInspirationCard({
   showSaveButton = true,
   style,
   shouldPlay = false,
+  adaptiveHeight = true,
 }: PlaceInspirationCardProps) {
   const cityLabel = place.City?.name || '';
   const ratingLabel =
@@ -73,6 +75,9 @@ export default function PlaceInspirationCard({
           muted
           loop
           showControls={false}
+          adaptiveHeight={adaptiveHeight}
+          minHeight={imageHeight}
+          maxHeight={380}
           style={{ height: imageHeight }}
         />
         {cityLabel ? (

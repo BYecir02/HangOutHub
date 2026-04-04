@@ -1,116 +1,130 @@
+﻿# HangOutHub - Mobile Frontend
 
-# HangOutHub - Mobile Frontend 🌍
+Mobile app for HangOutHub, built with Expo, React Native, TypeScript, and NativeWind.
 
-Bienvenue sur le frontend mobile de **HangOutHub**, l'application sociale ultime pour découvrir des événements, organiser des sorties et rencontrer du monde autour de chez vous.
+## Prerequisites
 
-Ce projet est construit avec :
-* **React Native** & **Expo**
-* **TypeScript**
-* **NativeWind** (Tailwind CSS)
+- Node.js LTS
+- Expo Go for quick iOS/Android testing
+- Optional: Expo account for EAS Build and EAS Update
 
-## 🚀 Prérequis
+## Install
 
-Avant de commencer, assurez-vous d'avoir installé :
-- [Node.js](https://nodejs.org/) (Version LTS recommandée)
-- **Expo Go** sur votre téléphone (disponible sur Google Play ou App Store)
+```bash
+cd frontend
+npm install
+```
 
-## 🛠️ Installation
+## Environment
 
-1.  **Accéder au dossier frontend** :
-    ```bash
-    cd frontend
-    ```
+Create `frontend/.env` and set:
 
-2.  **Installer les dépendances** :
-    ```bash
-    npm install
-    ```
-
-## ⚙️ Configuration (.env)
-
-Pour que l'application puisse communiquer avec le backend (NestJS), vous devez configurer l'URL de l'API.
-
-1.  Créez un fichier `.env` à la racine du dossier `frontend`.
-2.  Ajoutez la variable `EXPO_PUBLIC_API_URL` selon votre situation :
-
-**Option A : Développement Local (Même Wi-Fi)**
-Utilisez l'adresse IP locale de votre ordinateur.
-*(Astuce : tapez `ipconfig` sous Windows ou `ifconfig` sous Mac/Linux pour la trouver)*.
 ```dotenv
 EXPO_PUBLIC_API_URL=http://192.168.1.XX:3000
-
 ```
 
-**Option B : Développement à Distance (Ngrok)**
-Si vous testez sur un réseau différent (4G, etc.), utilisez l'URL fournie par Ngrok.
+Use your local backend IP for same-network testing.
+If you are on a different network, use an ngrok URL instead.
 
-```dotenv
-EXPO_PUBLIC_API_URL=[https://votre-id-ngrok.ngrok-free.app](https://votre-id-ngrok.ngrok-free.app)
-
-```
-
----
-
-## 🌍 Lancement (Backend & Frontend)
-
-Pour que l'application fonctionne, le backend et le frontend doivent tourner en parallèle.
-
-### 1. Démarrer le Backend
-
-Dans un terminal séparé, allez dans le dossier `backend` :
+## Run locally
 
 ```bash
-# Lancement classique
-npm run start:dev
-
-# OU (si besoin d'accès à distance)
-npx ngrok http 3000
-
+npm run start
 ```
 
-### 2. Démarrer le Frontend (Application Mobile)
-
-Dans le dossier `frontend` :
+Useful variants:
 
 ```bash
-npx expo start
-
+npm run start:lan
+npm run start:tunnel
 ```
 
-> **Astuce :** Si vous utilisez Ngrok ou avez des soucis de connexion, forcez le mode tunnel :
-> ```bash
-> npx expo start --tunnel
-> 
-> ```
-> 
-> 
+## Android workflow
 
-### 3. Ouvrir sur votre téléphone
+We now use EAS for Android test builds and over-the-air updates.
 
-Scannez le **QR code** affiché dans le terminal avec :
+### One-time setup
 
-* L'application **Expo Go** (Android).
-* L'application **Appareil Photo** (iOS).
+The project is already linked to Expo/EAS.
 
----
+If you ever need to re-link it:
 
-## 📂 Structure du projet
+```bash
+npx eas login
+npx eas update:configure
+```
 
-Voici un aperçu de l'organisation des fichiers :
+### First Android test build
+
+```bash
+cd frontend
+npx eas build -p android --profile preview
+```
+
+Android package:
+
+```text
+com.taiwo.hangouthub
+```
+
+Expo/EAS will create the Android keystore and give you a build link.
+Install that build once on the Android phone.
+
+### Future updates
+
+For JS/UI changes, publish an EAS update:
+
+```bash
+cd frontend
+npx eas update --channel preview --message "Small fix"
+```
+
+This is for:
+- screen changes
+- styles
+- text
+- navigation
+- other JavaScript-only changes
+
+### When you must rebuild
+
+Create a new Android build if you change:
+- native dependencies
+- Expo plugins
+- `app.json` native settings
+- anything that changes the native runtime
+
+### Quick rule
+
+- JS/UI changes -> EAS Update
+- Native changes -> new Android build
+
+### iPhone note
+
+For now, iOS can stay on Expo Go.
+We are focusing the installed test-build flow on Android.
+
+## Commands to remember
+
+```bash
+# local dev
+npm run start
+
+# Android test build
+npx eas build -p android --profile preview
+
+# publish a JS/UI update
+npx eas update --channel preview --message "Small fix"
+```
+
+## Project structure
 
 ```text
 frontend/
-├── app/                  # Écrans et Navigation (Expo Router)
-│   ├── (tabs)/           # Écrans principaux (Accueil, Carte, Social, Profil)
-│   ├── event/            # Pages de détails d'événements
-│   └── _layout.tsx       # Configuration globale du layout
-├── components/           # Composants réutilisables
-│   ├── ui/               # Éléments d'interface (Cartes, Boutons, etc.)
-│   └── ...
-├── services/             # Gestion des appels API (Axios)
-├── assets/               # Images et polices
-└── ...
-
+|-- app/            # Expo Router screens
+|-- components/     # reusable UI
+|-- services/       # API and app services
+|-- hooks/          # shared hooks
+|-- assets/         # images and fonts
+`-- ...
 ```
-
----

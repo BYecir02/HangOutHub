@@ -27,6 +27,7 @@ interface EventInspirationCardProps {
   priceLabel: string;
   style?: StyleProp<ViewStyle>;
   shouldPlay?: boolean;
+  adaptiveHeight?: boolean;
 }
 
 const EVENT_PLACEHOLDER =
@@ -42,6 +43,7 @@ export default function EventInspirationCard({
   priceLabel,
   style,
   shouldPlay = false,
+  adaptiveHeight = true,
 }: EventInspirationCardProps) {
   return (
     <TouchableOpacity
@@ -58,6 +60,9 @@ export default function EventInspirationCard({
           muted
           loop
           showControls={false}
+          adaptiveHeight={adaptiveHeight}
+          minHeight={imageHeight}
+          maxHeight={380}
           style={{ height: imageHeight }}
         />
 
