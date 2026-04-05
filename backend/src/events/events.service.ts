@@ -2081,6 +2081,31 @@ export class EventsService {
     eventId: string,
     payload: CreateEventBookingDto,
   ) {
+    const bookingInclude = {
+      Event: {
+        select: {
+          id: true,
+          title: true,
+          startTime: true,
+          endTime: true,
+          coverUrl: true,
+          organizerId: true,
+          Place: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      TicketType: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    };
+
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
       select: {
@@ -2120,6 +2145,21 @@ export class EventsService {
 
     if (!event) {
       throw new NotFoundException('Evenement introuvable');
+    }
+
+    const existingRequestBooking = await this.prisma.booking.findUnique({
+      where: {
+        userId_eventId_clientRequestId: {
+          userId,
+          eventId,
+          clientRequestId: payload.clientRequestId,
+        },
+      },
+      include: bookingInclude,
+    });
+
+    if (existingRequestBooking) {
+      return this.formatBooking(existingRequestBooking);
     }
 
     const eventEnd = event.endTime || event.startTime;
@@ -2190,30 +2230,7 @@ export class EventsService {
           status: 'CANCELLED',
         },
       },
-      include: {
-        Event: {
-          select: {
-            id: true,
-            title: true,
-            startTime: true,
-            endTime: true,
-            coverUrl: true,
-            organizerId: true,
-            Place: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        TicketType: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
+      include: bookingInclude,
     });
 
     const activeBookingsCount = await this.prisma.booking.count({
@@ -2242,30 +2259,7 @@ export class EventsService {
             data: {
               qrCode: randomUUID(),
             },
-            include: {
-              Event: {
-                select: {
-                  id: true,
-                  title: true,
-                  startTime: true,
-                  endTime: true,
-                  coverUrl: true,
-                  organizerId: true,
-                  Place: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
-                },
-              },
-              TicketType: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
+            include: bookingInclude,
           });
 
           return this.formatBooking(upgraded);
@@ -2291,30 +2285,7 @@ export class EventsService {
           data: {
             qrCode: randomUUID(),
           },
-          include: {
-            Event: {
-              select: {
-                id: true,
-                title: true,
-                startTime: true,
-                endTime: true,
-                coverUrl: true,
-                organizerId: true,
-                Place: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            TicketType: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
+            include: bookingInclude,
         });
 
         return this.formatBooking(upgraded);
@@ -2349,112 +2320,116 @@ export class EventsService {
     const status = paymentRequired ? 'PENDING' : 'CONFIRMED';
     const qrCode = paymentRequired ? null : randomUUID();
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      if (selectedTicketType) {
-        const stockUpdate = await tx.ticketType.updateMany({
-          where: {
-            id: selectedTicketType.id,
-            quantity: {
-              gt: 0,
-            },
-          },
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const createdBooking = await tx.booking.create({
           data: {
-            quantity: {
-              decrement: 1,
-            },
+            userId,
+            eventId,
+            ticketTypeId: selectedTicketType?.id || null,
+            clientRequestId: payload.clientRequestId,
+            status,
+            qrCode,
           },
+          include: bookingInclude,
         });
 
-        if (stockUpdate.count === 0) {
-          throw new BadRequestException(
-            `Le tarif ${selectedTicketType.name} est epuise.`,
-          );
-        }
-      }
-
-      if (selectedPromotion) {
-        const promoUpdate = await tx.promotion.updateMany({
-          where: {
-            id: selectedPromotion.id,
-            ...(selectedPromotion.maxRedemptions
-              ? {
-                  redeemedCount: {
-                    lt: selectedPromotion.maxRedemptions,
-                  },
-                }
-              : {}),
-            ...(selectedPromotion.endDate
-              ? {
-                  endDate: {
-                    gte: new Date(),
-                  },
-                }
-              : {}),
-          },
-          data: {
-            redeemedCount: {
-              increment: 1,
-            },
-          },
-        });
-
-        if (promoUpdate.count === 0) {
-          throw new BadRequestException(
-            'Ce code promo est expire ou n est plus disponible.',
-          );
-        }
-      }
-
-      return tx.booking.create({
-        data: {
-          userId,
-          eventId,
-          ticketTypeId: selectedTicketType?.id || null,
-          status,
-          qrCode,
-        },
-        include: {
-          Event: {
-            select: {
-              id: true,
-              title: true,
-              startTime: true,
-              endTime: true,
-              coverUrl: true,
-              organizerId: true,
-              Place: {
-                select: {
-                  id: true,
-                  name: true,
-                },
+        if (selectedTicketType) {
+          const stockUpdate = await tx.ticketType.updateMany({
+            where: {
+              id: selectedTicketType.id,
+              quantity: {
+                gt: 0,
               },
             },
-          },
-          TicketType: {
-            select: {
-              id: true,
-              name: true,
+            data: {
+              quantity: {
+                decrement: 1,
+              },
             },
-          },
+          });
+
+          if (stockUpdate.count === 0) {
+            throw new BadRequestException(
+              `Le tarif ${selectedTicketType.name} est epuise.`,
+            );
+          }
+        }
+
+        if (selectedPromotion) {
+          const promoUpdate = await tx.promotion.updateMany({
+            where: {
+              id: selectedPromotion.id,
+              ...(selectedPromotion.maxRedemptions
+                ? {
+                    redeemedCount: {
+                      lt: selectedPromotion.maxRedemptions,
+                    },
+                  }
+                : {}),
+              ...(selectedPromotion.endDate
+                ? {
+                    endDate: {
+                      gte: new Date(),
+                    },
+                  }
+                : {}),
+            },
+            data: {
+              redeemedCount: {
+                increment: 1,
+              },
+            },
+          });
+
+          if (promoUpdate.count === 0) {
+            throw new BadRequestException(
+              'Ce code promo est expire ou n est plus disponible.',
+            );
+          }
+        }
+
+        return createdBooking;
+      });
+
+      await this.createOrganizerNotification({
+        organizerId: event.organizerId,
+        actorUserId: userId,
+        type: 'ORGANIZER_BOOKING_CREATED',
+        title: 'Nouvelle reservation',
+        message: `Nouvelle reservation sur ${event.title}.`,
+        severity: 'IMPORTANT',
+        targetPath: `/event/${eventId}`,
+        metadata: {
+          eventId,
+          eventTitle: event.title,
         },
       });
-    });
 
-    await this.createOrganizerNotification({
-      organizerId: event.organizerId,
-      actorUserId: userId,
-      type: 'ORGANIZER_BOOKING_CREATED',
-      title: 'Nouvelle reservation',
-      message: `Nouvelle reservation sur ${event.title}.`,
-      severity: 'IMPORTANT',
-      targetPath: `/event/${eventId}`,
-      metadata: {
-        eventId,
-        eventTitle: event.title,
-      },
-    });
+      return this.formatBooking(created);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existingConflict = await this.prisma.booking.findUnique({
+          where: {
+            userId_eventId_clientRequestId: {
+              userId,
+              eventId,
+              clientRequestId: payload.clientRequestId,
+            },
+          },
+          include: bookingInclude,
+        });
 
-    return this.formatBooking(created);
+        if (existingConflict) {
+          return this.formatBooking(existingConflict);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async cancelBooking(userId: string, bookingId: string) {

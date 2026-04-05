@@ -1061,8 +1061,6 @@ const fr = {
   postPlacePlaceholder: 'Lieu (ex: Rooftop Sky)',
   postCityPlaceholder: 'Ville (ex: Cotonou)',
   postAmbianceLabel: 'Categorie',
-  postPlanShortcutHint:
-    'Ajoute une categorie, un lieu ou un evenement via l icone localisation en bas.',
   postPlanModalTitle: 'Infos lieu / evenement',
   postPlanModalTargetTitle: 'Type',
   postPlanModalTargetPlace: 'Lieu',
@@ -1090,13 +1088,9 @@ const fr = {
   postNextStep: 'Apercu',
   postBackToEdit: 'Retour a la saisie',
   postVisibilitySection: 'Visibilite',
-  postEditHint:
-    'Tu peux modifier le texte, la visibilite, les images et les infos du plan.',
-  postCreateHint:
-    'Ajoute une ou plusieurs images et choisis qui peut voir ta publication.',
   postVisibilityModalTitle: 'Qui peut voir ce post ?',
   postImageLimitTitle: 'Limite atteinte',
-  postImageLimitMessage: 'Tu peux ajouter jusqu a {count} images.',
+  postImageLimitMessage: 'Tu peux ajouter jusqu a {count} medias.',
   postVisibilityPublicLabel: 'Tout le monde',
   postVisibilityPublicDescription:
     'Visible par tous les utilisateurs de l application.',
@@ -1643,6 +1637,9 @@ const fr = {
   socialFeedHeaderTitle: 'Vibes locales',
   socialFeedHeaderSubtitle:
     'Suis les dernieres publications, reponds et fais vivre la communaute.',
+  socialFeedStatPosts: 'Publications',
+  socialFeedStatMedia: 'Medias',
+  socialFeedStatLive: 'En direct',
   socialFeedFilterCategory: 'Categorie',
   socialFeedFilterType: 'Type',
   socialFeedFilterLocation: 'Lieu / Ville',
@@ -1661,6 +1658,7 @@ const fr = {
   postItemDeleteConfirmMessage: 'Supprimer ce post ?',
   postItemCancel: 'Annuler',
   postItemOptionsTitle: 'Options',
+  postItemOptionsSubtitle: 'Choisis une action pour cette publication.',
   postItemUserFallback: 'Utilisateur',
   postItemJustNow: 'A l instant',
   postItemPlanFallback: 'Plan visuel',
@@ -2740,8 +2738,6 @@ const en: Record<keyof typeof fr, string> = {
   postPlacePlaceholder: 'Place (ex: Rooftop Sky)',
   postCityPlaceholder: 'City (ex: Cotonou)',
   postAmbianceLabel: 'Category',
-  postPlanShortcutHint:
-    'Add a category, place, or event using the location icon below.',
   postPlanModalTitle: 'Place / event details',
   postPlanModalTargetTitle: 'Type',
   postPlanModalTargetPlace: 'Place',
@@ -2769,13 +2765,9 @@ const en: Record<keyof typeof fr, string> = {
   postNextStep: 'Preview',
   postBackToEdit: 'Back to edit',
   postVisibilitySection: 'Visibility',
-  postEditHint:
-    'You can edit the text, visibility, images, and plan details.',
-  postCreateHint:
-    'Add one or more images and choose who can see your post.',
   postVisibilityModalTitle: 'Who can see this post?',
   postImageLimitTitle: 'Limit reached',
-  postImageLimitMessage: 'You can add up to {count} images.',
+  postImageLimitMessage: 'You can add up to {count} media items.',
   postVisibilityPublicLabel: 'Everyone',
   postVisibilityPublicDescription:
     'Visible to all users of the app.',
@@ -3320,6 +3312,9 @@ const en: Record<keyof typeof fr, string> = {
   socialFeedHeaderTitle: 'Local vibes',
   socialFeedHeaderSubtitle:
     'Follow latest posts, react, and keep the community alive.',
+  socialFeedStatPosts: 'Posts',
+  socialFeedStatMedia: 'Media',
+  socialFeedStatLive: 'Live',
   socialFeedFilterCategory: 'Category',
   socialFeedFilterType: 'Type',
   socialFeedFilterLocation: 'Place / City',
@@ -3338,6 +3333,7 @@ const en: Record<keyof typeof fr, string> = {
   postItemDeleteConfirmMessage: 'Delete this post?',
   postItemCancel: 'Cancel',
   postItemOptionsTitle: 'Options',
+  postItemOptionsSubtitle: 'Choose an action for this post.',
   postItemUserFallback: 'User',
   postItemJustNow: 'Just now',
   postItemPlanFallback: 'Visual plan',

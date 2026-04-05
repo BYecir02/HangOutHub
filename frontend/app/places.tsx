@@ -22,7 +22,12 @@ import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
 import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import ScreenState from '@/components/ui/ScreenState';
-import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
+import api, {
+  clearAuthState,
+  getApiErrorMessage,
+  getImageUrl,
+  storage,
+} from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
@@ -290,6 +295,17 @@ export default function PlacesScreen() {
       setCache('places', response.data);
       setErrorMessage(null);
     } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 401
+      ) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
       setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
       if (!getCache('places')) {
         setPlaces([]);
@@ -321,10 +337,21 @@ export default function PlacesScreen() {
     try {
       const response = await api.get<{ id: string }[]>('/places/saved/mine');
       setSavedPlaceIds(new Set(response.data.map((place) => place.id)));
-    } catch {
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 401
+      ) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
       setSavedPlaceIds(new Set());
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void loadSavedPlaces();
@@ -440,7 +467,18 @@ export default function PlacesScreen() {
           }
           return next;
         });
-      } catch {
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'response' in error &&
+          (error as { response?: { status?: number } }).response?.status === 401
+        ) {
+          await clearAuthState();
+          router.replace('/');
+          return;
+        }
+
         Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
       } finally {
         setSavingPlaceIds((current) => {

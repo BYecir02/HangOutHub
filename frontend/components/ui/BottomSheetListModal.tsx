@@ -23,6 +23,7 @@ type BottomSheetListModalProps<T> = {
   emptyTitle?: string;
   emptyDescription?: string;
   maxHeight?: number;
+  autoFocusSearchInput?: boolean;
 };
 
 export default function BottomSheetListModal<T>({
@@ -43,6 +44,7 @@ export default function BottomSheetListModal<T>({
   emptyTitle,
   emptyDescription,
   maxHeight,
+  autoFocusSearchInput = false,
 }: BottomSheetListModalProps<T>) {
   return (
     <BottomSheetModal
@@ -51,6 +53,7 @@ export default function BottomSheetListModal<T>({
       title={title}
       subtitle={subtitle}
       maxHeight={maxHeight}
+      contentMode="auto"
     >
       <View className="mb-4 flex-row items-center rounded-2xl bg-gray-100 px-3 py-2 dark:bg-gray-800">
         <Ionicons name="search-outline" size={18} color="#9ca3af" />
@@ -59,6 +62,7 @@ export default function BottomSheetListModal<T>({
           onChangeText={onSearchChange}
           placeholder={searchPlaceholder}
           placeholderTextColor="#9ca3af"
+          autoFocus={autoFocusSearchInput}
           className="ml-2 flex-1 text-gray-900 dark:text-white"
         />
       </View>
@@ -79,7 +83,11 @@ export default function BottomSheetListModal<T>({
           description={emptyDescription}
         />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 8 }}
+        >
           {items.map((item) => (
             <View key={keyExtractor(item)}>{renderItem(item)}</View>
           ))}

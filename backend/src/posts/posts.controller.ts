@@ -47,9 +47,14 @@ export class PostsController {
     FilesInterceptor('images', 5, {
       storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
+        if (
+          !file.mimetype.startsWith('image/') &&
+          !file.mimetype.startsWith('video/')
+        ) {
           return cb(
-            new BadRequestException('Seules les images sont autorisees.'),
+            new BadRequestException(
+              'Seules les images et les videos sont autorisees.',
+            ),
             false,
           );
         }
@@ -149,9 +154,14 @@ export class PostsController {
     FilesInterceptor('images', 5, {
       storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
+        if (
+          !file.mimetype.startsWith('image/') &&
+          !file.mimetype.startsWith('video/')
+        ) {
           return cb(
-            new BadRequestException('Seules les images sont autorisees.'),
+            new BadRequestException(
+              'Seules les images et les videos sont autorisees.',
+            ),
             false,
           );
         }

@@ -21,7 +21,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import EventFormWizard from '@/components/ui/EventFormWizard';
-import api from '../services/api';
+import api, { clearAuthState } from '../services/api';
 import { getMySettings } from '@/services/settings';
 
 interface OwnedPlaceOption {
@@ -73,13 +73,11 @@ interface EventDraftPayload {
   selectedCategoryId: number | null;
   selectedTagIds: number[];
   ticketTypes: DraftTicketType[];
-  images: {
-    uri: string;
-    fileName?: string;
-    mimeType?: string;
-  }[];
   coverIndex: number;
 }
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
 
 const EVENT_DRAFT_KEY = 'create-event-draft-v1';
 const AUTO_SAVE_INTERVAL_MS = 15000;
@@ -160,6 +158,11 @@ export default function CreateEventScreen() {
     fieldOffsetsRef.current[field] = y;
   };
 
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const parseOffsetMinutes = (rawValue: string, fallback: number) => {
     const parsed = Number(rawValue);
     if (!Number.isFinite(parsed)) {
@@ -213,11 +216,6 @@ export default function CreateEventScreen() {
     selectedCategoryId,
     selectedTagIds,
     ticketTypes,
-    images: images.map((item) => ({
-      uri: item.uri,
-      fileName: item.fileName || undefined,
-      mimeType: item.mimeType || undefined,
-    })),
     coverIndex,
   }), [
     eventForm,
@@ -225,7 +223,6 @@ export default function CreateEventScreen() {
     selectedCategoryId,
     selectedTagIds,
     ticketTypes,
-    images,
     coverIndex,
   ]);
 
@@ -296,26 +293,8 @@ export default function CreateEventScreen() {
           ],
     );
 
-    const nextImages = (draft.images || []).map((item) => ({
-      uri: item.uri,
-      fileName: item.fileName,
-      mimeType: item.mimeType,
-      width: 0,
-      height: 0,
-      type: 'image' as const,
-    }));
-
-    setImages(nextImages);
-
-    if (nextImages.length === 0) {
-      setCoverIndex(0);
-    } else {
-      const normalizedCoverIndex = Math.max(
-        0,
-        Math.min(draft.coverIndex || 0, nextImages.length - 1),
-      );
-      setCoverIndex(normalizedCoverIndex);
-    }
+    setImages([]);
+    setCoverIndex(0);
   },
   []);
 
@@ -441,7 +420,12 @@ export default function CreateEventScreen() {
             );
           }
         }
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         if (isMounted) {
           setOwnedPlaces([]);
           setAllPlaces([]);
@@ -467,7 +451,7 @@ export default function CreateEventScreen() {
     return () => {
       isMounted = false;
     };
-  }, [applyDraft, t]);
+  }, [applyDraft, handleInvalidSession, t]);
 
   useEffect(() => {
     if (lastSavedDraftRef.current === null) {
@@ -676,6 +660,11 @@ export default function CreateEventScreen() {
       );
       setCustomTagName('');
     } catch (error: any) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       const apiMessage =
         error?.response?.data?.message && typeof error.response.data.message === 'string'
           ? error.response.data.message
@@ -898,6 +887,11 @@ export default function CreateEventScreen() {
         params: { id: response.data.id },
       });
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error(error);
       Alert.alert(t('commonErrorTitle'), t('createEventCreateFailed'));
     } finally {

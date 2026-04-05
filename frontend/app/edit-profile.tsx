@@ -15,7 +15,10 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl } from '../services/api';
+import api, { clearAuthState, getImageUrl } from '../services/api';
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -36,6 +39,11 @@ export default function EditProfileScreen() {
   const [newCover, setNewCover] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
 
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const fetchCurrentProfile = useCallback(async () => {
     try {
       const response = await api.get('/users/me');
@@ -47,13 +55,18 @@ export default function EditProfileScreen() {
         avatarUrl,
         coverUrl,
       });
-    } catch {
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       Alert.alert(t('commonErrorTitle'), t('editProfileLoadError'));
       router.back();
     } finally {
       setLoading(false);
     }
-  }, [router, t]);
+  }, [handleInvalidSession, router, t]);
 
   useEffect(() => {
     void fetchCurrentProfile();
@@ -123,6 +136,12 @@ export default function EditProfileScreen() {
       router.back();
     } catch (error) {
       console.error(error);
+
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       Alert.alert(t('commonErrorTitle'), t('editProfileSaveFailed'));
     } finally {
       setSaving(false);

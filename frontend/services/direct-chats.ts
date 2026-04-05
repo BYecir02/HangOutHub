@@ -142,7 +142,6 @@ export async function sendDirectMessageWithImages(
     `/direct-chats/${id}/messages`,
     formData,
     {
-      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (event) => {
         if (!options?.onUploadProgress) {
           return;

@@ -12,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl } from '../../services/api';
+import api, { clearAuthState, getImageUrl } from '../../services/api';
 import PostItem from '../../components/social/PostItem';
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
 
 interface PublicUserProfile {
   id: string;
@@ -73,6 +76,11 @@ export default function PublicProfileScreen() {
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [posts, setPosts] = useState<UserPost[]>([]);
 
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const loadProfile = useCallback(async () => {
     if (!params.id) {
       return;
@@ -89,13 +97,18 @@ export default function PublicProfileScreen() {
       setProfile(profileResponse.data);
       setPosts(postsResponse.data);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur chargement profil public:', error);
       setProfile(null);
       setPosts([]);
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [handleInvalidSession, params.id]);
 
   useFocusEffect(
     useCallback(() => {

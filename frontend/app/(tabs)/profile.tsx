@@ -26,6 +26,7 @@ import {
   isOrganizerSuspended,
   normalizeTeamWorkspaceRole,
 } from '../../services/organizer-access';
+import { useVisibleItemAutoplay } from '../../hooks/useVisibleItemAutoplay';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { useI18n } from '@/hooks/use-i18n';
 
@@ -244,6 +245,7 @@ export default function ProfileScreen() {
   }, [outingFilter, sortedOutings]);
 
   const featuredOuting = filteredOutings[0] ?? null;
+  const profilePostsAutoplay = useVisibleItemAutoplay(posts, (post) => post.id);
   const savedPlaceColumns = useMemo(() => {
     const nextColumns: Array<Array<{ place: (typeof savedPlaces)[number]; imageHeight: number }>> =
       [[], []];
@@ -342,7 +344,13 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-white dark:bg-black" showsVerticalScrollIndicator={false}>
+    <ScrollView
+      className="flex-1 bg-white dark:bg-black"
+      showsVerticalScrollIndicator={false}
+      onScroll={activeTab === 'posts' ? profilePostsAutoplay.onScroll : undefined}
+      scrollEventThrottle={16}
+      onLayout={activeTab === 'posts' ? profilePostsAutoplay.onLayout : undefined}
+    >
       <ProfileHeader
         user={displayUser}
         isOrganizer={isOrganizer}
@@ -526,14 +534,24 @@ export default function ProfileScreen() {
           {!isOrganizer && activeTab === 'posts' ? (
             posts.length > 0 ? (
               posts.map((post) => (
-                <PostItem
+                <View
                   key={post.id}
-                  item={post}
-                  showDateColumn={false}
-                  onDelete={handleDeletePost}
-                  onEdit={handleEditPost}
-                  onComment={handleCommentPost}
-                />
+                  onLayout={(event) =>
+                    profilePostsAutoplay.registerLayout(post.id, {
+                      y: event.nativeEvent.layout.y,
+                      height: event.nativeEvent.layout.height,
+                    })
+                  }
+                >
+                  <PostItem
+                    item={post}
+                    showDateColumn={false}
+                    onDelete={handleDeletePost}
+                    onEdit={handleEditPost}
+                    onComment={handleCommentPost}
+                    shouldPlayMedia={profilePostsAutoplay.activeId === post.id}
+                  />
+                </View>
               ))
             ) : (
               <EmptyPanel

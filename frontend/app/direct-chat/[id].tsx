@@ -42,6 +42,7 @@ import {
 } from '@/services/direct-chats';
 import { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { resolveStoredUserSession } from '@/services/user-session';
+import { clearAuthState, storage } from '@/services/api';
 import {
   resolveReplyToMessageId,
   resolveSharedPostId,
@@ -392,7 +393,13 @@ export default function DirectChatScreen() {
     let isMounted = true;
 
     const resolveUser = async () => {
+      const token = await storage.getItem('userToken');
       const session = await resolveStoredUserSession();
+      if (!session && token) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
       if (!isMounted) {
         return;
       }
@@ -557,6 +564,18 @@ export default function DirectChatScreen() {
       setPartnerTyping(false);
     };
 
+    const handleSocketConnect = () => {
+      if (!isActive || !socketRef.current || !chatId) {
+        return;
+      }
+
+      joinDirectConversation(socketRef.current, chatId);
+      if (typingActiveRef.current) {
+        emitDirectTyping(socketRef.current, chatId, true);
+      }
+      void loadThread({ silent: true });
+    };
+
     void (async () => {
       const socket = await getDirectChatSocket();
       if (!isActive || !socket) {
@@ -570,6 +589,7 @@ export default function DirectChatScreen() {
         emitDirectTyping(socket, chatId, true);
       }
 
+      socket.on('connect', handleSocketConnect);
       socket.on('message:new', handleMessageNew);
       socket.on('message:updated', handleMessageUpdated);
       socket.on('chat:read', handleReadUpdated);
@@ -587,6 +607,7 @@ export default function DirectChatScreen() {
       }
       if (attachedSocket) {
         emitDirectTyping(attachedSocket, chatId, false);
+        attachedSocket.off('connect', handleSocketConnect);
         attachedSocket.off('message:new', handleMessageNew);
         attachedSocket.off('message:updated', handleMessageUpdated);
         attachedSocket.off('chat:read', handleReadUpdated);
@@ -596,7 +617,7 @@ export default function DirectChatScreen() {
         leaveDirectConversation(attachedSocket, chatId);
       }
     };
-  }, [applyReactionLocally, chatId, currentUserId, mergeMessages, scheduleAutoScroll]);
+  }, [applyReactionLocally, chatId, currentUserId, loadThread, mergeMessages, scheduleAutoScroll]);
 
   useEffect(() => {
     if (!shouldAutoScrollRef.current || messages.length === 0) {

@@ -1,18 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image as RNImage, Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useEventListener } from 'expo';
+import { Image as ExpoImage } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
 
 import { isVideoUrl } from '@/services/media';
 
 interface MediaFrameProps {
   source: string;
+  mediaType?: 'auto' | 'image' | 'video';
   className?: string;
   style?: StyleProp<ViewStyle>;
   shouldPlay?: boolean;
   muted?: boolean;
   loop?: boolean;
   showControls?: boolean;
+  contentFit?: 'cover' | 'contain';
   fallbackLabel?: string;
   adaptiveHeight?: boolean;
   minHeight?: number;
@@ -22,25 +25,100 @@ interface MediaFrameProps {
 
 export default function MediaFrame({
   source,
+  mediaType = 'auto',
   className,
   style,
   shouldPlay = false,
   muted = true,
   loop = true,
   showControls = false,
+  contentFit = 'cover',
   fallbackLabel,
   adaptiveHeight = false,
   minHeight = 180,
   maxHeight = 520,
   fallbackAspectRatio = 4 / 5,
 }: MediaFrameProps) {
-  const isVideo = isVideoUrl(source);
+  const isVideo = mediaType === 'video' ? true : mediaType === 'image' ? false : isVideoUrl(source);
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | null>(
     null,
   );
-  const videoSource = isVideo ? { uri: source } : null;
-  const player = useVideoPlayer(videoSource);
+  const [posterSource, setPosterSource] = useState<unknown | null>(null);
+  const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
+  const isMountedRef = useRef(true);
+  const thumbnailRequestIdRef = useRef(0);
+  const videoSource = useMemo(() => {
+    if (!isVideo) {
+      return null;
+    }
+
+    return {
+      uri: source,
+      useCaching: true,
+      contentType: 'auto' as const,
+    };
+  }, [isVideo, source]);
+
+  const setupPlayer = useCallback((videoPlayer: ReturnType<typeof useVideoPlayer>) => {
+    videoPlayer.bufferOptions = {
+      preferredForwardBufferDuration: 1.5,
+      waitsToMinimizeStalling: false,
+      minBufferForPlayback: 0.5,
+      maxBufferBytes: 0,
+      prioritizeTimeOverSizeThreshold: true,
+    };
+  }, []);
+
+  const player = useVideoPlayer(videoSource, setupPlayer);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setPosterSource(null);
+    setHasRenderedFirstFrame(false);
+  }, [source, isVideo]);
+
+  useEventListener(player, 'sourceLoad', () => {
+    if (!isVideo || !source) {
+      return;
+    }
+
+    const requestId = thumbnailRequestIdRef.current + 1;
+    thumbnailRequestIdRef.current = requestId;
+
+    void (async () => {
+      try {
+        const thumbnails = await player.generateThumbnailsAsync([0.2], {
+          maxWidth: 960,
+          maxHeight: 960,
+        });
+        if (!isMountedRef.current || thumbnailRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setPosterSource(thumbnails[0] || null);
+      } catch {
+        if (isMountedRef.current && thumbnailRequestIdRef.current === requestId) {
+          setPosterSource(null);
+        }
+      }
+    })();
+  });
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (!isVideo || !shouldPlay || status !== 'readyToPlay') {
+      return;
+    }
+
+    void player.play();
+  });
 
   useEffect(() => {
     if (!adaptiveHeight || isVideo || !source) {
@@ -49,7 +127,7 @@ export default function MediaFrame({
 
     let isMounted = true;
 
-    Image.getSize(
+    RNImage.getSize(
       source,
       (width, height) => {
         if (!isMounted || !width || !height) {
@@ -129,18 +207,31 @@ export default function MediaFrame({
           : undefined
       }
     >
+      {isVideo && posterSource && !hasRenderedFirstFrame ? (
+        <ExpoImage
+          source={posterSource as never}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
+        />
+      ) : null}
       {isVideo ? (
         <VideoView
           player={player}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit={contentFit}
           nativeControls={showControls}
+          surfaceType={Platform.OS === 'android' ? 'textureView' : undefined}
+          onFirstFrameRender={() => {
+            setHasRenderedFirstFrame(true);
+          }}
         />
       ) : (
-        <Image
+        <RNImage
           source={{ uri: source }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          resizeMode={contentFit}
         />
       )}
       {fallbackLabel ? (

@@ -9,7 +9,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { storage } from '@/services/api';
+import api, { clearAuthState, storage } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import {
   type AppLanguage,
@@ -45,6 +45,20 @@ export default function SettingsScreen() {
       setSettings(nextSettings);
       await syncAppPreferencesFromSettings(nextSettings);
     } catch (error) {
+      const status =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { status?: number } }).response?.status === 'number'
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+
+      if (status === 401) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
       console.error('Erreur chargement settings:', error);
       setSettings(null);
     } finally {
@@ -82,6 +96,20 @@ export default function SettingsScreen() {
       setSettings(savedSettings);
       await syncAppPreferencesFromSettings(savedSettings);
     } catch (error) {
+      const status =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { status?: number } }).response?.status === 'number'
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+
+      if (status === 401) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
       console.error('Erreur sauvegarde settings:', error);
       setSettings(previousSettings);
       await syncAppPreferencesFromSettings(previousSettings);
@@ -103,8 +131,7 @@ export default function SettingsScreen() {
               // 1. Logout backend (invalider la session)
               await api.post('/auth/logout').catch(() => {});
               // 2. Supprimer le token et les infos locales
-              await storage.removeItem('userToken');
-              await storage.removeItem('refreshToken');
+              await clearAuthState();
               await clearStoredUserSession();
               // 3. Rediriger vers la page de connexion (index)
               router.replace('/');
@@ -130,8 +157,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await api.delete('/users/me');
-              await storage.removeItem('userToken');
-              await storage.removeItem('refreshToken');
+              await clearAuthState();
               await clearStoredUserSession();
               router.replace('/');
               Alert.alert(

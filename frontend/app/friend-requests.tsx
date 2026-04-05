@@ -14,7 +14,7 @@ import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import { getApiErrorMessage } from '@/services/api';
+import { clearAuthState, getApiErrorMessage } from '@/services/api';
 import {
   acceptFriendRequest,
   getFriendshipOverview,
@@ -41,6 +41,14 @@ export default function FriendRequestsScreen() {
   const [friendships, setFriendships] =
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
 
+  const isUnauthorized = (error: unknown) =>
+    (error as { response?: { status?: number } }).response?.status === 401;
+
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const loadRequests = useCallback(async () => {
     setLoading(true);
 
@@ -49,13 +57,18 @@ export default function FriendRequestsScreen() {
       setFriendships(data);
       setErrorMessage(null);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur chargement demandes:', error);
       setFriendships(EMPTY_FRIENDSHIPS);
       setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [handleInvalidSession, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -68,6 +81,11 @@ export default function FriendRequestsScreen() {
       await acceptFriendRequest(friendshipId);
       await loadRequests();
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error(error);
       Alert.alert(t('commonErrorTitle'), t('searchRequestAcceptError'));
     }
@@ -78,6 +96,11 @@ export default function FriendRequestsScreen() {
       await rejectFriendRequest(friendshipId);
       await loadRequests();
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error(error);
       Alert.alert(t('commonErrorTitle'), t('searchRequestRejectError'));
     }
@@ -93,15 +116,6 @@ export default function FriendRequestsScreen() {
         className="flex-1 px-5 pb-10 pt-2"
         showsVerticalScrollIndicator={false}
       >
-        <View className="rounded-[28px] bg-[#f39c12]/10 p-5">
-          <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f39c12]">
-            {t('friendRequestsLabel')}
-          </Text>
-          <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            {t('friendRequestsSubtitle')}
-          </Text>
-        </View>
-
         <View className="mt-5">
           <SocialCountChip
             label={t('friendRequestsCountLabel')}

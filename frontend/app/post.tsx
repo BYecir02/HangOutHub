@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,14 +17,17 @@ import * as ImagePicker from 'expo-image-picker';
 
 import PostCustomAudienceModal from '@/components/post/PostCustomAudienceModal';
 import PostVisibilityModal from '@/components/post/PostVisibilityModal';
+import MediaFrame from '@/components/ui/MediaFrame';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import api, { getImageUrl } from '../services/api';
+import { emitPostChanged } from '../services/post-events';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { getFriendshipOverview } from '@/services/friendships';
 import { formatEventDate } from '@/services/formatters';
 import type { FriendshipItem } from '@/types/social';
 import { getMySettings } from '@/services/settings';
+import { clearAuthState } from '../services/api';
 
 type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 type PostType = 'post' | 'plan';
@@ -33,6 +35,17 @@ type PublicationScope = 'personal' | 'structure';
 
 const MAX_IMAGES = 5;
 const MAX_CHARS = 500;
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
+
+type PostMediaItem = {
+  uri: string;
+  assetType?: ImagePicker.ImagePickerAsset['type'];
+  duration?: number | null;
+  mimeType?: string | null;
+  fileName?: string | null;
+};
 
 type CategoryOption = {
   id: number;
@@ -105,27 +118,6 @@ const VISIBILITY_OPTIONS: {
   },
 ];
 
-const PUBLICATION_SCOPE_OPTIONS: {
-  id: PublicationScope;
-  labelKey:
-    | 'postPublicationScopePersonalLabel'
-    | 'postPublicationScopeStructureLabel';
-  descriptionKey:
-    | 'postPublicationScopePersonalDescription'
-    | 'postPublicationScopeStructureDescription';
-}[] = [
-  {
-    id: 'personal',
-    labelKey: 'postPublicationScopePersonalLabel',
-    descriptionKey: 'postPublicationScopePersonalDescription',
-  },
-  {
-    id: 'structure',
-    labelKey: 'postPublicationScopeStructureLabel',
-    descriptionKey: 'postPublicationScopeStructureDescription',
-  },
-];
-
 export default function CreatePostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -178,12 +170,14 @@ export default function CreatePostScreen() {
   };
 
   const [content, setContent] = useState(params.content ? String(params.content) : '');
-  const [images, setImages] = useState<string[]>(() => parseImagesParam(params.images));
+  const [mediaItems, setMediaItems] = useState<PostMediaItem[]>(() =>
+    parseImagesParam(params.images).map((uri) => ({ uri })),
+  );
   const [visibility, setVisibility] = useState<PostVisibility>(
     params.visibility ||
       (params.postType === 'plan' ? 'friends' : 'public'),
   );
-  const [publicationScope, setPublicationScope] = useState<PublicationScope>(
+  const [publicationScope] = useState<PublicationScope>(
     params.publicationScope === 'structure' ? 'structure' : 'personal',
   );
   const [placeId, setPlaceId] = useState(
@@ -229,6 +223,11 @@ export default function CreatePostScreen() {
     params.eventId ? 'event' : 'place',
   );
 
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const visibilityOptions = useMemo(
     () =>
       VISIBILITY_OPTIONS.map((option) => ({
@@ -238,16 +237,6 @@ export default function CreatePostScreen() {
       })),
     [t],
   );
-  const publicationScopeOptions = useMemo(
-    () =>
-      PUBLICATION_SCOPE_OPTIONS.map((option) => ({
-        ...option,
-        label: t(option.labelKey),
-        description: t(option.descriptionKey),
-      })),
-    [t],
-  );
-
   useEffect(() => {
     if (isEditing || params.visibility) {
       return;
@@ -262,7 +251,12 @@ export default function CreatePostScreen() {
         if (isMounted) {
           setVisibility(settings.defaultPostVisibility);
         }
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         // Fallback garde la valeur locale par defaut.
       }
     };
@@ -288,7 +282,12 @@ export default function CreatePostScreen() {
         if (isMounted) {
           setAudienceConnections(data.connections || []);
         }
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         if (isMounted) {
           setAudienceConnections([]);
         }
@@ -317,7 +316,12 @@ export default function CreatePostScreen() {
         if (isMounted) {
           setCategories(response.data || []);
         }
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         if (isMounted) {
           setCategories([]);
         }
@@ -394,7 +398,7 @@ export default function CreatePostScreen() {
   }, [eventId, placeId, showPlanModal]);
 
   const derivedPostType: PostType = visibility === 'friends' ? 'plan' : 'post';
-  const canSubmit = content.trim().length > 0 || images.length > 0;
+  const canSubmit = content.trim().length > 0 || mediaItems.length > 0;
   const visibilityLabel =
     visibilityOptions.find((option) => option.id === visibility)?.label ||
     t('postVisibilityPublicLabel');
@@ -405,9 +409,6 @@ export default function CreatePostScreen() {
   const visibilityIcon =
     visibilityOptions.find((option) => option.id === visibility)?.icon ||
     'globe-outline';
-  const publicationScopeLabel =
-    publicationScopeOptions.find((option) => option.id === publicationScope)
-      ?.label || t('postPublicationScopePersonalLabel');
   const visibilityTone = useMemo(() => {
     if (visibility === 'friends') {
       return {
@@ -510,7 +511,7 @@ export default function CreatePostScreen() {
   const isLocalImage = (uri: string) =>
     uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
 
-  const resolveImageUri = (uri: string) => {
+  const resolveMediaUri = (uri: string) => {
     if (!uri) {
       return uri;
     }
@@ -520,9 +521,115 @@ export default function CreatePostScreen() {
     return getImageUrl(uri) || uri;
   };
 
+  const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    heic: 'image/heic',
+    heif: 'image/heif',
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    m4v: 'video/mp4',
+    webm: 'video/webm',
+    '3gp': 'video/3gpp',
+    mkv: 'video/x-matroska',
+    avi: 'video/x-msvideo',
+  };
+
+  const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+    'video/mp4': 'mp4',
+    'video/quicktime': 'mov',
+    'video/webm': 'webm',
+    'video/3gpp': '3gp',
+    'video/x-matroska': 'mkv',
+    'video/x-msvideo': 'avi',
+  };
+
+  const VALID_MEDIA_EXTENSIONS = new Set(Object.keys(MIME_TYPE_BY_EXTENSION));
+
+  const inferMediaKind = (media: PostMediaItem) => {
+    if (media.assetType === 'video') {
+      return 'video';
+    }
+    if (media.assetType === 'image') {
+      return 'image';
+    }
+    if (typeof media.duration === 'number' && media.duration > 0) {
+      return 'video';
+    }
+    const mimeType = media.mimeType?.toLowerCase();
+    if (mimeType?.startsWith('video/')) {
+      return 'video';
+    }
+    if (mimeType?.startsWith('image/')) {
+      return 'image';
+    }
+
+    const normalizedName = (media.fileName || media.uri).toLowerCase();
+    if (/\.(mp4|mov|m4v|3gp|webm|avi|mkv)(\?|#|$)/.test(normalizedName)) {
+      return 'video';
+    }
+    return 'image';
+  };
+
+  const inferMediaExtension = (media: PostMediaItem) => {
+    const fileName = media.fileName?.trim();
+    if (fileName?.includes('.')) {
+      const extension = fileName.split('.').pop()?.toLowerCase();
+      if (extension && VALID_MEDIA_EXTENSIONS.has(extension)) {
+        return extension;
+      }
+    }
+
+    const mimeType = media.mimeType?.toLowerCase();
+    if (mimeType) {
+      if (EXTENSION_BY_MIME_TYPE[mimeType]) {
+        return EXTENSION_BY_MIME_TYPE[mimeType];
+      }
+    }
+
+    return inferMediaKind(media) === 'video' ? 'mp4' : 'jpg';
+  };
+
+  const inferMediaMimeType = (media: PostMediaItem) => {
+    if (media.mimeType) {
+      return media.mimeType;
+    }
+
+    const extension = inferMediaExtension(media);
+    return MIME_TYPE_BY_EXTENSION[extension] || (inferMediaKind(media) === 'video' ? 'video/mp4' : 'image/jpeg');
+  };
+
+  const getUploadFileName = (media: PostMediaItem, index: number) => {
+    const fileName = media.fileName?.trim();
+    if (fileName?.includes('.')) {
+      const extension = fileName.split('.').pop()?.toLowerCase();
+      if (extension && VALID_MEDIA_EXTENSIONS.has(extension)) {
+        return fileName;
+      }
+    }
+
+    return `media_${index}.${inferMediaExtension(media)}`;
+  };
+
+  const buildUploadPayload = (media: PostMediaItem, index: number) => ({
+    uri: media.uri,
+    name: getUploadFileName(media, index),
+    type: inferMediaMimeType(media),
+  });
+
 
   const pickImage = async (source: 'camera' | 'gallery') => {
-    if (images.length >= MAX_IMAGES) {
+    if (mediaItems.length >= MAX_IMAGES) {
       Alert.alert(
         t('postImageLimitTitle'),
         t('postImageLimitMessage', { count: MAX_IMAGES }),
@@ -531,7 +638,7 @@ export default function CreatePostScreen() {
     }
 
     const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: 'images',
+      mediaTypes: ['images', 'videos'],
       allowsEditing: false,
       allowsMultipleSelection: source === 'gallery',
       quality: 0.7,
@@ -547,16 +654,22 @@ export default function CreatePostScreen() {
     }
 
     if (!result.canceled) {
-      setImages((currentImages) => {
-        if (currentImages.length >= MAX_IMAGES) {
-          return currentImages;
+      setMediaItems((currentMediaItems) => {
+        if (currentMediaItems.length >= MAX_IMAGES) {
+          return currentMediaItems;
         }
-        const remaining = MAX_IMAGES - currentImages.length;
-        const pickedUris = result.assets
-          .map((asset) => asset.uri)
-          .filter(Boolean)
+        const remaining = MAX_IMAGES - currentMediaItems.length;
+        const pickedMedia = result.assets
+          .map((asset) => ({
+            uri: asset.uri,
+            assetType: asset.type ?? null,
+            duration: asset.duration ?? null,
+            mimeType: asset.mimeType ?? null,
+            fileName: asset.fileName ?? null,
+          }))
+          .filter((asset) => Boolean(asset.uri))
           .slice(0, remaining);
-        return [...currentImages, ...pickedUris];
+        return [...currentMediaItems, ...pickedMedia];
       });
     }
   };
@@ -619,22 +732,22 @@ export default function CreatePostScreen() {
           formData.append('ambiance', ambiance);
         }
 
-        const existingImages = images.filter((uri) => !isLocalImage(uri));
-        formData.append('existingImages', JSON.stringify(existingImages));
+        const existingMedia = mediaItems.filter((item) => !isLocalImage(item.uri));
+        formData.append(
+          'existingImages',
+          JSON.stringify(existingMedia.map((item) => item.uri)),
+        );
 
-        images
-          .filter((uri) => isLocalImage(uri))
-          .forEach((uri, index) => {
-            formData.append('images', {
-              uri,
-              name: `image_${index}.jpg`,
-              type: 'image/jpeg',
-            } as never);
+        mediaItems
+          .filter((item) => isLocalImage(item.uri))
+          .forEach((media, index) => {
+            formData.append('images', buildUploadPayload(media, index) as never);
           });
 
-        await api.patch(`/posts/${params.postId}`, formData, {
+        const response = await api.patch(`/posts/${params.postId}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        emitPostChanged(response.data);
         Alert.alert(t('outingCreateSuccessTitle'), t('postEditSuccessMessage'));
       } else {
         const formData = new FormData();
@@ -664,17 +777,15 @@ export default function CreatePostScreen() {
           formData.append('ambiance', ambiance);
         }
 
-        images.forEach((uri, index) => {
-          formData.append('images', {
-            uri,
-            name: `image_${index}.jpg`,
-            type: 'image/jpeg',
-          } as never);
+        mediaItems.forEach((media, index) => {
+          formData.append('images', buildUploadPayload(media, index) as never);
         });
 
-        await api.post('/posts', formData, {
+        const response = await api.post('/posts', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+
+        emitPostChanged(response.data);
 
         Alert.alert(t('outingCreateSuccessTitle'), t('postCreateSuccessMessage'));
       }
@@ -682,6 +793,12 @@ export default function CreatePostScreen() {
       router.back();
     } catch (error) {
       console.error(error);
+
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       Alert.alert(t('commonErrorTitle'), t('postPublishFailedMessage'));
     } finally {
       setLoading(false);
@@ -769,46 +886,6 @@ export default function CreatePostScreen() {
                 maxLength={MAX_CHARS}
               />
 
-              <View className="mx-5 mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
-                <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                  {t('postPublicationScopeTitle')}
-                </Text>
-                <View className="mt-3 gap-2">
-                  {publicationScopeOptions.map((option) => {
-                    const isActive = publicationScope === option.id;
-                    const isStructure = option.id === 'structure';
-                    return (
-                      <TouchableOpacity
-                        key={option.id}
-                        onPress={() => setPublicationScope(option.id)}
-                        className={`rounded-xl border px-3 py-3 ${
-                          isActive
-                            ? isStructure
-                              ? 'border-[#1f7aec] bg-[#1f7aec]/10'
-                              : 'border-[#4c669f] bg-[#4c669f]/10'
-                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
-                        }`}
-                      >
-                        <Text
-                          className={`text-sm font-semibold ${
-                            isActive
-                              ? isStructure
-                                ? 'text-[#1f7aec]'
-                                : 'text-[#4c669f]'
-                              : 'text-gray-700 dark:text-gray-200'
-                          }`}
-                        >
-                          {option.label}
-                        </Text>
-                        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {option.description}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
               <View className="mx-5 mt-3">
                 {hasContextDetails ? (
                   <View className="flex-row flex-wrap gap-2">
@@ -835,11 +912,7 @@ export default function CreatePostScreen() {
                       </View>
                     ) : null}
                   </View>
-                ) : (
-                  <Text className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('postPlanShortcutHint')}
-                  </Text>
-                )}
+                ) : null}
               </View>
 
               {visibility === 'custom' ? (
@@ -875,24 +948,29 @@ export default function CreatePostScreen() {
                 </View>
               ) : null}
 
-              {images.length > 0 ? (
+              {mediaItems.length > 0 ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   className="px-5"
                 >
-                  {images.map((uri, index) => (
+                  {mediaItems.map((media, index) => (
                     <View key={index} className="relative mr-3">
-                      <Image
-                        source={{ uri: resolveImageUri(uri) }}
+                      <MediaFrame
+                        source={resolveMediaUri(media.uri)}
+                        mediaType={inferMediaKind(media)}
                         className="w-48 rounded-2xl bg-gray-100"
                         style={{ aspectRatio: 4 / 3 }}
-                        resizeMode="cover"
+                        shouldPlay={inferMediaKind(media) === 'video'}
+                        muted
+                        loop
+                        showControls={false}
+                        adaptiveHeight={false}
                       />
                       <TouchableOpacity
                         onPress={() =>
-                          setImages((currentImages) =>
-                            currentImages.filter((_, currentIndex) => currentIndex !== index),
+                          setMediaItems((currentMediaItems) =>
+                            currentMediaItems.filter((_, currentIndex) => currentIndex !== index),
                           )
                         }
                         className="absolute right-2 top-2 rounded-full bg-black/50 p-1"
@@ -904,11 +982,7 @@ export default function CreatePostScreen() {
                 </ScrollView>
               ) : null}
 
-              <Text className="mx-5 mt-5 text-sm leading-6 text-gray-500 dark:text-gray-400">
-                {isEditing
-                  ? t('postEditHint')
-                  : t('postCreateHint')}
-              </Text>
+              {null}
             </>
           ) : (
             <View className="mx-5 mt-6 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
@@ -940,13 +1014,6 @@ export default function CreatePostScreen() {
                     </View>
                   </View>
                   <View className="flex-1 px-4 py-4">
-                    {publicationScope === 'structure' ? (
-                      <View className="mb-2 self-start rounded-full bg-[#1f7aec]/10 px-2 py-1">
-                        <Text className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1f7aec]">
-                          {t('postPublicationScopeStructureBadge')}
-                        </Text>
-                      </View>
-                    ) : null}
                     <Text className="text-base font-bold text-gray-900 dark:text-white">
                       {previewTitle}
                     </Text>
@@ -1013,18 +1080,6 @@ export default function CreatePostScreen() {
 
             <View className="flex-1" />
 
-            <TouchableOpacity
-              onPress={() => setShowVisibilityModal(true)}
-              className="mr-3 flex-row items-center rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800"
-            >
-              <Ionicons name={visibilityIcon} size={14} color={visibilityTone.accent} />
-              <Text className="ml-1 text-xs font-semibold" style={{ color: visibilityTone.accent }}>
-                {publicationScope === 'structure'
-                  ? `${visibilityBadgeLabel} · ${publicationScopeLabel}`
-                  : visibilityBadgeLabel}
-              </Text>
-            </TouchableOpacity>
-
             <Text
               className={`text-xs font-medium ${
                 content.length >= MAX_CHARS
@@ -1045,17 +1100,6 @@ export default function CreatePostScreen() {
                 <Ionicons name="arrow-back" size={18} color="#4c669f" />
                 <Text className="ml-2 text-sm font-semibold text-[#4c669f]">
                   {t('postBackToEdit')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowVisibilityModal(true)}
-                className="flex-row items-center rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800"
-              >
-                <Ionicons name={visibilityIcon} size={14} color={visibilityTone.accent} />
-                <Text className="ml-1 text-xs font-semibold" style={{ color: visibilityTone.accent }}>
-                  {publicationScope === 'structure'
-                    ? `${visibilityBadgeLabel} · ${publicationScopeLabel}`
-                    : visibilityBadgeLabel}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1229,11 +1273,7 @@ export default function CreatePostScreen() {
                     );
                   })}
                 </View>
-              ) : (
-                <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                  {t('postCategoryEmpty')}
-                </Text>
-              )}
+              ) : null}
 
               {planTarget === 'place' ? (
                 <>

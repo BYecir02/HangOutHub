@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Image,
   Text,
   TouchableOpacity,
@@ -11,7 +11,10 @@ import { useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
+import PostMediaGallery from './PostMediaGallery';
+import PostMediaViewer from './PostMediaViewer';
 
 import api, { getApiErrorMessage, getImageUrl } from '../../services/api';
 import { createReport } from '../../services/reports';
@@ -70,12 +73,13 @@ export interface PostItemData {
 
 interface PostItemProps {
   item: PostItemData;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => void | Promise<void>;
   onEdit?: (post: PostItemData) => void;
   onComment?: (post: PostItemData) => void;
   onShare?: (post: PostItemData) => void;
   showDateColumn?: boolean;
   authorDisplayMode?: 'place' | 'user' | 'auto';
+  shouldPlayMedia?: boolean;
 }
 
 export default function PostItem({
@@ -86,6 +90,7 @@ export default function PostItem({
   onShare,
   showDateColumn = true,
   authorDisplayMode = 'place',
+  shouldPlayMedia = false,
 }: PostItemProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -95,11 +100,13 @@ export default function PostItem({
     getImageUrl(item.User?.avatarUrl) || 'https://i.pravatar.cc/150';
   const placeAvatarUri =
     getImageUrl(item.Place?.coverUrl) || avatarUri;
-  const postImageUri = getImageUrl(item.images?.[0]);
-
   const [isLiked, setIsLiked] = useState(Boolean(item.isLiked));
   const [likesCount, setLikesCount] = useState(item._count?.likes || 0);
   const [commentsCount, setCommentsCount] = useState(item._count?.comments || 0);
+  const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
+  const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
+  const [optionsSheetVisible, setOptionsSheetVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const shareCount = item.shareCount || 0;
   const isConnections = item.visibility === 'friends';
@@ -232,56 +239,44 @@ export default function PostItem({
   const handleSubmitReportReason = async (reason: string) => {
     try {
       await createReport(item.id, 'POST', reason);
-      Alert.alert(t('reportSuccessTitle'), t('reportSuccessMessage'));
+      setReportSheetVisible(false);
     } catch (error) {
-      Alert.alert(
-        t('commonErrorTitle'),
-        getApiErrorMessage(error, t('reportFailed')),
-      );
+      console.error(getApiErrorMessage(error, t('reportFailed')));
     }
   };
 
-  const handleOptions = () => {
-    const buttons: {
-      text: string;
-      style?: 'default' | 'cancel' | 'destructive';
-      onPress?: () => void;
-    }[] = [];
+  const handleOpenReport = () => {
+    setOptionsSheetVisible(false);
+    setReportSheetVisible(true);
+  };
 
-    if (onEdit) {
-      buttons.push({ text: t('postItemEdit'), onPress: () => onEdit(item) });
+  const handleOpenOptionsMenu = () => {
+    if (isDeleting) {
+      return;
     }
 
-    if (onDelete) {
-      buttons.push({
-        text: t('postItemDelete'),
-        style: 'destructive',
-        onPress: () => {
-          Alert.alert(t('postItemDeleteConfirmTitle'), t('postItemDeleteConfirmMessage'), [
-            { text: t('postItemCancel'), style: 'cancel' },
-            {
-              text: t('postItemDelete'),
-              style: 'destructive',
-              onPress: () => onDelete(item.id),
-            },
-          ]);
-        },
-      });
+    setOptionsSheetVisible(true);
+  };
+
+  const handleDeletePress = () => {
+    setOptionsSheetVisible(false);
+    void handleConfirmDelete();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!onDelete || isDeleting) {
+      return;
     }
 
-    if (!item.isOwner) {
-      buttons.push({
-        text: t('reportAction'),
-        onPress: () => {
-          setReportSheetVisible(true);
-        },
-      });
-    }
+    setIsDeleting(true);
 
-    buttons.push({ text: t('postItemCancel'), style: 'cancel' });
-
-    if (buttons.length > 1) {
-      Alert.alert(t('postItemOptionsTitle'), undefined, buttons);
+    try {
+      await Promise.resolve(onDelete(item.id));
+    } catch (error) {
+      console.error(getApiErrorMessage(error, t('socialFeedDeleteError')));
+      Alert.alert(t('commonErrorTitle'), t('socialFeedDeleteError'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -322,8 +317,19 @@ export default function PostItem({
     });
   };
 
+  const mediaUrls = item.images || [];
+
+  const handleOpenMediaViewer = (index: number) => {
+    if (mediaUrls.length === 0) {
+      return;
+    }
+
+    setMediaViewerIndex(index);
+    setMediaViewerVisible(true);
+  };
+
   return (
-    <View className="mx-5 mb-5 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <View className="mx-4 mb-4 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100/70 dark:bg-gray-900 dark:ring-gray-800/70">
       <View className={showDateColumn ? 'flex-row' : ''}>
         {showDateColumn ? (
           <View
@@ -370,7 +376,11 @@ export default function PostItem({
             </View>
 
             {(onDelete || onEdit) && (
-              <TouchableOpacity onPress={handleOptions} className="p-2 -mr-2">
+              <TouchableOpacity
+                testID="post-options-button"
+                onPress={handleOpenOptionsMenu}
+                className="p-2 -mr-2"
+              >
                 <Ionicons
                   name="ellipsis-horizontal"
                   size={20}
@@ -427,12 +437,11 @@ export default function PostItem({
             </Text>
           ) : null}
 
-          {item.images && item.images.length > 0 && postImageUri ? (
-            <Image
-              source={{ uri: postImageUri }}
-              className="mt-4 w-full rounded-2xl bg-gray-200 dark:bg-gray-800"
-              style={{ aspectRatio: 4 / 3 }}
-              resizeMode="cover"
+          {item.images && item.images.length > 0 ? (
+            <PostMediaGallery
+              mediaUrls={item.images}
+              shouldPlayMedia={shouldPlayMedia}
+              onPressMedia={handleOpenMediaViewer}
             />
           ) : null}
 
@@ -501,6 +510,80 @@ export default function PostItem({
         visible={reportSheetVisible}
         onClose={() => setReportSheetVisible(false)}
         onSubmitReason={handleSubmitReportReason}
+      />
+
+      <BottomSheetModal
+        visible={optionsSheetVisible}
+        onClose={() => setOptionsSheetVisible(false)}
+        title={t('postItemOptionsTitle')}
+        subtitle={t('postItemOptionsSubtitle')}
+        contentMode="auto"
+        maxHeight={360}
+      >
+        <View className="gap-3">
+          {onEdit ? (
+            <TouchableOpacity
+              onPress={() => {
+                setOptionsSheetVisible(false);
+                onEdit(item);
+              }}
+              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('postItemEdit')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {onDelete ? (
+            <TouchableOpacity
+              testID="post-delete-button"
+              onPress={handleDeletePress}
+              disabled={isDeleting}
+              className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-900/20"
+            >
+              {isDeleting ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator color="#e11d48" size="small" />
+                  <Text className="text-sm font-semibold text-rose-600 dark:text-rose-300">
+                    Suppression...
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-sm font-semibold text-rose-600 dark:text-rose-300">
+                  {t('postItemDelete')}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : null}
+
+          {!item.isOwner ? (
+            <TouchableOpacity
+              onPress={handleOpenReport}
+              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('reportAction')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity
+            onPress={() => setOptionsSheetVisible(false)}
+            className="items-center rounded-2xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-600 dark:bg-gray-900"
+          >
+            <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {t('postItemCancel')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetModal>
+
+      <PostMediaViewer
+        visible={mediaViewerVisible}
+        mediaUrls={mediaUrls}
+        initialIndex={mediaViewerIndex}
+        onClose={() => setMediaViewerVisible(false)}
       />
     </View>
   );

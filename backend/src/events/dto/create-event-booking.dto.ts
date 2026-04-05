@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateEventBookingDto {
   @IsOptional()
@@ -8,4 +8,9 @@ export class CreateEventBookingDto {
   @IsOptional()
   @IsString()
   promoCode?: string;
+
+  @IsString()
+  @IsUUID()
+  @MaxLength(64)
+  clientRequestId!: string;
 }

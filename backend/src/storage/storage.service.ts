@@ -107,4 +107,56 @@ export class StorageService {
   async uploadFiles(folder: string, files: Express.Multer.File[]) {
     return Promise.all(files.map((file) => this.uploadFile(folder, file)));
   }
+
+  private extractObjectPath(publicUrl: string) {
+    const normalizedUrl = publicUrl.trim();
+    const publicPrefix = `/storage/v1/object/public/${this.bucket}/`;
+    const markerIndex = normalizedUrl.indexOf(publicPrefix);
+
+    if (markerIndex === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(
+      normalizedUrl.slice(markerIndex + publicPrefix.length),
+    );
+  }
+
+  async deleteFile(publicUrl: string) {
+    this.ensureConfigured();
+
+    const objectPath = this.extractObjectPath(publicUrl);
+    if (!objectPath) {
+      return false;
+    }
+
+    const deleteUrl = `${this.supabaseUrl}/storage/v1/object/${this.bucket}/${objectPath}`;
+    const response = await fetch(deleteUrl, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${this.serviceRoleKey}`,
+        apikey: this.serviceRoleKey,
+      },
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      this.logger.warn(
+        `Echec suppression Supabase (${response.status}): ${errorBody}`,
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  async deleteFiles(publicUrls: string[]) {
+    const results = await Promise.allSettled(
+      publicUrls.map((publicUrl) => this.deleteFile(publicUrl)),
+    );
+
+    return results.map((result) =>
+      result.status === 'fulfilled' ? result.value : false,
+    );
+  }
 }

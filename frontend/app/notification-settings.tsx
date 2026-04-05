@@ -12,6 +12,7 @@ import {
   type UserSettings,
   updateMySettings,
 } from '@/services/settings';
+import { clearAuthState } from '@/services/api';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import SettingsSection from '@/components/settings/SettingsSection';
@@ -29,6 +30,14 @@ export default function NotificationSettingsScreen() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isUnauthorized = (error: unknown) =>
+    (error as { response?: { status?: number } }).response?.status === 401;
+
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const loadSettings = useCallback(async () => {
     setLoading(true);
 
@@ -36,12 +45,17 @@ export default function NotificationSettingsScreen() {
       const nextSettings = await getMySettings();
       setSettings(nextSettings);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur chargement parametres notifications:', error);
       setSettings(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleInvalidSession]);
 
   useFocusEffect(
     useCallback(() => {
@@ -71,6 +85,11 @@ export default function NotificationSettingsScreen() {
       });
       setSettings(savedSettings);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur sauvegarde parametres notifications:', error);
       setSettings(previousSettings);
       Alert.alert(t('commonErrorTitle'), t('notificationSettingsSaveError'));

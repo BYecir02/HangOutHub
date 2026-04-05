@@ -17,6 +17,7 @@ import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
 import { getApiErrorMessage } from '@/services/api';
+import { clearAuthState } from '@/services/api';
 import {
   getFriendshipOverview,
   removeFriendship,
@@ -45,6 +46,14 @@ export default function ConnectionsScreen() {
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
   const [activeView, setActiveView] = useState<ConnectionsView>('connections');
 
+  const isUnauthorized = (error: unknown) =>
+    (error as { response?: { status?: number } }).response?.status === 401;
+
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const sectionOptions = useMemo<readonly FilterChipOption<ConnectionsView>[]>(
     () => [
       { key: 'connections', label: t('connectionsSectionConnections') },
@@ -61,13 +70,18 @@ export default function ConnectionsScreen() {
       setFriendships(friendshipsData);
       setErrorMessage(null);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur chargement connexions:', error);
       setFriendships(EMPTY_FRIENDSHIPS);
       setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [handleInvalidSession, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,6 +94,11 @@ export default function ConnectionsScreen() {
       await removeFriendship(friendshipId);
       await loadConnections();
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error(error);
       Alert.alert(t('commonErrorTitle'), t('searchRelationshipUpdateError'));
     }

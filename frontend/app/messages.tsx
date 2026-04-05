@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Dimensions,
   FlatList,
   RefreshControl,
   Text,
@@ -23,7 +24,7 @@ import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChi
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import SearchBar from '@/components/ui/SearchBar';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getApiErrorMessage } from '@/services/api';
+import api, { clearAuthState, getApiErrorMessage } from '@/services/api';
 import {
   getOrCreateDirectChat,
   listDirectChats,
@@ -70,6 +71,14 @@ export default function MessagesScreen() {
   const [filter, setFilter] = useState<OutingFilter>('all');
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
 
+  const isUnauthorized = (error: unknown) =>
+    (error as { response?: { status?: number } }).response?.status === 401;
+
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const loadChats = useCallback(
     async ({ isRefresh = false, silent = false } = {}) => {
       if (isRefresh) {
@@ -85,6 +94,11 @@ export default function MessagesScreen() {
         setSyncWarning(false);
         setErrorMessage(null);
       } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         console.error('Erreur chargement discussions:', error);
 
         if (chatsRef.current.length > 0) {
@@ -103,7 +117,7 @@ export default function MessagesScreen() {
         setRefreshing(false);
       }
     },
-    [t],
+    [handleInvalidSession, t],
   );
 
   const loadDirectChats = useCallback(
@@ -126,6 +140,11 @@ export default function MessagesScreen() {
         setDirectSyncWarning(false);
         setDirectErrorMessage(null);
       } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         console.error('Erreur chargement messages prives:', error);
 
         if (directChatsRef.current.length > 0) {
@@ -144,7 +163,7 @@ export default function MessagesScreen() {
         setDirectRefreshing(false);
       }
     },
-    [t],
+    [handleInvalidSession, t],
   );
 
   const loadConnections = useCallback(
@@ -163,6 +182,11 @@ export default function MessagesScreen() {
         setConnections(nextConnections);
         setConnectionsLoaded(true);
       } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         console.error('Erreur chargement connexions messages prives:', error);
         setConnections([]);
         setConnectionsErrorMessage(
@@ -172,7 +196,7 @@ export default function MessagesScreen() {
         setConnectionsLoading(false);
       }
     },
-    [connectionsLoaded, t],
+    [connectionsLoaded, handleInvalidSession, t],
   );
 
   const openConnectionPicker = useCallback(async () => {
@@ -194,6 +218,11 @@ export default function MessagesScreen() {
           params: { id: chat.id },
         });
       } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         Alert.alert(
           t('commonErrorTitle'),
           getApiErrorMessage(error, t('directChatStartFailed')),
@@ -202,7 +231,7 @@ export default function MessagesScreen() {
         setCreatingChatForUserId(null);
       }
     },
-    [loadDirectChats, router, t],
+    [handleInvalidSession, loadDirectChats, router, t],
   );
 
   useFocusEffect(
@@ -351,6 +380,10 @@ export default function MessagesScreen() {
     tab === 'outings'
       ? t('messagesSearchPlaceholder')
       : t('directChatSearchPlaceholder');
+  const pickerMaxHeight = Math.min(
+    720,
+    Math.round(Dimensions.get('window').height * 0.88),
+  );
   const normalizedQuery = query.trim();
   const headerSubtitle =
     normalizedQuery.length >= 2
@@ -613,6 +646,7 @@ export default function MessagesScreen() {
         searchValue={connectionsQuery}
         onSearchChange={setConnectionsQuery}
         searchPlaceholder={t('messagesDirectPickerSearchPlaceholder')}
+        autoFocusSearchInput
         loading={connectionsLoading}
         errorMessage={connectionsErrorMessage}
         onRetry={() => {
@@ -624,7 +658,7 @@ export default function MessagesScreen() {
             ? t('messagesDirectPickerNoResult')
             : t('messagesDirectPickerEmpty')
         }
-        maxHeight={560}
+        maxHeight={pickerMaxHeight}
       />
     </View>
   );

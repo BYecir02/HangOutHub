@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
   RefreshControl,
@@ -18,7 +19,7 @@ import InspirationCard from '@/components/ui/InspirationCard';
 import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
-import api, { getImageUrl, storage } from '@/services/api';
+import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { formatEventDate, formatPrice } from '@/services/formatters';
 import { getFriendshipOverview } from '@/services/friendships';
@@ -194,6 +195,8 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<HomeEvent[]>([]);
   const [places, setPlaces] = useState<HomePlace[]>([]);
+  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
+  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -227,36 +230,40 @@ export default function HomeScreen() {
       return;
     }
 
-    try {
-      const [unreadResult, friendshipsResult, invitationsResult] =
-        await Promise.allSettled([
-          api.get<NotificationCountResponse>('/notifications/unread-count'),
-          getFriendshipOverview(),
-          api.get<OutingInvitation[]>('/outings/invitations'),
-        ]);
+    const [unreadResult, friendshipsResult, invitationsResult] =
+      await Promise.allSettled([
+        api.get<NotificationCountResponse>('/notifications/unread-count'),
+        getFriendshipOverview(),
+        api.get<OutingInvitation[]>('/outings/invitations'),
+      ]);
 
-      const unreadCount =
-        unreadResult.status === 'fulfilled'
-          ? Number(unreadResult.value.data.unreadCount || 0)
-          : 0;
-      const incomingRequests =
-        friendshipsResult.status === 'fulfilled'
-          ? friendshipsResult.value.counts.incomingRequests || 0
-          : 0;
-      const outingInvites =
-        invitationsResult.status === 'fulfilled'
-          ? invitationsResult.value.data?.length || 0
-          : 0;
+    const hasUnauthorized = [unreadResult, friendshipsResult, invitationsResult].some(
+      (result) => result.status === 'rejected' && isUnauthorized(result.reason),
+    );
 
-      const computedCount = Math.max(unreadCount, incomingRequests + outingInvites);
-
-      setNotificationCount(computedCount);
-    } catch (error) {
-      if (!isUnauthorized(error)) {
-        console.error('Erreur chargement notifications:', error);
-      }
+    if (hasUnauthorized) {
+      await clearAuthState();
+      router.replace('/');
+      return;
     }
-  }, [isUnauthorized]);
+
+    const unreadCount =
+      unreadResult.status === 'fulfilled'
+        ? Number(unreadResult.value.data.unreadCount || 0)
+        : 0;
+    const incomingRequests =
+      friendshipsResult.status === 'fulfilled'
+        ? friendshipsResult.value.counts.incomingRequests || 0
+        : 0;
+    const outingInvites =
+      invitationsResult.status === 'fulfilled'
+        ? invitationsResult.value.data?.length || 0
+        : 0;
+
+    const computedCount = Math.max(unreadCount, incomingRequests + outingInvites);
+
+    setNotificationCount(computedCount);
+  }, [isUnauthorized, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -271,13 +278,25 @@ export default function HomeScreen() {
       api.get<HomePlace[]>('/places'),
     ]);
 
+    const unauthorizedResult = results.find(
+      (result) => result.status === 'rejected' && isUnauthorized(result.reason),
+    );
+
+    if (unauthorizedResult) {
+      await clearAuthState();
+      router.replace('/');
+      return;
+    }
+
     const [categoriesResult, eventsResult, placesResult] = results;
 
     if (categoriesResult.status === 'fulfilled') {
       setCategories(categoriesResult.value.data);
       setCache('categories', categoriesResult.value.data);
     } else {
-      console.error('Erreur chargement categories:', categoriesResult.reason);
+      if (!isUnauthorized(categoriesResult.reason)) {
+        console.error('Erreur chargement categories:', categoriesResult.reason);
+      }
       setCategories([]);
     }
 
@@ -285,7 +304,9 @@ export default function HomeScreen() {
       setEvents(eventsResult.value.data);
       setCache('events', eventsResult.value.data);
     } else {
-      console.error('Erreur chargement evenements:', eventsResult.reason);
+      if (!isUnauthorized(eventsResult.reason)) {
+        console.error('Erreur chargement evenements:', eventsResult.reason);
+      }
       setEvents([]);
     }
 
@@ -293,7 +314,9 @@ export default function HomeScreen() {
       setPlaces(placesResult.value.data);
       setCache('places', placesResult.value.data);
     } else {
-      console.error('Erreur chargement lieux:', placesResult.reason);
+      if (!isUnauthorized(placesResult.reason)) {
+        console.error('Erreur chargement lieux:', placesResult.reason);
+      }
       setPlaces([]);
     }
 
@@ -308,7 +331,81 @@ export default function HomeScreen() {
     }
 
     await loadNotificationCount();
-  }, [loadNotificationCount]);
+  }, [isUnauthorized, loadNotificationCount, router]);
+
+  const loadSavedPlaces = useCallback(async () => {
+    const token = await storage.getItem('userToken');
+
+    if (!token) {
+      setSavedPlaceIds(new Set());
+      return;
+    }
+
+    try {
+      const response = await api.get<{ id: string }[]>('/places/saved/mine');
+      setSavedPlaceIds(new Set(response.data.map((place) => place.id)));
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      setSavedPlaceIds(new Set());
+    }
+  }, [isUnauthorized, router]);
+
+  const handleTogglePlaceSave = useCallback(
+    async (placeId: string) => {
+      const token = await storage.getItem('userToken');
+
+      if (!token) {
+        Alert.alert(
+          t('placeDetailLoginRequiredTitle'),
+          t('placeDetailLoginRequiredMessage'),
+        );
+        return;
+      }
+
+      if (savingPlaceIds.has(placeId)) {
+        return;
+      }
+
+      setSavingPlaceIds((current) => {
+        const next = new Set(current);
+        next.add(placeId);
+        return next;
+      });
+
+      try {
+        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
+        setSavedPlaceIds((current) => {
+          const next = new Set(current);
+          if (response.data.saved) {
+            next.add(placeId);
+          } else {
+            next.delete(placeId);
+          }
+          return next;
+        });
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await clearAuthState();
+          router.replace('/');
+          return;
+        }
+
+        Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
+      } finally {
+        setSavingPlaceIds((current) => {
+          const next = new Set(current);
+          next.delete(placeId);
+          return next;
+        });
+      }
+    },
+    [isUnauthorized, router, savingPlaceIds, t],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -333,6 +430,16 @@ export default function HomeScreen() {
     useCallback(() => {
       void loadHomeData();
     }, [loadHomeData]),
+  );
+
+  useEffect(() => {
+    void loadSavedPlaces();
+  }, [loadSavedPlaces]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSavedPlaces();
+    }, [loadSavedPlaces]),
   );
 
   useEffect(() => {
@@ -621,7 +728,9 @@ export default function HomeScreen() {
                     params: { id: item.id },
                   })
                 }
-                showSaveButton={false}
+                isSaved={savedPlaceIds.has(item.id)}
+                onToggleSave={() => void handleTogglePlaceSave(item.id)}
+                saving={savingPlaceIds.has(item.id)}
                 style={{ width: 288, marginRight: 16 }}
               />
             )}

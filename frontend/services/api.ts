@@ -1,5 +1,6 @@
 import axios, { InternalAxiosRequestConfig, isAxiosError } from 'axios';
 import Constants from 'expo-constants';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
@@ -24,10 +25,35 @@ const defaultHeaders: Record<string, string> = {
 if (isNgrokBaseUrl) {
   defaultHeaders['ngrok-skip-browser-warning'] = 'true';
 }
+
 const ACCESS_TOKEN_KEY = 'userToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_INFO_KEY = 'userInfo';
 const AUTH_REDIRECT_REASON_KEY = 'authRedirectReason';
+
+const FILE_STORAGE_PATH = `${FileSystem.documentDirectory || ''}app-storage-v1.json`;
+const SECURE_KEYS = new Set([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+
+type FileStorageMap = Record<string, string>;
+
+const readFileStorage = async (): Promise<FileStorageMap> => {
+  try {
+    const raw = await FileSystem.readAsStringAsync(FILE_STORAGE_PATH);
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (parsed && typeof parsed === 'object') {
+      return parsed as FileStorageMap;
+    }
+  } catch {
+    // Ignore read failures and treat the store as empty.
+  }
+
+  return {};
+};
+
+const writeFileStorage = async (nextStorage: FileStorageMap) => {
+  await FileSystem.writeAsStringAsync(FILE_STORAGE_PATH, JSON.stringify(nextStorage));
+};
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
@@ -49,21 +75,57 @@ export const storage = {
   setItem: async (key: string, value: string) => {
     if (Platform.OS === 'web') {
       localStorage.setItem(key, value);
-    } else {
-      await SecureStore.setItemAsync(key, value);
+      return;
     }
+
+    if (SECURE_KEYS.has(key) && value.length <= 1800) {
+      await SecureStore.setItemAsync(key, value);
+      return;
+    }
+
+    const nextStorage = await readFileStorage();
+    nextStorage[key] = value;
+    await writeFileStorage(nextStorage);
   },
   getItem: async (key: string) => {
     if (Platform.OS === 'web') {
       return localStorage.getItem(key);
     }
-    return SecureStore.getItemAsync(key);
+
+    if (SECURE_KEYS.has(key)) {
+      const secureValue = await SecureStore.getItemAsync(key);
+      if (secureValue !== null) {
+        return secureValue;
+      }
+    }
+
+    const fileStorage = await readFileStorage();
+    if (Object.prototype.hasOwnProperty.call(fileStorage, key)) {
+      return fileStorage[key];
+    }
+
+    return null;
   },
   removeItem: async (key: string) => {
     if (Platform.OS === 'web') {
       localStorage.removeItem(key);
-    } else {
+      return;
+    }
+
+    if (SECURE_KEYS.has(key)) {
       await SecureStore.deleteItemAsync(key);
+    } else {
+      await SecureStore.deleteItemAsync(key).catch(() => {});
+    }
+
+    try {
+      const nextStorage = await readFileStorage();
+      if (Object.prototype.hasOwnProperty.call(nextStorage, key)) {
+        delete nextStorage[key];
+        await writeFileStorage(nextStorage);
+      }
+    } catch {
+      // Ignore cleanup failures.
     }
   },
 };
@@ -79,10 +141,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-const clearAuthState = async () => {
+export const clearAuthState = async () => {
   await storage.removeItem(ACCESS_TOKEN_KEY);
   await storage.removeItem(REFRESH_TOKEN_KEY);
   await storage.removeItem(USER_INFO_KEY);
+
+  try {
+    const { disconnectDirectChatSocket } = await import('./direct-chat-realtime');
+    disconnectDirectChatSocket();
+  } catch {
+    // Ignore socket cleanup failures during auth teardown.
+  }
 };
 
 const isAuthRoute = (url: string) =>

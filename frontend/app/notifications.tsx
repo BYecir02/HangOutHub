@@ -16,7 +16,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useScreenAsync } from '@/hooks/useScreenAsync';
 import { formatEventDate } from '@/services/formatters';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import api, { getApiErrorMessage } from '../services/api';
+import api, { clearAuthState, getApiErrorMessage } from '../services/api';
 import { getFriendshipOverview } from '../services/friendships';
 import {
   FriendshipOverview,
@@ -74,22 +74,39 @@ export default function NotificationsScreen() {
   const showInvitesCard = activeView === 'all' || activeView === 'invites';
   const showActivity = activeView === 'all' || activeView === 'activity';
 
+  const isUnauthorized = (error: unknown) =>
+    (error as { response?: { status?: number } }).response?.status === 401;
+
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const fetchNotificationsPayload = useCallback(async () => {
-    const [friendshipsData, invitationsResponse, activityResponse] =
-      await Promise.all([
-        getFriendshipOverview(),
-        api.get<OutingInvitation[]>('/outings/invitations'),
-        api.get<NotificationActivityItem[]>('/notifications/activity'),
-      ]);
+    try {
+      const [friendshipsData, invitationsResponse, activityResponse] =
+        await Promise.all([
+          getFriendshipOverview(),
+          api.get<OutingInvitation[]>('/outings/invitations'),
+          api.get<NotificationActivityItem[]>('/notifications/activity'),
+        ]);
 
-    await api.post('/notifications/mark-read');
+      await api.post('/notifications/mark-read');
 
-    return {
-      friendships: friendshipsData,
-      invitations: invitationsResponse.data,
-      activityItems: activityResponse.data || [],
-    };
-  }, []);
+      return {
+        friendships: friendshipsData,
+        invitations: invitationsResponse.data,
+        activityItems: activityResponse.data || [],
+      };
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return null;
+      }
+
+      throw error;
+    }
+  }, [handleInvalidSession]);
 
   const applyNotificationsPayload = useCallback(
     (payload: {
@@ -161,15 +178,6 @@ export default function NotificationsScreen() {
           />
         }
       >
-        <View className="rounded-[28px] border border-[#4c669f]/20 bg-[#4c669f]/10 p-5">
-          <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            {t('notificationsActivityCenterLabel')}
-          </Text>
-          <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            {t('notificationsActivityCenterSubtitle')}
-          </Text>
-        </View>
-
         {errorMessage ? (
           <ScreenState
             mode="warning"

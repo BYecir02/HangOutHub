@@ -35,18 +35,18 @@ export default function PersonRow({
         className="h-14 w-14 rounded-full bg-gray-200 dark:bg-gray-800"
         resizeMode="cover"
       />
-      <View className="ml-4 flex-1">
-        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+      <View className="ml-4 flex-1 min-w-0">
+        <Text className="text-base font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
           {user.displayName || user.username}
         </Text>
-        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400" numberOfLines={1}>
           @{user.username}
         </Text>
-        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400" numberOfLines={2}>
           {subtitle}
         </Text>
       </View>
-      <View className="items-end gap-2">
+      <View className="items-end gap-2 flex-shrink-0">
         {primaryAction}
         {secondaryAction}
       </View>

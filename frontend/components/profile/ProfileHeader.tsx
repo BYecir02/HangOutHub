@@ -66,11 +66,23 @@ export default function ProfileHeader({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
+  const cacheBustKey = user?.updatedAt ? String(user.updatedAt) : '';
+  const withCacheBust = (value: string | null | undefined, fallback: string) => {
+    const resolved = getImageUrl(value) || fallback;
 
-  const coverUrl =
-    getImageUrl(user?.coverUrl) ||
-    'https://images.unsplash.com/photo-1557683316-973673baf926';
-  const avatarUrl = getImageUrl(user?.avatarUrl) || 'https://i.pravatar.cc/150';
+    if (!cacheBustKey || !resolved) {
+      return resolved;
+    }
+
+    const separator = resolved.includes('?') ? '&' : '?';
+    return `${resolved}${separator}v=${encodeURIComponent(cacheBustKey)}`;
+  };
+
+  const coverUrl = withCacheBust(
+    user?.coverUrl,
+    'https://images.unsplash.com/photo-1557683316-973673baf926',
+  );
+  const avatarUrl = withCacheBust(user?.avatarUrl, 'https://i.pravatar.cc/150');
   const statusConfig = getStatusColors(user?.OrganizerProfile?.status, t);
   const organizerPanelLabel =
     user?.role === 'PLACE_OWNER'

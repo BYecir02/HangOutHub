@@ -1,5 +1,7 @@
 import React, { type ReactNode } from 'react';
 import {
+  Animated,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -41,6 +43,62 @@ export default function BottomSheetModal({
   const backdropClassName = isDark ? 'bg-black/60' : 'bg-gray-100/90';
   const sheetBackgroundColor = isDark ? '#111827' : '#ffffff';
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isRendered, setIsRendered] = useState(visible);
+  const backdropOpacity = React.useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const sheetTranslateY = React.useRef(new Animated.Value(visible ? 0 : 24)).current;
+  const sheetScale = React.useRef(new Animated.Value(visible ? 1 : 0.985)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setIsRendered(true);
+      Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetTranslateY, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetScale, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 140,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: 24,
+        duration: 180,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetScale, {
+        toValue: 0.985,
+        duration: 180,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setIsRendered(false);
+      }
+    });
+  }, [backdropOpacity, sheetScale, sheetTranslateY, visible]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') {
@@ -60,18 +118,28 @@ export default function BottomSheetModal({
     };
   }, []);
 
+  if (!isRendered) {
+    return null;
+  }
+
   return (
     <Modal
-      visible={visible}
+      visible={isRendered}
       transparent
       animationType="fade"
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end">
         <Pressable
-          className={`absolute inset-0 ${backdropClassName}`}
+          className="absolute inset-0"
           onPress={closeOnOverlayPress ? onClose : undefined}
-        />
+        >
+          <Animated.View
+            pointerEvents="none"
+            className={`absolute inset-0 ${backdropClassName}`}
+            style={{ opacity: backdropOpacity }}
+          />
+        </Pressable>
         {Platform.OS === 'ios' && keyboardHeight > 0 ? (
           <View
             pointerEvents="none"
@@ -89,18 +157,30 @@ export default function BottomSheetModal({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
-          <View
+          <Animated.View
             className="w-full rounded-t-3xl border-t border-gray-200 bg-white px-5 pb-8 pt-4 dark:border-gray-800 dark:bg-gray-900"
-            style={{
-              maxHeight,
-              backgroundColor: sheetBackgroundColor,
-              borderTopLeftRadius: uiTokens.radius.xl,
-              borderTopRightRadius: uiTokens.radius.xl,
-              borderTopWidth: uiTokens.borderWidth.hairline,
-              paddingHorizontal: uiTokens.spacing.screenX,
-              paddingTop: uiTokens.spacing.rowY,
-              paddingBottom: uiTokens.spacing.cardPaddingLg + 12,
-            }}
+            style={[
+              {
+                maxHeight,
+                backgroundColor: sheetBackgroundColor,
+                borderTopLeftRadius: uiTokens.radius.xl,
+                borderTopRightRadius: uiTokens.radius.xl,
+                borderTopWidth: uiTokens.borderWidth.hairline,
+                paddingHorizontal: uiTokens.spacing.screenX,
+                paddingTop: uiTokens.spacing.rowY,
+                paddingBottom: uiTokens.spacing.cardPaddingLg + 12,
+              },
+              {
+                opacity: backdropOpacity.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.88, 1],
+                }),
+                transform: [
+                  { translateY: sheetTranslateY },
+                  { scale: sheetScale },
+                ],
+              },
+            ]}
           >
             <View className="mb-4 items-center">
               <View
@@ -142,7 +222,7 @@ export default function BottomSheetModal({
               {children}
             </View>
             {footer ? <View className="mt-4">{footer}</View> : null}
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </View>
     </Modal>

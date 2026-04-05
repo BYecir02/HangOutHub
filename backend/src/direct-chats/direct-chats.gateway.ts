@@ -248,13 +248,37 @@ export class DirectChatsGateway
 
     const roomName = this.getConversationRoom(conversationId);
     for (const socketId of sockets) {
-      const socket = this.server.sockets.sockets.get(socketId);
+      const socket = this.getSocketById(socketId);
       if (socket?.rooms.has(roomName)) {
         return true;
       }
     }
 
     return false;
+  }
+
+  private getSocketById(socketId: string) {
+    const server = this.server as
+      | (Server & { sockets?: { get?: (id: string) => Socket | undefined } })
+      | undefined;
+
+    if (!server) {
+      return undefined;
+    }
+
+    const socketsCollection = server.sockets as
+      | { get?: (id: string) => Socket | undefined; sockets?: Map<string, Socket> }
+      | undefined;
+
+    if (!socketsCollection) {
+      return undefined;
+    }
+
+    if (typeof socketsCollection.get === 'function') {
+      return socketsCollection.get(socketId);
+    }
+
+    return socketsCollection.sockets?.get(socketId);
   }
 
   private extractToken(client: Socket) {

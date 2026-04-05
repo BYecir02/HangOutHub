@@ -25,6 +25,10 @@ import { getOrCreateDirectChat, sendDirectMessage } from '@/services/direct-chat
 import PersonRow from '@/components/social/PersonRow';
 import type { SocialUser } from '@/types/social';
 import * as Linking from 'expo-linking';
+import { clearAuthState } from '@/services/api';
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
 
 export default function PostViewScreen() {
   const router = useRouter();
@@ -44,6 +48,11 @@ export default function PostViewScreen() {
     null,
   );
 
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const postId = params.id || '';
 
   const loadPost = useCallback(async () => {
@@ -58,12 +67,17 @@ export default function PostViewScreen() {
       setPost(response);
       setErrorMessage(null);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       setErrorMessage(getApiErrorMessage(error, t('postDetailLoadError')));
       setPost(null);
     } finally {
       setLoading(false);
     }
-  }, [postId, t]);
+  }, [handleInvalidSession, postId, t]);
 
   useEffect(() => {
     void loadPost();
@@ -107,6 +121,11 @@ export default function PostViewScreen() {
       setConnectionsLoaded(true);
       setConnectionsErrorMessage(null);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur chargement connexions', error);
       setConnections([]);
       setConnectionsErrorMessage(
@@ -115,7 +134,7 @@ export default function PostViewScreen() {
     } finally {
       setLoadingConnections(false);
     }
-  }, [connectionsLoaded, t]);
+  }, [connectionsLoaded, handleInvalidSession, t]);
 
   const openShareToConnection = useCallback(async () => {
     if (!post) {
@@ -169,13 +188,18 @@ export default function PostViewScreen() {
           pathname: '/direct-chat/[id]',
           params: { id: chat.id },
         });
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         Alert.alert(t('commonErrorTitle'), t('postShareSendError'));
       } finally {
         setSendingConnectionId(null);
       }
     },
-    [buildShareMessage, bumpShareCount, post, router, t],
+    [buildShareMessage, bumpShareCount, handleInvalidSession, post, router, t],
   );
 
   const commentTarget = useMemo(() => {

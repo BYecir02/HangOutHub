@@ -23,7 +23,12 @@ import MediaFrame from '@/components/ui/MediaFrame';
 import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import Tabs, { type TabItem } from '@/components/ui/Tabs';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getApiErrorMessage, getImageUrl, storage } from '@/services/api';
+import api, {
+  clearAuthState,
+  getApiErrorMessage,
+  getImageUrl,
+  storage,
+} from '@/services/api';
 import { createReport } from '@/services/reports';
 import { resolveStoredUserSession } from '@/services/user-session';
 import { getOrCreateDirectChat } from '@/services/direct-chats';
@@ -147,6 +152,15 @@ function getPlaceCategoryLabel(
   return category;
 }
 
+function isUnauthorizedError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    (error as { response?: { status?: number } }).response?.status === 401
+  );
+}
+
 export default function PlaceDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -178,6 +192,11 @@ export default function PlaceDetailScreen() {
 
   useEffect(() => {
     let isMounted = true;
+
+    const handleUnauthorized = async () => {
+      await clearAuthState();
+      router.replace('/');
+    };
 
     const fetchPlace = async () => {
       if (!params.id) {
@@ -214,13 +233,23 @@ export default function PlaceDetailScreen() {
               ),
             );
           }
-        } catch {
+        } catch (error) {
+          if (isUnauthorizedError(error)) {
+            await handleUnauthorized();
+            return;
+          }
+
           if (isMounted) {
             setCanSave(true);
             setIsSaved(false);
           }
         }
-      } catch {
+      } catch (error) {
+        if (isUnauthorizedError(error)) {
+          await handleUnauthorized();
+          return;
+        }
+
         if (isMounted) {
           setPlace(null);
         }
@@ -236,7 +265,7 @@ export default function PlaceDetailScreen() {
     return () => {
       isMounted = false;
     };
-  }, [params.id]);
+  }, [params.id, router]);
 
   useEffect(() => {
     let isMounted = true;
@@ -367,7 +396,13 @@ export default function PlaceDetailScreen() {
           ? t('placeDetailSaveAdded')
           : t('placeDetailSaveRemoved'),
       );
-    } catch {
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
       Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
     } finally {
       setSaveLoading(false);
@@ -448,7 +483,13 @@ export default function PlaceDetailScreen() {
       setReviewRating(0);
       setReviewComment('');
       Alert.alert(t('placeDetailReviewSuccessTitle'), t('placeDetailReviewSuccessMessage'));
-    } catch {
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
       Alert.alert(t('commonErrorTitle'), t('placeDetailReviewFailed'));
     } finally {
       setReviewSubmitting(false);

@@ -21,7 +21,7 @@ const poppinsFonts = {
 import '../global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { storage } from '@/services/api';
+import { clearAuthState, storage } from '@/services/api';
 import {
   getCurrentThemePreference,
   loadAppPreferences,
@@ -34,6 +34,9 @@ import { getMySettings } from '@/services/settings';
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
 
 LogBox.ignoreLogs([
   'SafeAreaView has been deprecated and will be removed in a future release.',
@@ -113,7 +116,12 @@ export default function RootLayout() {
         if (isMounted) {
           await syncAppPreferencesFromSettings(settings);
         }
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await clearAuthState();
+          return;
+        }
+
         // Ignore l'erreur: l'app continue sur les preferences locales.
       }
     };

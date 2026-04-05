@@ -16,7 +16,12 @@ import {
 } from '@/services/organizer-access';
 import { fetchOrganizerNotificationsUnreadCount } from '@/services/organizer-notifications';
 import { listMyPlaceTeams } from '@/services/place-team';
-import { patchStoredUserSession, resolveStoredUserSession } from '@/services/user-session';
+import {
+  clearStoredUserSession,
+  patchStoredUserSession,
+  resolveStoredUserSession,
+} from '@/services/user-session';
+import { clearAuthState } from '@/services/api';
 
 interface ActionItem {
   id: string;
@@ -47,6 +52,9 @@ export default function OrganizerLayout() {
   const hydrateAccessUser = useCallback(async () => {
     const session = await resolveStoredUserSession();
     if (!session) {
+      await clearAuthState();
+      await clearStoredUserSession();
+      router.replace('/');
       setAccessUser(null);
       return;
     }

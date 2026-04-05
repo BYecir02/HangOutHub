@@ -10,25 +10,36 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { useI18n } from '@/hooks/use-i18n';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 import PersonRow from './PersonRow';
 import PostItem from './PostItem';
+import SocialFeedEmptyState from './SocialFeedEmptyState';
+import SocialFeedFiltersSheet from './SocialFeedFiltersSheet';
+import SocialFeedHeader from './SocialFeedHeader';
+import { resolvePostOwnership } from './post-ownership';
 import { SkeletonBlock } from '../ui/Skeleton';
-import api, { storage } from '../../services/api';
+import api, { getImageUrl } from '../../services/api';
 import { getFriendshipOverview } from '../../services/friendships';
 import { getOrCreateDirectChat, sendDirectMessage } from '../../services/direct-chats';
+import { subscribeToPostChanges, type PostChangedPayload } from '../../services/post-events';
+import { resolveStoredUserSession } from '../../services/user-session';
+import { clearAuthState, storage } from '../../services/api';
 import type { SocialUser } from '../../types/social';
 
-const FEED_CACHE_KEY = 'socialFeedCache:v2';
-const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt:v2';
-const FEED_CACHE_CURSOR_KEY = 'socialFeedCacheCursor:v2';
+const FEED_CACHE_KEY = 'socialFeedCache_v2';
+const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt_v2';
+const FEED_CACHE_CURSOR_KEY = 'socialFeedCacheCursor_v2';
 const FEED_CACHE_TTL_MS = 60 * 1000;
 const FEED_PAGE_SIZE = 20;
 const FEED_TOP_THRESHOLD = 12;
+const FEED_CACHE_FILE = `${FileSystem.documentDirectory || ''}socialFeedCache_v2.json`;
 
 type FilterType = 'all' | 'plan' | 'post';
 
@@ -82,12 +93,55 @@ interface FeedPost {
   shareCount?: number | null;
 }
 
+type FeedCacheSnapshot = {
+  posts: FeedPost[];
+  nextCursor: string | null;
+  cachedAt: number;
+};
+
+const readFeedCache = async (): Promise<FeedCacheSnapshot | null> => {
+  try {
+    if (Platform.OS === 'web') {
+      const raw = localStorage.getItem(FEED_CACHE_KEY);
+      return raw ? (JSON.parse(raw) as FeedCacheSnapshot) : null;
+    }
+
+    if (!FEED_CACHE_FILE) {
+      return null;
+    }
+
+    const raw = await FileSystem.readAsStringAsync(FEED_CACHE_FILE);
+    return JSON.parse(raw) as FeedCacheSnapshot;
+  } catch {
+    return null;
+  }
+};
+
+const writeFeedCache = async (snapshot: FeedCacheSnapshot) => {
+  const serialized = JSON.stringify(snapshot);
+
+  if (Platform.OS === 'web') {
+    localStorage.setItem(FEED_CACHE_KEY, serialized);
+    return;
+  }
+
+  if (!FEED_CACHE_FILE) {
+    return;
+  }
+
+  await FileSystem.writeAsStringAsync(FEED_CACHE_FILE, serialized);
+};
+
 function EmptyState({
   title,
   description,
+  actionLabel,
+  onAction,
 }: {
   title: string;
   description: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <View className="items-center px-6 py-16">
@@ -100,13 +154,21 @@ function EmptyState({
       <Text className="mt-3 text-center text-base leading-7 text-gray-500 dark:text-gray-400">
         {description}
       </Text>
+      {actionLabel && onAction ? (
+        <TouchableOpacity
+          onPress={onAction}
+          className="mt-6 rounded-full bg-[#4c669f] px-5 py-3"
+        >
+          <Text className="text-sm font-semibold text-white">{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
 
 function SkeletonPost() {
   return (
-    <View className="mx-5 mb-4 rounded-3xl bg-white p-4 shadow-sm dark:bg-gray-900">
+    <View className="mx-4 mb-4 rounded-3xl bg-white p-4 shadow-sm dark:bg-gray-900">
       <View className="flex-row items-center">
         <SkeletonBlock className="h-12 w-12 rounded-full" />
         <View className="ml-3 flex-1">
@@ -158,23 +220,22 @@ export default function SocialFeed() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedType, setSelectedType] = useState<FilterType>('all');
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const persistFeedCache = useCallback(
     async (nextPosts: FeedPost[], nextCursorValue: string | null) => {
-    const timestamp = Date.now();
-    try {
-      await storage.setItem(FEED_CACHE_KEY, JSON.stringify(nextPosts));
-      await storage.setItem(FEED_CACHE_TIME_KEY, String(timestamp));
-      if (nextCursorValue) {
-        await storage.setItem(FEED_CACHE_CURSOR_KEY, nextCursorValue);
-      } else {
-        await storage.removeItem(FEED_CACHE_CURSOR_KEY);
+      const timestamp = Date.now();
+      try {
+        await writeFeedCache({
+          posts: nextPosts,
+          nextCursor: nextCursorValue,
+          cachedAt: timestamp,
+        });
+        setLastFetchedAt(timestamp);
+      } catch (error) {
+        console.warn('Social feed cache save failed', error);
       }
-      setLastFetchedAt(timestamp);
-    } catch (error) {
-      console.warn('Social feed cache save failed', error);
-    }
-  },
+    },
     [],
   );
 
@@ -200,29 +261,23 @@ export default function SocialFeed() {
     }
 
     try {
-      const cached = await storage.getItem(FEED_CACHE_KEY);
-      const cachedAt = await storage.getItem(FEED_CACHE_TIME_KEY);
-      const cachedCursor = await storage.getItem(FEED_CACHE_CURSOR_KEY);
+      const cached = await readFeedCache();
 
-      if (cached) {
-        const parsed = JSON.parse(cached) as FeedPost[];
-        setPosts(parsed);
+      if (cached?.posts) {
+        setPosts(cached.posts);
         setLoading(false);
-        const cachedLatest = getMaxCreatedAt(parsed);
+        const cachedLatest = getMaxCreatedAt(cached.posts);
         if (cachedLatest) {
           latestFetchedAtRef.current = cachedLatest;
         }
       }
 
-      if (cachedAt) {
-        const parsedTime = Number(cachedAt);
-        if (!Number.isNaN(parsedTime)) {
-          setLastFetchedAt(parsedTime);
-        }
+      if (cached?.cachedAt) {
+        setLastFetchedAt(cached.cachedAt);
       }
 
-      if (cachedCursor) {
-        setNextCursor(cachedCursor);
+      if (cached?.nextCursor) {
+        setNextCursor(cached.nextCursor);
       }
     } catch (error) {
       console.warn('Social feed cache read failed', error);
@@ -275,6 +330,29 @@ export default function SocialFeed() {
     });
   }, []);
 
+  const mergeUpdatedPost = useCallback(
+    (post: FeedPost, update: PostChangedPayload) => {
+      const nextPost: FeedPost = {
+        ...post,
+        ...update,
+        images:
+          update.images !== undefined
+            ? update.images ?? []
+            : post.images,
+      };
+
+      if (update._count) {
+        nextPost._count = {
+          ...(post._count || {}),
+          ...update._count,
+        };
+      }
+
+      return nextPost;
+    },
+    [],
+  );
+
   const fetchFeed = useCallback(
     async (mode: 'initial' | 'refresh' | 'background' | 'more' = 'initial') => {
       if (mode === 'refresh') {
@@ -308,16 +386,20 @@ export default function SocialFeed() {
           nextCursor: string | null;
         }>('/posts/feed', { params });
 
+        const mergedVisiblePosts = mergePosts(response.data.items, postsRef.current);
+
         if (mode === 'more') {
           setPosts((current) => mergePosts(response.data.items, current));
         } else if (mode === 'background') {
           if (response.data.items.length > 0) {
             if (isAtTopRef.current) {
-              setPosts((current) => mergePosts(response.data.items, current));
+              setPosts(mergedVisiblePosts);
             } else {
               setPendingPosts((current) => mergePosts(response.data.items, current));
             }
           }
+        } else if (mode === 'refresh') {
+          setPosts(mergedVisiblePosts);
         } else {
           setPosts(response.data.items);
           setPendingPosts([]);
@@ -336,9 +418,11 @@ export default function SocialFeed() {
             ? nextCursorRef.current
             : response.data.nextCursor;
         const postsForCache =
-          mode === 'initial' || mode === 'refresh'
+          mode === 'initial'
             ? response.data.items
-            : mergePosts(response.data.items, postsRef.current);
+            : mode === 'background' && !isAtTopRef.current
+              ? postsRef.current
+              : mergedVisiblePosts;
         await persistFeedCache(postsForCache, nextForCache || null);
       } catch (error) {
         console.error(t('socialFeedLoadError'), error);
@@ -369,15 +453,11 @@ export default function SocialFeed() {
     }
 
     try {
-      const cachedAt = await storage.getItem(FEED_CACHE_TIME_KEY);
-      if (!cachedAt) {
+      const cached = await readFeedCache();
+      if (!cached?.cachedAt) {
         return true;
       }
-      const parsedTime = Number(cachedAt);
-      if (Number.isNaN(parsedTime)) {
-        return true;
-      }
-      return Date.now() - parsedTime > FEED_CACHE_TTL_MS;
+      return Date.now() - cached.cachedAt > FEED_CACHE_TTL_MS;
     } catch {
       return true;
     }
@@ -438,25 +518,105 @@ export default function SocialFeed() {
     };
   }, []);
 
-  const removePostFromLists = useCallback((postId: string) => {
-    setPosts((current) => current.filter((post) => post.id !== postId));
-    setPendingPosts((current) => current.filter((post) => post.id !== postId));
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      try {
+        const token = await storage.getItem('userToken');
+        const session = await resolveStoredUserSession();
+        if (!session && token) {
+          await clearAuthState();
+          router.replace('/');
+          return;
+        }
+
+        if (isMounted) {
+          setCurrentUserId(session?.id || null);
+        }
+      } catch {
+        if (isMounted) {
+          setCurrentUserId(null);
+        }
+      }
+    };
+
+    void loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToPostChanges((updatedPost) => {
+      const normalizedPost: FeedPost = {
+        ...updatedPost,
+        images: updatedPost.images ?? [],
+      };
+
+      setPosts((current) => {
+        const hasPost = current.some((post) => post.id === normalizedPost.id);
+        const next = hasPost
+          ? current.map((post) =>
+              post.id === normalizedPost.id
+                ? mergeUpdatedPost(post, normalizedPost)
+                : post,
+            )
+          : mergePosts([normalizedPost], current);
+        void persistFeedCache(next, nextCursorRef.current || null);
+        return next;
+      });
+      setPendingPosts((current) =>
+        current.some((post) => post.id === normalizedPost.id)
+          ? current.map((post) =>
+              post.id === normalizedPost.id
+                ? mergeUpdatedPost(post, normalizedPost)
+                : post,
+            )
+          : mergePosts([normalizedPost], current),
+      );
+    });
+
+    return unsubscribe;
+  }, [mergePosts, mergeUpdatedPost, persistFeedCache]);
 
   const handleDeletePost = useCallback(
     async (postId: string) => {
+      const previousPosts = postsRef.current;
+      const previousPendingPosts = pendingPosts;
+      const nextPosts = previousPosts.filter((post) => post.id !== postId);
+      const nextPendingPosts = previousPendingPosts.filter((post) => post.id !== postId);
+
+      setPosts(nextPosts);
+      setPendingPosts(nextPendingPosts);
+      await persistFeedCache(
+        nextPendingPosts.length > 0
+          ? mergePosts(nextPendingPosts, nextPosts)
+          : nextPosts,
+        nextCursorRef.current || null,
+      );
+
       try {
         await api.delete(`/posts/${postId}`);
-        removePostFromLists(postId);
         Alert.alert(
           t('profileDeletePostSuccessTitle'),
           t('profileDeletePostSuccessMessage'),
         );
-      } catch {
+      } catch (error) {
+        setPosts(previousPosts);
+        setPendingPosts(previousPendingPosts);
+        await persistFeedCache(
+          previousPendingPosts.length > 0
+            ? mergePosts(previousPendingPosts, previousPosts)
+            : previousPosts,
+          nextCursorRef.current || null,
+        );
         Alert.alert(t('commonErrorTitle'), t('socialFeedDeleteError'));
+        console.error('Erreur suppression post:', error);
       }
     },
-    [removePostFromLists, t],
+    [mergePosts, pendingPosts, persistFeedCache, t],
   );
 
   const handleEditPost = useCallback(
@@ -513,6 +673,10 @@ export default function SocialFeed() {
     router.push('/messages');
   }, [router]);
 
+  const handleOpenCreateModal = useCallback(() => {
+    router.push('/create-modal');
+  }, [router]);
+
   const handleOpenSearch = useCallback(() => {
     router.push('/search');
   }, [router]);
@@ -563,13 +727,31 @@ export default function SocialFeed() {
     return label;
   }, [pendingPosts.length, t]);
 
-  const visiblePosts = useMemo(() => {
-    if (pendingPosts.length === 0) {
-      return posts;
+  const timelinePosts = useMemo(() => posts, [posts]);
+
+  useEffect(() => {
+    const urlsToPrefetch = timelinePosts
+      .slice(0, 8)
+      .flatMap((post) => (post.images || []).slice(0, 1))
+      .map((url) => getImageUrl(url))
+      .filter((url): url is string => Boolean(url))
+      .filter(
+        (url) =>
+          !url.endsWith('.mp4') &&
+          !url.endsWith('.mov') &&
+          !url.endsWith('.m4v') &&
+          !url.endsWith('.webm') &&
+          !url.endsWith('.mkv'),
+      );
+
+    if (urlsToPrefetch.length === 0) {
+      return;
     }
 
-    return mergePosts(pendingPosts, posts);
-  }, [mergePosts, pendingPosts, posts]);
+    void Promise.all(urlsToPrefetch.map((url) => ExpoImage.prefetch(url))).catch(() => {
+      // Préchargement opportuniste: on ignore les erreurs réseau.
+    });
+  }, [timelinePosts]);
 
   const buildShareMessage = useCallback(
     (post: FeedPost) => {
@@ -688,17 +870,17 @@ export default function SocialFeed() {
 
   const locationOptions = useMemo(() => {
     const values = new Set<string>();
-    visiblePosts.forEach((post) => {
+    timelinePosts.forEach((post) => {
       const label = resolveLocationLabel(post);
       if (label) {
         values.add(label);
       }
     });
     return Array.from(values);
-  }, [resolveLocationLabel, visiblePosts]);
+  }, [resolveLocationLabel, timelinePosts]);
 
   const filteredPosts = useMemo(() => {
-    return visiblePosts.filter((post) => {
+    return timelinePosts.filter((post) => {
       if (selectedCategory && post.ambiance !== selectedCategory) {
         return false;
       }
@@ -727,65 +909,67 @@ export default function SocialFeed() {
     selectedCategory,
     selectedLocation,
     selectedType,
-    visiblePosts,
+    timelinePosts,
   ]);
 
-  const renderHeader = () => (
-    <View className="mb-4 bg-white px-5 pb-5 pt-5 dark:bg-black">
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-4">
-          <Text className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-400 dark:text-gray-500">
-            {t('socialFeedHeaderLabel')}
-          </Text>
-          <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-            {t('socialFeedHeaderTitle')}
-          </Text>
-        </View>
+  const feedMediaCount = useMemo(
+    () => filteredPosts.filter((post) => (post.images || []).length > 0).length,
+    [filteredPosts],
+  );
 
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={handleOpenSearch}
-            className="mr-2 h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
-          >
-            <Ionicons name="search-outline" size={22} color="#4c669f" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setFiltersOpen(true)}
-            className="mr-2 h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
-          >
-            <Ionicons name="options-outline" size={22} color="#4c669f" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleOpenMessages}
-            className="h-12 w-12 items-center justify-center rounded-2xl border border-[#4c669f]/25 bg-[#4c669f]/10 dark:border-[#4c669f]/35 dark:bg-[#4c669f]/20"
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#4c669f" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      {pendingPosts.length > 0 ? (
-        <TouchableOpacity
-          onPress={() => void applyPendingPosts()}
-          className="mt-4 rounded-2xl border border-[#4c669f]/20 bg-[#4c669f]/10 px-4 py-2"
-        >
-          <Text className="text-xs font-semibold text-[#4c669f]">
-            {pendingLabel}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
+  const feedAutoplay = useVisibleItemAutoplay(filteredPosts, (post) => post.id);
+
+  const renderHeader = () => (
+    <SocialFeedHeader
+      headerLabel={t('socialFeedHeaderLabel')}
+      headerTitle={t('socialFeedHeaderTitle')}
+      headerSubtitle={t('socialFeedHeaderSubtitle')}
+      allLabel={t('socialFeedFilterAll')}
+      postsLabel={t('socialFeedFilterPosts')}
+      plansLabel={t('socialFeedFilterPlans')}
+      locationLabel={t('socialFeedFilterLocation')}
+      pendingLabel={pendingLabel}
+      pendingVisible={pendingPosts.length > 0}
+      onSearch={handleOpenSearch}
+      onOpenFilters={() => setFiltersOpen(true)}
+      onOpenMessages={handleOpenMessages}
+      onShowAll={() => {
+        setSelectedCategory('');
+        setSelectedType('all');
+        setSelectedLocation('');
+      }}
+      onShowPosts={() => {
+        setSelectedCategory('');
+        setSelectedLocation('');
+        setSelectedType('post');
+      }}
+      onShowPlans={() => {
+        setSelectedCategory('');
+        setSelectedLocation('');
+        setSelectedType('plan');
+      }}
+      onOpenLocationFilters={() => {
+        setActiveFilter('location');
+        setFiltersOpen(true);
+      }}
+      selectedCategory={selectedCategory}
+      selectedType={selectedType}
+      selectedLocation={selectedLocation}
+      onApplyPending={() => void applyPendingPosts()}
+    />
   );
 
   if (loading && posts.length === 0) {
     return (
-      <FlatList
-        data={[0, 1, 2]}
-        keyExtractor={(item) => `skeleton-${item}`}
+      <FlatList<string>
+        key="social-feed-skeleton"
+        data={['skeleton-0', 'skeleton-1', 'skeleton-2']}
+        keyExtractor={(item) => item}
         renderItem={() => <SkeletonPost />}
         ListHeaderComponent={renderHeader}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 120, paddingTop: 4 }}
         className="flex-1 bg-gray-50 dark:bg-black"
       />
     );
@@ -793,24 +977,51 @@ export default function SocialFeed() {
 
   return (
     <>
-      <FlatList
+      <FlatList<FeedPost>
+        key="social-feed-main"
         data={filteredPosts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <PostItem
-            item={item}
-            showDateColumn={false}
-            onDelete={item.isOwner ? handleDeletePost : undefined}
-            onEdit={item.isOwner ? handleEditPost : undefined}
-            onComment={handleCommentPost}
-            onShare={handleSharePost}
-          />
+          <View
+            onLayout={(event) => {
+              feedAutoplay.registerLayout(item.id, {
+                y: event.nativeEvent.layout.y,
+                height: event.nativeEvent.layout.height,
+              });
+            }}
+          >
+            {(() => {
+              const isOwner = resolvePostOwnership(
+                item.userId,
+                item.isOwner,
+                currentUserId,
+              );
+              const normalizedItem: FeedPost = {
+                ...item,
+                isOwner,
+              };
+
+              return (
+            <PostItem
+              item={normalizedItem}
+              showDateColumn={false}
+              shouldPlayMedia={feedAutoplay.activeId === item.id}
+              onDelete={normalizedItem.isOwner ? handleDeletePost : undefined}
+              onEdit={normalizedItem.isOwner ? handleEditPost : undefined}
+              onComment={handleCommentPost}
+              onShare={handleSharePost}
+            />
+              );
+            })()}
+          </View>
         )}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
-          <EmptyState
+          <SocialFeedEmptyState
             title={t('socialFeedEmptyTitle')}
             description={t('socialFeedEmptyDescription')}
+            actionLabel={t('createActionPostLabel')}
+            onAction={handleOpenCreateModal}
           />
         }
         refreshControl={
@@ -820,7 +1031,11 @@ export default function SocialFeed() {
             tintColor="#4c669f"
           />
         }
-        onScroll={handleScroll}
+        onLayout={feedAutoplay.onLayout}
+        onScroll={(event) => {
+          handleScroll(event);
+          feedAutoplay.onScroll(event);
+        }}
         scrollEventThrottle={16}
         onEndReached={() => {
           if (!fetchingMore && nextCursor) {
@@ -841,123 +1056,45 @@ export default function SocialFeed() {
         className="flex-1 bg-gray-50 dark:bg-black"
       />
 
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={() => setFiltersOpen(false)}
-        className={`absolute inset-0 bg-black/50 ${filtersOpen ? 'flex' : 'hidden'}`}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          className="absolute bottom-0 w-full rounded-t-3xl bg-white p-5 pb-8 dark:bg-gray-900"
-        >
-          <View className="mb-4 items-center">
-            <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
-          </View>
-          <Text className="mb-4 text-center text-lg font-bold text-gray-800 dark:text-white">
-            {activeFilter === 'category'
-              ? t('socialFeedFilterCategoryTitle')
-              : activeFilter === 'type'
-              ? t('socialFeedFilterTypeTitle')
-              : t('socialFeedFilterLocationTitle')}
-          </Text>
-
-          <View className="mb-4 flex-row rounded-2xl bg-gray-100 p-1 dark:bg-gray-800">
-            {[
-              { key: 'category', label: t('socialFeedFilterCategory') },
-              { key: 'type', label: t('socialFeedFilterType') },
-              { key: 'location', label: t('socialFeedFilterLocation') },
-            ].map((option) => {
-              const active = activeFilter === option.key;
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  onPress={() => setActiveFilter(option.key as 'category' | 'type' | 'location')}
-                  className="flex-1 items-center rounded-xl px-3 py-3"
-                  style={
-                    active
-                      ? {
-                          backgroundColor: '#4c669f',
-                        }
-                      : undefined
-                  }
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-600 dark:text-gray-300'
-                    }`}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-            <TouchableOpacity
-              onPress={() => {
-                setSelectedCategory('');
-                setSelectedType('all');
-                setSelectedLocation('');
-                setFiltersOpen(false);
-              }}
-              className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
-            >
-              <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                {t('socialFeedFilterAll')}
-              </Text>
-            </TouchableOpacity>
-
-            {activeFilter === 'category'
-              ? categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    onPress={() => {
-                      setSelectedCategory(category.name);
-                      setFiltersOpen(false);
-                    }}
-                    className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
-                  >
-                    <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              : activeFilter === 'type'
-              ? [
-                  { id: 'plan', label: t('socialFeedFilterPlans') },
-                  { id: 'post', label: t('socialFeedFilterPosts') },
-                ].map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    onPress={() => {
-                      setSelectedType(option.id as FilterType);
-                      setFiltersOpen(false);
-                    }}
-                    className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
-                  >
-                    <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              : locationOptions.map((location) => (
-                  <TouchableOpacity
-                    key={location}
-                    onPress={() => {
-                      setSelectedLocation(location);
-                      setFiltersOpen(false);
-                    }}
-                    className="flex-row items-center border-b border-gray-100 py-3 dark:border-gray-800"
-                  >
-                    <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      {location}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-          </ScrollView>
-        </TouchableOpacity>
-      </TouchableOpacity>
+      <SocialFeedFiltersSheet
+        open={filtersOpen}
+        filterCategoryLabel={t('socialFeedFilterCategory')}
+        filterTypeLabel={t('socialFeedFilterType')}
+        filterLocationLabel={t('socialFeedFilterLocation')}
+        filterCategoryTitle={t('socialFeedFilterCategoryTitle')}
+        filterTypeTitle={t('socialFeedFilterTypeTitle')}
+        filterLocationTitle={t('socialFeedFilterLocationTitle')}
+        clearLabel={t('socialFeedFilterClear')}
+        allLabel={t('socialFeedFilterAll')}
+        plansLabel={t('socialFeedFilterPlans')}
+        postsLabel={t('socialFeedFilterPosts')}
+        categories={categories}
+        locationOptions={locationOptions}
+        activeFilter={activeFilter}
+        selectedCategory={selectedCategory}
+        selectedType={selectedType}
+        selectedLocation={selectedLocation}
+        onClose={() => setFiltersOpen(false)}
+        onSetActiveFilter={setActiveFilter}
+        onReset={() => {
+          setSelectedCategory('');
+          setSelectedType('all');
+          setSelectedLocation('');
+          setFiltersOpen(false);
+        }}
+        onSelectCategory={(value) => {
+          setSelectedCategory(value);
+          setFiltersOpen(false);
+        }}
+        onSelectType={(value) => {
+          setSelectedType(value);
+          setFiltersOpen(false);
+        }}
+        onSelectLocation={(value) => {
+          setSelectedLocation(value);
+          setFiltersOpen(false);
+        }}
+      />
 
       {shareModalOpen ? (
         <TouchableOpacity

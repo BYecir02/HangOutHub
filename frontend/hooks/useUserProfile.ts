@@ -58,6 +58,7 @@ export interface UserProfile {
   displayName: string | null;
   avatarUrl: string | null;
   coverUrl: string | null;
+  updatedAt?: string | Date | null;
   bio: string | null;
   role?: string;
   followersCount?: number | null;
@@ -213,10 +214,13 @@ export function useUserProfile() {
   }, [hasLoaded]);
 
   const deletePost = async (postId: string) => {
+    const previousPosts = posts;
+    setPosts((currentPosts) => currentPosts.filter((post) => post.id !== postId));
+
     try {
       await api.delete(`/posts/${postId}`);
-      setPosts((currentPosts) => currentPosts.filter((p) => p.id !== postId));
     } catch (error) {
+      setPosts(previousPosts);
       debugProfileError('deletePost failed', error);
       throw error;
     }

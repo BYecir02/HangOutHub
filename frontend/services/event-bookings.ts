@@ -54,10 +54,12 @@ export const createEventBooking = async (
   eventId: string,
   ticketTypeId?: string,
   promoCode?: string,
+  clientRequestId?: string,
 ): Promise<EventBookingTicket> => {
   const response = await api.post<EventBookingTicket>(`/events/${eventId}/book`, {
     ticketTypeId,
     promoCode,
+    clientRequestId,
   });
 
   return response.data;

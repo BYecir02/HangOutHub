@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -76,6 +76,32 @@ interface EventDetail {
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
+const generateBookingRequestId = () => {
+  const cryptoApi = globalThis.crypto as
+    | {
+        randomUUID?: () => string;
+      }
+    | undefined;
+
+  if (cryptoApi?.randomUUID) {
+    return cryptoApi.randomUUID();
+  }
+
+  const bytes = Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 256),
+  );
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const toHex = (value: number) => value.toString(16).padStart(2, '0');
+  const hex = bytes.map(toHex).join('');
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
+    16,
+    20,
+  )}-${hex.slice(20)}`;
+};
+
 export default function EventDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; tab?: string }>();
@@ -92,6 +118,8 @@ export default function EventDetailScreen() {
   const [promoError, setPromoError] = useState('');
   const [showCancellationDetails, setShowCancellationDetails] = useState(false);
   const [showRefundDetails, setShowRefundDetails] = useState(false);
+  const bookingRequestIdRef = useRef<string | null>(null);
+  const bookingSubmissionLockRef = useRef(false);
   const [activeTab, setActiveTab] = useState<'details' | 'tickets' | 'gallery'>(() =>
     params.tab === 'tickets' ? 'tickets' : 'details',
   );
@@ -107,6 +135,12 @@ export default function EventDetailScreen() {
       setActiveTab('tickets');
     }
   }, [params.tab]);
+
+  useEffect(() => {
+    if (hasActiveBooking) {
+      bookingRequestIdRef.current = null;
+    }
+  }, [hasActiveBooking]);
 
   const fetchEvent = useCallback(async () => {
     if (!params.id) {
@@ -362,6 +396,7 @@ export default function EventDetailScreen() {
               try {
                 const cancelled = await cancelEventBooking(booking.id);
                 setBooking(cancelled);
+                bookingRequestIdRef.current = null;
                 await fetchEvent();
                 Alert.alert(
                   t('eventDetailCancelSuccessTitle'),
@@ -391,6 +426,10 @@ export default function EventDetailScreen() {
       return;
     }
 
+    if (bookingSubmissionLockRef.current || joining) {
+      return;
+    }
+
     if (ticketTypes.length > 0 && !selectedTicketTypeId) {
       Alert.alert(t('commonErrorTitle'), t('eventDetailTicketTypeRequired'));
       return;
@@ -401,6 +440,10 @@ export default function EventDetailScreen() {
       return;
     }
 
+    const clientRequestId =
+      bookingRequestIdRef.current || generateBookingRequestId();
+    bookingRequestIdRef.current = clientRequestId;
+    bookingSubmissionLockRef.current = true;
     setJoining(true);
     setPromoError('');
     try {
@@ -408,8 +451,10 @@ export default function EventDetailScreen() {
         event.id,
         selectedTicketTypeId || undefined,
         promoCode.trim() || undefined,
+        clientRequestId,
       );
       setBooking(reserved);
+      bookingRequestIdRef.current = null;
 
       Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
 
@@ -425,6 +470,7 @@ export default function EventDetailScreen() {
       Alert.alert(t('commonErrorTitle'), message);
     } finally {
       setJoining(false);
+      bookingSubmissionLockRef.current = false;
     }
   };
 
@@ -910,9 +956,9 @@ export default function EventDetailScreen() {
       <View className="border-t border-gray-200 bg-white/95 px-4 pb-5 pt-4 dark:border-gray-800 dark:bg-gray-950/95">
         <TouchableOpacity
           onPress={handlePrimaryAction}
-          disabled={joining}
+          disabled={joining || cancelling}
           className={`items-center rounded-[28px] px-5 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ${
-            joining || (!hasActiveBooking && isSoldOut)
+            joining || cancelling || (!hasActiveBooking && isSoldOut)
               ? 'bg-[#ff9aa3]'
               : 'bg-[#ff4757]'
           }`}

@@ -1,4 +1,5 @@
-import api, { storage } from '@/services/api';
+import api, { clearAuthState, storage } from '@/services/api';
+import { disconnectDirectChatSocket } from '@/services/direct-chat-realtime';
 
 const USER_INFO_KEY = 'userInfo';
 
@@ -102,13 +103,27 @@ export async function patchStoredUserSession(
 
 export async function clearStoredUserSession(): Promise<void> {
   await storage.removeItem(USER_INFO_KEY);
+  disconnectDirectChatSocket();
 }
 
 export async function syncStoredUserSessionFromApi(): Promise<StoredUserSession | null> {
   try {
     const response = await api.get<UserSessionLike>('/users/me');
     return setStoredUserSession(response.data);
-  } catch {
+  } catch (error) {
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'response' in error &&
+      typeof (error as { response?: { status?: number } }).response?.status === 'number'
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+
+    if (status === 401) {
+      await clearAuthState();
+      return null;
+    }
+
     return null;
   }
 }

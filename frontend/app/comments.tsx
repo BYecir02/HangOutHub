@@ -19,7 +19,10 @@ import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import ScreenState from '@/components/ui/ScreenState';
 import CommentItem from '../components/social/CommentItem';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getApiErrorMessage, getImageUrl } from '../services/api';
+import api, { clearAuthState, getApiErrorMessage, getImageUrl } from '../services/api';
+
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
 
 interface CommentAuthor {
   displayName?: string | null;
@@ -66,6 +69,11 @@ export default function CommentsScreen() {
   const [replyingTo, setReplyingTo] = useState<CommentListItem | null>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
+
   const mapComment = useCallback(
     (item: ApiComment): CommentListItem => {
       return {
@@ -94,12 +102,17 @@ export default function CommentsScreen() {
       setComments(res.data.map(mapComment));
       setErrorMessage(null);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur chargement commentaires:', error);
       setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
       setLoading(false);
     }
-  }, [mapComment, postId, t]);
+  }, [handleInvalidSession, mapComment, postId, t]);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -108,10 +121,15 @@ export default function CommentsScreen() {
         id: res.data.id,
         avatarUrl: res.data.avatarUrl,
       });
-    } catch {
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       setCurrentUser(null);
     }
-  }, []);
+  }, [handleInvalidSession]);
 
   useEffect(() => {
     void fetchComments();
@@ -150,6 +168,11 @@ export default function CommentsScreen() {
       setErrorMessage(null);
       Keyboard.dismiss();
     } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       console.error('Erreur envoi commentaire:', error);
       Alert.alert(t('commonErrorTitle'), getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
@@ -180,7 +203,12 @@ export default function CommentsScreen() {
         return prev.filter((current) => !idsToRemove.has(current.id));
       });
       Alert.alert(t('commentsDeleteSuccessTitle'), t('commentsDeleteSuccessMessage'));
-    } catch {
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        await handleInvalidSession();
+        return;
+      }
+
       Alert.alert(t('commonErrorTitle'), t('commentsDeleteErrorMessage'));
     }
   };

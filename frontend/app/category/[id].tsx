@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -14,7 +16,7 @@ import LottieView from 'lottie-react-native';
 import MediaFrame from '@/components/ui/MediaFrame';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getImageUrl } from '@/services/api';
+import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import {
@@ -108,6 +110,9 @@ type CategoryInspirationItem = {
   metaIcon: keyof typeof Ionicons.glyphMap;
 };
 
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
+
 function estimateCategoryCardHeight(index: number) {
   const imageHeights = [182, 238, 204, 258, 194, 228];
   return imageHeights[index % imageHeights.length] + 124;
@@ -119,12 +124,20 @@ function CategoryInspirationCard({
   accentColor,
   shouldPlay = false,
   onPress,
+  showSaveButton = false,
+  isSaved = false,
+  onToggleSave,
+  saving = false,
 }: {
   item: CategoryInspirationItem;
   imageHeight: number;
   accentColor: string;
   shouldPlay?: boolean;
   onPress: () => void;
+  showSaveButton?: boolean;
+  isSaved?: boolean;
+  onToggleSave?: () => void;
+  saving?: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -155,6 +168,28 @@ function CategoryInspirationCard({
             </Text>
           </View>
         </View>
+
+        {showSaveButton && onToggleSave ? (
+          <TouchableOpacity
+            onPress={onToggleSave}
+            disabled={saving}
+            className={`absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-2xl border ${
+              isSaved
+                ? 'border-[#2ecc71] bg-green-50/95 dark:bg-green-900/20'
+                : 'border-white/80 bg-white/95 dark:border-gray-700 dark:bg-gray-800'
+            }`}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={isSaved ? '#2ecc71' : '#4c669f'} />
+            ) : (
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={18}
+                color={isSaved ? '#2ecc71' : '#4c669f'}
+              />
+            )}
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View className="p-4">
@@ -178,12 +213,20 @@ function CategoryInspirationMasonry({
   activeItemId,
   registerLayout,
   onPressItem,
+  showSaveButton = false,
+  isSavedItem,
+  isSavingItem,
+  onToggleSaveItem,
 }: {
   items: CategoryInspirationItem[];
   accentColor: string;
   activeItemId: string | null;
   registerLayout: (id: string, layout: { y: number; height: number }) => void;
   onPressItem: (item: CategoryInspirationItem) => void;
+  showSaveButton?: boolean;
+  isSavedItem?: (placeId: string) => boolean;
+  isSavingItem?: (placeId: string) => boolean;
+  onToggleSaveItem?: (placeId: string) => void;
 }) {
   const columns = useMemo(() => {
     const nextColumns: Array<Array<{ item: CategoryInspirationItem; imageHeight: number }>> = [
@@ -219,6 +262,12 @@ function CategoryInspirationMasonry({
                 accentColor={accentColor}
                 shouldPlay={activeItemId === item.id}
                 onPress={() => onPressItem(item)}
+                showSaveButton={showSaveButton}
+                isSaved={isSavedItem ? isSavedItem(item.targetId) : false}
+                saving={isSavingItem ? isSavingItem(item.targetId) : false}
+                onToggleSave={
+                  onToggleSaveItem ? () => onToggleSaveItem(item.targetId) : undefined
+                }
               />
             </View>
           ))}
@@ -241,6 +290,8 @@ export default function CategoryDiscoverScreen() {
     null,
   );
   const [activeTab, setActiveTab] = useState<'events' | 'places'>('events');
+  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
+  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -294,6 +345,85 @@ export default function CategoryDiscoverScreen() {
       isMounted = false;
     };
   }, [params.id]);
+
+  useEffect(() => {
+    const loadSavedPlaces = async () => {
+      const token = await storage.getItem('userToken');
+
+      if (!token) {
+        setSavedPlaceIds(new Set());
+        return;
+      }
+
+      try {
+        const response = await api.get<{ id: string }[]>('/places/saved/mine');
+        setSavedPlaceIds(new Set(response.data.map((place) => place.id)));
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await clearAuthState();
+          router.replace('/');
+          return;
+        }
+
+        setSavedPlaceIds(new Set());
+      }
+    };
+
+    void loadSavedPlaces();
+  }, [router]);
+
+  const handleTogglePlaceSave = useMemo(
+    () =>
+      async (placeId: string) => {
+        const token = await storage.getItem('userToken');
+
+        if (!token) {
+          Alert.alert(
+            t('placeDetailLoginRequiredTitle'),
+            t('placeDetailLoginRequiredMessage'),
+          );
+          return;
+        }
+
+        if (savingPlaceIds.has(placeId)) {
+          return;
+        }
+
+        setSavingPlaceIds((current) => {
+          const next = new Set(current);
+          next.add(placeId);
+          return next;
+        });
+
+        try {
+          const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
+          setSavedPlaceIds((current) => {
+            const next = new Set(current);
+            if (response.data.saved) {
+              next.add(placeId);
+            } else {
+              next.delete(placeId);
+            }
+            return next;
+          });
+        } catch (error) {
+          if (isUnauthorized(error)) {
+            await clearAuthState();
+            router.replace('/');
+            return;
+          }
+
+          Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
+        } finally {
+          setSavingPlaceIds((current) => {
+            const next = new Set(current);
+            next.delete(placeId);
+            return next;
+          });
+        }
+      },
+    [router, savingPlaceIds, t],
+  );
 
   if (!data && !loading) {
     return (
@@ -587,6 +717,12 @@ export default function CategoryDiscoverScreen() {
                     params: { id: item.targetId },
                   })
                 }
+                showSaveButton
+                isSavedItem={(placeId) => savedPlaceIds.has(placeId)}
+                isSavingItem={(placeId) => savingPlaceIds.has(placeId)}
+                onToggleSaveItem={(placeId) => {
+                  void handleTogglePlaceSave(placeId);
+                }}
               />
             ) : (
               <EmptyBlock

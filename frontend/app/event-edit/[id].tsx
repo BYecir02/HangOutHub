@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import EventFormWizard from '@/components/ui/EventFormWizard';
-import api, { getApiErrorMessage } from '@/services/api';
+import api, { clearAuthState, getApiErrorMessage } from '@/services/api';
 import { clearCache } from '@/services/dataCache';
 import { getMySettings } from '@/services/settings';
 
@@ -86,6 +86,9 @@ interface EventPayload {
   }[];
 }
 
+const isUnauthorized = (error: unknown) =>
+  (error as { response?: { status?: number } }).response?.status === 401;
+
 export default function EditEventScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -128,6 +131,10 @@ export default function EditEventScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [currentField, setCurrentField] = useState<'start' | 'end'>('start');
+  const handleInvalidSession = useCallback(async () => {
+    await clearAuthState();
+    router.replace('/');
+  }, [router]);
   const [checkInInputMode, setCheckInInputMode] = useState<'picker' | 'manual'>(
     'picker',
   );
@@ -298,7 +305,12 @@ export default function EditEventScreen() {
         );
         setImages(mergedImages);
         setCoverIndex(0);
-      } catch {
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await handleInvalidSession();
+          return;
+        }
+
         if (isMounted) {
           Alert.alert(t('commonErrorTitle'), t('eventEditLoadFailed'));
           router.back();
@@ -315,7 +327,7 @@ export default function EditEventScreen() {
     return () => {
       isMounted = false;
     };
-  }, [eventId, router, t]);
+  }, [eventId, handleInvalidSession, router, t]);
 
   const availablePlaces = useMemo(() => {
     const sourceItems = placeSource === 'all' ? allPlaces : ownedPlaces;

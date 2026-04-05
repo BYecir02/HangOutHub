@@ -199,6 +199,12 @@ export default function CreateModalScreen() {
           if (!isMounted) {
             return;
           }
+
+          if (!resolvedUser) {
+            router.replace('/');
+            return;
+          }
+
           setCurrentUser(resolvedUser || null);
         } catch {
           if (!isMounted) {

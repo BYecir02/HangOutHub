@@ -22,6 +22,7 @@ import {
 } from '@/services/organizer-access';
 import { getOrganizerStatusTone } from '@/services/organizer-ui';
 import { clearStoredUserSession } from '@/services/user-session';
+import { clearAuthState } from '@/services/api';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
@@ -167,8 +168,7 @@ export default function OrganizerProfileScreen() {
         onPress: async () => {
           try {
             await api.post('/auth/logout').catch(() => {});
-            await storage.removeItem('userToken');
-            await storage.removeItem('refreshToken');
+            await clearAuthState();
             await clearStoredUserSession();
             router.replace('/');
           } catch {

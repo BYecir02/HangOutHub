@@ -82,15 +82,6 @@ export default function OutingInvitationsScreen() {
         className="flex-1 px-5 pb-10 pt-2"
         showsVerticalScrollIndicator={false}
       >
-        <View className="rounded-[28px] border border-[#4c669f]/20 bg-[#4c669f]/10 p-5">
-          <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            {t('outingInvitationsLabel')}
-          </Text>
-          <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            {t('outingInvitationsHero')}
-          </Text>
-        </View>
-
         <View className="mt-5">
           <SocialCountChip
             label={t('outingInvitationsCountLabel')}

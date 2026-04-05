@@ -336,7 +336,7 @@ export class PostsService {
       this.postsGateway.emitNewPost(postForFeed, audience);
     }
 
-    return created;
+    return postForFeed ? this.serializePost(postForFeed, userId) : created;
   }
 
   async findFeed(
@@ -883,9 +883,15 @@ export class PostsService {
       throw new ForbiddenException('You are not allowed to delete this post');
     }
 
-    return this.prisma.post.delete({
+    const deletedPost = await this.prisma.post.delete({
       where: { id },
     });
+
+    if (Array.isArray(post.images) && post.images.length > 0) {
+      void this.storageService.deleteFiles(post.images);
+    }
+
+    return deletedPost;
   }
 
   async update(
