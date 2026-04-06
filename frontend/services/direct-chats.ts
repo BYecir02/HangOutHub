@@ -1,4 +1,8 @@
 import api from '@/services/api';
+import {
+  buildMediaUploadPayload,
+  type MediaUploadAsset,
+} from '@/services/media-upload';
 
 export interface DirectChatPartner {
   id: string;
@@ -28,7 +32,7 @@ export interface DirectChatMessage {
 export interface DirectMessagePayload {
   content?: string;
   clientId?: string;
-  images?: { uri: string }[];
+  images?: MediaUploadAsset[];
   replyToMessageId?: string | null;
   sharedPostId?: string | null;
 }
@@ -128,20 +132,22 @@ export async function sendDirectMessageWithImages(
   if (payload.sharedPostId) {
     formData.append('sharedPostId', payload.sharedPostId);
   }
-  (payload.images || []).forEach((image, index) => {
-    if (!image.uri) {
+  (payload.images || []).forEach((media, index) => {
+    if (!media.uri) {
       return;
     }
-    formData.append('images', {
-      uri: image.uri,
-      name: `message_${index}.jpg`,
-      type: 'image/jpeg',
-    } as never);
+    formData.append(
+      'images',
+      buildMediaUploadPayload(media, index, 'message') as never,
+    );
   });
   const response = await api.post<DirectChatMessage>(
     `/direct-chats/${id}/messages`,
     formData,
     {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
       onUploadProgress: (event) => {
         if (!options?.onUploadProgress) {
           return;

@@ -23,6 +23,7 @@ type ChatComposerProps = {
   sendEnabled: boolean;
   isDark: boolean;
   uploadProgress?: number | null;
+  showMediaButton?: boolean;
 };
 
 export function ChatComposer({
@@ -38,6 +39,7 @@ export function ChatComposer({
   sendEnabled,
   isDark,
   uploadProgress,
+  showMediaButton = true,
 }: ChatComposerProps) {
   return (
     <>
@@ -67,12 +69,14 @@ export function ChatComposer({
       ) : null}
 
       <View className="flex-row items-center gap-2 rounded-2xl border border-gray-200 px-2 py-2 dark:border-gray-800">
-        <TouchableOpacity
-          onPress={onPickImages}
-          className="h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800"
-        >
-          <Ionicons name="image-outline" size={20} color="#4c669f" />
-        </TouchableOpacity>
+        {showMediaButton ? (
+          <TouchableOpacity
+            onPress={onPickImages}
+            className="h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800"
+          >
+            <Ionicons name="image-outline" size={20} color="#4c669f" />
+          </TouchableOpacity>
+        ) : null}
         <TextInput
           ref={inputRef}
           value={input}

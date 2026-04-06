@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
-type VisibleRect = {
-  y: number;
-  height: number;
-};
+import { selectVisibleItemId, type VisibleRect } from './useVisibleItemAutoplay.logic';
 
 export function useVisibleItemAutoplay<T>(
   items: T[],
@@ -20,6 +17,9 @@ export function useVisibleItemAutoplay<T>(
   const scrollYRef = useRef(0);
   const viewportHeightRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const isMomentumScrollingRef = useRef(false);
+  const pendingRecomputeRef = useRef(false);
 
   useEffect(() => {
     getIdRef.current = getId;
@@ -43,97 +43,43 @@ export function useVisibleItemAutoplay<T>(
     });
   }, [items]);
 
-  const recomputeActiveId = useCallback(
-    () => {
-      const currentItems = itemsRef.current;
+  const recomputeActiveId = useCallback(() => {
+    const nextActiveId = selectVisibleItemId({
+      items: itemsRef.current,
+      getId: getIdRef.current,
+      layouts: layoutsRef.current,
+      scrollY: scrollYRef.current,
+      viewportHeight: viewportHeightRef.current,
+      currentActiveId: activeIdRef.current,
+    });
 
-      if (currentItems.length === 0) {
-        if (activeIdRef.current !== null) {
-          activeIdRef.current = null;
-          setActiveId(null);
-        }
-        return;
-      }
-
-      const nextScrollY = scrollYRef.current;
-      const nextViewportHeight = viewportHeightRef.current;
-
-      if (nextViewportHeight <= 0) {
-        return;
-      }
-
-      const viewportTop = nextScrollY;
-      const viewportBottom = viewportTop + nextViewportHeight;
-      const viewportCenter = viewportTop + nextViewportHeight / 2;
-
-      let bestId: string | null = null;
-      let bestScore = 0;
-      let bestDistance = Number.POSITIVE_INFINITY;
-      let currentScore = 0;
-
-      currentItems.forEach((item) => {
-        const id = getIdRef.current(item);
-        const layout = layoutsRef.current.get(id);
-
-        if (!layout) {
-          return;
-        }
-
-        const itemTop = layout.y;
-        const itemBottom = layout.y + layout.height;
-        const visibleHeight =
-          Math.min(itemBottom, viewportBottom) - Math.max(itemTop, viewportTop);
-
-        if (visibleHeight <= 0) {
-          return;
-        }
-
-        const visibleRatio = visibleHeight / Math.max(layout.height, 1);
-        const centerDistance = Math.abs(itemTop + layout.height / 2 - viewportCenter);
-
-        if (id === activeIdRef.current) {
-          currentScore = visibleRatio;
-        }
-
-        if (
-          visibleRatio > bestScore ||
-          (Math.abs(visibleRatio - bestScore) < 0.001 && centerDistance < bestDistance)
-        ) {
-          bestId = id;
-          bestScore = visibleRatio;
-          bestDistance = centerDistance;
-        }
-      });
-
-      const activeId = activeIdRef.current;
-      const shouldSwitchToBest =
-        !!bestId &&
-        bestId !== activeId &&
-        (activeId === null ||
-          currentScore <= 0 ||
-          (bestScore >= 0.55 && (bestScore - currentScore >= 0.08 || currentScore < 0.35)));
-
-      if (shouldSwitchToBest) {
-        activeIdRef.current = bestId;
-        setActiveId(bestId);
-      } else if (!bestId && currentItems[0]) {
-        const fallbackId = getIdRef.current(currentItems[0]);
-        if (fallbackId !== activeIdRef.current) {
-          activeIdRef.current = fallbackId;
-          setActiveId(fallbackId);
-        }
-      }
-    },
-    [],
-  );
+    if (nextActiveId !== activeIdRef.current) {
+      activeIdRef.current = nextActiveId;
+      setActiveId(nextActiveId);
+    }
+  }, []);
 
   const scheduleRecompute = useCallback(() => {
+    if (isDraggingRef.current || isMomentumScrollingRef.current) {
+      pendingRecomputeRef.current = true;
+      return;
+    }
+
     if (animationFrameRef.current !== null) {
       return;
     }
 
     animationFrameRef.current = requestAnimationFrame(() => {
       animationFrameRef.current = null;
+      if (isDraggingRef.current || isMomentumScrollingRef.current) {
+        pendingRecomputeRef.current = true;
+        return;
+      }
+
+      if (pendingRecomputeRef.current) {
+        pendingRecomputeRef.current = false;
+      }
+
       recomputeActiveId();
     });
   }, [recomputeActiveId]);
@@ -185,11 +131,39 @@ export function useVisibleItemAutoplay<T>(
     [scheduleRecompute],
   );
 
+  const beginInteraction = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
+  const endInteraction = useCallback(() => {
+    isDraggingRef.current = false;
+
+    if (!isMomentumScrollingRef.current && pendingRecomputeRef.current) {
+      scheduleRecompute();
+    }
+  }, [scheduleRecompute]);
+
+  const beginMomentum = useCallback(() => {
+    isMomentumScrollingRef.current = true;
+  }, []);
+
+  const endMomentum = useCallback(() => {
+    isMomentumScrollingRef.current = false;
+
+    if (!isDraggingRef.current && pendingRecomputeRef.current) {
+      scheduleRecompute();
+    }
+  }, [scheduleRecompute]);
+
   const activeIdSet = useMemo(() => new Set(activeId ? [activeId] : []), [activeId]);
 
   return {
     activeId,
     activeIdSet,
+    beginInteraction,
+    beginMomentum,
+    endInteraction,
+    endMomentum,
     onLayout,
     onScroll,
     registerLayout,

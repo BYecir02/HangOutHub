@@ -18,7 +18,7 @@ export default function ChatScreenShell({
 }: ChatScreenShellProps) {
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={keyboardVerticalOffset}
       className="flex-1 bg-gray-50 dark:bg-black"
     >

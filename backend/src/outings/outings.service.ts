@@ -7,10 +7,15 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOutingDto } from './dto/create-outing.dto';
+import { CreateOutingMessageDto } from './dto/create-outing-message.dto';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class OutingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
   private async getInvitePolicy(inviterId: string, participantIds: string[]) {
     if (participantIds.length === 0) {
@@ -287,14 +292,30 @@ export class OutingsService {
     });
   }
 
-  async sendMessage(userId: string, outingId: string, content: string) {
+  async sendMessage(
+    userId: string,
+    outingId: string,
+    payload: CreateOutingMessageDto,
+    files: Express.Multer.File[] = [],
+  ) {
     await this.assertChatAccess(userId, outingId);
+
+    const content = payload.content?.trim() || '';
+    const images =
+      files.length > 0
+        ? await this.storageService.uploadFiles('outing-messages', files)
+        : [];
+
+    if (!content && images.length === 0) {
+      throw new BadRequestException('Message vide.');
+    }
 
     const message = await this.prisma.chatMessage.create({
       data: {
         outingId,
         senderId: userId,
         content,
+        images,
       },
       include: {
         User: {

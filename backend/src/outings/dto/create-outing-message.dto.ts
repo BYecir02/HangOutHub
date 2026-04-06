@@ -1,8 +1,8 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateOutingMessageDto {
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(1000)
-  content: string;
+  content?: string;
 }

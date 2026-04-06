@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { memo, useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 
@@ -13,6 +13,7 @@ interface PostMediaGalleryProps {
   mediaUrls: string[];
   shouldPlayMedia?: boolean;
   onPressMedia?: (index: number) => void;
+  compactLayout?: boolean;
 }
 
 function MediaBadge({ label }: { label: string }) {
@@ -46,12 +47,15 @@ function SoundToggle({
   );
 }
 
-export default function PostMediaGallery({
+function PostMediaGallery({
   mediaUrls,
   shouldPlayMedia = false,
   onPressMedia,
+  compactLayout = false,
 }: PostMediaGalleryProps) {
   const [isMuted, setIsMuted] = useState(true);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
   const resolvedMedia = useMemo(
     () => mediaUrls.map((uri) => getImageUrl(uri)).filter(Boolean) as string[],
     [mediaUrls],
@@ -82,24 +86,34 @@ export default function PostMediaGallery({
     };
   }, []);
 
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [resolvedMedia]);
+
   if (resolvedMedia.length === 0) {
     return null;
   }
 
-  if (resolvedMedia.length === 1) {
+  const containerClassName = 'mt-4 overflow-hidden bg-gray-100 dark:bg-gray-800';
+  const mediaStyle = compactLayout ? { aspectRatio: 4 / 5 } : undefined;
+  const slideHeightStyle = compactLayout ? { aspectRatio: 4 / 5 } : { aspectRatio: 1 };
+  const canCarousel = resolvedMedia.length > 1;
+
+  const renderSingleMedia = () => {
     const [uri] = resolvedMedia;
     const isVideo = isVideoUrl(uri);
 
     return (
       <Pressable
         onPress={onPressMedia ? () => onPressMedia(0) : undefined}
-        className="mt-4 overflow-hidden rounded-3xl bg-gray-100 dark:bg-gray-800"
+        className={containerClassName}
       >
         <MediaFrame
           source={uri}
           mediaType={isVideo ? 'video' : 'image'}
           className="w-full"
-          adaptiveHeight
+          style={mediaStyle}
+          adaptiveHeight={!compactLayout}
           minHeight={220}
           maxHeight={440}
           shouldPlay={shouldPlayMedia}
@@ -107,7 +121,6 @@ export default function PostMediaGallery({
           loop
           showControls={false}
         />
-        <MediaBadge label={isVideo ? 'Video' : 'Photo'} />
         {isVideo ? (
           <SoundToggle
             muted={isMuted}
@@ -120,84 +133,56 @@ export default function PostMediaGallery({
         ) : null}
       </Pressable>
     );
-  }
+  };
 
-  const heroMedia = resolvedMedia[0];
-  const heroIsVideo = isVideoUrl(heroMedia);
-  const remainingMedia = resolvedMedia.slice(1, 4);
-  const extraCount = Math.max(0, resolvedMedia.length - 4);
+  const renderCarouselMedia = () => {
+    const slideWidth = containerWidth > 0 ? containerWidth : 0;
+    const slideStyle = slideWidth > 0 ? { width: slideWidth } : { width: '100%' as const };
 
-  return (
-    <View className="mt-4 gap-2">
-      <Pressable
-        onPress={onPressMedia ? () => onPressMedia(0) : undefined}
-        className="overflow-hidden rounded-3xl bg-gray-100 dark:bg-gray-800"
+    return (
+      <View
+        className={containerClassName}
+        onLayout={(event) => {
+          setContainerWidth(event.nativeEvent.layout.width);
+        }}
       >
-        <MediaFrame
-          source={heroMedia}
-          mediaType={heroIsVideo ? 'video' : 'image'}
-          className="w-full"
-          adaptiveHeight
-          minHeight={220}
-          maxHeight={440}
-          shouldPlay={shouldPlayMedia}
-          muted={isMuted}
-          loop
-          showControls={false}
-        />
-        <MediaBadge label={heroIsVideo ? 'Video' : 'Photo'} />
-        {heroIsVideo ? (
-          <SoundToggle
-            muted={isMuted}
-            onPress={() => {
-              const nextMuted = !isMuted;
-              setIsMuted(nextMuted);
-              void storage.setItem(FEED_VIDEO_SOUND_KEY, String(nextMuted));
-            }}
-          />
-        ) : null}
-      </Pressable>
-
-      {remainingMedia.length > 0 ? (
-        <View className="flex-row gap-2">
-          {remainingMedia.map((uri, index) => {
-            const absoluteIndex = index + 1;
-            const isVideo = isVideoUrl(uri);
-            const isLastVisible = extraCount > 0 && index === remainingMedia.length - 1;
+        <FlatList
+          data={resolvedMedia}
+          keyExtractor={(item, index) => `${item}-${index}`}
+          horizontal
+          pagingEnabled
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          snapToAlignment="start"
+          disableIntervalMomentum
+          onMomentumScrollEnd={(event) => {
+            const index = Math.round(
+              event.nativeEvent.contentOffset.x /
+                Math.max(event.nativeEvent.layoutMeasurement.width, 1),
+            );
+            setActiveIndex(index);
+          }}
+          renderItem={({ item, index }) => {
+            const isVideo = isVideoUrl(item);
 
             return (
               <Pressable
-                key={`${uri}-${absoluteIndex}`}
-                onPress={onPressMedia ? () => onPressMedia(absoluteIndex) : undefined}
-                className="flex-1 overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
+                onPress={onPressMedia ? () => onPressMedia(index) : undefined}
+                style={slideStyle}
+                className="overflow-hidden bg-gray-100 dark:bg-gray-800"
               >
-                {isVideo ? (
-                  <MediaFrame
-                    source={uri}
-                    mediaType="video"
-                    className="w-full"
-                    style={{ aspectRatio: 1 }}
-                    shouldPlay={false}
-                    muted={isMuted}
-                    loop
-                    showControls={false}
-                  />
-                ) : (
-                  <Image
-                    source={{ uri }}
-                    style={{ width: '100%', aspectRatio: 1 }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    transition={180}
-                    recyclingKey={uri}
-                  />
-                )}
-                {isLastVisible ? (
-                  <View className="absolute inset-0 items-center justify-center bg-black/35">
-                    <Text className="text-2xl font-bold text-white">+{extraCount}</Text>
-                  </View>
-                ) : null}
-                <MediaBadge label={isVideo ? 'Video' : 'Photo'} />
+                <MediaFrame
+                  source={item}
+                  mediaType={isVideo ? 'video' : 'image'}
+                  className="w-full"
+                  style={slideHeightStyle}
+                  adaptiveHeight={false}
+                  shouldPlay={shouldPlayMedia && activeIndex === index}
+                  muted={isMuted}
+                  loop
+                  showControls={false}
+                />
                 {isVideo ? (
                   <SoundToggle
                     muted={isMuted}
@@ -210,9 +195,28 @@ export default function PostMediaGallery({
                 ) : null}
               </Pressable>
             );
-          })}
-        </View>
-      ) : null}
-    </View>
-  );
+          }}
+        />
+
+        {resolvedMedia.length > 1 ? (
+          <View className="absolute bottom-2 left-0 right-0 z-10 flex-row justify-center gap-1.5">
+            {resolvedMedia.map((_, index) => (
+              <View
+                key={`indicator-${index}`}
+                className={`h-1.5 rounded-full ${index === activeIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/50'}`}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  if (resolvedMedia.length === 1) {
+    return renderSingleMedia();
+  }
+
+  return renderCarouselMedia();
 }
+
+export default memo(PostMediaGallery);

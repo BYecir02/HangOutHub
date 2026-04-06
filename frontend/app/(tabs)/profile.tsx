@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  FlatList,
   Modal,
   ScrollView,
   Text,
@@ -14,6 +15,7 @@ import { useRouter } from 'expo-router';
 import ProfileHeader from '../../components/profile/ProfileHeader';
 import ProfileStats from '../../components/profile/ProfileStats';
 import PostItem from '../../components/social/PostItem';
+import type { PostItemData } from '../../components/social/PostItem';
 import PlaceInspirationCard from '../../components/ui/PlaceInspirationCard';
 import { SkeletonBlock } from '../../components/ui/Skeleton';
 import Tabs from '../../components/ui/Tabs';
@@ -533,26 +535,36 @@ export default function ProfileScreen() {
 
           {!isOrganizer && activeTab === 'posts' ? (
             posts.length > 0 ? (
-              posts.map((post) => (
-                <View
-                  key={post.id}
-                  onLayout={(event) =>
-                    profilePostsAutoplay.registerLayout(post.id, {
-                      y: event.nativeEvent.layout.y,
-                      height: event.nativeEvent.layout.height,
-                    })
-                  }
-                >
-                  <PostItem
-                    item={post}
-                    showDateColumn={false}
-                    onDelete={handleDeletePost}
-                    onEdit={handleEditPost}
-                    onComment={handleCommentPost}
-                    shouldPlayMedia={profilePostsAutoplay.activeId === post.id}
-                  />
-                </View>
-              ))
+              <FlatList<PostItemData>
+                data={posts}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                removeClippedSubviews={false}
+                initialNumToRender={4}
+                maxToRenderPerBatch={4}
+                windowSize={5}
+                updateCellsBatchingPeriod={50}
+                renderItem={({ item }) => (
+                  <View
+                    onLayout={(event) =>
+                      profilePostsAutoplay.registerLayout(item.id, {
+                        y: event.nativeEvent.layout.y,
+                        height: event.nativeEvent.layout.height,
+                      })
+                    }
+                  >
+                    <PostItem
+                      item={item}
+                      showDateColumn={false}
+                      presentation="instagram"
+                      onDelete={handleDeletePost}
+                      onEdit={handleEditPost}
+                      onComment={handleCommentPost}
+                      shouldPlayMedia={profilePostsAutoplay.activeId === item.id}
+                    />
+                  </View>
+                )}
+              />
             ) : (
               <EmptyPanel
                 icon="create-outline"

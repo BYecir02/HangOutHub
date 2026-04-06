@@ -2,13 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  Camera,
-  MapView,
-  PointAnnotation,
-  UserLocation,
-  type CameraRef,
-} from '@maplibre/maplibre-react-native';
+import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 
 import { useI18n } from '@/hooks/use-i18n';
@@ -16,6 +10,30 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import MediaFrame from '@/components/ui/MediaFrame';
 import api, { getImageUrl } from '@/services/api';
+
+const DARK_MAP_STYLE: MapStyleElement[] = [
+  { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#4b6878' }] },
+  { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#64779e' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#023e58' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#6f9ba5' }] },
+  { featureType: 'poi.park', elementType: 'geometry.fill', stylers: [{ color: '#023e58' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#3C7680' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#98a5be' }] },
+  { featureType: 'road', elementType: 'labels.text.stroke', stylers: [{ color: '#1d2c4d' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2c6675' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#255763' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#b0d5ce' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#284a5d' }] },
+  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4e6d8c' }] },
+  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#0e1626' }] },
+];
 
 interface PlacePin {
   id: string;
@@ -75,12 +93,29 @@ const CITY_CENTER_ZOOM = 12;
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200';
 
+function zoomToRegionDelta(zoom: number) {
+  const longitudeDelta = Math.max(0.005, 360 / Math.pow(2, zoom));
+  return {
+    latitudeDelta: longitudeDelta * 0.75,
+    longitudeDelta,
+  };
+}
+
+function regionFromCenter(center: MapCenter, zoom: number): Region {
+  const delta = zoomToRegionDelta(zoom);
+  return {
+    latitude: center.latitude,
+    longitude: center.longitude,
+    latitudeDelta: delta.latitudeDelta,
+    longitudeDelta: delta.longitudeDelta,
+  };
+}
+
 export default function MapScreen() {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const router = useRouter();
-  const cameraRef = useRef<CameraRef | null>(null);
   const { selectedLocation, filterByLocation, locationValueLabel } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
@@ -104,6 +139,7 @@ export default function MapScreen() {
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [mapCenter, setMapCenter] = useState<MapCenter>(BENIN_CENTER);
   const [mapZoom, setMapZoom] = useState(COUNTRY_CENTER_ZOOM);
+  const mapRef = useRef<any>(null);
   const headerSurfaceStyle = useMemo(
     () => ({
       backgroundColor: isDarkMode ? 'rgba(17,24,39,0.94)' : 'rgba(255,255,255,0.96)',
@@ -115,12 +151,7 @@ export default function MapScreen() {
   const updateMapCamera = useCallback((center: MapCenter, zoom: number) => {
     setMapCenter(center);
     setMapZoom(zoom);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [center.longitude, center.latitude],
-      zoomLevel: zoom,
-      animationDuration: 600,
-      animationMode: 'flyTo',
-    });
+    mapRef.current?.animateToRegion(regionFromCenter(center, zoom), 600);
   }, []);
 
   useEffect(() => {
@@ -400,66 +431,63 @@ export default function MapScreen() {
     Alert.alert(t('mapRecenterTitle'), t('mapRecenterMissingCoords'));
   };
 
-  const handleRegionDidChange = useCallback((feature: any) => {
-    const coordinates = feature?.geometry?.coordinates;
-    if (Array.isArray(coordinates) && coordinates.length >= 2) {
-      const [longitude, latitude] = coordinates;
-      if (typeof latitude === 'number' && typeof longitude === 'number') {
-        setMapCenter({ latitude, longitude });
-      }
-    }
+  const handleRegionChangeComplete = useCallback((region: Region) => {
+    setMapCenter({
+      latitude: region.latitude,
+      longitude: region.longitude,
+    });
 
-    const zoomLevel = feature?.properties?.zoomLevel;
-    if (typeof zoomLevel === 'number') {
-      setMapZoom(zoomLevel);
+    if (typeof region.longitudeDelta === 'number' && region.longitudeDelta > 0) {
+      setMapZoom(Math.log2(360 / region.longitudeDelta));
     }
   }, []);
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <MapView
+        ref={mapRef}
         style={{ flex: 1 }}
+        initialRegion={regionFromCenter(mapCenter, mapZoom)}
+        customMapStyle={isDarkMode ? DARK_MAP_STYLE : undefined}
+        showsCompass
+        showsMyLocationButton={false}
+        showsUserLocation={useMyLocation}
         onPress={() => {
           setSelectedPlace(null);
           setSelectedEvent(null);
         }}
-        onRegionDidChange={handleRegionDidChange}
-        compassEnabled
+        onRegionChangeComplete={handleRegionChangeComplete}
       >
-        <Camera
-          ref={cameraRef}
-          defaultSettings={{
-            centerCoordinate: [mapCenter.longitude, mapCenter.latitude],
-            zoomLevel: mapZoom,
-          }}
-        />
-        <UserLocation visible={useMyLocation} />
         {(activeLayer === 'all' || activeLayer === 'places'
           ? filteredPlaces
           : []
-        ).map((place) => (
-          <PointAnnotation
-            key={place.id}
-            id={`place-${place.id}`}
-            coordinate={[place.longitude as number, place.latitude as number]}
-            selected={selectedPlace?.id === place.id}
-            onSelected={() => setSelectedPlace(place)}
-            anchor={{ x: 0.5, y: 1 }}
-          >
-            <View className="items-center justify-center">
-              <View
-                className="h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg"
-                style={{ backgroundColor: '#2ecc71' }}
-              >
-                <Ionicons name="location" size={16} color="#fff" />
+        ).map((place) => {
+          if (typeof place.latitude !== 'number' || typeof place.longitude !== 'number') {
+            return null;
+          }
+
+          return (
+            <Marker
+              key={place.id}
+              coordinate={{ latitude: place.latitude, longitude: place.longitude }}
+              anchor={{ x: 0.5, y: 1 }}
+              onPress={() => setSelectedPlace(place)}
+            >
+              <View className="items-center justify-center">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg"
+                  style={{ backgroundColor: '#2ecc71' }}
+                >
+                  <Ionicons name="location" size={16} color="#fff" />
+                </View>
+                <View
+                  className="-mt-1 h-2.5 w-2.5 rounded-full border border-white"
+                  style={{ backgroundColor: '#2ecc71' }}
+                />
               </View>
-              <View
-                className="-mt-1 h-2.5 w-2.5 rounded-full border border-white"
-                style={{ backgroundColor: '#2ecc71' }}
-              />
-            </View>
-          </PointAnnotation>
-        ))}
+            </Marker>
+          );
+        })}
         {(activeLayer === 'all' || activeLayer === 'events'
           ? filteredEvents
           : []
@@ -470,13 +498,11 @@ export default function MapScreen() {
             return null;
           }
           return (
-            <PointAnnotation
+            <Marker
               key={event.id}
-              id={`event-${event.id}`}
-              coordinate={[longitude, latitude]}
-              selected={selectedEvent?.id === event.id}
-              onSelected={() => setSelectedEvent(event)}
+              coordinate={{ latitude, longitude }}
               anchor={{ x: 0.5, y: 1 }}
+              onPress={() => setSelectedEvent(event)}
             >
               <View className="items-center justify-center">
                 <View
@@ -490,7 +516,7 @@ export default function MapScreen() {
                   style={{ backgroundColor: '#f39c12' }}
                 />
               </View>
-            </PointAnnotation>
+            </Marker>
           );
         })}
       </MapView>

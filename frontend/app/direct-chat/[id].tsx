@@ -50,6 +50,7 @@ import {
   stripSharedPostMarker,
 } from '@/services/direct-chat-meta';
 import { getPostById, type PostDetails } from '@/services/posts';
+import { isVideoUrl } from '@/services/media';
 import {
   FocusMessage,
   MessageImage,
@@ -645,7 +646,9 @@ export default function DirectChatScreen() {
         return cleaned;
       }
       if (hasImages) {
-        return t('directChatReplyPhoto');
+        return (message.images || []).some((uri) => isVideoUrl(uri))
+          ? t('directChatReplyMedia')
+          : t('directChatReplyPhoto');
       }
       return t('directChatReplyUnknown');
     },
@@ -807,7 +810,7 @@ export default function DirectChatScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
+      mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
       quality: 0.6,
     });
@@ -890,7 +893,7 @@ export default function DirectChatScreen() {
           pendingImages.length > 0
             ? await sendDirectMessageWithImages(chatId, {
                 ...payload,
-                images: pendingImages.map((item) => ({ uri: item.uri })),
+                images: pendingImages,
               }, {
                 onUploadProgress: (progress) => {
                   setUploadProgress(progress);
@@ -1255,7 +1258,7 @@ export default function DirectChatScreen() {
     try {
       if (messageImages.length > 0) {
         await Share.share({
-          message: cleaned || t('directChatReplyPhoto'),
+          message: cleaned || t('directChatReplyMedia'),
           url: messageImages[0],
         });
       } else {

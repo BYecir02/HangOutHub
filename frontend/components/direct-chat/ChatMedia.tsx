@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -14,6 +16,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+
+import MediaFrame from '@/components/ui/MediaFrame';
+import { isVideoUrl } from '@/services/media';
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
@@ -66,8 +71,8 @@ export function MessageImage({
   height?: number;
   overlayLabel?: string;
 }) {
-  const [loading, setLoading] = useState(true);
   const resolvedHeight = height ?? width;
+  const video = isVideoUrl(uri);
 
   return (
     <TouchableOpacity
@@ -82,18 +87,29 @@ export function MessageImage({
         style={{ width, height: resolvedHeight }}
         className="items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-800"
       >
-        <Image
-          source={{ uri }}
-          style={{ width, height: resolvedHeight, borderRadius: 12 }}
-          resizeMode="cover"
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-        />
-        {loading ? (
-          <View className="absolute inset-0 items-center justify-center bg-black/10">
-            <ActivityIndicator color="#fff" />
-          </View>
-        ) : null}
+        {video ? (
+          <>
+            <MediaFrame
+              source={uri}
+              mediaType="video"
+              shouldPlay={false}
+              showControls={false}
+              contentFit="cover"
+              style={StyleSheet.absoluteFill}
+            />
+            <View className="absolute inset-0 items-center justify-center bg-black/20">
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-black/40">
+                <Ionicons name="play" size={18} color="#fff" />
+              </View>
+            </View>
+          </>
+        ) : (
+          <Image
+            source={{ uri }}
+            style={{ width, height: resolvedHeight, borderRadius: 12 }}
+            resizeMode="cover"
+          />
+        )}
         {overlayLabel ? (
           <View className="absolute inset-0 items-center justify-center bg-black/50">
             <Text className="text-lg font-semibold text-white">{overlayLabel}</Text>
@@ -117,6 +133,8 @@ export function ZoomableImage({
   onClose: () => void;
   onLongPress: () => void;
 }) {
+  const isVideo = isVideoUrl(uri);
+
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
 
@@ -155,6 +173,21 @@ export function ZoomableImage({
     });
 
   const composed = Gesture.Simultaneous(pinch, tap, longPress);
+
+  if (isVideo) {
+    return (
+      <View style={{ width, height }} className="overflow-hidden bg-black">
+        <MediaFrame
+          source={uri}
+          mediaType="video"
+          shouldPlay
+          showControls
+          contentFit="contain"
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+    );
+  }
 
   return (
     <GestureDetector gesture={composed}>

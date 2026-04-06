@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -80,9 +80,10 @@ interface PostItemProps {
   showDateColumn?: boolean;
   authorDisplayMode?: 'place' | 'user' | 'auto';
   shouldPlayMedia?: boolean;
+  presentation?: 'thread' | 'instagram';
 }
 
-export default function PostItem({
+function PostItem({
   item,
   onDelete,
   onEdit,
@@ -91,6 +92,7 @@ export default function PostItem({
   showDateColumn = true,
   authorDisplayMode = 'place',
   shouldPlayMedia = false,
+  presentation = 'thread',
 }: PostItemProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -216,6 +218,7 @@ export default function PostItem({
     ? item.Place?.name?.trim() || item.User?.displayName || item.User?.username || t('postItemUserFallback')
     : item.User?.displayName || item.User?.username || t('postItemUserFallback');
   const authorAvatarUri = displayAsPlace ? placeAvatarUri : avatarUri;
+  const isInstagramPresentation = presentation === 'instagram';
 
   useEffect(() => {
     setIsLiked(Boolean(item.isLiked));
@@ -329,7 +332,13 @@ export default function PostItem({
   };
 
   return (
-    <View className="mx-4 mb-4 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100/70 dark:bg-gray-900 dark:ring-gray-800/70">
+    <View
+      className={`overflow-hidden bg-white shadow-sm ring-1 ring-gray-100/70 dark:bg-gray-900 dark:ring-gray-800/70 ${
+        isInstagramPresentation ? '' : 'mx-4'
+      } ${
+        isInstagramPresentation ? 'rounded-none' : 'rounded-3xl'
+      }`}
+    >
       <View className={showDateColumn ? 'flex-row' : ''}>
         {showDateColumn ? (
           <View
@@ -390,60 +399,63 @@ export default function PostItem({
             )}
           </View>
 
-          <Text className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
-            {titleText}
-          </Text>
-
-          {isOfficialPost ? (
-            <View className="mt-2 self-start rounded-full bg-[#1f7aec]/10 px-2.5 py-1">
-              <Text className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1f7aec]">
-                {t('postPublicationScopeStructureBadge')}
-              </Text>
-            </View>
-          ) : null}
-
-          {eventLabel ? (
-            <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2.5 py-1">
-              <Text className="text-[10px] font-semibold text-[#ff4757]">
-                {eventLabel}
-              </Text>
-            </View>
-          ) : null}
-
-          {locationLabel ? (
-            <View className="mt-2 flex-row items-center">
-              <Ionicons
-                name="location-outline"
-                size={14}
-                color={visibilityTone.accent}
-              />
-              <Text className="ml-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                {locationLabel}
-              </Text>
-            </View>
-          ) : null}
-
-          {categoryLabel ? (
-            <View className={`mt-2 self-start rounded-full px-2.5 py-1 ${visibilityTone.column}`}>
-              <Text className={`text-[10px] font-semibold ${visibilityTone.label}`}>
-                {categoryLabel}
-              </Text>
-            </View>
-          ) : null}
-
-          {bodyExcerpt ? (
-            <Text className="mt-2 text-base leading-6 text-gray-600 dark:text-gray-300">
-              {bodyExcerpt}
-            </Text>
-          ) : null}
-
           {item.images && item.images.length > 0 ? (
             <PostMediaGallery
               mediaUrls={item.images}
               shouldPlayMedia={shouldPlayMedia}
+              compactLayout={isInstagramPresentation}
               onPressMedia={handleOpenMediaViewer}
             />
           ) : null}
+
+          <View className={isInstagramPresentation ? 'mt-3' : 'mt-4'}>
+            <Text className={`${isInstagramPresentation ? 'text-lg' : 'text-xl'} font-bold text-gray-900 dark:text-white`}>
+              {titleText}
+            </Text>
+
+            {isOfficialPost ? (
+              <View className="mt-2 self-start rounded-full bg-[#1f7aec]/10 px-2.5 py-1">
+                <Text className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1f7aec]">
+                  {t('postPublicationScopeStructureBadge')}
+                </Text>
+              </View>
+            ) : null}
+
+            {eventLabel ? (
+              <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2.5 py-1">
+                <Text className="text-[10px] font-semibold text-[#ff4757]">
+                  {eventLabel}
+                </Text>
+              </View>
+            ) : null}
+
+            {locationLabel ? (
+              <View className="mt-2 flex-row items-center">
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={visibilityTone.accent}
+                />
+                <Text className="ml-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  {locationLabel}
+                </Text>
+              </View>
+            ) : null}
+
+            {categoryLabel ? (
+              <View className={`mt-2 self-start rounded-full px-2.5 py-1 ${visibilityTone.column}`}>
+                <Text className={`text-[10px] font-semibold ${visibilityTone.label}`}>
+                  {categoryLabel}
+                </Text>
+              </View>
+            ) : null}
+
+            {bodyExcerpt ? (
+              <Text className="mt-2 text-base leading-6 text-gray-600 dark:text-gray-300">
+                {bodyExcerpt}
+              </Text>
+            ) : null}
+          </View>
 
           <View className="mt-4 flex-row items-center justify-between pb-4">
             <View className="flex-row">
@@ -588,3 +600,5 @@ export default function PostItem({
     </View>
   );
 }
+
+export default memo(PostItem);

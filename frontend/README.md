@@ -36,8 +36,8 @@ This means:
 - local Expo Go or LAN dev keeps using your private backend IP
 - installed Android builds point to `https://hang-out-hub.vercel.app`
 
-Maps now use MapLibre, so there is no Google Maps API key to manage for the frontend.
-Because MapLibre is native, the map now needs an EAS/dev build for testing; Expo Go is no longer the right path for the map screen.
+Maps now use react-native-maps, so the screen stays compatible with Expo Go while still working in production.
+If you later add an Android Google Maps key, keep it in the native build config only.
 
 ## Run locally
 

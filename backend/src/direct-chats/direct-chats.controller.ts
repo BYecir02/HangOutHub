@@ -76,9 +76,12 @@ export class DirectChatsController {
     FilesInterceptor('images', 5, {
       storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
+        if (
+          !file.mimetype.startsWith('image/') &&
+          !file.mimetype.startsWith('video/')
+        ) {
           return cb(
-            new BadRequestException('Seules les images sont autorisees.'),
+            new BadRequestException('Seules les images et videos sont autorisees.'),
             false,
           );
         }

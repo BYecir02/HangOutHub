@@ -16,6 +16,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { clearAuthState, getImageUrl } from '../services/api';
+import {
+  buildMediaUploadPayload,
+  isMediaFileTooLarge,
+  isSupportedMediaAsset,
+} from '@/services/media-upload';
 
 const isUnauthorized = (error: unknown) =>
   (error as { response?: { status?: number } }).response?.status === 401;
@@ -84,10 +89,20 @@ export default function EditProfileScreen() {
       return;
     }
 
+    const [pickedAsset] = result.assets;
+    if (!pickedAsset) {
+      return;
+    }
+
+    if (!isSupportedMediaAsset(pickedAsset) || isMediaFileTooLarge(pickedAsset)) {
+      Alert.alert(t('mediaValidationTitle'), t('mediaValidationMessage'));
+      return;
+    }
+
     if (type === 'avatar') {
-      setNewAvatar(result.assets[0]);
+      setNewAvatar(pickedAsset);
     } else {
-      setNewCover(result.assets[0]);
+      setNewCover(pickedAsset);
     }
   };
 
@@ -107,22 +122,14 @@ export default function EditProfileScreen() {
       if (newAvatar) {
         formData.append(
           'avatar',
-          {
-            uri: newAvatar.uri,
-            name: 'avatar.jpg',
-            type: 'image/jpeg',
-          } as any,
+          buildMediaUploadPayload(newAvatar, 0, 'avatar') as any,
         );
       }
 
       if (newCover) {
         formData.append(
           'cover',
-          {
-            uri: newCover.uri,
-            name: 'cover.jpg',
-            type: 'image/jpeg',
-          } as any,
+          buildMediaUploadPayload(newCover, 0, 'cover') as any,
         );
       }
 

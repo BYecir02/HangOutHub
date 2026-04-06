@@ -4,6 +4,7 @@ import { Image, Text, TouchableOpacity, View } from 'react-native';
 import { useI18n } from '@/hooks/use-i18n';
 import { getImageUrl } from '@/services/api';
 import { stripSystemMarkers } from '@/services/direct-chat-meta';
+import { isVideoUrl } from '@/services/media';
 import type { DirectChatSummary } from '@/services/direct-chats';
 
 function formatDate(value: string, locale: string) {
@@ -29,18 +30,26 @@ export default function DirectConversationCard({
     item.partner.displayName ||
     item.partner.username ||
     t('directChatTitleFallback');
-  const lastMessageText = item.lastMessage?.isDeleted
+  const cleanedLastMessageText = item.lastMessage?.isDeleted
     ? t('directChatMessageDeleted')
-    : item.lastMessage?.images?.length
-      ? item.lastMessage.content
-        ? item.lastMessage.content
-        : t('directChatLastMessageImage')
-      : item.lastMessage?.content || t('directChatLastMessageEmpty');
-  const cleanedLastMessageText = lastMessageText
-    ? item.lastMessage?.isDeleted
-      ? lastMessageText
-      : stripSystemMarkers(item.lastMessage)
-    : lastMessageText;
+    : (() => {
+        const cleanedText = stripSystemMarkers(item.lastMessage).trim();
+
+        if (cleanedText) {
+          return cleanedText;
+        }
+
+        const mediaUrls = item.lastMessage?.images || [];
+        if (mediaUrls.some((url) => isVideoUrl(url))) {
+          return t('directChatLastMessageVideo');
+        }
+
+        if (mediaUrls.length > 0) {
+          return t('directChatLastMessageImage');
+        }
+
+        return t('directChatLastMessageEmpty');
+      })();
   const lastMessageDate = item.lastMessageAt
     ? formatDate(item.lastMessageAt, locale)
     : '';

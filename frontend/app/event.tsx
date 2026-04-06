@@ -23,6 +23,11 @@ import { useI18n } from '@/hooks/use-i18n';
 import EventFormWizard from '@/components/ui/EventFormWizard';
 import api, { clearAuthState } from '../services/api';
 import { getMySettings } from '@/services/settings';
+import {
+  buildMediaUploadPayload,
+  isMediaFileTooLarge,
+  isSupportedMediaAsset,
+} from '@/services/media-upload';
 
 interface OwnedPlaceOption {
   id: string;
@@ -508,7 +513,15 @@ export default function CreateEventScreen() {
     });
 
     if (!result.canceled) {
-      setImages((current) => [...current, ...result.assets]);
+      const validAssets = result.assets.filter(
+        (asset) => isSupportedMediaAsset(asset) && !isMediaFileTooLarge(asset),
+      );
+
+      if (validAssets.length !== result.assets.length) {
+        Alert.alert(t('mediaValidationTitle'), t('mediaValidationMessage'));
+      }
+
+      setImages((current) => [...current, ...validAssets]);
     }
   };
 
@@ -815,6 +828,15 @@ export default function CreateEventScreen() {
 
     setLoading(true);
     try {
+      const invalidMedia = images.find(
+        (asset) => !isSupportedMediaAsset(asset) || isMediaFileTooLarge(asset),
+      );
+
+      if (invalidMedia) {
+        Alert.alert(t('mediaValidationTitle'), t('mediaValidationMessage'));
+        return;
+      }
+
       const formData = new FormData();
       formData.append('title', eventForm.title.trim());
       formData.append('description', eventForm.description.trim());
@@ -855,19 +877,11 @@ export default function CreateEventScreen() {
 
       if (images.length > 0) {
         const coverImage = images[coverIndex];
-        formData.append('cover', {
-          uri: coverImage.uri,
-          name: coverImage.fileName || 'event-cover.jpg',
-          type: coverImage.mimeType || 'image/jpeg',
-        } as any);
+        formData.append('cover', buildMediaUploadPayload(coverImage, coverIndex, 'event-cover') as any);
 
         images.forEach((img, index) => {
           if (index !== coverIndex) {
-            formData.append('gallery', {
-              uri: img.uri,
-              name: img.fileName || `gallery-${index}.jpg`,
-              type: img.mimeType || 'image/jpeg',
-            } as any);
+            formData.append('gallery', buildMediaUploadPayload(img, index, 'gallery') as any);
           }
         });
       }

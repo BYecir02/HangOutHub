@@ -61,4 +61,4 @@ npm run eas:build:preview
 - Local development can use your LAN backend IP.
 - Android preview builds should use the public backend URL.
 - Do not mix the two when publishing updates.
-- MapLibre is native, so the map screen now relies on a dev or preview build rather than Expo Go.
+- The map screen now uses react-native-maps, so Expo Go should work again for map testing.

@@ -19,11 +19,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   );
 
   const apiUrl = overrideApiUrl || (isReleaseBuild ? PUBLIC_API_URL : localApiUrl);
-  const plugins = [...(config.plugins || []), '@maplibre/maplibre-react-native'];
 
   return {
     ...config,
-    plugins,
     extra: {
       ...(config.extra || {}),
       apiUrl: apiUrl || PUBLIC_API_URL,

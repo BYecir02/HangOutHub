@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,9 +7,13 @@ import {
   Patch,
   Post,
   Request,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 
 import { CreateOutingMessageDto } from './dto/create-outing-message.dto';
 import { CreateOutingDto } from './dto/create-outing.dto';
@@ -56,15 +61,31 @@ export class OutingsController {
   }
 
   @Post(':id/messages')
+  @UseInterceptors(
+    FilesInterceptor('images', 5, {
+      storage: memoryStorage(),
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(
+            new BadRequestException('Seules les images sont autorisees.'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
   sendMessage(
     @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() createOutingMessageDto: CreateOutingMessageDto,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
     return this.outingsService.sendMessage(
       req.user.userId,
       id,
-      createOutingMessageDto.content,
+      createOutingMessageDto,
+      files,
     );
   }
 

@@ -46,6 +46,7 @@ export default function MediaFrame({
   );
   const [posterSource, setPosterSource] = useState<unknown | null>(null);
   const [hasRenderedFirstFrame, setHasRenderedFirstFrame] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const isMountedRef = useRef(true);
   const thumbnailRequestIdRef = useRef(0);
   const videoSource = useMemo(() => {
@@ -83,6 +84,7 @@ export default function MediaFrame({
   useEffect(() => {
     setPosterSource(null);
     setHasRenderedFirstFrame(false);
+    setImageLoadFailed(false);
   }, [source, isVideo]);
 
   useEventListener(player, 'sourceLoad', () => {
@@ -213,7 +215,6 @@ export default function MediaFrame({
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={150}
         />
       ) : null}
       {isVideo ? (
@@ -228,16 +229,20 @@ export default function MediaFrame({
           }}
         />
       ) : (
-        <RNImage
-          source={{ uri: source }}
+        <ExpoImage
+          source={{ uri: source } as never}
           style={StyleSheet.absoluteFill}
-          resizeMode={contentFit}
+          contentFit={contentFit}
+          cachePolicy="memory-disk"
+          onError={() => {
+            setImageLoadFailed(true);
+          }}
         />
       )}
-      {fallbackLabel ? (
+      {fallbackLabel || imageLoadFailed ? (
         <View className="absolute inset-0 items-center justify-center bg-black/20">
           <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-white">
-            {fallbackLabel}
+            {fallbackLabel || 'Media'}
           </Text>
         </View>
       ) : null}

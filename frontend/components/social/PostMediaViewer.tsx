@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -14,7 +14,7 @@ interface PostMediaViewerProps {
   onClose: () => void;
 }
 
-export default function PostMediaViewer({
+function PostMediaViewer({
   visible,
   mediaUrls,
   initialIndex = 0,
@@ -85,15 +85,14 @@ export default function PostMediaViewer({
             const isActive = index === activeIndex;
 
             return (
-              <View className="w-screen flex-1 items-center justify-center px-4">
-                <View className="w-full overflow-hidden rounded-[28px] bg-black/20">
+              <View className="w-screen flex-1 items-center justify-center">
+                <View className="w-full flex-1 bg-black">
                   <MediaFrame
                     source={item}
                     mediaType={isVideo ? 'video' : 'image'}
-                    className="w-full"
-                    adaptiveHeight
-                    minHeight={260}
-                    maxHeight={Math.round(screenWidth * 1.2)}
+                    className="w-full flex-1"
+                    style={{ width: '100%', height: '100%' }}
+                    adaptiveHeight={false}
                     shouldPlay={isActive}
                     muted={false}
                     loop
@@ -109,3 +108,5 @@ export default function PostMediaViewer({
     </Modal>
   );
 }
+
+export default memo(PostMediaViewer);

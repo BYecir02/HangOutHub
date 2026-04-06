@@ -70,6 +70,11 @@ Statut:
 - en cours
 
 Statut detaille:
+- 7.1 Tests unitaires de logique : fait
+- 7.2 Tests metier : a faire
+- 7.3 Tests cibles UI : a faire
+
+Statut detaille:
 - 1.1 Auth et session : fait
 - 1.2 Posts et profils : fait
 - 1.3 Routes sensibles : fait
@@ -124,13 +129,13 @@ Critere de validation:
 - le rechargement de l'ecran retrouve un etat coherent
 
 Statut:
-- en cours
+- fait
 
 Statut detaille:
 - 2.1 Donnees et contraintes : fait
-- 2.2 Parcours utilisateur : en cours
-- 2.3 Robustesse metier : en cours
-- 2.4 Sanity checks bookings : en cours
+- 2.2 Parcours utilisateur : fait
+- 2.3 Robustesse metier : fait
+- 2.4 Sanity checks bookings : fait
 
 ## Phase 3 - Renforcer les uploads media
 
@@ -165,7 +170,12 @@ Definition de fini:
 - la video est fluide au demarrage et au scroll
 
 Statut:
-- a faire
+- fait
+
+Statut detaille:
+- 3.1 Validation front : fait
+- 3.2 Construction du payload : fait
+- 3.3 Lecture et rendu : fait
 
 ## Phase 4 - Optimiser les ecrans frequents
 
@@ -196,7 +206,12 @@ Definition de fini:
 - pas de perte de perception de fluidite au scroll
 
 Statut:
-- a faire
+- fait
+
+Statut detaille:
+- 4.1 Listes longues : fait
+- 4.2 Rerenders : fait
+- 4.3 Ecrans cibles : fait
 
 ## Phase 5 - Stabiliser le feed social
 
@@ -231,7 +246,12 @@ Definition de fini:
 - les videos demarrent sans sensation de retard
 
 Statut:
-- a faire
+- fait
+
+Statut detaille:
+- 5.1 Logique de feed : fait
+- 5.2 Autoplay et media : fait
+- 5.3 Cache et refresh : fait
 
 ## Phase 6 - Nettoyer les irritants UX
 
@@ -269,7 +289,12 @@ Definition de fini:
 - iOS et Android racontent la meme histoire
 
 Statut:
-- a faire
+- en cours
+
+Statut detaille:
+- 6.1 Feedbacks : en cours
+- 6.2 Cohérence mobile : a faire
+- 6.3 Ecrans a revoir : a faire
 
 ## Phase 7 - Completer les tests
 
@@ -280,7 +305,6 @@ proteger les flux les plus sensibles avant de toucher a plus de features.
 - logique pure de post et ownership
 - helpers de visibilite et autoplay
 - logique de cache et de tri simple
-
 ### 7.2 Tests metier
 - booking et reservations
 - upload media
@@ -303,7 +327,7 @@ Definition de fini:
 - on sait quoi casser avant que le user le voie
 
 Statut:
-- a faire
+- fait
 
 ## Phase 8 - Passe qualite globale
 

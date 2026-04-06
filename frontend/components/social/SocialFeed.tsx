@@ -30,12 +30,21 @@ import { getFriendshipOverview } from '../../services/friendships';
 import { getOrCreateDirectChat, sendDirectMessage } from '../../services/direct-chats';
 import { subscribeToPostChanges, type PostChangedPayload } from '../../services/post-events';
 import { resolveStoredUserSession } from '../../services/user-session';
+import { isVideoUrl } from '@/services/media';
+import {
+  collectPrefetchUrls,
+  getLatestFeedPostCreatedAtTime,
+  mergeFeedPosts,
+  splitFeedPostsBySeenAt,
+  type MergeMode,
+} from './social-feed.utils';
 import { clearAuthState, storage } from '../../services/api';
 import type { SocialUser } from '../../types/social';
 
 const FEED_CACHE_KEY = 'socialFeedCache_v2';
 const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt_v2';
 const FEED_CACHE_CURSOR_KEY = 'socialFeedCacheCursor_v2';
+const FEED_SEEN_AT_KEY_PREFIX = 'socialFeedSeenAt_v1';
 const FEED_CACHE_TTL_MS = 60 * 1000;
 const FEED_PAGE_SIZE = 20;
 const FEED_TOP_THRESHOLD = 12;
@@ -97,6 +106,18 @@ type FeedCacheSnapshot = {
   posts: FeedPost[];
   nextCursor: string | null;
   cachedAt: number;
+};
+
+const NOOP_AUTOPLAY = {
+  activeId: null as string | null,
+  activeIdSet: new Set<string>(),
+  beginInteraction: () => undefined,
+  beginMomentum: () => undefined,
+  endInteraction: () => undefined,
+  endMomentum: () => undefined,
+  onLayout: () => undefined,
+  onScroll: () => undefined,
+  registerLayout: () => undefined,
 };
 
 const readFeedCache = async (): Promise<FeedCacheSnapshot | null> => {
@@ -192,6 +213,7 @@ function SkeletonPost() {
 export default function SocialFeed() {
   const router = useRouter();
   const { t } = useI18n();
+  const feedListRef = useRef<FlatList<FeedPost>>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -200,9 +222,11 @@ export default function SocialFeed() {
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [pendingPosts, setPendingPosts] = useState<FeedPost[]>([]);
+  const [feedSeenAt, setFeedSeenAt] = useState<number | null>(null);
   const postsRef = useRef<FeedPost[]>([]);
   const nextCursorRef = useRef<string | null>(null);
   const latestFetchedAtRef = useRef<string | null>(null);
+  const feedSeenAtRef = useRef<number | null>(null);
   const isAtTopRef = useRef(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<FeedPost | null>(null);
@@ -212,6 +236,7 @@ export default function SocialFeed() {
   const [sendingConnectionId, setSendingConnectionId] = useState<string | null>(
     null,
   );
+  const [feedErrorMessage, setFeedErrorMessage] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'category' | 'type' | 'location'>(
@@ -221,6 +246,33 @@ export default function SocialFeed() {
   const [selectedType, setSelectedType] = useState<FilterType>('all');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const getFeedSeenAtKey = useCallback(
+    (userId: string | null) => `${FEED_SEEN_AT_KEY_PREFIX}_${userId || 'anonymous'}`,
+    [],
+  );
+
+  const updateFeedSeenAt = useCallback(
+    (items: FeedPost[], persist = true) => {
+      const latestSeenAt = getLatestFeedPostCreatedAtTime(items);
+      if (!latestSeenAt) {
+        return;
+      }
+
+      const currentSeenAt = feedSeenAtRef.current ?? 0;
+      if (latestSeenAt <= currentSeenAt) {
+        return;
+      }
+
+      feedSeenAtRef.current = latestSeenAt;
+      setFeedSeenAt(latestSeenAt);
+
+      if (persist && currentUserId) {
+        void storage.setItem(getFeedSeenAtKey(currentUserId), String(latestSeenAt));
+      }
+    },
+    [currentUserId, getFeedSeenAtKey],
+  );
 
   const persistFeedCache = useCallback(
     async (nextPosts: FeedPost[], nextCursorValue: string | null) => {
@@ -269,6 +321,7 @@ export default function SocialFeed() {
         const cachedLatest = getMaxCreatedAt(cached.posts);
         if (cachedLatest) {
           latestFetchedAtRef.current = cachedLatest;
+          updateFeedSeenAt(cached.posts, false);
         }
       }
 
@@ -286,7 +339,7 @@ export default function SocialFeed() {
     }
 
     return true;
-  }, [cacheHydrated, getMaxCreatedAt]);
+  }, [cacheHydrated, getMaxCreatedAt, updateFeedSeenAt]);
 
   useEffect(() => {
     postsRef.current = posts;
@@ -295,6 +348,22 @@ export default function SocialFeed() {
   useEffect(() => {
     nextCursorRef.current = nextCursor;
   }, [nextCursor]);
+
+  useEffect(() => {
+    if (feedSeenAt === null || pendingPosts.length === 0) {
+      return;
+    }
+
+    const { seenPosts, unseenPosts } = splitFeedPostsBySeenAt(pendingPosts, feedSeenAt);
+
+    if (seenPosts.length > 0) {
+      setPosts((current) => mergePosts(seenPosts, current, 'prepend'));
+    }
+
+    if (unseenPosts.length !== pendingPosts.length) {
+      setPendingPosts(unseenPosts);
+    }
+  }, [feedSeenAt, mergePosts, pendingPosts]);
 
   const getLatestPostCreatedAt = useCallback(() => {
     return latestFetchedAtRef.current;
@@ -315,20 +384,12 @@ export default function SocialFeed() {
     }
   }, [getMaxCreatedAt]);
 
-  const mergePosts = useCallback((incoming: FeedPost[], current: FeedPost[]) => {
-    const map = new Map<string, FeedPost>();
-    [...current, ...incoming].forEach((post) => {
-      map.set(post.id, post);
-    });
-    return Array.from(map.values()).sort((a, b) => {
-      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (aTime === bTime) {
-        return b.id.localeCompare(a.id);
-      }
-      return bTime - aTime;
-    });
-  }, []);
+  const mergePosts = useCallback(
+    (incoming: FeedPost[], current: FeedPost[], mode: MergeMode = 'prepend') => {
+      return mergeFeedPosts(incoming, current, mode);
+    },
+    [],
+  );
 
   const mergeUpdatedPost = useCallback(
     (post: FeedPost, update: PostChangedPayload) => {
@@ -366,6 +427,8 @@ export default function SocialFeed() {
       }
 
       try {
+        setFeedErrorMessage(null);
+
         const params: Record<string, string | number> = {
           limit: FEED_PAGE_SIZE,
         };
@@ -386,27 +449,44 @@ export default function SocialFeed() {
           nextCursor: string | null;
         }>('/posts/feed', { params });
 
-        const mergedVisiblePosts = mergePosts(response.data.items, postsRef.current);
+        const seenAtThreshold = feedSeenAtRef.current ?? 0;
+        const { seenPosts, unseenPosts } =
+          mode === 'background'
+            ? splitFeedPostsBySeenAt(response.data.items, seenAtThreshold)
+            : { seenPosts: response.data.items, unseenPosts: [] };
+
+        const mergedVisiblePosts = mergePosts(
+          mode === 'background' ? seenPosts : response.data.items,
+          postsRef.current,
+          mode === 'more' ? 'append' : 'prepend',
+        );
 
         if (mode === 'more') {
-          setPosts((current) => mergePosts(response.data.items, current));
+          setPosts((current) => mergePosts(response.data.items, current, 'append'));
         } else if (mode === 'background') {
-          if (response.data.items.length > 0) {
-            if (isAtTopRef.current) {
-              setPosts(mergedVisiblePosts);
-            } else {
-              setPendingPosts((current) => mergePosts(response.data.items, current));
-            }
+          if (seenPosts.length > 0) {
+            setPosts((current) => mergePosts(seenPosts, current, 'prepend'));
+          }
+
+          if (unseenPosts.length > 0) {
+            setPendingPosts((current) => mergePosts(unseenPosts, current, 'prepend'));
+          } else {
+            setPendingPosts([]);
           }
         } else if (mode === 'refresh') {
           setPosts(mergedVisiblePosts);
+          setPendingPosts([]);
         } else {
-          setPosts(response.data.items);
+          setPosts(mergedVisiblePosts);
           setPendingPosts([]);
         }
 
         if (mode !== 'more') {
           updateLatestFetchedAt(response.data.items);
+        }
+
+        if (mode !== 'background') {
+          updateFeedSeenAt(mergedVisiblePosts);
         }
 
         if (mode !== 'background') {
@@ -418,14 +498,13 @@ export default function SocialFeed() {
             ? nextCursorRef.current
             : response.data.nextCursor;
         const postsForCache =
-          mode === 'initial'
-            ? response.data.items
-            : mode === 'background' && !isAtTopRef.current
-              ? postsRef.current
-              : mergedVisiblePosts;
+          mode === 'background'
+            ? mergePosts(seenPosts, postsRef.current, 'prepend')
+            : mergedVisiblePosts;
         await persistFeedCache(postsForCache, nextForCache || null);
       } catch (error) {
         console.error(t('socialFeedLoadError'), error);
+        setFeedErrorMessage(t('socialFeedLoadError'));
       } finally {
         if (mode === 'initial') {
           setLoading(false);
@@ -439,10 +518,12 @@ export default function SocialFeed() {
       }
     },
     [
+      feedSeenAt,
       getLatestPostCreatedAt,
       mergePosts,
       persistFeedCache,
       t,
+      updateFeedSeenAt,
       updateLatestFetchedAt,
     ],
   );
@@ -549,6 +630,50 @@ export default function SocialFeed() {
   }, []);
 
   useEffect(() => {
+    if (!currentUserId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadFeedSeenAt = async () => {
+      try {
+        const rawValue = await storage.getItem(getFeedSeenAtKey(currentUserId));
+        const storedValue = rawValue ? Number(rawValue) : 0;
+        const currentValue = feedSeenAtRef.current ?? 0;
+        const nextValue = Math.max(
+          currentValue,
+          Number.isFinite(storedValue) ? storedValue : 0,
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        feedSeenAtRef.current = nextValue > 0 ? nextValue : null;
+        setFeedSeenAt(nextValue > 0 ? nextValue : null);
+
+        if (nextValue > 0 && nextValue !== storedValue) {
+          await storage.setItem(getFeedSeenAtKey(currentUserId), String(nextValue));
+        }
+      } catch {
+        if (isMounted) {
+          const currentValue = feedSeenAtRef.current;
+          if (currentValue !== null) {
+            setFeedSeenAt(currentValue);
+          }
+        }
+      }
+    };
+
+    void loadFeedSeenAt();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUserId, getFeedSeenAtKey]);
+
+  useEffect(() => {
     const unsubscribe = subscribeToPostChanges((updatedPost) => {
       const normalizedPost: FeedPost = {
         ...updatedPost,
@@ -563,7 +688,7 @@ export default function SocialFeed() {
                 ? mergeUpdatedPost(post, normalizedPost)
                 : post,
             )
-          : mergePosts([normalizedPost], current);
+          : current;
         void persistFeedCache(next, nextCursorRef.current || null);
         return next;
       });
@@ -574,7 +699,7 @@ export default function SocialFeed() {
                 ? mergeUpdatedPost(post, normalizedPost)
                 : post,
             )
-          : mergePosts([normalizedPost], current),
+          : mergePosts([normalizedPost], current, 'prepend'),
       );
     });
 
@@ -592,7 +717,7 @@ export default function SocialFeed() {
       setPendingPosts(nextPendingPosts);
       await persistFeedCache(
         nextPendingPosts.length > 0
-          ? mergePosts(nextPendingPosts, nextPosts)
+          ? mergePosts(nextPendingPosts, nextPosts, 'prepend')
           : nextPosts,
         nextCursorRef.current || null,
       );
@@ -608,7 +733,7 @@ export default function SocialFeed() {
         setPendingPosts(previousPendingPosts);
         await persistFeedCache(
           previousPendingPosts.length > 0
-            ? mergePosts(previousPendingPosts, previousPosts)
+            ? mergePosts(previousPendingPosts, previousPosts, 'prepend')
             : previousPosts,
           nextCursorRef.current || null,
         );
@@ -682,25 +807,27 @@ export default function SocialFeed() {
   }, [router]);
 
   const applyPendingPosts = useCallback(async () => {
-    if (pendingPosts.length === 0) {
+    if (pendingPostsToShow.length === 0) {
       return;
     }
-    const nextPosts = mergePosts(pendingPosts, postsRef.current);
+    const nextPosts = mergePosts(pendingPostsToShow, postsRef.current, 'prepend');
     setPosts(nextPosts);
     setPendingPosts([]);
+    updateFeedSeenAt(pendingPostsToShow);
     await persistFeedCache(nextPosts, nextCursorRef.current || null);
-  }, [mergePosts, pendingPosts, persistFeedCache]);
+
+    requestAnimationFrame(() => {
+      feedListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+  }, [mergePosts, pendingPostsToShow, persistFeedCache, updateFeedSeenAt]);
 
   const handleScroll = useCallback(
     (event: { nativeEvent: { contentOffset: { y: number } } }) => {
       const offsetY = event.nativeEvent.contentOffset.y;
       const isAtTop = offsetY <= FEED_TOP_THRESHOLD;
       isAtTopRef.current = isAtTop;
-      if (isAtTop && pendingPosts.length > 0) {
-        void applyPendingPosts();
-      }
     },
-    [applyPendingPosts, pendingPosts.length],
+    [],
   );
 
   const resolveLocationLabel = useCallback((post: FeedPost) => {
@@ -719,30 +846,33 @@ export default function SocialFeed() {
     return '';
   }, []);
 
+  const pendingPostsToShow = useMemo(() => {
+    if (feedSeenAt === null) {
+      return pendingPosts;
+    }
+
+    return pendingPosts.filter(
+      (post) => getLatestFeedPostCreatedAtTime([post]) > feedSeenAt,
+    );
+  }, [feedSeenAt, pendingPosts]);
+
   const pendingLabel = useMemo(() => {
-    const label = t('socialFeedNewPosts', { count: pendingPosts.length });
+    const label = t('socialFeedNewPosts', { count: pendingPostsToShow.length });
     if (!label || label === 'socialFeedNewPosts') {
-      return `${pendingPosts.length} nouveau(x) post(s)`;
+      return `${pendingPostsToShow.length} nouveau(x) post(s)`;
     }
     return label;
-  }, [pendingPosts.length, t]);
+  }, [pendingPostsToShow.length, t]);
 
   const timelinePosts = useMemo(() => posts, [posts]);
 
   useEffect(() => {
-    const urlsToPrefetch = timelinePosts
-      .slice(0, 8)
-      .flatMap((post) => (post.images || []).slice(0, 1))
-      .map((url) => getImageUrl(url))
-      .filter((url): url is string => Boolean(url))
-      .filter(
-        (url) =>
-          !url.endsWith('.mp4') &&
-          !url.endsWith('.mov') &&
-          !url.endsWith('.m4v') &&
-          !url.endsWith('.webm') &&
-          !url.endsWith('.mkv'),
-      );
+    const urlsToPrefetch = collectPrefetchUrls(timelinePosts, feedActiveId, {
+      resolveImageUrl: getImageUrl,
+      isVideoUrl,
+      beforeCount: 1,
+      afterCount: 6,
+    });
 
     if (urlsToPrefetch.length === 0) {
       return;
@@ -751,7 +881,7 @@ export default function SocialFeed() {
     void Promise.all(urlsToPrefetch.map((url) => ExpoImage.prefetch(url))).catch(() => {
       // Préchargement opportuniste: on ignore les erreurs réseau.
     });
-  }, [timelinePosts]);
+  }, [feedActiveId, timelinePosts]);
 
   const buildShareMessage = useCallback(
     (post: FeedPost) => {
@@ -912,51 +1042,78 @@ export default function SocialFeed() {
     timelinePosts,
   ]);
 
-  const feedMediaCount = useMemo(
-    () => filteredPosts.filter((post) => (post.images || []).length > 0).length,
-    [filteredPosts],
+  const displayPosts = useMemo(
+    () =>
+      filteredPosts.map((post) => ({
+        ...post,
+        isOwner: resolvePostOwnership(post.userId, post.isOwner, currentUserId),
+      })),
+    [currentUserId, filteredPosts],
   );
 
-  const feedAutoplay = useVisibleItemAutoplay(filteredPosts, (post) => post.id);
+  const feedMediaCount = useMemo(
+    () => displayPosts.filter((post) => (post.images || []).length > 0).length,
+    [displayPosts],
+  );
 
-  const renderHeader = () => (
-    <SocialFeedHeader
-      headerLabel={t('socialFeedHeaderLabel')}
-      headerTitle={t('socialFeedHeaderTitle')}
-      headerSubtitle={t('socialFeedHeaderSubtitle')}
-      allLabel={t('socialFeedFilterAll')}
-      postsLabel={t('socialFeedFilterPosts')}
-      plansLabel={t('socialFeedFilterPlans')}
-      locationLabel={t('socialFeedFilterLocation')}
-      pendingLabel={pendingLabel}
-      pendingVisible={pendingPosts.length > 0}
-      onSearch={handleOpenSearch}
-      onOpenFilters={() => setFiltersOpen(true)}
-      onOpenMessages={handleOpenMessages}
-      onShowAll={() => {
-        setSelectedCategory('');
-        setSelectedType('all');
-        setSelectedLocation('');
-      }}
-      onShowPosts={() => {
-        setSelectedCategory('');
-        setSelectedLocation('');
-        setSelectedType('post');
-      }}
-      onShowPlans={() => {
-        setSelectedCategory('');
-        setSelectedLocation('');
-        setSelectedType('plan');
-      }}
-      onOpenLocationFilters={() => {
-        setActiveFilter('location');
-        setFiltersOpen(true);
-      }}
-      selectedCategory={selectedCategory}
-      selectedType={selectedType}
-      selectedLocation={selectedLocation}
-      onApplyPending={() => void applyPendingPosts()}
-    />
+  const feedAutoplay =
+    useVisibleItemAutoplay(displayPosts, (post) => post.id) ?? NOOP_AUTOPLAY;
+  const {
+    activeId: feedActiveId = null,
+    beginInteraction: feedBeginInteraction = NOOP_AUTOPLAY.beginInteraction,
+    beginMomentum: feedBeginMomentum = NOOP_AUTOPLAY.beginMomentum,
+    endInteraction: feedEndInteraction = NOOP_AUTOPLAY.endInteraction,
+    endMomentum: feedEndMomentum = NOOP_AUTOPLAY.endMomentum,
+    onLayout: feedOnLayout = NOOP_AUTOPLAY.onLayout,
+    onScroll: feedOnScroll = NOOP_AUTOPLAY.onScroll,
+    registerLayout: feedRegisterLayout = NOOP_AUTOPLAY.registerLayout,
+  } = feedAutoplay ?? NOOP_AUTOPLAY;
+
+  const headerComponent = useMemo(
+    () => (
+      <SocialFeedHeader
+        headerLabel={t('socialFeedHeaderLabel')}
+        headerTitle={t('socialFeedHeaderTitle')}
+        headerSubtitle={t('socialFeedHeaderSubtitle')}
+        allLabel={t('socialFeedFilterAll')}
+        postsLabel={t('socialFeedFilterPosts')}
+        plansLabel={t('socialFeedFilterPlans')}
+        locationLabel={t('socialFeedFilterLocation')}
+        onSearch={handleOpenSearch}
+        onOpenFilters={() => setFiltersOpen(true)}
+        onOpenMessages={handleOpenMessages}
+        onShowAll={() => {
+          setSelectedCategory('');
+          setSelectedType('all');
+          setSelectedLocation('');
+        }}
+        onShowPosts={() => {
+          setSelectedCategory('');
+          setSelectedLocation('');
+          setSelectedType('post');
+        }}
+        onShowPlans={() => {
+          setSelectedCategory('');
+          setSelectedLocation('');
+          setSelectedType('plan');
+        }}
+        onOpenLocationFilters={() => {
+          setActiveFilter('location');
+          setFiltersOpen(true);
+        }}
+        selectedCategory={selectedCategory}
+        selectedType={selectedType}
+        selectedLocation={selectedLocation}
+      />
+    ),
+    [
+      handleOpenMessages,
+      handleOpenSearch,
+      selectedCategory,
+      selectedLocation,
+      selectedType,
+      t,
+    ],
   );
 
   if (loading && posts.length === 0) {
@@ -966,7 +1123,7 @@ export default function SocialFeed() {
         data={['skeleton-0', 'skeleton-1', 'skeleton-2']}
         keyExtractor={(item) => item}
         renderItem={() => <SkeletonPost />}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={headerComponent}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{ paddingBottom: 120, paddingTop: 4 }}
@@ -977,45 +1134,77 @@ export default function SocialFeed() {
 
   return (
     <>
+      {pendingPostsToShow.length > 0 ? (
+        <View className="mt-2 border-y border-gray-100 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-semibold text-[#4c669f] dark:text-[#b9c8f2]">
+                {pendingLabel}
+              </Text>
+              <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Les nouvelles publications attendent pour eviter de bouger le feed.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => void applyPendingPosts()}
+              className="rounded-full bg-[#4c669f] px-4 py-2"
+            >
+              <Text className="text-xs font-semibold text-white">Afficher</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {feedErrorMessage ? (
+        <View className="mt-2 border-y border-gray-100 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+          <View className="flex-row items-start">
+            <Ionicons name="warning-outline" size={18} color="#dc2626" />
+            <View className="ml-3 flex-1">
+              <Text className="text-sm font-semibold text-red-700 dark:text-red-200">
+                {feedErrorMessage}
+              </Text>
+              <TouchableOpacity
+                onPress={() => void fetchFeed(posts.length > 0 ? 'refresh' : 'initial')}
+                className="mt-3 self-start rounded-full bg-red-600 px-4 py-2"
+              >
+                <Text className="text-xs font-semibold text-white">{t('commonRetry')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : null}
       <FlatList<FeedPost>
+        ref={feedListRef}
         key="social-feed-main"
-        data={filteredPosts}
+        data={displayPosts}
         keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={15}
+        updateCellsBatchingPeriod={16}
+        removeClippedSubviews={false}
         renderItem={({ item }) => (
           <View
             onLayout={(event) => {
-              feedAutoplay.registerLayout(item.id, {
+              feedRegisterLayout(item.id, {
                 y: event.nativeEvent.layout.y,
                 height: event.nativeEvent.layout.height,
               });
             }}
           >
-            {(() => {
-              const isOwner = resolvePostOwnership(
-                item.userId,
-                item.isOwner,
-                currentUserId,
-              );
-              const normalizedItem: FeedPost = {
-                ...item,
-                isOwner,
-              };
-
-              return (
             <PostItem
-              item={normalizedItem}
+              item={item}
               showDateColumn={false}
-              shouldPlayMedia={feedAutoplay.activeId === item.id}
-              onDelete={normalizedItem.isOwner ? handleDeletePost : undefined}
-              onEdit={normalizedItem.isOwner ? handleEditPost : undefined}
+              shouldPlayMedia={feedActiveId === item.id}
+              presentation="instagram"
+              onDelete={item.isOwner ? handleDeletePost : undefined}
+              onEdit={item.isOwner ? handleEditPost : undefined}
               onComment={handleCommentPost}
               onShare={handleSharePost}
             />
-              );
-            })()}
           </View>
         )}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={headerComponent}
         ListEmptyComponent={
           <SocialFeedEmptyState
             title={t('socialFeedEmptyTitle')}
@@ -1031,18 +1220,22 @@ export default function SocialFeed() {
             tintColor="#4c669f"
           />
         }
-        onLayout={feedAutoplay.onLayout}
+        onLayout={feedOnLayout}
+        onScrollBeginDrag={feedBeginInteraction}
+        onMomentumScrollBegin={feedBeginMomentum}
         onScroll={(event) => {
           handleScroll(event);
-          feedAutoplay.onScroll(event);
+          feedOnScroll(event);
         }}
+        onScrollEndDrag={feedEndInteraction}
+        onMomentumScrollEnd={feedEndMomentum}
         scrollEventThrottle={16}
         onEndReached={() => {
           if (!fetchingMore && nextCursor) {
             void fetchFeed('more');
           }
         }}
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={0.8}
         ListFooterComponent={
           fetchingMore ? (
             <View className="items-center py-6">
@@ -1053,7 +1246,7 @@ export default function SocialFeed() {
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
-        className="flex-1 bg-gray-50 dark:bg-black"
+        className="flex-1 bg-white dark:bg-gray-900"
       />
 
       <SocialFeedFiltersSheet

@@ -1,36 +1,26 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   Text,
   TextInput,
-  TouchableOpacity,
+  useWindowDimensions,
+  useColorScheme,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
+import { ChatComposer } from '@/components/direct-chat/ChatComposer';
 import ChatScreenShell from '@/components/ui/ChatScreenShell';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
-
-interface ChatUser {
-  id: string;
-  username?: string | null;
-  displayName?: string | null;
-}
-
-interface OutingMessage {
-  id: string;
-  outingId: string;
-  senderId: string;
-  content: string;
-  sentAt: string;
-  User?: ChatUser;
-}
+import { sendOutingMessage, type OutingMessage } from '@/services/outings';
 
 interface OutingDetail {
   id: string;
@@ -59,8 +49,12 @@ function formatTime(value: string, locale: string) {
 export default function OutingChatScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
+  const colorScheme = useColorScheme();
   const params = useLocalSearchParams<{ id?: string }>();
   const outingId = params.id;
+  const inputRef = useRef<TextInput | null>(null);
+  const { width: screenWidth } = useWindowDimensions();
+  const attachmentSize = Math.min(Math.round(screenWidth * 0.58), 240);
 
   const [title, setTitle] = useState(t('outingChatDefaultTitle'));
   const [subtitle, setSubtitle] = useState('');
@@ -72,7 +66,11 @@ export default function OutingChatScreen() {
   const [syncWarning, setSyncWarning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
+  const [pendingImages, setPendingImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const isDark = colorScheme === 'dark';
+  const MAX_MESSAGE_IMAGES = 5;
 
   const loadChat = useCallback(
     async ({ isRefresh = false, silent = false } = {}) => {
@@ -145,30 +143,74 @@ export default function OutingChatScreen() {
     }, [loadChat]),
   );
 
-  const canSend = useMemo(() => draft.trim().length > 0 && !sending, [draft, sending]);
+  const sendEnabled = useMemo(
+    () => !sending && (draft.trim().length > 0 || pendingImages.length > 0),
+    [draft, pendingImages.length, sending],
+  );
+
+  const handlePickImages = useCallback(async () => {
+    if (pendingImages.length >= MAX_MESSAGE_IMAGES) {
+      Alert.alert(
+        t('commonErrorTitle'),
+        t('directChatImageLimit', { count: MAX_MESSAGE_IMAGES }),
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setPendingImages((current) => {
+        const remaining = MAX_MESSAGE_IMAGES - current.length;
+        const picked = result.assets.slice(0, remaining);
+        return [...current, ...picked];
+      });
+    }
+  }, [MAX_MESSAGE_IMAGES, pendingImages.length, t]);
+
+  const removePendingImage = useCallback((uri: string) => {
+    setPendingImages((current) => current.filter((item) => item.uri !== uri));
+  }, []);
 
   const handleSend = async () => {
     const content = draft.trim();
-    if (!outingId || !content) {
+    if (!outingId || sending || (!content && pendingImages.length === 0)) {
       return;
     }
 
     setSending(true);
+    setUploadProgress(pendingImages.length > 0 ? 0 : null);
     try {
-      const response = await api.post<OutingMessage>(`/outings/${outingId}/messages`, {
-        content,
-      });
+      const response = await sendOutingMessage(
+        outingId,
+        {
+          content,
+          images: pendingImages,
+        },
+        {
+          onUploadProgress: (progress) => {
+            setUploadProgress(progress);
+          },
+        },
+      );
       setMessages((current) => {
-        const next = [...current, response.data];
+        const next = [...current, response];
         messagesRef.current = next;
         return next;
       });
       setSyncWarning(false);
       setDraft('');
+      setPendingImages([]);
     } catch (error) {
       console.error('Erreur envoi message:', error);
+      Alert.alert(t('commonErrorTitle'), t('directChatSendFailed'));
     } finally {
       setSending(false);
+      setUploadProgress(null);
     }
   };
 
@@ -220,30 +262,21 @@ export default function OutingChatScreen() {
         ) : undefined
       }
       composer={
-        <View className="border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-black">
-          <View className="flex-row items-end">
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={t('outingChatInputPlaceholder')}
-              placeholderTextColor="#9ca3af"
-              multiline
-              className="max-h-28 flex-1 rounded-2xl bg-gray-100 px-4 py-3 text-gray-900 dark:bg-gray-900 dark:text-white"
-            />
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={!canSend}
-              className={`ml-3 h-11 w-11 items-center justify-center rounded-full ${
-                canSend ? 'bg-[#4c669f]' : 'bg-gray-300 dark:bg-gray-700'
-              }`}
-            >
-              {sending ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Ionicons name="send" size={18} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </View>
+        <View className="px-4 pb-6 pt-2">
+          <ChatComposer
+            inputRef={inputRef}
+            input={draft}
+            onChangeInput={setDraft}
+            placeholder={t('outingChatInputPlaceholder')}
+            pendingImages={pendingImages}
+            onRemoveImage={removePendingImage}
+            onPickImages={() => void handlePickImages()}
+            onSend={handleSend}
+            sending={sending}
+            sendEnabled={sendEnabled}
+            isDark={isDark}
+            uploadProgress={uploadProgress}
+          />
         </View>
       }
     >
@@ -270,6 +303,7 @@ export default function OutingChatScreen() {
           const mine = item.senderId === myUserId;
           const senderName =
             item.User?.displayName || item.User?.username || t('outingChatMemberFallback');
+          const attachments = (item.images || []).filter((uri): uri is string => Boolean(uri));
 
           return (
             <View className={`mb-3 ${mine ? 'items-end' : 'items-start'}`}>
@@ -283,9 +317,29 @@ export default function OutingChatScreen() {
                   mine ? 'bg-[#4c669f]' : 'bg-white dark:bg-gray-900'
                 }`}
               >
-                <Text className={mine ? 'text-white' : 'text-gray-800 dark:text-gray-100'}>
-                  {item.content}
-                </Text>
+                {item.content ? (
+                  <Text className={mine ? 'text-white' : 'text-gray-800 dark:text-gray-100'}>
+                    {item.content}
+                  </Text>
+                ) : null}
+                {attachments.length > 0 ? (
+                  <View className="mt-3 flex-row flex-wrap">
+                    {attachments.map((uri, index) => (
+                      <Image
+                        key={`${item.id}-${uri}-${index}`}
+                        source={{ uri }}
+                        style={{
+                          width: attachmentSize,
+                          height: attachmentSize,
+                          marginRight: index % 2 === 0 ? 8 : 0,
+                          marginBottom: 8,
+                          borderRadius: 16,
+                        }}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </View>
+                ) : null}
               </View>
               <Text className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                 {formatTime(item.sentAt, locale)}

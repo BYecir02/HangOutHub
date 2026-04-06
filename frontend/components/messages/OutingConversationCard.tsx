@@ -12,6 +12,7 @@ interface ChatUser {
 interface ChatMessage {
   id: string;
   content: string;
+  images?: string[] | null;
   sentAt?: string;
   User?: ChatUser;
 }
@@ -57,7 +58,9 @@ export default function OutingConversationCard({
     item.Place?.City?.name ||
     item.Place?.address ||
     t('messagesLocationFallback');
-  const lastMessageText = item.lastMessage?.content || t('messagesLastMessageEmpty');
+  const lastMessageText = item.lastMessage?.content?.trim()
+    || (item.lastMessage?.images?.length ? t('outingChatLastMessageImage') : '')
+    || t('messagesLastMessageEmpty');
   const lastMessageAuthor =
     item.lastMessage?.User?.displayName ||
     item.lastMessage?.User?.username ||

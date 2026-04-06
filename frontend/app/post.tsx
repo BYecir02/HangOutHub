@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,12 @@ import PostVisibilityModal from '@/components/post/PostVisibilityModal';
 import MediaFrame from '@/components/ui/MediaFrame';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import api, { getImageUrl } from '../services/api';
+import {
+  buildMediaUploadPayload,
+  inferMediaKind,
+  isMediaFileTooLarge,
+  isSupportedMediaAsset,
+} from '@/services/media-upload';
 import { emitPostChanged } from '../services/post-events';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
@@ -45,6 +51,7 @@ type PostMediaItem = {
   duration?: number | null;
   mimeType?: string | null;
   fileName?: string | null;
+  fileSize?: number | null;
 };
 
 type CategoryOption = {
@@ -521,111 +528,18 @@ export default function CreatePostScreen() {
     return getImageUrl(uri) || uri;
   };
 
-  const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    gif: 'image/gif',
-    webp: 'image/webp',
-    heic: 'image/heic',
-    heif: 'image/heif',
-    mp4: 'video/mp4',
-    mov: 'video/quicktime',
-    m4v: 'video/mp4',
-    webm: 'video/webm',
-    '3gp': 'video/3gpp',
-    mkv: 'video/x-matroska',
-    avi: 'video/x-msvideo',
-  };
-
-  const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-    'image/heic': 'heic',
-    'image/heif': 'heif',
-    'video/mp4': 'mp4',
-    'video/quicktime': 'mov',
-    'video/webm': 'webm',
-    'video/3gpp': '3gp',
-    'video/x-matroska': 'mkv',
-    'video/x-msvideo': 'avi',
-  };
-
-  const VALID_MEDIA_EXTENSIONS = new Set(Object.keys(MIME_TYPE_BY_EXTENSION));
-
-  const inferMediaKind = (media: PostMediaItem) => {
-    if (media.assetType === 'video') {
-      return 'video';
-    }
-    if (media.assetType === 'image') {
-      return 'image';
-    }
-    if (typeof media.duration === 'number' && media.duration > 0) {
-      return 'video';
-    }
-    const mimeType = media.mimeType?.toLowerCase();
-    if (mimeType?.startsWith('video/')) {
-      return 'video';
-    }
-    if (mimeType?.startsWith('image/')) {
-      return 'image';
-    }
-
-    const normalizedName = (media.fileName || media.uri).toLowerCase();
-    if (/\.(mp4|mov|m4v|3gp|webm|avi|mkv)(\?|#|$)/.test(normalizedName)) {
-      return 'video';
-    }
-    return 'image';
-  };
-
-  const inferMediaExtension = (media: PostMediaItem) => {
-    const fileName = media.fileName?.trim();
-    if (fileName?.includes('.')) {
-      const extension = fileName.split('.').pop()?.toLowerCase();
-      if (extension && VALID_MEDIA_EXTENSIONS.has(extension)) {
-        return extension;
-      }
-    }
-
-    const mimeType = media.mimeType?.toLowerCase();
-    if (mimeType) {
-      if (EXTENSION_BY_MIME_TYPE[mimeType]) {
-        return EXTENSION_BY_MIME_TYPE[mimeType];
-      }
-    }
-
-    return inferMediaKind(media) === 'video' ? 'mp4' : 'jpg';
-  };
-
-  const inferMediaMimeType = (media: PostMediaItem) => {
-    if (media.mimeType) {
-      return media.mimeType;
-    }
-
-    const extension = inferMediaExtension(media);
-    return MIME_TYPE_BY_EXTENSION[extension] || (inferMediaKind(media) === 'video' ? 'video/mp4' : 'image/jpeg');
-  };
-
-  const getUploadFileName = (media: PostMediaItem, index: number) => {
-    const fileName = media.fileName?.trim();
-    if (fileName?.includes('.')) {
-      const extension = fileName.split('.').pop()?.toLowerCase();
-      if (extension && VALID_MEDIA_EXTENSIONS.has(extension)) {
-        return fileName;
-      }
-    }
-
-    return `media_${index}.${inferMediaExtension(media)}`;
-  };
-
-  const buildUploadPayload = (media: PostMediaItem, index: number) => ({
-    uri: media.uri,
-    name: getUploadFileName(media, index),
-    type: inferMediaMimeType(media),
-  });
+  const buildUploadPayload = (media: PostMediaItem, index: number) =>
+    buildMediaUploadPayload(
+      {
+        uri: media.uri,
+        mimeType: media.mimeType ?? null,
+        fileName: media.fileName ?? null,
+        duration: media.duration ?? null,
+        fileSize: media.fileSize ?? null,
+        type: media.assetType ?? null,
+      },
+      index,
+    );
 
 
   const pickImage = async (source: 'camera' | 'gallery') => {
@@ -666,10 +580,19 @@ export default function CreatePostScreen() {
             duration: asset.duration ?? null,
             mimeType: asset.mimeType ?? null,
             fileName: asset.fileName ?? null,
+            fileSize: asset.fileSize ?? null,
           }))
-          .filter((asset) => Boolean(asset.uri))
-          .slice(0, remaining);
-        return [...currentMediaItems, ...pickedMedia];
+          .filter((asset) => Boolean(asset.uri));
+
+        const validPickedMedia = pickedMedia.filter(
+          (asset) => isSupportedMediaAsset(asset) && !isMediaFileTooLarge(asset),
+        );
+
+        if (validPickedMedia.length !== pickedMedia.length) {
+          Alert.alert(t('mediaValidationTitle'), t('mediaValidationMessage'));
+        }
+
+        return [...currentMediaItems, ...validPickedMedia.slice(0, remaining)];
       });
     }
   };
