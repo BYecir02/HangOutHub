@@ -22,6 +22,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...config,
+    android: {
+      ...(config.android || {}),
+      softwareKeyboardLayoutMode: 'resize',
+    },
     extra: {
       ...(config.extra || {}),
       apiUrl: apiUrl || PUBLIC_API_URL,

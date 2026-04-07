@@ -2,6 +2,8 @@
 const statusLabels: Record<string, string> = {
   PENDING: 'En attente',
   APPROVED: 'Approuve',
+  VERIFIED: 'Verifie',
+  NEEDS_REVIEW: 'A revoir',
   RESOLVED: 'Traite',
   REJECTED: 'Refuse',
   SUSPENDED: 'Suspendu',
@@ -10,6 +12,8 @@ const statusLabels: Record<string, string> = {
 const statusStyles: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-700',
   APPROVED: 'bg-emerald-100 text-emerald-700',
+  VERIFIED: 'bg-emerald-100 text-emerald-700',
+  NEEDS_REVIEW: 'bg-amber-100 text-amber-700',
   RESOLVED: 'bg-emerald-100 text-emerald-700',
   REJECTED: 'bg-rose-100 text-rose-700',
   SUSPENDED: 'bg-slate-200 text-slate-700',

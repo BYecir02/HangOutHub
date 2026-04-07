@@ -28,11 +28,13 @@ import { SkeletonBlock } from '../ui/Skeleton';
 import api, { getImageUrl } from '../../services/api';
 import { getFriendshipOverview } from '../../services/friendships';
 import { getOrCreateDirectChat, sendDirectMessage } from '../../services/direct-chats';
+import { getPostsSocket } from '../../services/post-realtime';
 import { subscribeToPostChanges, type PostChangedPayload } from '../../services/post-events';
 import { resolveStoredUserSession } from '../../services/user-session';
 import { isVideoUrl } from '@/services/media';
 import {
   collectPrefetchUrls,
+  getFeedPostCreatedAtTime,
   getLatestFeedPostCreatedAtTime,
   mergeFeedPosts,
   splitFeedPostsBySeenAt,
@@ -224,6 +226,7 @@ export default function SocialFeed() {
   const [pendingPosts, setPendingPosts] = useState<FeedPost[]>([]);
   const [feedSeenAt, setFeedSeenAt] = useState<number | null>(null);
   const postsRef = useRef<FeedPost[]>([]);
+  const pendingPostsRef = useRef<FeedPost[]>([]);
   const nextCursorRef = useRef<string | null>(null);
   const latestFetchedAtRef = useRef<string | null>(null);
   const feedSeenAtRef = useRef<number | null>(null);
@@ -346,6 +349,10 @@ export default function SocialFeed() {
   }, [posts]);
 
   useEffect(() => {
+    pendingPostsRef.current = pendingPosts;
+  }, [pendingPosts]);
+
+  useEffect(() => {
     nextCursorRef.current = nextCursor;
   }, [nextCursor]);
 
@@ -414,6 +421,26 @@ export default function SocialFeed() {
     [],
   );
 
+  const removePostFromFeed = useCallback(
+    (postId: string) => {
+      const nextPosts = postsRef.current.filter((post) => post.id !== postId);
+      const nextPendingPosts = pendingPostsRef.current.filter(
+        (post) => post.id !== postId,
+      );
+
+      setPosts(nextPosts);
+      setPendingPosts(nextPendingPosts);
+
+      void persistFeedCache(
+        nextPendingPosts.length > 0
+          ? mergePosts(nextPendingPosts, nextPosts, 'prepend')
+          : nextPosts,
+        nextCursorRef.current || null,
+      );
+    },
+    [mergePosts, persistFeedCache],
+  );
+
   const fetchFeed = useCallback(
     async (mode: 'initial' | 'refresh' | 'background' | 'more' = 'initial') => {
       if (mode === 'refresh') {
@@ -455,6 +482,26 @@ export default function SocialFeed() {
             ? splitFeedPostsBySeenAt(response.data.items, seenAtThreshold)
             : { seenPosts: response.data.items, unseenPosts: [] };
 
+        const freshPosts = response.data.items;
+        const freshPostIds = new Set(freshPosts.map((post) => post.id));
+        const oldestFreshTime =
+          freshPosts.length > 0
+            ? getFeedPostCreatedAtTime(freshPosts[freshPosts.length - 1])
+            : 0;
+
+        const keepOlderCachedPosts = (items: FeedPost[]) =>
+          items.filter((post) => {
+            if (freshPostIds.has(post.id)) {
+              return false;
+            }
+
+            if (oldestFreshTime === 0) {
+              return true;
+            }
+
+            return getFeedPostCreatedAtTime(post) < oldestFreshTime;
+          });
+
         const mergedVisiblePosts = mergePosts(
           mode === 'background' ? seenPosts : response.data.items,
           postsRef.current,
@@ -474,10 +521,16 @@ export default function SocialFeed() {
             setPendingPosts([]);
           }
         } else if (mode === 'refresh') {
-          setPosts(mergedVisiblePosts);
+          setPosts((current) => {
+            const olderCachedPosts = keepOlderCachedPosts(current);
+            return mergePosts(freshPosts, olderCachedPosts, 'prepend');
+          });
           setPendingPosts([]);
         } else {
-          setPosts(mergedVisiblePosts);
+          setPosts((current) => {
+            const olderCachedPosts = keepOlderCachedPosts(current);
+            return mergePosts(freshPosts, olderCachedPosts, 'prepend');
+          });
           setPendingPosts([]);
         }
 
@@ -500,7 +553,9 @@ export default function SocialFeed() {
         const postsForCache =
           mode === 'background'
             ? mergePosts(seenPosts, postsRef.current, 'prepend')
-            : mergedVisiblePosts;
+            : mode === 'more'
+              ? mergePosts(response.data.items, postsRef.current, 'append')
+              : mergePosts(freshPosts, keepOlderCachedPosts(postsRef.current), 'prepend');
         await persistFeedCache(postsForCache, nextForCache || null);
       } catch (error) {
         console.error(t('socialFeedLoadError'), error);
@@ -705,6 +760,38 @@ export default function SocialFeed() {
 
     return unsubscribe;
   }, [mergePosts, mergeUpdatedPost, persistFeedCache]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let socketCleanup: (() => void) | null = null;
+
+    const connectPostsSocket = async () => {
+      const socket = await getPostsSocket();
+      if (!socket || !isMounted) {
+        return;
+      }
+
+      const handlePostDeleted = (payload: { id?: string }) => {
+        if (!payload.id) {
+          return;
+        }
+
+        removePostFromFeed(payload.id);
+      };
+
+      socket.on('post:deleted', handlePostDeleted);
+      socketCleanup = () => {
+        socket.off('post:deleted', handlePostDeleted);
+      };
+    };
+
+    void connectPostsSocket();
+
+    return () => {
+      isMounted = false;
+      socketCleanup?.();
+    };
+  }, [removePostFromFeed]);
 
   const handleDeletePost = useCallback(
     async (postId: string) => {

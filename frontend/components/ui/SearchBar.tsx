@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { uiTokens } from '@/theme/tokens';
@@ -11,6 +12,7 @@ interface SearchBarProps {
   value?: string;
   onChangeText?: (text: string) => void;
   autoFocus?: boolean;
+  useBottomSheetInput?: boolean;
 }
 
 export default function SearchBar({ 
@@ -18,10 +20,12 @@ export default function SearchBar({
   onFilterPress,
   value,
   onChangeText,
-  autoFocus = false
+  autoFocus = false,
+  useBottomSheetInput = false,
 }: SearchBarProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const InputComponent = useBottomSheetInput ? BottomSheetTextInput : TextInput;
 
   return (
     <View style={{ paddingHorizontal: uiTokens.spacing.screenX }}>
@@ -39,7 +43,7 @@ export default function SearchBar({
           size={uiTokens.size.iconMd}
           color={isDark ? '#9ca3af' : '#999'}
         />
-        <TextInput 
+        <InputComponent 
           className="flex-1 ml-3 text-base text-gray-800 dark:text-white"
           placeholder={placeholder}
           placeholderTextColor={isDark ? "#666" : "#999"}

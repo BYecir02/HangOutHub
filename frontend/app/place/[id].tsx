@@ -658,6 +658,24 @@ export default function PlaceDetailScreen() {
                     <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
                       {place.address || t('homeAddressToConfirm')}
                     </Text>
+                    {place.latitude !== null &&
+                    place.latitude !== undefined &&
+                    place.longitude !== null &&
+                    place.longitude !== undefined ? (
+                      <TouchableOpacity
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(tabs)/map',
+                            params: { placeId: place.id },
+                          })
+                        }
+                        className="mt-3 self-start rounded-full bg-[#4c669f] px-4 py-2"
+                      >
+                        <Text className="text-xs font-semibold text-white">
+                          Voir sur la carte
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </View>
 

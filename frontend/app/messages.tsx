@@ -607,7 +607,7 @@ export default function MessagesScreen() {
         onClose={() => setSearchSheetOpen(false)}
         title={t('messagesTitle')}
         subtitle={searchPlaceholder}
-        maxHeight={320}
+        maxHeight={140}
         contentMode="auto"
       >
         <SearchBar
@@ -615,6 +615,7 @@ export default function MessagesScreen() {
           onChangeText={setQuery}
           autoFocus
           placeholder={searchPlaceholder}
+          useBottomSheetInput
         />
       </BottomSheetModal>
 

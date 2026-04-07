@@ -152,6 +152,13 @@ export const clearAuthState = async () => {
   } catch {
     // Ignore socket cleanup failures during auth teardown.
   }
+
+  try {
+    const { disconnectPostsSocket } = await import('./post-realtime');
+    disconnectPostsSocket();
+  } catch {
+    // Ignore socket cleanup failures during auth teardown.
+  }
 };
 
 const isAuthRoute = (url: string) =>

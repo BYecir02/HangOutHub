@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,16 +10,17 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import ScreenState from '@/components/ui/ScreenState';
 import CommentItem from '../components/social/CommentItem';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { clearAuthState, getApiErrorMessage, getImageUrl } from '../services/api';
+import { emitPostChanged } from '@/services/post-events';
 
 const isUnauthorized = (error: unknown) =>
   (error as { response?: { status?: number } }).response?.status === 401;
@@ -59,6 +60,7 @@ export default function CommentsScreen() {
   const params = useLocalSearchParams<{ postId?: string }>();
   const postId = params.postId;
   const { locale, t } = useI18n();
+  const commentsListRef = useRef<FlatList<CommentListItem>>(null);
 
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<CommentListItem[]>([]);
@@ -89,6 +91,26 @@ export default function CommentsScreen() {
     [locale, t],
   );
 
+  const scrollCommentsToEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      commentsListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
+
+  const syncPostCommentsCount = useCallback(
+    (nextCount: number) => {
+      if (!postId) {
+        return;
+      }
+
+      emitPostChanged({
+        id: postId,
+        _count: { comments: nextCount },
+      });
+    },
+    [postId],
+  );
+
   const fetchComments = useCallback(async () => {
     if (!postId) {
       setComments([]);
@@ -99,7 +121,11 @@ export default function CommentsScreen() {
     setLoading(true);
     try {
       const res = await api.get<ApiComment[]>(`/posts/${postId}/comments`);
-      setComments(res.data.map(mapComment));
+      const nextComments = res.data.map(mapComment);
+      setComments(nextComments);
+      if (nextComments.length > 0) {
+        scrollCommentsToEnd();
+      }
       setErrorMessage(null);
     } catch (error) {
       if (isUnauthorized(error)) {
@@ -112,7 +138,7 @@ export default function CommentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [handleInvalidSession, mapComment, postId, t]);
+  }, [handleInvalidSession, mapComment, postId, scrollCommentsToEnd, t]);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -162,11 +188,17 @@ export default function CommentsScreen() {
         parentId: replyingTo ? replyingTo.id : undefined,
       });
 
-      setComments((prev) => [...prev, mapComment(res.data)]);
+      const nextComment = mapComment(res.data);
+      setComments((prev) => {
+        const next = [...prev, nextComment];
+        syncPostCommentsCount(next.length);
+        return next;
+      });
       setComment('');
       setReplyingTo(null);
       setErrorMessage(null);
       Keyboard.dismiss();
+      scrollCommentsToEnd();
     } catch (error) {
       if (isUnauthorized(error)) {
         await handleInvalidSession();
@@ -200,7 +232,9 @@ export default function CommentsScreen() {
           });
         }
 
-        return prev.filter((current) => !idsToRemove.has(current.id));
+        const next = prev.filter((current) => !idsToRemove.has(current.id));
+        syncPostCommentsCount(next.length);
+        return next;
       });
       Alert.alert(t('commentsDeleteSuccessTitle'), t('commentsDeleteSuccessMessage'));
     } catch (error) {
@@ -278,46 +312,81 @@ export default function CommentsScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
       className="flex-1"
     >
-      <BottomSheetModal
-        visible
-        onClose={() => router.back()}
-        title={t('commentsTitle')}
-        maxHeight={680}
-        footer={composer}
-      >
-        {loading ? (
-          <ScreenState mode="loading" />
-        ) : errorMessage ? (
-          <ScreenState
-            mode="error"
-            title={t('commonErrorTitle')}
-            description={errorMessage}
-            actionLabel={t('commonRetry')}
-            onAction={() => {
-              void fetchComments();
-            }}
-          />
-        ) : comments.length === 0 ? (
-          <ScreenState mode="empty" title={t('commentsFirstComment')} />
-        ) : (
-          <FlatList
-            data={comments}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 12 }}
-            renderItem={({ item }) => (
-              <CommentItem
-                item={{ ...item, isMine: item.userId === currentUser?.id }}
-                onDelete={handleDeleteComment}
-                onReport={handleReportComment}
-                onReply={setReplyingTo}
+      <View className="flex-1 justify-end">
+        <Pressable
+          className="absolute inset-0"
+          onPress={() => router.back()}
+        >
+          <View className="absolute inset-0 bg-black/40" />
+        </Pressable>
+
+        <View
+          className="w-full flex-1 overflow-hidden rounded-t-3xl border-t border-gray-200 bg-white px-5 pb-8 pt-4 dark:border-gray-800 dark:bg-gray-900"
+          style={{ height: '85%', maxHeight: 680 }}
+        >
+          <View className="mb-4 items-center">
+            <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+          </View>
+
+          <View className="mb-4 flex-row items-start justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                {t('commentsTitle')}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="bg-gray-100 p-2 dark:bg-gray-800"
+              style={{ borderRadius: 999 }}
+            >
+              <Ionicons name="close" size={18} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+
+          <View className="flex-1 min-h-[1px]">
+            {loading ? (
+              <ScreenState mode="loading" />
+            ) : errorMessage ? (
+              <ScreenState
+                mode="error"
+                title={t('commonErrorTitle')}
+                description={errorMessage}
+                actionLabel={t('commonRetry')}
+                onAction={() => {
+                  void fetchComments();
+                }}
+              />
+            ) : comments.length === 0 ? (
+              <ScreenState mode="empty" title={t('commentsFirstComment')} />
+            ) : (
+              <FlatList
+                ref={commentsListRef}
+                data={comments}
+                keyExtractor={(item) => item.id}
+                style={{ flex: 1 }}
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ padding: 16, paddingBottom: 12 }}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <CommentItem
+                    item={{ ...item, isMine: item.userId === currentUser?.id }}
+                    onDelete={handleDeleteComment}
+                    onReport={handleReportComment}
+                    onReply={setReplyingTo}
+                  />
+                )}
               />
             )}
-          />
-        )}
-      </BottomSheetModal>
+          </View>
+
+          <View className="mt-4">{composer}</View>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }

@@ -245,7 +245,7 @@ export default function SearchScreen() {
         onClose={() => setSearchSheetOpen(false)}
         title={t('searchTitle')}
         subtitle={t('searchHintDescription')}
-        maxHeight={360}
+        maxHeight={300}
         contentMode="auto"
       >
         <SearchBar
@@ -253,6 +253,7 @@ export default function SearchScreen() {
           onChangeText={setQuery}
           autoFocus
           placeholder={t('searchPlaceholder')}
+          useBottomSheetInput
         />
       </BottomSheetModal>
     </View>

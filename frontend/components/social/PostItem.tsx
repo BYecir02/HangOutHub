@@ -81,6 +81,7 @@ interface PostItemProps {
   authorDisplayMode?: 'place' | 'user' | 'auto';
   shouldPlayMedia?: boolean;
   presentation?: 'thread' | 'instagram';
+  readOnly?: boolean;
 }
 
 function PostItem({
@@ -93,6 +94,7 @@ function PostItem({
   authorDisplayMode = 'place',
   shouldPlayMedia = false,
   presentation = 'thread',
+  readOnly = false,
 }: PostItemProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -110,6 +112,7 @@ function PostItem({
   const [optionsSheetVisible, setOptionsSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
+  const [isContentExpanded, setIsContentExpanded] = useState(false);
   const shareCount = item.shareCount || 0;
   const isConnections = item.visibility === 'friends';
   const isPlanPost = item.postType === 'plan' || isConnections;
@@ -192,6 +195,9 @@ function PostItem({
     : '';
   const bodyExcerpt =
     bodyText.length > 160 ? `${bodyText.slice(0, 157)}...` : bodyText;
+  const hasExpandableContent =
+    isInstagramPresentation &&
+    (rawContent.includes('\n') || rawContent.length > 140);
   const locationLabel = (() => {
     const primary = [item.placeName, item.cityName]
       .map((value) => (value || '').trim())
@@ -225,6 +231,10 @@ function PostItem({
     setLikesCount(item._count?.likes || 0);
     setCommentsCount(item._count?.comments || 0);
   }, [item._count?.comments, item._count?.likes, item.isLiked]);
+
+  useEffect(() => {
+    setIsContentExpanded(false);
+  }, [item.id]);
 
   const handleLike = async () => {
     const previousState = isLiked;
@@ -384,7 +394,7 @@ function PostItem({
               </View>
             </View>
 
-            {(onDelete || onEdit) && (
+            {!readOnly && (onDelete || onEdit) && (
               <TouchableOpacity
                 testID="post-options-button"
                 onPress={handleOpenOptionsMenu}
@@ -409,9 +419,46 @@ function PostItem({
           ) : null}
 
           <View className={isInstagramPresentation ? 'mt-3' : 'mt-4'}>
-            <Text className={`${isInstagramPresentation ? 'text-lg' : 'text-xl'} font-bold text-gray-900 dark:text-white`}>
-              {titleText}
-            </Text>
+            {isInstagramPresentation ? (
+              <>
+                {rawContent ? (
+                  <Text
+                    className="text-[15px] leading-6 text-gray-700 dark:text-gray-200"
+                    numberOfLines={isContentExpanded ? undefined : 4}
+                    ellipsizeMode="tail"
+                  >
+                    {rawContent}
+                  </Text>
+                ) : (
+                  <Text className="text-[15px] leading-6 text-gray-700 dark:text-gray-200">
+                    {titleText}
+                  </Text>
+                )}
+
+                {hasExpandableContent ? (
+                  <TouchableOpacity
+                    onPress={() => setIsContentExpanded((current) => !current)}
+                    className="mt-2 self-start"
+                  >
+                    <Text className="text-sm font-semibold text-[#4c669f] dark:text-[#b9c8f2]">
+                      {isContentExpanded ? t('postItemShowLess') : t('postItemShowMore')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Text className="text-xl font-bold text-gray-900 dark:text-white">
+                  {titleText}
+                </Text>
+
+                {bodyExcerpt ? (
+                  <Text className="mt-2 text-base leading-6 text-gray-600 dark:text-gray-300">
+                    {bodyExcerpt}
+                  </Text>
+                ) : null}
+              </>
+            )}
 
             {isOfficialPost ? (
               <View className="mt-2 self-start rounded-full bg-[#1f7aec]/10 px-2.5 py-1">
@@ -449,19 +496,13 @@ function PostItem({
                 </Text>
               </View>
             ) : null}
-
-            {bodyExcerpt ? (
-              <Text className="mt-2 text-base leading-6 text-gray-600 dark:text-gray-300">
-                {bodyExcerpt}
-              </Text>
-            ) : null}
           </View>
 
           <View className="mt-4 flex-row items-center justify-between pb-4">
             <View className="flex-row">
               <TouchableOpacity
                 className="flex-row items-center mr-5"
-                onPress={handleLike}
+                onPress={readOnly ? undefined : handleLike}
               >
                 <Ionicons
                   name={isLiked ? 'heart' : 'heart-outline'}
@@ -504,7 +545,7 @@ function PostItem({
               </TouchableOpacity>
             </View>
 
-            {isPlanPost && (item.placeId || item.eventId || item.Event) ? (
+            {!readOnly && isPlanPost && (item.placeId || item.eventId || item.Event) ? (
               <TouchableOpacity
                 onPress={handleCreateOuting}
                 className="rounded-full bg-[#4c669f] px-3 py-2"

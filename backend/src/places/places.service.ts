@@ -40,20 +40,25 @@ export class PlacesService {
 
     return this.prisma.place.create({
       data: {
-        name: createPlaceDto.name,
-        category: createPlaceDto.category,
-        description: createPlaceDto.description,
-        address: createPlaceDto.address,
-        phone: createPlaceDto.phone,
-        whatsapp: createPlaceDto.whatsapp,
-        openingHours: createPlaceDto.openingHours,
-        latitude: createPlaceDto.latitude,
-        longitude: createPlaceDto.longitude,
+        ...createPlaceDto,
+        moderationStatus: this.normalizeModerationStatus(
+          createPlaceDto.moderationStatus,
+        ),
+        externalProvider: this.normalizeOptionalString(
+          createPlaceDto.externalProvider,
+        ),
+        externalProviderId: this.normalizeOptionalString(
+          createPlaceDto.externalProviderId,
+        ),
+        externalUrl: this.normalizeOptionalString(createPlaceDto.externalUrl),
         coverUrl,
         images: galleryUrls,
         ownerId,
         priceLevel: createPlaceDto.priceLevel || 1,
         cityId: createPlaceDto.cityId || 1,
+        providerMatchedAt: this.hasProviderMetadata(createPlaceDto)
+          ? new Date()
+          : undefined,
       },
     });
   }
@@ -91,6 +96,36 @@ export class PlacesService {
       existingImages?: string;
     };
     const data: Prisma.PlaceUpdateInput = { ...rest };
+
+    if (rest.moderationStatus !== undefined) {
+      data.moderationStatus = this.normalizeModerationStatus(
+        rest.moderationStatus,
+      );
+    }
+
+    if (rest.externalProvider !== undefined) {
+      data.externalProvider = this.normalizeOptionalString(
+        rest.externalProvider,
+      );
+    }
+
+    if (rest.externalProviderId !== undefined) {
+      data.externalProviderId = this.normalizeOptionalString(
+        rest.externalProviderId,
+      );
+    }
+
+    if (rest.externalUrl !== undefined) {
+      data.externalUrl = this.normalizeOptionalString(rest.externalUrl);
+    }
+
+    if (rest.providerMatchConfidence !== undefined) {
+      data.providerMatchConfidence = rest.providerMatchConfidence;
+    }
+
+    if (this.hasProviderMetadata(rest)) {
+      data.providerMatchedAt = new Date();
+    }
 
     const tagIds =
       rawTagIds !== undefined ? this.parseTagIdsPayload(rawTagIds) : null;
@@ -332,6 +367,30 @@ export class PlacesService {
     }
 
     return Array.from(new Set(normalized));
+  }
+
+  private hasProviderMetadata(payload: {
+    externalProvider?: string | null;
+    externalProviderId?: string | null;
+    externalUrl?: string | null;
+    providerMatchConfidence?: number | null;
+  }) {
+    return (
+      Boolean(this.normalizeOptionalString(payload.externalProvider)) ||
+      Boolean(this.normalizeOptionalString(payload.externalProviderId)) ||
+      Boolean(this.normalizeOptionalString(payload.externalUrl)) ||
+      payload.providerMatchConfidence !== undefined
+    );
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private normalizeModerationStatus(value?: string | null) {
+    const trimmed = value?.trim().toUpperCase();
+    return trimmed || 'PENDING';
   }
 
   private async getPlaceAuthorizationContext(placeId: string) {

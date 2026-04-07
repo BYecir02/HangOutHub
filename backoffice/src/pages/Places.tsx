@@ -13,6 +13,7 @@ import SearchInput from '../components/SearchInput';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import TableRowActions from '../components/TableRowActions';
+import StatusBadge from '../components/StatusBadge';
 
 interface CityOption {
   id: number;
@@ -29,6 +30,9 @@ interface PlaceItem {
   latitude?: number | null;
   longitude?: number | null;
   priceLevel?: number | null;
+  moderationStatus?: string | null;
+  externalProvider?: string | null;
+  providerMatchConfidence?: number | null;
   updatedAt?: string | null;
   City?: CityOption | null;
   PlaceTag?: {
@@ -203,6 +207,20 @@ export default function PlacesPage() {
     }).format(date);
   };
 
+    const formatProviderSource = (value?: string | null) => {
+      const normalized = (value || '').toUpperCase();
+      if (normalized === 'GOOGLE') {
+        return 'Google Maps';
+      }
+      if (normalized === 'APPLE') {
+        return 'Apple Maps';
+      }
+      if (normalized === 'OTHER') {
+        return 'Autre';
+      }
+      return normalized || '-';
+    };
+
   const handleDelete = async (place: PlaceItem) => {
     const confirmed = window.confirm(
       `Supprimer le lieu "${place.name}" ? Cette action est irreversible.`,
@@ -303,6 +321,7 @@ export default function PlacesPage() {
                 { label: 'Lieu' },
                 { label: 'Ville' },
                 { label: 'Categorie' },
+                { label: 'Moderation' },
                 { label: 'Derniere maj' },
                 { label: 'Tags' },
                 { label: 'Action', className: 'text-right' },
@@ -317,6 +336,18 @@ export default function PlacesPage() {
                     </td>
                     <td className="py-4 text-xs text-slate-500">
                       {resolveCategory(place)}
+                    </td>
+                    <td className="py-4">
+                      <div className="space-y-2">
+                        <StatusBadge status={place.moderationStatus} />
+                        <p className="text-xs text-slate-500">
+                          {formatProviderSource(place.externalProvider)}
+                          {place.providerMatchConfidence !== undefined &&
+                          place.providerMatchConfidence !== null
+                            ? ` · ${place.providerMatchConfidence.toFixed(2)}`
+                            : ''}
+                        </p>
+                      </div>
                     </td>
                     <td className="py-4 text-xs text-slate-500">
                       {formatUpdatedAt(place.updatedAt)}
@@ -363,7 +394,7 @@ export default function PlacesPage() {
                 ))}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <EmptyState title="Aucun lieu trouve." />
                     </td>
                   </tr>

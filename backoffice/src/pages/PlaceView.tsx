@@ -8,6 +8,7 @@ import SectionCard from '../components/SectionCard';
 import SectionTitle from '../components/SectionTitle';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
+import StatusBadge from '../components/StatusBadge';
 
 interface PlaceDetail {
   id: string;
@@ -21,6 +22,14 @@ interface PlaceDetail {
   latitude?: number | null;
   longitude?: number | null;
   priceLevel?: number | null;
+  moderationStatus?: string | null;
+  externalProvider?: string | null;
+  externalProviderId?: string | null;
+  externalUrl?: string | null;
+  providerLatitude?: number | null;
+  providerLongitude?: number | null;
+  providerMatchConfidence?: number | null;
+  providerMatchedAt?: string | null;
   coverUrl?: string | null;
   images?: string[];
   avgRating?: number | null;
@@ -77,6 +86,79 @@ function formatPriceLevel(level?: number | null) {
   }
 
   return '$'.repeat(level);
+}
+
+function formatProviderSource(value?: string | null) {
+  const normalized = (value || '').toUpperCase();
+  if (normalized === 'GOOGLE') {
+    return 'Google Maps';
+  }
+  if (normalized === 'APPLE') {
+    return 'Apple Maps';
+  }
+  if (normalized === 'OTHER') {
+    return 'Autre';
+  }
+  return normalized || '-';
+}
+
+function computeDistanceMeters(
+  firstLatitude?: number | null,
+  firstLongitude?: number | null,
+  secondLatitude?: number | null,
+  secondLongitude?: number | null,
+) {
+  if (
+    !Number.isFinite(firstLatitude as number) ||
+    !Number.isFinite(firstLongitude as number) ||
+    !Number.isFinite(secondLatitude as number) ||
+    !Number.isFinite(secondLongitude as number)
+  ) {
+    return null;
+  }
+
+  const earthRadiusMeters = 6371000;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const deltaLatitude = toRadians((secondLatitude as number) - (firstLatitude as number));
+  const deltaLongitude = toRadians((secondLongitude as number) - (firstLongitude as number));
+  const latitudeA = toRadians(firstLatitude as number);
+  const latitudeB = toRadians(secondLatitude as number);
+
+  const haversine =
+    Math.sin(deltaLatitude / 2) * Math.sin(deltaLatitude / 2) +
+    Math.sin(deltaLongitude / 2) * Math.sin(deltaLongitude / 2) *
+      Math.cos(latitudeA) *
+      Math.cos(latitudeB);
+
+  return 2 * earthRadiusMeters * Math.asin(Math.min(1, Math.sqrt(haversine)));
+}
+
+function formatDistanceLabel(distanceMeters: number | null) {
+  if (distanceMeters === null) {
+    return '-';
+  }
+
+  if (distanceMeters < 1000) {
+    return `${Math.round(distanceMeters)} m`;
+  }
+
+  return `${(distanceMeters / 1000).toFixed(2)} km`;
+}
+
+function getDistanceVerdict(distanceMeters: number | null) {
+  if (distanceMeters === null) {
+    return 'Coordonnees provider non detectees';
+  }
+
+  if (distanceMeters < 30) {
+    return 'Correspondance tres probable';
+  }
+
+  if (distanceMeters < 100) {
+    return 'A verifier';
+  }
+
+  return 'Probable faux rapprochement';
 }
 
 function formatEventDate(value?: string | null) {
@@ -138,6 +220,12 @@ export default function PlaceViewPage() {
   const gallery = place?.images?.length
     ? place.images.map((image) => resolveImageUrl(image) || image)
     : [];
+  const distanceMeters = computeDistanceMeters(
+    place?.latitude,
+    place?.longitude,
+    place?.providerLatitude,
+    place?.providerLongitude,
+  );
 
   return (
     <div className="space-y-6">
@@ -257,6 +345,93 @@ export default function PlaceViewPage() {
                 <p className="mt-2 text-sm font-semibold text-slate-700">
                   {place.whatsapp || '-'}
                 </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <SectionTitle label="Moderation" />
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Statut
+                  </p>
+                  <div className="mt-2">
+                    <StatusBadge status={place.moderationStatus} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Provider
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                    {formatProviderSource(place.externalProvider)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Provider ID
+                  </p>
+                  <p className="mt-2 break-all text-sm font-semibold text-slate-700">
+                    {place.externalProviderId || '-'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Coordonnees internes
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                    {typeof place.latitude === 'number' && typeof place.longitude === 'number'
+                      ? `${place.latitude.toFixed(6)}, ${place.longitude.toFixed(6)}`
+                      : '-'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Coordonnees provider
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                    {typeof place.providerLatitude === 'number' &&
+                    typeof place.providerLongitude === 'number'
+                      ? `${place.providerLatitude.toFixed(6)}, ${place.providerLongitude.toFixed(6)}`
+                      : '-'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Ecart
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                    {formatDistanceLabel(distanceMeters)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {getDistanceVerdict(distanceMeters)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Dernier lien
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                    {formatDate(place.providerMatchedAt)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    URL provider
+                  </p>
+                  {place.externalUrl ? (
+                    <a
+                      href={place.externalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block break-all text-sm font-semibold text-brand-600 hover:underline"
+                    >
+                      Ouvrir la fiche
+                    </a>
+                  ) : (
+                    <p className="mt-2 text-sm font-semibold text-slate-700">-</p>
+                  )}
+                </div>
               </div>
             </div>
 

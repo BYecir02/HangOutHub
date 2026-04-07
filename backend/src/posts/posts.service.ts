@@ -873,6 +873,13 @@ export class PostsService {
   async remove(id: string, userId: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
+      select: {
+        id: true,
+        userId: true,
+        visibility: true,
+        visibilityUserIds: true,
+        images: true,
+      },
     });
 
     if (!post) {
@@ -886,6 +893,16 @@ export class PostsService {
     const deletedPost = await this.prisma.post.delete({
       where: { id },
     });
+
+    const audience =
+      post.visibility === 'public'
+        ? { type: 'public' as const }
+        : {
+            type: 'users' as const,
+            userIds: await this.getPostAudienceUserIds(post),
+          };
+
+    this.postsGateway.emitDeletedPost(post, audience);
 
     if (Array.isArray(post.images) && post.images.length > 0) {
       void this.storageService.deleteFiles(post.images);

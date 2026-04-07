@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import PersonActionButton from '../components/social/PersonActionButton';
@@ -111,29 +112,24 @@ export default function ConnectionsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
-      <View className="px-5 pb-4">
-        <ScreenHeader title={t('connectionsTitle')} onBack={() => router.back()} />
-      </View>
+      <ScreenHeader
+        title={t('connectionsTitle')}
+        onBack={() => router.back()}
+        containerClassName="px-5 pb-4"
+        rightSlot={
+          <TouchableOpacity
+            onPress={() => router.push('/search')}
+            className="h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+          >
+            <Ionicons name="search-outline" size={20} color="#4c669f" />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView
         className="flex-1 px-5 pb-10 pt-2"
         showsVerticalScrollIndicator={false}
       >
-        <View className="rounded-[28px] border border-[#4c669f]/20 bg-[#4c669f]/10 p-5">
-          <Text className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4c669f]">
-            {t('connectionsNetworkLabel')}
-          </Text>
-          <Text className="mt-3 text-2xl font-bold text-gray-900 dark:text-white">
-            {t('connectionsHeroSubtitle')}
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/search')}
-            className="mt-4 self-start rounded-full bg-[#4c669f] px-5 py-2.5"
-          >
-            <Text className="font-semibold text-white">{t('connectionsSearchPeople')}</Text>
-          </TouchableOpacity>
-        </View>
-
         <View className="mt-5 flex-row gap-2.5">
           <View className="flex-1">
             <SocialCountChip

@@ -307,6 +307,14 @@ model Place {
   latitude     Float
   longitude    Float
   priceLevel   Int?           @default(1)
+  moderationStatus String     @default("PENDING") @db.VarChar(32)
+  externalProvider String?    @db.VarChar(32)
+  externalProviderId String?   @db.VarChar(255)
+  externalUrl   String?        @db.VarChar(500)
+  providerLatitude Float?
+  providerLongitude Float?
+  providerMatchConfidence Float? @default(0)
+  providerMatchedAt DateTime?  @db.Timestamp(6)
   coverUrl     String?        @db.VarChar(255)
   avgRating    Float?         @default(0)
   viewCount    Int?           @default(0)

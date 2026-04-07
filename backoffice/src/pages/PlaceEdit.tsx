@@ -37,6 +37,14 @@ interface PlaceDetails {
   latitude?: number | null;
   longitude?: number | null;
   priceLevel?: number | null;
+  moderationStatus?: string | null;
+  externalProvider?: string | null;
+  externalProviderId?: string | null;
+  externalUrl?: string | null;
+  providerLatitude?: number | null;
+  providerLongitude?: number | null;
+  providerMatchConfidence?: number | null;
+  providerMatchedAt?: string | null;
   coverUrl?: string | null;
   images?: string[];
   City?: CityOption | null;
@@ -71,6 +79,13 @@ interface DuplicatePlaceSource {
   latitude?: number | null;
   longitude?: number | null;
   priceLevel?: number | null;
+  moderationStatus?: string | null;
+  externalProvider?: string | null;
+  externalProviderId?: string | null;
+  externalUrl?: string | null;
+  providerLatitude?: number | null;
+  providerLongitude?: number | null;
+  providerMatchConfidence?: number | null;
   coverUrl?: string | null;
   images?: string[];
   City?: CityOption | null;
@@ -81,6 +96,217 @@ interface DuplicatePlaceSource {
       status?: string | null;
     } | null;
   }>;
+}
+
+type ParsedProviderLink = {
+  provider: string | null;
+  providerId: string | null;
+  providerLatitude: number | null;
+  providerLongitude: number | null;
+  confidence: number;
+};
+
+function formatProviderLabel(value?: string | null) {
+  const normalized = (value || '').trim().toUpperCase();
+  if (!normalized) {
+    return '-';
+  }
+  if (normalized === 'GOOGLE') {
+    return 'Google Maps';
+  }
+  if (normalized === 'APPLE') {
+    return 'Apple Maps';
+  }
+  return normalized;
+}
+
+function parseCoordinatePair(rawValue?: string | null) {
+  if (!rawValue) {
+    return null;
+  }
+
+  const [rawLatitude, rawLongitude] = rawValue.split(',').map((part) => part.trim());
+  const latitude = Number(rawLatitude);
+  const longitude = Number(rawLongitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  return { latitude, longitude };
+}
+
+function getFirstMatch(value: string, patterns: RegExp[]) {
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match?.[1] && match?.[2]) {
+      return {
+        latitude: Number(match[1]),
+        longitude: Number(match[2]),
+      };
+    }
+  }
+
+  return null;
+}
+
+function computeDistanceMeters(
+  firstLatitude?: number | null,
+  firstLongitude?: number | null,
+  secondLatitude?: number | null,
+  secondLongitude?: number | null,
+) {
+  if (
+    !Number.isFinite(firstLatitude as number) ||
+    !Number.isFinite(firstLongitude as number) ||
+    !Number.isFinite(secondLatitude as number) ||
+    !Number.isFinite(secondLongitude as number)
+  ) {
+    return null;
+  }
+
+  const earthRadiusMeters = 6371000;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const deltaLatitude = toRadians((secondLatitude as number) - (firstLatitude as number));
+  const deltaLongitude = toRadians((secondLongitude as number) - (firstLongitude as number));
+  const latitudeA = toRadians(firstLatitude as number);
+  const latitudeB = toRadians(secondLatitude as number);
+
+  const haversine =
+    Math.sin(deltaLatitude / 2) * Math.sin(deltaLatitude / 2) +
+    Math.sin(deltaLongitude / 2) * Math.sin(deltaLongitude / 2) *
+      Math.cos(latitudeA) *
+      Math.cos(latitudeB);
+
+  return 2 * earthRadiusMeters * Math.asin(Math.min(1, Math.sqrt(haversine)));
+}
+
+function formatDistanceLabel(distanceMeters: number | null) {
+  if (distanceMeters === null) {
+    return '-';
+  }
+
+  if (distanceMeters < 1000) {
+    return `${Math.round(distanceMeters)} m`;
+  }
+
+  return `${(distanceMeters / 1000).toFixed(2)} km`;
+}
+
+function getDistanceVerdict(distanceMeters: number | null) {
+  if (distanceMeters === null) {
+    return 'Coordonnees provider non detectees';
+  }
+
+  if (distanceMeters < 30) {
+    return 'Correspondance tres probable';
+  }
+
+  if (distanceMeters < 100) {
+    return 'A verifier';
+  }
+
+  return 'Probable faux rapprochement';
+}
+
+function parseGoogleMapsLink(rawUrl: string): ParsedProviderLink {
+  let providerId: string | null = null;
+  let providerCoordinates: { latitude: number; longitude: number } | null = null;
+
+  const decodedIdMatches = [
+    rawUrl.match(/!16s%2Fg%2F([^!?&]+)/i),
+    rawUrl.match(/!16s\/g\/([^!?&]+)/i),
+    rawUrl.match(/!1s([^!?&]+)/i),
+    rawUrl.match(/!2s([^!?&]+)/i),
+  ];
+
+  for (const match of decodedIdMatches) {
+    if (match?.[1]) {
+      const candidate = decodeURIComponent(match[1]);
+      providerId = candidate.startsWith('/g/') ? candidate : candidate;
+      break;
+    }
+  }
+
+  if (!providerId) {
+    const cidMatch = rawUrl.match(/0x[0-9a-f]+:0x[0-9a-f]+/i);
+    if (cidMatch?.[0]) {
+      providerId = cidMatch[0];
+    }
+  }
+
+  providerCoordinates = getFirstMatch(rawUrl, [
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/i,
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i,
+    /!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/i,
+  ]);
+
+  return {
+    provider: 'GOOGLE',
+    providerId,
+    providerLatitude: providerCoordinates?.latitude ?? null,
+    providerLongitude: providerCoordinates?.longitude ?? null,
+    confidence:
+      providerId && providerCoordinates
+        ? 0.92
+        : providerId || providerCoordinates
+          ? 0.78
+          : 0.55,
+  };
+}
+
+function parseAppleMapsLink(rawUrl: string): ParsedProviderLink {
+  let providerId: string | null = null;
+  let providerCoordinates: { latitude: number; longitude: number } | null = null;
+  try {
+    const url = new URL(rawUrl);
+    providerId = url.searchParams.get('place-id');
+    providerCoordinates = parseCoordinatePair(url.searchParams.get('coordinate'));
+
+    if (!providerCoordinates) {
+      providerCoordinates = parseCoordinatePair(url.searchParams.get('ll'));
+    }
+  } catch {
+    providerId = null;
+  }
+
+  return {
+    provider: 'APPLE',
+    providerId,
+    providerLatitude: providerCoordinates?.latitude ?? null,
+    providerLongitude: providerCoordinates?.longitude ?? null,
+    confidence:
+      providerId && providerCoordinates
+        ? 0.99
+        : providerId || providerCoordinates
+          ? 0.87
+          : 0.75,
+  };
+}
+
+function parseProviderLink(rawUrl: string): ParsedProviderLink | null {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (hostname.includes('maps.apple.com') || hostname.includes('apple.com')) {
+    return parseAppleMapsLink(trimmed);
+  }
+
+  if (hostname.includes('google.') || hostname.includes('goo.gl')) {
+    return parseGoogleMapsLink(trimmed);
+  }
+
+  return null;
 }
 
 const EMPTY_PLACE: PlaceDetails = {
@@ -95,6 +321,13 @@ const EMPTY_PLACE: PlaceDetails = {
   latitude: 0,
   longitude: 0,
   priceLevel: 1,
+  moderationStatus: 'PENDING',
+  externalProvider: null,
+  externalProviderId: null,
+  externalUrl: null,
+  providerLatitude: null,
+  providerLongitude: null,
+  providerMatchConfidence: null,
   images: [],
   City: null,
   coverUrl: null,
@@ -123,6 +356,7 @@ export default function PlaceEditPage() {
   const [tagCreationCategoryId, setTagCreationCategoryId] = useState<number | null>(
     null,
   );
+  const [showModerationAdvanced, setShowModerationAdvanced] = useState(false);
   const [error, setError] = useState('');
 
   const buildCreateDraft = (source: DuplicatePlaceSource): PlaceDetails => ({
@@ -137,6 +371,13 @@ export default function PlaceEditPage() {
     latitude: source.latitude ?? 0,
     longitude: source.longitude ?? 0,
     priceLevel: source.priceLevel ?? 1,
+    moderationStatus: 'PENDING',
+    externalProvider: null,
+    externalProviderId: null,
+    externalUrl: null,
+    providerLatitude: null,
+    providerLongitude: null,
+    providerMatchConfidence: null,
     City: source.City ?? null,
   });
 
@@ -159,10 +400,19 @@ export default function PlaceEditPage() {
         if (isMounted) {
           if (params.id) {
             setPlace(placeData);
+            setShowModerationAdvanced(
+              Boolean(
+                placeData.externalProvider ||
+                  placeData.externalProviderId ||
+                  placeData.externalUrl ||
+                  placeData.providerMatchConfidence !== null,
+              ),
+            );
           } else if (duplicateFrom) {
             const source = placeData as DuplicatePlaceSource;
             setPlace(buildCreateDraft(source));
             setGalleryImages([]);
+            setShowModerationAdvanced(false);
             setSelectedTagIds(
               source.PlaceTag?.map((entry) => entry.Tag?.id || 0).filter(Boolean) ||
                 [],
@@ -170,6 +420,7 @@ export default function PlaceEditPage() {
           } else {
             setPlace(placeData);
             setGalleryImages(placeData.images || []);
+            setShowModerationAdvanced(false);
             setSelectedTagIds(
               placeData.PlaceTag?.map((entry) => entry.Tag?.id || 0).filter(Boolean) ||
                 [],
@@ -276,6 +527,34 @@ export default function PlaceEditPage() {
     }
   };
 
+  const handleAnalyzeProviderUrl = () => {
+    if (!place) {
+      return;
+    }
+
+    const rawUrl = place.externalUrl?.trim();
+    if (!rawUrl) {
+      setError('Colle une URL Google Maps ou Apple Maps avant analyse.');
+      return;
+    }
+
+    const parsed = parseProviderLink(rawUrl);
+    if (!parsed) {
+      setError("Impossible de reconnaitre ce lien. Utilise une URL Apple Maps ou Google Maps.");
+      return;
+    }
+
+    setError('');
+    setPlace({
+      ...place,
+      externalProvider: parsed.provider,
+      externalProviderId: parsed.providerId,
+      providerLatitude: parsed.providerLatitude,
+      providerLongitude: parsed.providerLongitude,
+    });
+    setShowModerationAdvanced(true);
+  };
+
   const handleSubmit = async () => {
     if (!place) {
       return;
@@ -298,6 +577,25 @@ export default function PlaceEditPage() {
       formData.append('description', place.description ?? '');
       formData.append('address', place.address ?? '');
       formData.append('priceLevel', String(Number(place.priceLevel || 1)));
+      formData.append('moderationStatus', place.moderationStatus || 'PENDING');
+      formData.append('externalProvider', place.externalProvider?.trim() || '');
+      formData.append(
+        'externalProviderId',
+        place.externalProviderId?.trim() || '',
+      );
+      formData.append('externalUrl', place.externalUrl?.trim() || '');
+      if (typeof place.providerLatitude === 'number') {
+        formData.append('providerLatitude', String(place.providerLatitude));
+      }
+      if (typeof place.providerLongitude === 'number') {
+        formData.append('providerLongitude', String(place.providerLongitude));
+      }
+      if (typeof place.providerMatchConfidence === 'number') {
+        formData.append(
+          'providerMatchConfidence',
+          String(place.providerMatchConfidence),
+        );
+      }
       if (place.latitude !== null && place.latitude !== undefined) {
         formData.append('latitude', String(place.latitude));
       }
@@ -500,6 +798,167 @@ export default function PlaceEditPage() {
               className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
             />
           </FormField>
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionTitle
+          label="Moderation"
+          subtitle="Colle une URL Google Maps ou Apple Maps, puis laisse le formulaire remplir le reste."
+        />
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <FormField label="URL provider externe">
+              <input
+                value={place.externalUrl ?? ''}
+                onChange={(evt) =>
+                  setPlace({
+                    ...place,
+                    externalUrl: evt.target.value,
+                  })
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+                placeholder="Colle ici une URL Apple Maps ou Google Maps"
+              />
+            </FormField>
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={handleAnalyzeProviderUrl}
+                className="h-12 rounded-xl border border-brand-200 bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600"
+              >
+                Analyser l'URL
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowModerationAdvanced((current) => !current)}
+                className="h-12 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                {showModerationAdvanced ? 'Masquer les champs avancés' : 'Champs avancés'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Provider detecte
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">
+                {formatProviderLabel(place.externalProvider)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Provider ID
+              </p>
+              <p className="mt-2 break-all text-sm font-semibold text-slate-700">
+                {place.externalProviderId || '-'}
+              </p>
+            </div>
+          </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Coordonnees internes
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-700">
+                  {typeof place.latitude === 'number' && typeof place.longitude === 'number'
+                    ? `${place.latitude.toFixed(6)}, ${place.longitude.toFixed(6)}`
+                    : '-'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Coordonnees provider
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-700">
+                  {typeof place.providerLatitude === 'number' &&
+                  typeof place.providerLongitude === 'number'
+                    ? `${place.providerLatitude.toFixed(6)}, ${place.providerLongitude.toFixed(6)}`
+                    : '-'}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Ecart entre les points
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">
+                {formatDistanceLabel(
+                  computeDistanceMeters(
+                    place.latitude,
+                    place.longitude,
+                    place.providerLatitude,
+                    place.providerLongitude,
+                  ),
+                )}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {getDistanceVerdict(
+                  computeDistanceMeters(
+                    place.latitude,
+                    place.longitude,
+                    place.providerLatitude,
+                    place.providerLongitude,
+                  ),
+                )}
+              </p>
+            </div>
+
+          <div className="rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-500">
+            Le lieu interne reste la source de vérité. Cette URL sert uniquement à le rattacher
+            a Google Maps ou Apple Maps.
+          </div>
+
+          {showModerationAdvanced ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField label="Statut de moderation">
+                <SelectField
+                  value={place.moderationStatus || 'PENDING'}
+                  onChange={(value) =>
+                    setPlace({ ...place, moderationStatus: value || 'PENDING' })
+                  }
+                  options={[
+                    { label: 'En attente', value: 'PENDING' },
+                    { label: 'Verifie', value: 'VERIFIED' },
+                    { label: 'A revoir', value: 'NEEDS_REVIEW' },
+                    { label: 'Refuse', value: 'REJECTED' },
+                  ]}
+                />
+              </FormField>
+              <FormField label="Latitude provider">
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={place.providerLatitude ?? ''}
+                  onChange={(evt) =>
+                    setPlace({
+                      ...place,
+                      providerLatitude: evt.target.value ? Number(evt.target.value) : null,
+                    })
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+                />
+              </FormField>
+              <FormField label="Longitude provider">
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={place.providerLongitude ?? ''}
+                  onChange={(evt) =>
+                    setPlace({
+                      ...place,
+                      providerLongitude: evt.target.value ? Number(evt.target.value) : null,
+                    })
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+                />
+              </FormField>
+            </div>
+          ) : null}
         </div>
       </SectionCard>
 

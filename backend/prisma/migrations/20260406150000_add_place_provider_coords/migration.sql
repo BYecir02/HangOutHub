@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Place"
+ADD COLUMN IF NOT EXISTS "providerLatitude" DOUBLE PRECISION,
+ADD COLUMN IF NOT EXISTS "providerLongitude" DOUBLE PRECISION;

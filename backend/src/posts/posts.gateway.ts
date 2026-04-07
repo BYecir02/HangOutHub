@@ -117,6 +117,31 @@ export class PostsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  emitDeletedPost(
+    post: {
+      id: string;
+      userId: string;
+      visibility?: string | null;
+      visibilityUserIds?: string[] | null;
+    },
+    audience: { type: 'public' } | { type: 'users'; userIds: string[] },
+  ) {
+    const recipients =
+      audience.type === 'public'
+        ? Array.from(this.connectedUsers.keys())
+        : Array.from(new Set(audience.userIds));
+
+    if (recipients.length === 0) {
+      return;
+    }
+
+    recipients.forEach((userId) => {
+      this.server.to(this.getUserRoom(userId)).emit('post:deleted', {
+        id: post.id,
+      });
+    });
+  }
+
   private extractToken(client: Socket) {
     const authToken =
       (client.handshake.auth?.token as string | undefined) || undefined;

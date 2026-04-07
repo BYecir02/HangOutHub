@@ -65,4 +65,41 @@ export class CreatePlaceDto {
   @IsNumber()
   @Type(() => Number)
   cityId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  moderationStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  externalProvider?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  externalProviderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  externalUrl?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  providerLatitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  providerLongitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  @Max(1)
+  providerMatchConfidence?: number;
 }

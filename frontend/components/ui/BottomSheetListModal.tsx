@@ -1,6 +1,7 @@
 import React from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import ScreenState from '@/components/ui/ScreenState';
@@ -57,7 +58,7 @@ export default function BottomSheetListModal<T>({
     >
       <View className="mb-4 flex-row items-center rounded-2xl bg-gray-100 px-3 py-2 dark:bg-gray-800">
         <Ionicons name="search-outline" size={18} color="#9ca3af" />
-        <TextInput
+        <BottomSheetTextInput
           value={searchValue}
           onChangeText={onSearchChange}
           placeholder={searchPlaceholder}

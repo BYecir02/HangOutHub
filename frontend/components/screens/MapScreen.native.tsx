@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -9,6 +9,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import MediaFrame from '@/components/ui/MediaFrame';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import api, { getImageUrl } from '@/services/api';
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
@@ -56,6 +57,14 @@ interface PlacePin {
   address?: string | null;
 }
 
+interface PlaceSheetDetail extends PlacePin {
+  description?: string | null;
+  images?: string[];
+  phone?: string | null;
+  whatsapp?: string | null;
+  openingHours?: string | null;
+}
+
 interface CategoryItem {
   id: number;
   name: string;
@@ -87,6 +96,38 @@ type MapCenter = {
   longitude: number;
 };
 
+type MapMarkerRenderItem =
+  | {
+      id: string;
+      kind: 'place';
+      latitude: number;
+      longitude: number;
+      place: PlacePin;
+      groupSize: number;
+    }
+  | {
+      id: string;
+      kind: 'event';
+      latitude: number;
+      longitude: number;
+      event: EventPin;
+      groupSize: number;
+    };
+
+type MapSuggestionTile =
+  | {
+      id: string;
+      kind: 'place';
+      place: PlacePin;
+      imageHeight: number;
+    }
+  | {
+      id: string;
+      kind: 'event';
+      event: EventPin;
+      imageHeight: number;
+    };
+
 const BENIN_CENTER = { latitude: 9.3077, longitude: 2.3158 };
 const COUNTRY_CENTER_ZOOM = 5.2;
 const CITY_CENTER_ZOOM = 12;
@@ -111,11 +152,159 @@ function regionFromCenter(center: MapCenter, zoom: number): Region {
   };
 }
 
+function getCoordinateKey(latitude: number, longitude: number) {
+  return `${latitude.toFixed(5)}:${longitude.toFixed(5)}`;
+}
+
+function offsetMarkerCoordinate(
+  latitude: number,
+  longitude: number,
+  index: number,
+  total: number,
+) {
+  if (total <= 1) {
+    return { latitude, longitude };
+  }
+
+  const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
+  const radius = 0.00008 + Math.min(total, 5) * 0.00001;
+  const latitudeOffset = Math.sin(angle) * radius;
+  const longitudeScale = Math.max(Math.cos((latitude * Math.PI) / 180), 0.35);
+  const longitudeOffset = (Math.cos(angle) * radius) / longitudeScale;
+
+  return {
+    latitude: latitude + latitudeOffset,
+    longitude: longitude + longitudeOffset,
+  };
+}
+
+function estimateMapSuggestionCardHeight(index: number) {
+  const imageHeights = [184, 240, 206, 262, 194, 228];
+  return imageHeights[index % imageHeights.length] + 126;
+}
+
+function MapSuggestionsMasonry({
+  places,
+  events,
+  activeLayer,
+  onPressPlace,
+  onPressEvent,
+}: {
+  places: PlacePin[];
+  events: EventPin[];
+  activeLayer: MapLayer;
+  onPressPlace: (place: PlacePin) => void;
+  onPressEvent: (event: EventPin) => void;
+}) {
+  const tiles = useMemo<MapSuggestionTile[]>(() => {
+    const nextTiles: MapSuggestionTile[] = [];
+
+    if (activeLayer === 'all' || activeLayer === 'places') {
+      places.forEach((place) => {
+        nextTiles.push({
+          id: `place-${place.id}`,
+          kind: 'place',
+          place,
+          imageHeight: 0,
+        });
+      });
+    }
+
+    if (activeLayer === 'all' || activeLayer === 'events') {
+      events.forEach((event) => {
+        nextTiles.push({
+          id: `event-${event.id}`,
+          kind: 'event',
+          event,
+          imageHeight: 0,
+        });
+      });
+    }
+
+    return nextTiles.map((tile, index) => ({
+      ...tile,
+      imageHeight: [184, 240, 206, 262, 194, 228][index % 6],
+    }));
+  }, [activeLayer, events, places]);
+
+  const columns = useMemo(() => {
+    const nextColumns: Array<MapSuggestionTile[]> = [[], []];
+    const columnHeights = [0, 0];
+
+    tiles.forEach((tile, index) => {
+      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
+      nextColumns[targetColumn].push(tile);
+      columnHeights[targetColumn] += estimateMapSuggestionCardHeight(index);
+    });
+
+    return nextColumns;
+  }, [tiles]);
+
+  return (
+    <View className="flex-row items-start gap-3">
+      {columns.map((column, columnIndex) => (
+        <View key={`map-suggestion-column-${columnIndex}`} className="min-w-0 flex-1">
+          {column.map((tile) => {
+            const title = tile.kind === 'place' ? tile.place.name : tile.event.title;
+            const subtitle =
+              tile.kind === 'place'
+                ? tile.place.City?.name || tile.place.address || ''
+                : tile.event.Place?.name || tile.event.Place?.City?.name || '';
+            const imageSource =
+              tile.kind === 'place'
+                ? getImageUrl(tile.place.coverUrl) || PLACE_PLACEHOLDER
+                : getImageUrl(tile.event.coverUrl) || PLACE_PLACEHOLDER;
+
+            return (
+              <TouchableOpacity
+                key={tile.id}
+                onPress={() => {
+                  if (tile.kind === 'place') {
+                    onPressPlace(tile.place);
+                    return;
+                  }
+
+                  onPressEvent(tile.event);
+                }}
+                className="mb-3 overflow-hidden rounded-[28px] bg-white shadow-lg dark:bg-gray-900"
+              >
+                <MediaFrame
+                  source={imageSource}
+                  style={{ height: tile.imageHeight }}
+                  className="w-full"
+                  shouldPlay
+                  muted
+                  loop
+                />
+
+                <View className="px-3 pb-3 pt-3">
+                  <View className="mb-2 self-start rounded-full bg-[#4c669f]/10 px-2.5 py-1">
+                    <Text className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#4c669f] dark:text-[#b9c8f2]">
+                      {tile.kind === 'place' ? 'Lieu' : 'Événement'}
+                    </Text>
+                  </View>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-white" numberOfLines={2}>
+                    {title}
+                  </Text>
+                  <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400" numberOfLines={2}>
+                    {subtitle || ' '}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function MapScreen() {
   const { t } = useI18n();
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const router = useRouter();
+  const params = useLocalSearchParams<{ placeId?: string }>();
   const { selectedLocation, filterByLocation, locationValueLabel } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
@@ -136,10 +325,16 @@ export default function MapScreen() {
     longitude: number;
   } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const [headerCollapsed, setHeaderCollapsed] = useState(true);
   const [mapCenter, setMapCenter] = useState<MapCenter>(BENIN_CENTER);
   const [mapZoom, setMapZoom] = useState(COUNTRY_CENTER_ZOOM);
   const mapRef = useRef<any>(null);
+  const focusedPlaceIdRef = useRef<string | null>(null);
+  const skipNextMapPressRef = useRef(false);
+  const [mapSheetVisible, setMapSheetVisible] = useState(false);
+  const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceSheetDetail | null>(null);
+  const [selectedPlaceDetailsLoading, setSelectedPlaceDetailsLoading] = useState(false);
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const headerSurfaceStyle = useMemo(
     () => ({
       backgroundColor: isDarkMode ? 'rgba(17,24,39,0.94)' : 'rgba(255,255,255,0.96)',
@@ -147,6 +342,16 @@ export default function MapScreen() {
     }),
     [isDarkMode],
   );
+  const floatingButtonBottomOffset = 16;
+  const mapSheetMaxHeight = Math.min(520, Math.round(screenHeight * 0.56));
+  const selectedPlaceHeroWidth = Math.min(340, Math.round(screenWidth * 0.84));
+  const selectedPlaceHeroSource =
+    getImageUrl(
+      selectedPlaceDetails?.images?.[0] ||
+        selectedPlaceDetails?.coverUrl ||
+        selectedPlace?.coverUrl ||
+        PLACE_PLACEHOLDER,
+    ) || PLACE_PLACEHOLDER;
 
   const updateMapCamera = useCallback((center: MapCenter, zoom: number) => {
     setMapCenter(center);
@@ -329,7 +534,106 @@ export default function MapScreen() {
     ],
   );
 
-  const focusOnPlace = (place: PlacePin) => {
+  const renderedMarkers = useMemo<MapMarkerRenderItem[]>(() => {
+    const rawMarkers: Array<
+      | {
+          id: string;
+          kind: 'place';
+          latitude: number;
+          longitude: number;
+          place: PlacePin;
+        }
+      | {
+          id: string;
+          kind: 'event';
+          latitude: number;
+          longitude: number;
+          event: EventPin;
+        }
+    > = [];
+
+    if (activeLayer === 'all' || activeLayer === 'places') {
+      filteredPlaces.forEach((place) => {
+        if (typeof place.latitude === 'number' && typeof place.longitude === 'number') {
+          rawMarkers.push({
+            id: `place-${place.id}`,
+            kind: 'place',
+            latitude: place.latitude,
+            longitude: place.longitude,
+            place,
+          });
+        }
+      });
+    }
+
+    if (activeLayer === 'all' || activeLayer === 'events') {
+      filteredEvents.forEach((event) => {
+        const latitude = event.Place?.latitude;
+        const longitude = event.Place?.longitude;
+
+        if (typeof latitude === 'number' && typeof longitude === 'number') {
+          rawMarkers.push({
+            id: `event-${event.id}`,
+            kind: 'event',
+            latitude,
+            longitude,
+            event,
+          });
+        }
+      });
+    }
+
+    const groupedMarkers = new Map<string, typeof rawMarkers>();
+
+    rawMarkers.forEach((marker) => {
+      const key = getCoordinateKey(marker.latitude, marker.longitude);
+      const group = groupedMarkers.get(key);
+      if (group) {
+        group.push(marker);
+        return;
+      }
+
+      groupedMarkers.set(key, [marker]);
+    });
+
+    const nextMarkers: MapMarkerRenderItem[] = [];
+
+    groupedMarkers.forEach((group) => {
+      group.forEach((marker, index) => {
+        const coordinate = offsetMarkerCoordinate(
+          marker.latitude,
+          marker.longitude,
+          index,
+          group.length,
+        );
+
+        if (marker.kind === 'place') {
+          nextMarkers.push({
+            id: marker.id,
+            kind: 'place',
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            place: marker.place,
+            groupSize: group.length,
+          });
+          return;
+        }
+
+        nextMarkers.push({
+          id: marker.id,
+          kind: 'event',
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude,
+          event: marker.event,
+          groupSize: group.length,
+        });
+      });
+    });
+
+    return nextMarkers;
+  }, [activeLayer, filteredEvents, filteredPlaces]);
+
+  const focusOnPlace = useCallback((place: PlacePin) => {
     if (
       typeof place.latitude !== 'number' ||
       typeof place.longitude !== 'number'
@@ -337,6 +641,9 @@ export default function MapScreen() {
       return;
     }
 
+    setSelectedEvent(null);
+    setSelectedPlaceDetails(null);
+    setSelectedPlaceDetailsLoading(true);
     updateMapCamera(
       {
         latitude: place.latitude,
@@ -344,8 +651,9 @@ export default function MapScreen() {
       },
       CITY_CENTER_ZOOM,
     );
+    setMapSheetVisible(true);
     setSelectedPlace(place);
-  };
+  }, [updateMapCamera]);
 
   const focusOnEvent = (event: EventPin) => {
     const latitude = event.Place?.latitude;
@@ -355,6 +663,8 @@ export default function MapScreen() {
       return;
     }
 
+    setSelectedPlace(null);
+    setSelectedPlaceDetails(null);
     updateMapCamera(
       {
         latitude,
@@ -362,8 +672,79 @@ export default function MapScreen() {
       },
       CITY_CENTER_ZOOM,
     );
+    setMapSheetVisible(true);
     setSelectedEvent(event);
   };
+
+  const clearSelectedPlace = useCallback((keepSheetVisible = true) => {
+    setSelectedPlace(null);
+    setSelectedPlaceDetails(null);
+    focusedPlaceIdRef.current = null;
+    if (typeof params.placeId === 'string' && params.placeId) {
+      router.replace('/(tabs)/map');
+    }
+    setMapSheetVisible(keepSheetVisible);
+  }, [params.placeId, router]);
+
+  useEffect(() => {
+    const placeId = typeof params.placeId === 'string' ? params.placeId : '';
+    if (!placeId) {
+      focusedPlaceIdRef.current = null;
+      return;
+    }
+
+    if (focusedPlaceIdRef.current === placeId) {
+      return;
+    }
+
+    const targetPlace = places.find((place) => place.id === placeId);
+    if (!targetPlace) {
+      return;
+    }
+
+    setActiveLayer('places');
+
+    if (selectedPlace?.id !== targetPlace.id) {
+      focusOnPlace(targetPlace);
+    }
+
+    focusedPlaceIdRef.current = placeId;
+  }, [focusOnPlace, params.placeId, places]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSelectedPlaceDetails = async () => {
+      if (!selectedPlace) {
+        setSelectedPlaceDetails(null);
+        setSelectedPlaceDetailsLoading(false);
+        return;
+      }
+
+      setSelectedPlaceDetailsLoading(true);
+
+      try {
+        const response = await api.get<PlaceSheetDetail>(`/places/${selectedPlace.id}`);
+        if (isMounted) {
+          setSelectedPlaceDetails(response.data);
+        }
+      } catch {
+        if (isMounted) {
+          setSelectedPlaceDetails(selectedPlace);
+        }
+      } finally {
+        if (isMounted) {
+          setSelectedPlaceDetailsLoading(false);
+        }
+      }
+    };
+
+    void loadSelectedPlaceDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedPlace]);
 
   const handleToggleMyLocation = async () => {
     if (useMyLocation) {
@@ -453,68 +834,55 @@ export default function MapScreen() {
         showsMyLocationButton={false}
         showsUserLocation={useMyLocation}
         onPress={() => {
-          setSelectedPlace(null);
-          setSelectedEvent(null);
+          if (skipNextMapPressRef.current) {
+            skipNextMapPressRef.current = false;
+            return;
+          }
+
+          if (selectedPlace || selectedEvent) {
+            clearSelectedPlace(true);
+            setSelectedEvent(null);
+          }
         }}
         onRegionChangeComplete={handleRegionChangeComplete}
       >
-        {(activeLayer === 'all' || activeLayer === 'places'
-          ? filteredPlaces
-          : []
-        ).map((place) => {
-          if (typeof place.latitude !== 'number' || typeof place.longitude !== 'number') {
-            return null;
-          }
+        {renderedMarkers.map((marker) => {
+          const isSelectedPlace = marker.kind === 'place' && selectedPlace?.id === marker.place.id;
+          const isSelectedEvent = marker.kind === 'event' && selectedEvent?.id === marker.event.id;
+          const isSelected = isSelectedPlace || isSelectedEvent;
 
           return (
             <Marker
-              key={place.id}
-              coordinate={{ latitude: place.latitude, longitude: place.longitude }}
+              key={marker.id}
+              coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
               anchor={{ x: 0.5, y: 1 }}
-              onPress={() => setSelectedPlace(place)}
+              onPress={() => {
+                skipNextMapPressRef.current = true;
+                setMapSheetVisible(true);
+
+                if (marker.kind === 'place') {
+                  setSelectedEvent(null);
+                  setSelectedPlace(marker.place);
+                  return;
+                }
+
+                setSelectedPlace(null);
+                setSelectedEvent(marker.event);
+              }}
             >
               <View className="items-center justify-center">
+                {isSelected ? <View className="absolute h-10 w-10 rounded-full bg-white/20" /> : null}
                 <View
-                  className="h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg"
-                  style={{ backgroundColor: '#2ecc71' }}
-                >
-                  <Ionicons name="location" size={16} color="#fff" />
-                </View>
-                <View
-                  className="-mt-1 h-2.5 w-2.5 rounded-full border border-white"
-                  style={{ backgroundColor: '#2ecc71' }}
+                  className={`rounded-full border-2 border-white shadow-lg ${
+                    isSelected ? 'h-5 w-5' : 'h-4 w-4'
+                  }`}
+                  style={{ backgroundColor: marker.kind === 'place' ? '#2ecc71' : '#f39c12' }}
                 />
-              </View>
-            </Marker>
-          );
-        })}
-        {(activeLayer === 'all' || activeLayer === 'events'
-          ? filteredEvents
-          : []
-        ).map((event) => {
-          const latitude = event.Place?.latitude;
-          const longitude = event.Place?.longitude;
-          if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-            return null;
-          }
-          return (
-            <Marker
-              key={event.id}
-              coordinate={{ latitude, longitude }}
-              anchor={{ x: 0.5, y: 1 }}
-              onPress={() => setSelectedEvent(event)}
-            >
-              <View className="items-center justify-center">
-                <View
-                  className="h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg"
-                  style={{ backgroundColor: '#f39c12' }}
-                >
-                  <Ionicons name="calendar" size={16} color="#fff" />
-                </View>
-                <View
-                  className="-mt-1 h-2.5 w-2.5 rounded-full border border-white"
-                  style={{ backgroundColor: '#f39c12' }}
-                />
+                {marker.groupSize > 1 ? (
+                  <View className="mt-1 rounded-full bg-black/70 px-1.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-white">+{marker.groupSize - 1}</Text>
+                  </View>
+                ) : null}
               </View>
             </Marker>
           );
@@ -724,175 +1092,181 @@ export default function MapScreen() {
         )}
       </View>
 
-      <View className="absolute inset-x-0 bottom-6 px-5">
-        {activeLayer !== 'events' && filteredPlaces.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: selectedPlace ? 12 : 0 }}
-          >
-            {filteredPlaces.map((place) => (
-              <TouchableOpacity
-                key={`map-mini-${place.id}`}
-                onPress={() => focusOnPlace(place)}
-                className="mr-3 w-48 overflow-hidden rounded-2xl bg-white p-2 shadow-lg dark:bg-gray-900"
+      <BottomSheetModal
+        visible={mapSheetVisible}
+        onClose={() => setMapSheetVisible(false)}
+        title={
+          selectedPlace
+            ? selectedPlace.name
+            : selectedEvent
+              ? selectedEvent.title
+              : activeLayer === 'events'
+                ? 'Suggestions d\'événements'
+                : 'Suggestions de lieux'
+        }
+        subtitle={
+          selectedPlace
+            ? selectedPlaceDetails?.address || selectedPlace.City?.name || t('homeAddressToConfirm')
+            : selectedEvent
+              ? selectedEvent.Place?.name || selectedEvent.Place?.City?.name || t('homeLocationToConfirm')
+              : activeLayer === 'events'
+                ? 'Touchez un événement pour voir son aperçu.'
+                : 'Touchez un lieu pour voir sa galerie et ouvrir sa fiche.'
+        }
+        maxHeight={mapSheetMaxHeight}
+        backdropOpacity={0}
+        contentMode="auto"
+        heroContent={
+          selectedPlace ? (
+            <View className="items-center">
+              <View
+                className="overflow-hidden rounded-3xl bg-gray-50 dark:bg-gray-800"
+                style={{ width: selectedPlaceHeroWidth }}
               >
-                <MediaFrame
-                  source={getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER}
-                  className="h-20 w-full rounded-xl bg-gray-200 dark:bg-gray-800"
-                  shouldPlay
-                  muted
-                  loop
-                />
-                <Text
-                  className="mt-2 text-sm font-semibold text-gray-900 dark:text-white"
-                  numberOfLines={2}
-                >
-                  {place.name}
-                </Text>
-                <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {place.City?.name || t('homeLocationToConfirm')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        ) : null}
-
-        {activeLayer === 'events' && filteredEvents.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: selectedEvent ? 12 : 0 }}
-          >
-            {filteredEvents.map((event) => (
-              <TouchableOpacity
-                key={`map-mini-event-${event.id}`}
-                onPress={() => focusOnEvent(event)}
-                className="mr-3 w-48 overflow-hidden rounded-2xl bg-white p-2 shadow-lg dark:bg-gray-900"
-              >
-                <MediaFrame
-                  source={getImageUrl(event.coverUrl) || PLACE_PLACEHOLDER}
-                  className="h-20 w-full rounded-xl bg-gray-200 dark:bg-gray-800"
-                  shouldPlay
-                  muted
-                  loop
-                />
-                <Text
-                  className="mt-2 text-sm font-semibold text-gray-900 dark:text-white"
-                  numberOfLines={2}
-                >
-                  {event.title}
-                </Text>
-                <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {event.Place?.name || event.Place?.City?.name || t('homeLocationToConfirm')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        ) : null}
-
+                {selectedPlaceDetailsLoading ? (
+                  <View className="h-32 items-center justify-center">
+                    <ActivityIndicator size="large" color="#2ecc71" />
+                  </View>
+                ) : (
+                  <MediaFrame
+                    source={selectedPlaceHeroSource}
+                    adaptiveHeight
+                    minHeight={108}
+                    maxHeight={164}
+                    className="bg-gray-200 dark:bg-gray-800"
+                    style={{ width: selectedPlaceHeroWidth }}
+                    shouldPlay
+                    muted
+                    loop
+                  />
+                )}
+              </View>
+            </View>
+          ) : undefined
+        }
+      >
         {selectedPlace ? (
-          <View className="mt-3">
-            <TouchableOpacity
-              onPress={() => setSelectedPlace(null)}
-              className="mb-3 self-center rounded-full bg-black/60 px-3 py-1"
-            >
-              <Text className="text-xs font-semibold text-white">
-                {t('mapHideCard')}
+          <View className="space-y-4">
+            <View className="rounded-3xl bg-gray-50 p-4 dark:bg-gray-800">
+              <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {selectedPlaceDetails?.description || selectedPlace.address || selectedPlace.City?.name || t('homeLocationToConfirm')}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/place/[id]',
-                  params: { id: selectedPlace.id },
-                })
-              }
-              className="flex-row items-center rounded-[28px] bg-white p-3 shadow-xl dark:bg-gray-900"
-            >
-              <MediaFrame
-                source={getImageUrl(selectedPlace.coverUrl) || PLACE_PLACEHOLDER}
-                className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                shouldPlay
-                muted
-                loop
-              />
-              <View className="ml-4 flex-1">
-                <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                  {selectedPlace.name}
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: '/place/[id]',
+                    params: { id: selectedPlace.id },
+                  })
+                }
+                className="mt-4 flex-row items-center justify-center rounded-2xl bg-[#2ecc71] px-4 py-3"
+              >
+                <Text className="text-sm font-semibold text-white">
+                  Voir la fiche du lieu
                 </Text>
-                <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {selectedPlace.address ||
-                    selectedPlace.City?.name ||
-                    t('homeAddressToConfirm')}
+                <Ionicons name="chevron-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: '/create-modal',
+                    params: {
+                      placeId: selectedPlace.id,
+                      placeName: selectedPlace.name,
+                      cityName: selectedPlace.City?.name || '',
+                      sourceLabel: selectedPlace.name,
+                      outingTitle: t('placeDetailOutingTitle', { name: selectedPlace.name }),
+                    },
+                  })
+                }
+                className="mt-3 flex-row items-center justify-center rounded-2xl bg-[#4c669f] px-4 py-3"
+              >
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text className="ml-2 text-sm font-semibold text-white">
+                  {t('mapCreateOutingCta')}
                 </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/create-modal',
-                  params: {
-                    placeId: selectedPlace.id,
-                    placeName: selectedPlace.name,
-                    cityName: selectedPlace.City?.name || '',
-                    sourceLabel: selectedPlace.name,
-                    outingTitle: t('placeDetailOutingTitle', { name: selectedPlace.name }),
-                  },
-                })
-              }
-              className="mt-3 flex-row items-center justify-center rounded-2xl bg-[#4c669f] px-4 py-3"
-            >
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text className="ml-2 text-sm font-semibold text-white">
-                {t('mapCreateOutingCta')}
-              </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : null}
+        ) : selectedEvent ? (
+          <View className="space-y-4">
+            <MediaFrame
+              source={getImageUrl(selectedEvent.coverUrl) || PLACE_PLACEHOLDER}
+              className="h-44 w-full rounded-3xl bg-gray-200 dark:bg-gray-800"
+              shouldPlay
+              muted
+              loop
+            />
+            <View className="rounded-3xl bg-gray-50 p-4 dark:bg-gray-800">
+              <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                {selectedEvent.title}
+              </Text>
+              <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {selectedEvent.Place?.name || selectedEvent.Place?.City?.name || t('homeLocationToConfirm')}
+              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: '/event/[id]',
+                    params: { id: selectedEvent.id },
+                  })
+                }
+                className="mt-4 flex-row items-center justify-center rounded-2xl bg-[#f39c12] px-4 py-3"
+              >
+                <Text className="text-sm font-semibold text-white">
+                  Voir l'événement
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : activeLayer === 'events' ? (
+          filteredEvents.length > 0 ? (
+            <MapSuggestionsMasonry
+              places={[]}
+              events={filteredEvents}
+              activeLayer="events"
+              onPressPlace={focusOnPlace}
+              onPressEvent={focusOnEvent}
+            />
+          ) : (
+            <View className="items-center justify-center rounded-3xl bg-gray-50 px-4 py-10 dark:bg-gray-800">
+              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                Aucun événement pour ce filtre.
+              </Text>
+            </View>
+          )
+        ) : (
+          filteredPlaces.length > 0 ? (
+            <MapSuggestionsMasonry
+              places={filteredPlaces}
+              events={[]}
+              activeLayer="places"
+              onPressPlace={focusOnPlace}
+              onPressEvent={focusOnEvent}
+            />
+          ) : (
+            <View className="items-center justify-center rounded-3xl bg-gray-50 px-4 py-10 dark:bg-gray-800">
+              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                Aucun lieu pour ce filtre.
+              </Text>
+            </View>
+          )
+        )}
+      </BottomSheetModal>
 
-        {selectedEvent ? (
-          <View className="mt-3">
-            <TouchableOpacity
-              onPress={() => setSelectedEvent(null)}
-              className="mb-3 self-center rounded-full bg-black/60 px-3 py-1"
-            >
-              <Text className="text-xs font-semibold text-white">
-                {t('mapHideCard')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/event/[id]',
-                  params: { id: selectedEvent.id },
-                })
-              }
-              className="flex-row items-center rounded-[28px] bg-white p-3 shadow-xl dark:bg-gray-900"
-            >
-              <MediaFrame
-                source={getImageUrl(selectedEvent.coverUrl) || PLACE_PLACEHOLDER}
-                className="h-20 w-20 rounded-2xl bg-gray-200 dark:bg-gray-800"
-                shouldPlay
-                muted
-                loop
-              />
-              <View className="ml-4 flex-1">
-                <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                  {selectedEvent.title}
-                </Text>
-                <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {selectedEvent.Place?.name ||
-                    selectedEvent.Place?.City?.name ||
-                    t('homeLocationToConfirm')}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </View>
+      {mapSheetVisible ? null : (
+        <View
+          className="absolute inset-x-0 items-center px-4"
+          style={{ bottom: floatingButtonBottomOffset }}
+        >
+          <TouchableOpacity
+            onPress={() => setMapSheetVisible(true)}
+            className="rounded-full bg-[#2ecc71] px-4 py-2.5 shadow-lg"
+          >
+            <Text className="text-xs font-semibold text-white">Ouvrir les suggestions</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

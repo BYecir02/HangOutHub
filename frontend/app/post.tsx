@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   Text,
@@ -17,6 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 import PostCustomAudienceModal from '@/components/post/PostCustomAudienceModal';
 import PostVisibilityModal from '@/components/post/PostVisibilityModal';
+import PostItem, { type PostItemData } from '@/components/social/PostItem';
+import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import MediaFrame from '@/components/ui/MediaFrame';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import api, { getImageUrl } from '../services/api';
@@ -48,57 +49,16 @@ const isUnauthorized = (error: unknown) =>
 type PostMediaItem = {
   uri: string;
   assetType?: ImagePicker.ImagePickerAsset['type'];
-  duration?: number | null;
-  mimeType?: string | null;
-  fileName?: string | null;
-  fileSize?: number | null;
 };
 
-type CategoryOption = {
-  id: number;
-  name: string;
-  color?: string | null;
-  icon?: string | null;
-};
-
-type PlaceOption = {
-  id: string;
-  name: string;
-  address?: string | null;
-  City?: {
-    name?: string | null;
-  } | null;
-};
-
-type EventOption = {
-  id: string;
-  title: string;
-  startTime: string;
-  placeId?: string | null;
-  Place?: {
-    id?: string;
-    name?: string | null;
-    City?: {
-      name?: string | null;
-    } | null;
-  } | null;
-  address?: string | null;
-};
-
-const VISIBILITY_OPTIONS: {
+type VisibilityOption = {
   id: PostVisibility;
-  labelKey:
-    | 'postVisibilityPublicLabel'
-    | 'postVisibilityFriendsLabel'
-    | 'postVisibilityPrivateLabel'
-    | 'postVisibilityCustomLabel';
+  labelKey: string;
   icon: keyof typeof Ionicons.glyphMap;
-  descriptionKey:
-    | 'postVisibilityPublicDescription'
-    | 'postVisibilityFriendsDescription'
-    | 'postVisibilityPrivateDescription'
-    | 'postVisibilityCustomDescription';
-}[] = [
+  descriptionKey: string;
+};
+
+const VISIBILITY_OPTIONS: VisibilityOption[] = [
   {
     id: 'public',
     labelKey: 'postVisibilityPublicLabel',
@@ -446,32 +406,57 @@ export default function CreatePostScreen() {
   }, [visibility]);
   const selectedCategoryLabel = ambiance;
   const trimmedContent = content.trim();
-  const previewTitle = trimmedContent
-    ? trimmedContent.split('\n')[0].slice(0, 72)
-    : t('postPreviewEmptyTitle');
-  const previewBody = trimmedContent
-    ? trimmedContent
-        .split('\n')
-        .slice(1)
-        .join('\n')
-        .trim()
-        .slice(0, 140)
-    : '';
-  const previewDate = new Date();
-  const previewDay = previewDate.toLocaleDateString(locale, { day: '2-digit' });
-  const previewMonth = previewDate
-    .toLocaleDateString(locale, { month: 'short' })
-    .toUpperCase();
-  const previewTime = previewDate.toLocaleTimeString(locale, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const previewLocation = [placeName.trim(), cityName.trim()]
-    .filter(Boolean)
-    .join(' · ');
   const hasContextDetails = Boolean(
     ambiance || placeName.trim() || cityName.trim() || eventTitle,
   );
+  const previewPostCreatedAt = new Date().toISOString();
+  const previewPost: PostItemData = {
+    id: 'post-preview',
+    userId: 'post-preview-user',
+    content: trimmedContent || null,
+    images: mediaItems.map((media) => resolveMediaUri(media.uri)),
+    publicationScope,
+    postType: derivedPostType,
+    placeId: placeId.trim() || null,
+    eventId: eventId.trim() || null,
+    placeName: placeName.trim() || null,
+    cityName: cityName.trim() || null,
+    ambiance: ambiance || null,
+    visibility,
+    createdAt: previewPostCreatedAt,
+    isLiked: false,
+    isOwner: true,
+    User: {
+      displayName: t('postPreviewAuthorLabel'),
+    },
+    _count: {
+      likes: 0,
+      comments: 0,
+    },
+    shareCount: 0,
+    Event: eventTitle.trim()
+      ? {
+          id: eventId.trim() || 'post-preview-event',
+          title: eventTitle.trim(),
+          startTime: previewPostCreatedAt,
+          placeId: placeId.trim() || null,
+          Place: placeName.trim() || cityName.trim()
+            ? {
+                id: placeId.trim() || undefined,
+                name: placeName.trim() || null,
+                City: cityName.trim() ? { name: cityName.trim() } : null,
+              }
+            : null,
+        }
+      : null,
+    Place: placeName.trim() || cityName.trim()
+      ? {
+          id: placeId.trim() || undefined,
+          name: placeName.trim() || null,
+          City: cityName.trim() ? { name: cityName.trim() } : null,
+        }
+      : null,
+  };
   const filteredPlaces = useMemo(() => {
     if (!placeSearch.trim()) {
       return places;
@@ -908,67 +893,18 @@ export default function CreatePostScreen() {
               {null}
             </>
           ) : (
-            <View className="mx-5 mt-6 rounded-2xl bg-white px-4 py-4 dark:bg-gray-900">
+            <View className="mx-5 mt-6">
               <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
                 {t('postPreviewTitle')}
               </Text>
-              <View className="mt-4 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800">
-                <View className="flex-row">
-                  <View
-                    className={`w-16 items-center justify-center px-2 py-4 ${visibilityTone.column}`}
-                  >
-                    {visibility !== 'public' ? (
-                      <Text
-                        className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${visibilityTone.label}`}
-                      >
-                        {visibilityLabel}
-                      </Text>
-                    ) : null}
-                    <Text className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-                      {previewDay}
-                    </Text>
-                    <Text className="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-300">
-                      {previewMonth}
-                    </Text>
-                    <View className="mt-2 rounded-full bg-white/70 px-2 py-1 dark:bg-gray-900/40">
-                      <Text className="text-[10px] font-semibold text-gray-600 dark:text-gray-200">
-                        {previewTime}
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="flex-1 px-4 py-4">
-                    <Text className="text-base font-bold text-gray-900 dark:text-white">
-                      {previewTitle}
-                    </Text>
-                    {previewBody ? (
-                      <Text className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                        {previewBody}
-                      </Text>
-                    ) : null}
-                  {previewLocation ? (
-                    <View className="mt-3 flex-row items-center">
-                      <Ionicons name="location-outline" size={14} color="#ff4757" />
-                      <Text className="ml-1 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                        {previewLocation}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {eventTitle ? (
-                    <View className="mt-2 self-start rounded-full bg-[#ff4757]/10 px-2 py-1">
-                      <Text className="text-[10px] font-semibold text-[#ff4757]">
-                        {eventTitle}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {selectedCategoryLabel ? (
-                    <View className="mt-2 self-start rounded-full bg-[#4c669f]/10 px-2 py-1">
-                      <Text className="text-[10px] font-semibold text-[#4c669f]">
-                        {selectedCategoryLabel}
-                      </Text>
-                    </View>
-                    ) : null}
-                  </View>
-                </View>
+              <View className="mt-4">
+                <PostItem
+                  item={previewPost}
+                  showDateColumn={false}
+                  authorDisplayMode="user"
+                  presentation="instagram"
+                  readOnly
+                />
               </View>
             </View>
           )}
@@ -1077,269 +1013,250 @@ export default function CreatePostScreen() {
         onClose={() => setShowCustomAudienceModal(false)}
       />
 
-      <Modal
+      <BottomSheetModal
         visible={showPlanModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPlanModal(false)}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowPlanModal(false)}
-          className="flex-1 justify-end bg-black/50"
-        >
+        onClose={() => setShowPlanModal(false)}
+        title={t('postPlanModalTitle')}
+        maxHeight={760}
+        contentMode="auto"
+        footer={
           <TouchableOpacity
-            activeOpacity={1}
-            className="rounded-t-3xl bg-white p-5 pb-6 dark:bg-gray-900"
+            className="items-center rounded-xl bg-[#ff4757] px-4 py-3"
+            onPress={() => setShowPlanModal(false)}
           >
-            <View className="mb-4 items-center">
-              <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
+            <Text className="font-semibold text-white">{t('genericClose')}</Text>
+          </TouchableOpacity>
+        }
+      >
+        <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
+          <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+            {t('postPlanModalTargetTitle')}
+          </Text>
+          <View className="mt-3 flex-row gap-3">
+            <TouchableOpacity
+              onPress={() => {
+                setPlanTarget('place');
+                setSelectedEventId(null);
+                setEventId('');
+                setEventTitle('');
+              }}
+              className={`flex-1 items-center rounded-2xl px-3 py-3 ${
+                planTarget === 'place'
+                  ? 'bg-[#4c669f]'
+                  : 'bg-gray-100 dark:bg-gray-800'
+              }`}
+            >
+              <Text
+                className={`text-sm font-semibold ${
+                  planTarget === 'place'
+                    ? 'text-white'
+                    : 'text-gray-700 dark:text-gray-200'
+                }`}
+              >
+                {t('postPlanModalTargetPlace')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setPlanTarget('event');
+                setSelectedPlaceId(null);
+                setPlaceId('');
+                setPlaceName('');
+                setCityName('');
+              }}
+              className={`flex-1 items-center rounded-2xl px-3 py-3 ${
+                planTarget === 'event'
+                  ? 'bg-[#ff4757]'
+                  : 'bg-gray-100 dark:bg-gray-800'
+              }`}
+            >
+              <Text
+                className={`text-sm font-semibold ${
+                  planTarget === 'event'
+                    ? 'text-white'
+                    : 'text-gray-700 dark:text-gray-200'
+                }`}
+              >
+                {t('postPlanModalTargetEvent')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+            {t('postPlanModalCategoryTitle')}
+          </Text>
+
+          {categoriesLoading ? (
+            <View className="mt-3">
+              <ActivityIndicator color="#ff4757" />
             </View>
-
-            <Text className="mb-4 text-center text-lg font-bold text-gray-800 dark:text-white">
-              {t('postPlanModalTitle')}
-            </Text>
-
-            <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
-              <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {t('postPlanModalTargetTitle')}
-              </Text>
-              <View className="mt-3 flex-row gap-3">
-                <TouchableOpacity
-                  onPress={() => {
-                    setPlanTarget('place');
-                    setSelectedEventId(null);
-                    setEventId('');
-                    setEventTitle('');
-                  }}
-                  className={`flex-1 items-center rounded-2xl px-3 py-3 ${
-                    planTarget === 'place'
-                      ? 'bg-[#4c669f]'
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-sm font-semibold ${
-                      planTarget === 'place'
-                        ? 'text-white'
-                        : 'text-gray-700 dark:text-gray-200'
+          ) : categories.length > 0 ? (
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              {categories.map((category) => {
+                const isSelected = category.name === ambiance;
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    onPress={() =>
+                      setAmbiance((current) =>
+                        current === category.name ? '' : category.name,
+                      )
+                    }
+                    className={`rounded-full px-3 py-2 ${
+                      isSelected ? '' : 'bg-gray-100 dark:bg-gray-800'
                     }`}
+                    style={
+                      isSelected
+                        ? { backgroundColor: category.color || '#ff4757' }
+                        : undefined
+                    }
                   >
-                    {t('postPlanModalTargetPlace')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    setPlanTarget('event');
-                    setSelectedPlaceId(null);
-                    setPlaceId('');
-                    setPlaceName('');
-                    setCityName('');
-                  }}
-                  className={`flex-1 items-center rounded-2xl px-3 py-3 ${
-                    planTarget === 'event'
-                      ? 'bg-[#ff4757]'
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-sm font-semibold ${
-                      planTarget === 'event'
-                        ? 'text-white'
-                        : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {t('postPlanModalTargetEvent')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                    <Text
+                      className={`text-xs font-semibold ${
+                        isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
 
+          {planTarget === 'place' ? (
+            <>
               <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {t('postPlanModalCategoryTitle')}
+                {t('postPlanModalPlaceTitle')}
               </Text>
+              <TextInput
+                value={placeSearch}
+                onChangeText={setPlaceSearch}
+                placeholder={t('postPlanModalSearchPlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+              />
 
-              {categoriesLoading ? (
-                <View className="mt-3">
-                  <ActivityIndicator color="#ff4757" />
+              {placesLoading ? (
+                <View className="mt-4">
+                  <ActivityIndicator color="#4c669f" />
                 </View>
-              ) : categories.length > 0 ? (
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  {categories.map((category) => {
-                    const isSelected = category.name === ambiance;
+              ) : filteredPlaces.length > 0 ? (
+                <View className="mt-4 gap-3">
+                  {filteredPlaces.map((place) => {
+                    const isSelected = selectedPlaceId === place.id;
                     return (
                       <TouchableOpacity
-                        key={category.id}
-                        onPress={() =>
-                          setAmbiance((current) =>
-                            current === category.name ? '' : category.name,
-                          )
-                        }
-                        className={`rounded-full px-3 py-2 ${
+                        key={place.id}
+                        onPress={() => {
+                          setSelectedPlaceId(place.id);
+                          setSelectedEventId(null);
+                          setEventId('');
+                          setEventTitle('');
+                          setPlaceId(place.id);
+                          setPlaceName(place.name);
+                          setCityName(place.City?.name || '');
+                        }}
+                        className={`rounded-2xl border px-4 py-3 ${
                           isSelected
-                            ? ''
-                            : 'bg-gray-100 dark:bg-gray-800'
+                            ? 'border-[#4c669f] bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
                         }`}
-                        style={
-                          isSelected
-                            ? { backgroundColor: category.color || '#ff4757' }
-                            : undefined
-                        }
                       >
-                        <Text
-                          className={`text-xs font-semibold ${
-                            isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                          }`}
-                        >
-                          {category.name}
+                        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                          {place.name}
+                        </Text>
+                        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {place.City?.name || place.address || t('homeAddressToConfirm')}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              ) : null}
-
-              {planTarget === 'place' ? (
-                <>
-                  <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                    {t('postPlanModalPlaceTitle')}
-                  </Text>
-                  <TextInput
-                    value={placeSearch}
-                    onChangeText={setPlaceSearch}
-                    placeholder={t('postPlanModalSearchPlaceholder')}
-                    placeholderTextColor={isDark ? '#666' : '#999'}
-                    className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
-                  />
-
-                  {placesLoading ? (
-                    <View className="mt-4">
-                      <ActivityIndicator color="#4c669f" />
-                    </View>
-                  ) : filteredPlaces.length > 0 ? (
-                    <View className="mt-4 gap-3">
-                      {filteredPlaces.map((place) => {
-                        const isSelected = selectedPlaceId === place.id;
-                        return (
-                          <TouchableOpacity
-                            key={place.id}
-                            onPress={() => {
-                              setSelectedPlaceId(place.id);
-                              setSelectedEventId(null);
-                              setEventId('');
-                              setEventTitle('');
-                              setPlaceId(place.id);
-                              setPlaceName(place.name);
-                              setCityName(place.City?.name || '');
-                            }}
-                            className={`rounded-2xl border px-4 py-3 ${
-                              isSelected
-                                ? 'border-[#4c669f] bg-blue-50 dark:bg-blue-900/20'
-                                : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
-                            }`}
-                          >
-                            <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                              {place.name}
-                            </Text>
-                            <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {place.City?.name || place.address || t('homeAddressToConfirm')}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                      {t('postPlanModalEmptyPlaces')}
-                    </Text>
-                  )}
-                </>
               ) : (
-                <>
-                  <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                    {t('postPlanModalEventTitle')}
-                  </Text>
-                  <TextInput
-                    value={eventSearch}
-                    onChangeText={setEventSearch}
-                    placeholder={t('postPlanModalSearchEventPlaceholder')}
-                    placeholderTextColor={isDark ? '#666' : '#999'}
-                    className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
-                  />
-
-                  {eventsLoading ? (
-                    <View className="mt-4">
-                      <ActivityIndicator color="#ff4757" />
-                    </View>
-                  ) : filteredEvents.length > 0 ? (
-                    <View className="mt-4 gap-3">
-                      {filteredEvents.map((eventItem) => {
-                        const isSelected = selectedEventId === eventItem.id;
-                        return (
-                          <TouchableOpacity
-                            key={eventItem.id}
-                            onPress={() => {
-                              setSelectedEventId(eventItem.id);
-                              setSelectedPlaceId(null);
-                              setEventId(eventItem.id);
-                              setEventTitle(eventItem.title);
-                              setPlaceId(eventItem.Place?.id || eventItem.placeId || '');
-                              setPlaceName(eventItem.Place?.name || eventItem.address || '');
-                              setCityName(eventItem.Place?.City?.name || '');
-                            }}
-                            className={`rounded-2xl border px-4 py-3 ${
-                              isSelected
-                                ? 'border-[#ff4757] bg-red-50 dark:bg-red-900/20'
-                                : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
-                            }`}
-                          >
-                          <Text className="text-base font-semibold text-gray-900 dark:text-white">
-                            {eventItem.title}
-                          </Text>
-                          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {formatEventDate(eventItem.startTime, locale)}
-                          </Text>
-                          <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {eventItem.Place?.name || eventItem.address || t('homeAddressToConfirm')}
-                          </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                      {t('postPlanModalEmptyEvents')}
-                    </Text>
-                  )}
-                </>
-              )}
-
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedPlaceId(null);
-                  setSelectedEventId(null);
-                  setPlaceId('');
-                  setEventId('');
-                  setEventTitle('');
-                  setPlaceName('');
-                  setCityName('');
-                }}
-                className="mt-4 self-start rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-800"
-              >
-                <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                  {t('postPlanModalClearPlace')}
+                <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                  {t('postPlanModalEmptyPlaces')}
                 </Text>
-              </TouchableOpacity>
-            </ScrollView>
+              )}
+            </>
+          ) : (
+            <>
+              <Text className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                {t('postPlanModalEventTitle')}
+              </Text>
+              <TextInput
+                value={eventSearch}
+                onChangeText={setEventSearch}
+                placeholder={t('postPlanModalSearchEventPlaceholder')}
+                placeholderTextColor={isDark ? '#666' : '#999'}
+                className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-base text-gray-800 dark:bg-gray-800 dark:text-white"
+              />
 
-            <TouchableOpacity
-              className="mt-5 items-center rounded-xl bg-[#ff4757] px-4 py-3"
-              onPress={() => setShowPlanModal(false)}
-            >
-              <Text className="text-white font-semibold">{t('genericClose')}</Text>
-            </TouchableOpacity>
+              {eventsLoading ? (
+                <View className="mt-4">
+                  <ActivityIndicator color="#ff4757" />
+                </View>
+              ) : filteredEvents.length > 0 ? (
+                <View className="mt-4 gap-3">
+                  {filteredEvents.map((eventItem) => {
+                    const isSelected = selectedEventId === eventItem.id;
+                    return (
+                      <TouchableOpacity
+                        key={eventItem.id}
+                        onPress={() => {
+                          setSelectedEventId(eventItem.id);
+                          setSelectedPlaceId(null);
+                          setEventId(eventItem.id);
+                          setEventTitle(eventItem.title);
+                          setPlaceId(eventItem.Place?.id || eventItem.placeId || '');
+                          setPlaceName(eventItem.Place?.name || eventItem.address || '');
+                          setCityName(eventItem.Place?.City?.name || '');
+                        }}
+                        className={`rounded-2xl border px-4 py-3 ${
+                          isSelected
+                            ? 'border-[#ff4757] bg-red-50 dark:bg-red-900/20'
+                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+                        }`}
+                      >
+                        <Text className="text-base font-semibold text-gray-900 dark:text-white">
+                          {eventItem.title}
+                        </Text>
+                        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {formatEventDate(eventItem.startTime, locale)}
+                        </Text>
+                        <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {eventItem.Place?.name || eventItem.address || t('homeAddressToConfirm')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                  {t('postPlanModalEmptyEvents')}
+                </Text>
+              )}
+            </>
+          )}
+
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedPlaceId(null);
+              setSelectedEventId(null);
+              setPlaceId('');
+              setEventId('');
+              setEventTitle('');
+              setPlaceName('');
+              setCityName('');
+            }}
+            className="mt-4 self-start rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-800"
+          >
+            <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {t('postPlanModalClearPlace')}
+            </Text>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        </ScrollView>
+      </BottomSheetModal>
     </View>
   );
 }
