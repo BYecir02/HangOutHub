@@ -400,6 +400,11 @@ export default function PlaceEditPage() {
         if (isMounted) {
           if (params.id) {
             setPlace(placeData);
+            setGalleryImages(placeData.images || []);
+            setSelectedTagIds(
+              placeData.PlaceTag?.map((entry) => entry.Tag?.id || 0).filter(Boolean) ||
+                [],
+            );
             setShowModerationAdvanced(
               Boolean(
                 placeData.externalProvider ||

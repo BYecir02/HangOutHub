@@ -50,6 +50,10 @@ interface PlaceDetail {
       id: number;
       name: string;
       status?: string | null;
+      Category?: {
+        id: number;
+        name?: string | null;
+      } | null;
     } | null;
   }>;
   Event?: Array<{
@@ -216,6 +220,21 @@ export default function PlaceViewPage() {
     [place],
   );
 
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            place?.category?.trim(),
+            ...(place?.PlaceTag || [])
+              .map((entry) => entry.Tag?.Category?.name?.trim())
+              .filter((value): value is string => Boolean(value)),
+          ].filter((value): value is string => Boolean(value)),
+        ),
+      ),
+    [place],
+  );
+
   const heroImage = resolveImageUrl(place?.coverUrl) || PLACE_PLACEHOLDER;
   const gallery = place?.images?.length
     ? place.images.map((image) => resolveImageUrl(image) || image)
@@ -286,6 +305,25 @@ export default function PlaceViewPage() {
                     <p className="mt-2 text-sm font-semibold text-slate-700">
                       {place.City?.name || '-'}
                     </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 p-4 sm:col-span-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      Categories
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {categories.length > 0 ? (
+                        categories.map((category) => (
+                          <span
+                            key={category}
+                            className="rounded-full bg-brand-500/10 px-3 py-1 text-sm font-semibold text-brand-600"
+                          >
+                            {category}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-sm font-semibold text-slate-700">-</span>
+                      )}
+                    </div>
                   </div>
                   <div className="rounded-2xl border border-slate-100 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">

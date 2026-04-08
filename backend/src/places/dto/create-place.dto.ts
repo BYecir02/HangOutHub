@@ -102,4 +102,8 @@ export class CreatePlaceDto {
   @Min(0)
   @Max(1)
   providerMatchConfidence?: number;
+
+  @IsOptional()
+  @IsString()
+  tagIds?: string;
 }

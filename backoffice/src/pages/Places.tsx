@@ -45,6 +45,18 @@ interface PlaceItem {
   }[];
 }
 
+function resolveCategories(place: PlaceItem) {
+  const categories = [
+    place.category?.trim(),
+    ...(place.PlaceTag || [])
+      .map((entry) => entry.Tag?.Category?.name?.trim())
+      .filter((value): value is string => Boolean(value)),
+  ]
+    .filter((value): value is string => Boolean(value));
+
+  return Array.from(new Set(categories));
+}
+
 export default function PlacesPage() {
   const navigate = useNavigate();
   const [places, setPlaces] = useState<PlaceItem[]>([]);
@@ -183,14 +195,6 @@ export default function PlacesPage() {
     return tags.join(', ');
   };
 
-  const resolveCategory = (place: PlaceItem) => {
-    return (
-      place.category ||
-      place.PlaceTag?.find((entry) => entry.Tag?.Category?.name)?.Tag?.Category?.name ||
-      '-'
-    );
-  };
-
   const formatUpdatedAt = (value?: string | null) => {
     if (!value) {
       return '-';
@@ -320,7 +324,7 @@ export default function PlacesPage() {
               columns={[
                 { label: 'Lieu' },
                 { label: 'Ville' },
-                { label: 'Categorie' },
+                { label: 'Categories' },
                 { label: 'Moderation' },
                 { label: 'Derniere maj' },
                 { label: 'Tags' },
@@ -335,7 +339,20 @@ export default function PlacesPage() {
                       {place.City?.name || '-'}
                     </td>
                     <td className="py-4 text-xs text-slate-500">
-                      {resolveCategory(place)}
+                      <div className="flex flex-wrap gap-1.5">
+                        {resolveCategories(place).length > 0 ? (
+                          resolveCategories(place).map((category) => (
+                            <span
+                              key={`${place.id}-${category}`}
+                              className="rounded-full bg-brand-500/10 px-2.5 py-1 font-semibold text-brand-600"
+                            >
+                              {category}
+                            </span>
+                          ))
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4">
                       <div className="space-y-2">

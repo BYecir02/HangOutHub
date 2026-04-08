@@ -38,28 +38,59 @@ export class PlacesService {
       ? await this.storageService.uploadFiles('places', files.gallery)
       : [];
 
-    return this.prisma.place.create({
-      data: {
-        ...createPlaceDto,
-        moderationStatus: this.normalizeModerationStatus(
-          createPlaceDto.moderationStatus,
-        ),
-        externalProvider: this.normalizeOptionalString(
-          createPlaceDto.externalProvider,
-        ),
-        externalProviderId: this.normalizeOptionalString(
-          createPlaceDto.externalProviderId,
-        ),
-        externalUrl: this.normalizeOptionalString(createPlaceDto.externalUrl),
-        coverUrl,
-        images: galleryUrls,
-        ownerId,
-        priceLevel: createPlaceDto.priceLevel || 1,
-        cityId: createPlaceDto.cityId || 1,
-        providerMatchedAt: this.hasProviderMetadata(createPlaceDto)
-          ? new Date()
-          : undefined,
-      },
+    const { tagIds: rawTagIds, ...placeData } = createPlaceDto as CreatePlaceDto & {
+      tagIds?: string;
+    };
+    const tagIds = this.parseTagIdsPayload(rawTagIds);
+
+    if (tagIds.length > 0) {
+      const existingTags = await this.prisma.tag.count({
+        where: {
+          id: { in: tagIds },
+          status: 'APPROVED',
+        },
+      });
+
+      if (existingTags !== tagIds.length) {
+        throw new BadRequestException('Un ou plusieurs tags sont invalides.');
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.place.create({
+        data: {
+          ...placeData,
+          moderationStatus: this.normalizeModerationStatus(
+            placeData.moderationStatus,
+          ),
+          externalProvider: this.normalizeOptionalString(
+            placeData.externalProvider,
+          ),
+          externalProviderId: this.normalizeOptionalString(
+            placeData.externalProviderId,
+          ),
+          externalUrl: this.normalizeOptionalString(placeData.externalUrl),
+          coverUrl,
+          images: galleryUrls,
+          ownerId,
+          priceLevel: placeData.priceLevel || 1,
+          cityId: placeData.cityId || 1,
+          providerMatchedAt: this.hasProviderMetadata(placeData)
+            ? new Date()
+            : undefined,
+        },
+      });
+
+      if (tagIds.length > 0) {
+        await tx.placeTag.createMany({
+          data: tagIds.map((tagId) => ({
+            placeId: created.id,
+            tagId,
+          })),
+        });
+      }
+
+      return created;
     });
   }
 
