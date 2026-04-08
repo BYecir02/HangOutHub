@@ -79,10 +79,10 @@ export default function EventInspirationCard({
 
         <View
           pointerEvents="box-none"
-          className="absolute left-3 right-3 top-3 flex-row items-start gap-2"
+          className="absolute left-3 right-3 top-3 flex-col"
         >
           {cityLabel ? (
-            <View className="max-w-[58%] self-start rounded-full bg-black/55 px-3 py-1.5">
+            <View className="max-w-[64%] self-start rounded-full bg-black/55 px-3 py-1.5">
               <Text
                 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white"
                 numberOfLines={1}
@@ -92,7 +92,7 @@ export default function EventInspirationCard({
             </View>
           ) : null}
 
-          <View className="ml-auto max-w-[42%] flex-shrink-0">
+          <View className="mt-1 self-end flex-shrink-0">
             <PriceDisplay label={priceLabel} size="sm" tone="brand" variant="solid" />
           </View>
         </View>
