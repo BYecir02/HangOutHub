@@ -8,9 +8,14 @@ import * as Location from 'expo-location';
 import { useI18n } from '@/hooks/use-i18n';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocationScope } from '@/hooks/useLocationScope';
+import EventInspirationCard from '@/components/ui/EventInspirationCard';
+import MasonryGrid from '@/components/ui/MasonryGrid';
 import MediaFrame from '@/components/ui/MediaFrame';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import api, { getImageUrl } from '@/services/api';
+import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
+import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
@@ -77,6 +82,11 @@ interface EventPin {
   title: string;
   startTime: string;
   coverUrl?: string | null;
+  TicketType?: {
+    id?: string;
+    price: number | string;
+    quantity: number;
+  }[];
   Place?: {
     id?: string;
     name?: string | null;
@@ -178,129 +188,86 @@ function offsetMarkerCoordinate(
   };
 }
 
-function estimateMapSuggestionCardHeight(index: number) {
-  const imageHeights = [184, 240, 206, 262, 194, 228];
-  return imageHeights[index % imageHeights.length] + 126;
-}
-
 function MapSuggestionsMasonry({
-  places,
-  events,
-  activeLayer,
+  tiles,
+  activeItemId,
   onPressPlace,
   onPressEvent,
+  isPlaceSaved,
+  isSavingPlace,
+  onToggleSavePlace,
+  locale,
+  fallbackNewLabel,
+  freeLabel,
+  soldOutLabel,
+  registerLayout,
 }: {
-  places: PlacePin[];
-  events: EventPin[];
-  activeLayer: MapLayer;
+  tiles: MapSuggestionTile[];
+  activeItemId: string | null;
   onPressPlace: (place: PlacePin) => void;
   onPressEvent: (event: EventPin) => void;
+  isPlaceSaved: (placeId: string) => boolean;
+  isSavingPlace: (placeId: string) => boolean;
+  onToggleSavePlace: (placeId: string) => void;
+  locale: string;
+  fallbackNewLabel: string;
+  freeLabel: string;
+  soldOutLabel: string;
+  registerLayout: (id: string, layout: { y: number; height: number }) => void;
 }) {
-  const tiles = useMemo<MapSuggestionTile[]>(() => {
-    const nextTiles: MapSuggestionTile[] = [];
-
-    if (activeLayer === 'all' || activeLayer === 'places') {
-      places.forEach((place) => {
-        nextTiles.push({
-          id: `place-${place.id}`,
-          kind: 'place',
-          place,
-          imageHeight: 0,
-        });
-      });
-    }
-
-    if (activeLayer === 'all' || activeLayer === 'events') {
-      events.forEach((event) => {
-        nextTiles.push({
-          id: `event-${event.id}`,
-          kind: 'event',
-          event,
-          imageHeight: 0,
-        });
-      });
-    }
-
-    return nextTiles.map((tile, index) => ({
-      ...tile,
-      imageHeight: [184, 240, 206, 262, 194, 228][index % 6],
-    }));
-  }, [activeLayer, events, places]);
-
-  const columns = useMemo(() => {
-    const nextColumns: Array<MapSuggestionTile[]> = [[], []];
-    const columnHeights = [0, 0];
-
-    tiles.forEach((tile, index) => {
-      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
-      nextColumns[targetColumn].push(tile);
-      columnHeights[targetColumn] += estimateMapSuggestionCardHeight(index);
-    });
-
-    return nextColumns;
-  }, [tiles]);
-
   return (
-    <View className="flex-row items-start gap-3">
-      {columns.map((column, columnIndex) => (
-        <View key={`map-suggestion-column-${columnIndex}`} className="min-w-0 flex-1">
-          {column.map((tile) => {
-            const title = tile.kind === 'place' ? tile.place.name : tile.event.title;
-            const subtitle =
-              tile.kind === 'place'
-                ? tile.place.City?.name || tile.place.address || ''
-                : tile.event.Place?.name || tile.event.Place?.City?.name || '';
-            const imageSource =
-              tile.kind === 'place'
-                ? getImageUrl(tile.place.coverUrl) || PLACE_PLACEHOLDER
-                : getImageUrl(tile.event.coverUrl) || PLACE_PLACEHOLDER;
+    <MasonryGrid
+      items={tiles}
+      getKey={(tile) => tile.id}
+      estimateItemHeight={(_, index) => [184, 248, 210, 276, 196, 232][index % 6] + 144}
+      onItemLayout={(tile, layout) => {
+        registerLayout(tile.id, layout);
+      }}
+      renderItem={(tile, index) => {
+        const imageHeights = [184, 240, 206, 262, 194, 228];
+        const imageHeight = imageHeights[index % imageHeights.length];
 
-            return (
-              <TouchableOpacity
-                key={tile.id}
-                onPress={() => {
-                  if (tile.kind === 'place') {
-                    onPressPlace(tile.place);
-                    return;
-                  }
+        if (tile.kind === 'place') {
+          return (
+            <PlaceInspirationCard
+              place={tile.place}
+              imageHeight={imageHeight}
+              fallbackNewLabel={fallbackNewLabel}
+              onPress={() => onPressPlace(tile.place)}
+              isSaved={isPlaceSaved(tile.place.id)}
+              onToggleSave={() => onToggleSavePlace(tile.place.id)}
+              saving={isSavingPlace(tile.place.id)}
+              shouldPlay={activeItemId === tile.id}
+              adaptiveHeight={false}
+            />
+          );
+        }
 
-                  onPressEvent(tile.event);
-                }}
-                className="mb-3 overflow-hidden rounded-[28px] bg-white shadow-lg dark:bg-gray-900"
-              >
-                <MediaFrame
-                  source={imageSource}
-                  style={{ height: tile.imageHeight }}
-                  className="w-full"
-                  shouldPlay
-                  muted
-                  loop
-                />
-
-                <View className="px-3 pb-3 pt-3">
-                  <View className="mb-2 self-start rounded-full bg-[#4c669f]/10 px-2.5 py-1">
-                    <Text className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#4c669f] dark:text-[#b9c8f2]">
-                      {tile.kind === 'place' ? 'Lieu' : 'Événement'}
-                    </Text>
-                  </View>
-                  <Text className="text-sm font-semibold text-gray-900 dark:text-white" numberOfLines={2}>
-                    {title}
-                  </Text>
-                  <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400" numberOfLines={2}>
-                    {subtitle || ' '}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
-    </View>
+        return (
+          <EventInspirationCard
+            event={tile.event}
+            imageHeight={imageHeight}
+            cityLabel={tile.event.Place?.City?.name || ''}
+            placeLabel={tile.event.Place?.name || tile.event.Place?.City?.name || ''}
+            dateLabel={formatEventDate(tile.event.startTime, locale, {
+              includeWeekday: true,
+            })}
+            priceLabel={formatEventCardPriceLabel(tile.event, locale, {
+              freeLabel,
+              soldOutLabel,
+            })}
+            onPress={() => onPressEvent(tile.event)}
+            shouldPlay={activeItemId === tile.id}
+            adaptiveHeight={false}
+          />
+        );
+      }}
+    />
   );
 }
 
 export default function MapScreen() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const router = useRouter();
@@ -320,6 +287,8 @@ export default function MapScreen() {
   const [activeLayer, setActiveLayer] = useState<MapLayer>('all');
   const [useMyLocation, setUseMyLocation] = useState(false);
   const [radiusKm, setRadiusKm] = useState(5);
+  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
+  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
   const [userCoords, setUserCoords] = useState<{
     latitude: number;
     longitude: number;
@@ -388,6 +357,90 @@ export default function MapScreen() {
     }
   }, []);
 
+  const loadSavedPlaces = useCallback(async () => {
+    const token = await storage.getItem('userToken');
+
+    if (!token) {
+      setSavedPlaceIds(new Set());
+      return;
+    }
+
+    try {
+      const response = await api.get<{ id: string }[]>('/places/saved/mine');
+      setSavedPlaceIds(new Set(response.data.map((place) => place.id)));
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 401
+      ) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      setSavedPlaceIds(new Set());
+    }
+  }, [router]);
+
+  const handleTogglePlaceSave = useCallback(
+    async (placeId: string) => {
+      const token = await storage.getItem('userToken');
+
+      if (!token) {
+        Alert.alert(
+          t('placeDetailLoginRequiredTitle'),
+          t('placeDetailLoginRequiredMessage'),
+        );
+        return;
+      }
+
+      if (savingPlaceIds.has(placeId)) {
+        return;
+      }
+
+      setSavingPlaceIds((current) => {
+        const next = new Set(current);
+        next.add(placeId);
+        return next;
+      });
+
+      try {
+        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
+        setSavedPlaceIds((current) => {
+          const next = new Set(current);
+          if (response.data.saved) {
+            next.add(placeId);
+          } else {
+            next.delete(placeId);
+          }
+          return next;
+        });
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'response' in error &&
+          (error as { response?: { status?: number } }).response?.status === 401
+        ) {
+          await clearAuthState();
+          router.replace('/');
+          return;
+        }
+
+        Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
+      } finally {
+        setSavingPlaceIds((current) => {
+          const next = new Set(current);
+          next.delete(placeId);
+          return next;
+        });
+      }
+    },
+    [router, savingPlaceIds, t],
+  );
+
   const fetchEvents = useCallback(async () => {
     try {
       const response = await api.get<EventPin[]>('/events');
@@ -409,6 +462,10 @@ export default function MapScreen() {
   useEffect(() => {
     void fetchPlaces();
   }, [fetchPlaces]);
+
+  useEffect(() => {
+    void loadSavedPlaces();
+  }, [loadSavedPlaces]);
 
   useEffect(() => {
     void fetchCategories();
@@ -532,6 +589,46 @@ export default function MapScreen() {
       useMyLocation,
       userCoords,
     ],
+  );
+
+  const mapSuggestionTiles = useMemo<MapSuggestionTile[]>(() => {
+    if (activeLayer === 'places') {
+      return filteredPlaces.map((place) => ({
+        id: `place-${place.id}`,
+        kind: 'place' as const,
+        place,
+        imageHeight: 0,
+      }));
+    }
+
+    if (activeLayer === 'events') {
+      return filteredEvents.map((event) => ({
+        id: `event-${event.id}`,
+        kind: 'event' as const,
+        event,
+        imageHeight: 0,
+      }));
+    }
+
+    return [
+      ...filteredPlaces.map((place) => ({
+        id: `place-${place.id}`,
+        kind: 'place' as const,
+        place,
+        imageHeight: 0,
+      })),
+      ...filteredEvents.map((event) => ({
+        id: `event-${event.id}`,
+        kind: 'event' as const,
+        event,
+        imageHeight: 0,
+      })),
+    ];
+  }, [activeLayer, filteredEvents, filteredPlaces]);
+
+  const mapSuggestionAutoplay = useVisibleItemAutoplay(
+    mapSuggestionTiles,
+    (item) => item.id,
   );
 
   const renderedMarkers = useMemo<MapMarkerRenderItem[]>(() => {
@@ -1116,6 +1213,12 @@ export default function MapScreen() {
         maxHeight={mapSheetMaxHeight}
         backdropOpacity={0}
         contentMode="auto"
+        onContentLayout={mapSuggestionAutoplay.onLayout}
+        onContentScroll={mapSuggestionAutoplay.onScroll}
+        onContentScrollBeginDrag={mapSuggestionAutoplay.beginInteraction}
+        onContentScrollEndDrag={mapSuggestionAutoplay.endInteraction}
+        onContentMomentumScrollBegin={mapSuggestionAutoplay.beginMomentum}
+        onContentMomentumScrollEnd={mapSuggestionAutoplay.endMomentum}
         heroContent={
           selectedPlace ? (
             <View className="items-center">
@@ -1219,38 +1322,33 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        ) : mapSuggestionTiles.length > 0 ? (
+          <MapSuggestionsMasonry
+            tiles={mapSuggestionTiles}
+            activeItemId={mapSuggestionAutoplay.activeId}
+            locale={locale}
+            fallbackNewLabel={t('placesNewBadge')}
+            freeLabel={t('homePriceFree')}
+            soldOutLabel={t('homePriceSoldOut')}
+            onPressPlace={focusOnPlace}
+            onPressEvent={focusOnEvent}
+            isPlaceSaved={(placeId) => savedPlaceIds.has(placeId)}
+            isSavingPlace={(placeId) => savingPlaceIds.has(placeId)}
+            onToggleSavePlace={(placeId) => void handleTogglePlaceSave(placeId)}
+            registerLayout={mapSuggestionAutoplay.registerLayout}
+          />
         ) : activeLayer === 'events' ? (
-          filteredEvents.length > 0 ? (
-            <MapSuggestionsMasonry
-              places={[]}
-              events={filteredEvents}
-              activeLayer="events"
-              onPressPlace={focusOnPlace}
-              onPressEvent={focusOnEvent}
-            />
-          ) : (
-            <View className="items-center justify-center rounded-3xl bg-gray-50 px-4 py-10 dark:bg-gray-800">
-              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                Aucun événement pour ce filtre.
-              </Text>
-            </View>
-          )
+          <View className="items-center justify-center rounded-3xl bg-gray-50 px-4 py-10 dark:bg-gray-800">
+            <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+              Aucun événement pour ce filtre.
+            </Text>
+          </View>
         ) : (
-          filteredPlaces.length > 0 ? (
-            <MapSuggestionsMasonry
-              places={filteredPlaces}
-              events={[]}
-              activeLayer="places"
-              onPressPlace={focusOnPlace}
-              onPressEvent={focusOnEvent}
-            />
-          ) : (
-            <View className="items-center justify-center rounded-3xl bg-gray-50 px-4 py-10 dark:bg-gray-800">
-              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                Aucun lieu pour ce filtre.
-              </Text>
-            </View>
-          )
+          <View className="items-center justify-center rounded-3xl bg-gray-50 px-4 py-10 dark:bg-gray-800">
+            <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+              Aucun lieu pour ce filtre.
+            </Text>
+          </View>
         )}
       </BottomSheetModal>
 

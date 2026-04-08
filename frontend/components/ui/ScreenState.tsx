@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { uiTokens } from '@/theme/tokens';
 
 type ScreenStateMode = 'loading' | 'error' | 'empty' | 'warning';
+type ScreenStateVariant = 'card' | 'plain';
 
 type ScreenStateProps = {
   mode: ScreenStateMode;
@@ -13,6 +14,9 @@ type ScreenStateProps = {
   onAction?: () => void;
   fullScreen?: boolean;
   containerClassName?: string;
+  variant?: ScreenStateVariant;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
 };
 
 const MODE_ICON: Record<Exclude<ScreenStateMode, 'loading'>, keyof typeof Ionicons.glyphMap> = {
@@ -35,10 +39,15 @@ export default function ScreenState({
   onAction,
   fullScreen = false,
   containerClassName = '',
+  variant = 'card',
+  icon,
+  iconColor,
 }: ScreenStateProps) {
   const wrapperClassName = fullScreen
     ? 'flex-1 items-center justify-center px-6'
     : 'items-center justify-center px-6 py-10';
+  const resolvedIcon = icon || MODE_ICON[mode];
+  const resolvedIconColor = iconColor || MODE_COLOR[mode];
 
   if (mode === 'loading') {
     return (
@@ -49,6 +58,34 @@ export default function ScreenState({
             {title}
           </Text>
         ) : null}
+      </View>
+    );
+  }
+
+  if (variant === 'plain') {
+    return (
+      <View className={`${wrapperClassName} ${containerClassName}`.trim()}>
+        <View className="items-center">
+          <Ionicons name={resolvedIcon} size={30} color={resolvedIconColor} />
+          {title ? (
+            <Text className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </Text>
+          ) : null}
+          {description ? (
+            <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+              {description}
+            </Text>
+          ) : null}
+          {actionLabel && onAction ? (
+            <TouchableOpacity
+              onPress={onAction}
+              className="mt-6 rounded-full bg-[#4c669f] px-5 py-3"
+            >
+              <Text className="text-sm font-semibold text-white">{actionLabel}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     );
   }
@@ -64,7 +101,7 @@ export default function ScreenState({
         }}
       >
         <View className="items-center">
-          <Ionicons name={MODE_ICON[mode]} size={30} color={MODE_COLOR[mode]} />
+          <Ionicons name={resolvedIcon} size={30} color={resolvedIconColor} />
           {title ? (
             <Text className="mt-3 text-center text-base font-semibold text-gray-900 dark:text-white">
               {title}

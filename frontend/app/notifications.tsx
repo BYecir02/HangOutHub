@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import EntityCard from '@/components/ui/EntityCard';
+import { EntityRowCard } from '@/components/ui/EntityCard';
 import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
@@ -265,7 +265,7 @@ export default function NotificationsScreen() {
             ) : activityItems.length > 0 ? (
               <View className="gap-4">
                 {activityItems.map((item) => (
-                  <EntityCard
+                  <EntityRowCard
                     key={item.id}
                     imageUrl={ACTIVITY_PLACEHOLDER}
                     title={item.title}

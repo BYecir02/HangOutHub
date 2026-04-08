@@ -18,7 +18,7 @@ import { useLocationScope } from '@/hooks/useLocationScope';
 import { useScreenAsync } from '@/hooks/useScreenAsync';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
-import { formatEventDate, formatPrice } from '@/services/formatters';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 
 interface EventItem {
@@ -27,6 +27,11 @@ interface EventItem {
   startTime: string;
   coverUrl: string | null;
   entryFee: number | string | null;
+  TicketType?: {
+    id?: string;
+    price: number | string;
+    quantity: number;
+  }[];
   Place?: {
     name?: string | null;
     address?: string | null;
@@ -209,7 +214,10 @@ export default function ExploreScreen() {
                 getImageUrl(item.coverUrl) ||
                 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200'
               }
-              price={formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
+              price={formatEventCardPriceLabel(item, locale, {
+                freeLabel: t('homePriceFree'),
+                soldOutLabel: t('homePriceSoldOut'),
+              })}
               onPress={() =>
                 router.push({
                   pathname: '/event/[id]',

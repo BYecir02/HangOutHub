@@ -24,6 +24,7 @@ import { syncAppPreferencesFromSettings } from '@/services/app-preferences';
 import { clearStoredUserSession } from '@/services/user-session';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
+import ListItem from '@/components/ui/primitives/ListItem';
 import SettingsSection from '@/components/settings/SettingsSection';
 import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
 
@@ -242,50 +243,41 @@ export default function SettingsScreen() {
         {!loading && settings ? (
           <>
             <SettingsSection title={t('settingsSectionAccount')} containerClassName="mb-6">
-              <TouchableOpacity
+              <ListItem
                 onPress={() => router.push('/edit-profile')}
-                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
-              >
-                <Ionicons name="person-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsEditProfile')}</Text>
-                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
-              </TouchableOpacity>
+                leading={<Ionicons name="person-outline" size={22} color={iconColor} />}
+                trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
+                title={t('settingsEditProfile')}
+              />
 
-              <TouchableOpacity
+              <ListItem
                 onPress={() => router.push('/notifications')}
-                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
-              >
-                <Ionicons name="notifications-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsNotificationInbox')}</Text>
-                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
-              </TouchableOpacity>
+                leading={<Ionicons name="notifications-outline" size={22} color={iconColor} />}
+                trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
+                title={t('settingsNotificationInbox')}
+              />
 
-              <TouchableOpacity
+              <ListItem
                 onPress={() => router.push('/notification-settings')}
-                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
-              >
-                <Ionicons name="notifications-circle-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsNotificationPreferences')}</Text>
-                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
-              </TouchableOpacity>
+                leading={<Ionicons name="notifications-circle-outline" size={22} color={iconColor} />}
+                trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
+                title={t('settingsNotificationPreferences')}
+              />
 
-              <TouchableOpacity
+              <ListItem
                 onPress={() => router.push('/preferences')}
-                className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-800"
-              >
-                <Ionicons name="lock-closed-outline" size={22} color={iconColor} />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsInterestCenter')}</Text>
-                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
-              </TouchableOpacity>
+                leading={<Ionicons name="lock-closed-outline" size={22} color={iconColor} />}
+                trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
+                title={t('settingsInterestCenter')}
+              />
 
-              <TouchableOpacity
+              <ListItem
                 onPress={handleLogout}
-                className="flex-row items-center p-4"
-              >
-                <Ionicons name="log-out-outline" size={22} color="#ff4757" />
-                <Text className="flex-1 ml-3 text-gray-700 dark:text-white text-base">{t('settingsLogout')}</Text>
-                <Ionicons name="chevron-forward" size={20} color={chevronColor} />
-              </TouchableOpacity>
+                leading={<Ionicons name="log-out-outline" size={22} color="#ff4757" />}
+                trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
+                title={t('settingsLogout')}
+                withBorder={false}
+              />
             </SettingsSection>
 
             <SettingsSection title={t('settingsPrivacySection')} containerClassName="mb-6">

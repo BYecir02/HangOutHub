@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import PersonActionButton from '../components/social/PersonActionButton';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import EntityCard from '@/components/ui/EntityCard';
+import { EntityRowCard } from '@/components/ui/EntityCard';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
@@ -120,7 +120,7 @@ export default function OutingInvitationsScreen() {
 
                 return (
                   <View key={invitation.id}>
-                    <EntityCard
+                    <EntityRowCard
                       imageUrl={
                         getImageUrl(invitation.Place?.coverUrl || null) ||
                         OUTING_PLACEHOLDER

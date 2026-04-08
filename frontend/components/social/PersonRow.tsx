@@ -1,6 +1,7 @@
 import React from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
+import Avatar from '@/components/ui/primitives/Avatar';
 import { getImageUrl } from '../../services/api';
 import { SocialUser } from '../../types/social';
 
@@ -30,11 +31,7 @@ export default function PersonRow({
       className="mb-3 flex-row items-center rounded-[28px] bg-gray-50 px-4 py-4 dark:bg-gray-900"
       activeOpacity={0.9}
     >
-      <Image
-        source={{ uri: avatarUri }}
-        className="h-14 w-14 rounded-full bg-gray-200 dark:bg-gray-800"
-        resizeMode="cover"
-      />
+      <Avatar uri={avatarUri} label={user.displayName || user.username} size={56} />
       <View className="ml-4 flex-1 min-w-0">
         <Text className="text-base font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
           {user.displayName || user.username}

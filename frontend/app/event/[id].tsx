@@ -19,7 +19,7 @@ import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import Tabs, { type TabItem } from '@/components/ui/Tabs';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
-import { formatEventDate, formatPrice } from '@/services/formatters';
+import { formatEventCardPriceLabel, formatEventDate, formatPrice } from '@/services/formatters';
 import { createReport } from '@/services/reports';
 import { getOrCreateDirectChat } from '@/services/direct-chats';
 import { isVideoUrl } from '@/services/media';
@@ -248,11 +248,17 @@ export default function EventDetailScreen() {
   const heroPriceLabel =
     isSoldOut && ticketTypes.length > 0
       ? t('eventDetailTicketSoldOutCta')
-      : hasMultipleTicketPrices
-      ? t('homePriceFrom', {
-          price: Number(displayPrice || 0).toLocaleString(locale),
-        })
-      : formatPrice(displayPrice, locale, { freeLabel: t('homePriceFree') });
+      : formatEventCardPriceLabel(
+          {
+            entryFee: displayPrice,
+            TicketType: ticketTypes,
+          },
+          locale,
+          {
+            freeLabel: t('homePriceFree'),
+            soldOutLabel: t('eventDetailTicketSoldOutCta'),
+          },
+        );
   const eventImages = event?.images || [];
   const gallery =
     eventImages.length > 0

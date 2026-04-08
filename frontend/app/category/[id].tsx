@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 
 import MediaFrame from '@/components/ui/MediaFrame';
+import MasonryGrid from '@/components/ui/MasonryGrid';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
@@ -228,52 +229,34 @@ function CategoryInspirationMasonry({
   isSavingItem?: (placeId: string) => boolean;
   onToggleSaveItem?: (placeId: string) => void;
 }) {
-  const columns = useMemo(() => {
-    const nextColumns: Array<Array<{ item: CategoryInspirationItem; imageHeight: number }>> = [
-      [],
-      [],
-    ];
-    const columnHeights = [0, 0];
-
-    items.forEach((item, index) => {
-      const imageHeight = [182, 238, 204, 258, 194, 228][index % 6];
-      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
-      nextColumns[targetColumn].push({ item, imageHeight });
-      columnHeights[targetColumn] += estimateCategoryCardHeight(index);
-    });
-
-    return nextColumns;
-  }, [items]);
-
   return (
-    <View className="flex-row items-start gap-3">
-      {columns.map((column, columnIndex) => (
-        <View key={`category-column-${columnIndex}`} className="min-w-0 flex-1">
-          {column.map(({ item, imageHeight }) => (
-            <View
-              key={item.id}
-              onLayout={(event) => {
-                registerLayout(item.id, event.nativeEvent.layout);
-              }}
-            >
-              <CategoryInspirationCard
-                item={item}
-                imageHeight={imageHeight}
-                accentColor={accentColor}
-                shouldPlay={activeItemId === item.id}
-                onPress={() => onPressItem(item)}
-                showSaveButton={showSaveButton}
-                isSaved={isSavedItem ? isSavedItem(item.targetId) : false}
-                saving={isSavingItem ? isSavingItem(item.targetId) : false}
-                onToggleSave={
-                  onToggleSaveItem ? () => onToggleSaveItem(item.targetId) : undefined
-                }
-              />
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
+    <MasonryGrid
+      items={items}
+      getKey={(item) => item.id}
+      estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
+      onItemLayout={(item, layout) => {
+        registerLayout(item.id, layout);
+      }}
+      renderItem={(item, index) => {
+        const imageHeights = [182, 238, 204, 258, 194, 228];
+
+        return (
+          <CategoryInspirationCard
+            item={item}
+            imageHeight={imageHeights[index % imageHeights.length]}
+            accentColor={accentColor}
+            shouldPlay={activeItemId === item.id}
+            onPress={() => onPressItem(item)}
+            showSaveButton={showSaveButton}
+            isSaved={isSavedItem ? isSavedItem(item.targetId) : false}
+            saving={isSavingItem ? isSavingItem(item.targetId) : false}
+            onToggleSave={
+              onToggleSaveItem ? () => onToggleSaveItem(item.targetId) : undefined
+            }
+          />
+        );
+      }}
+    />
   );
 }
 

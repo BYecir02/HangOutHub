@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Dimensions,
+  Text,
+  TouchableOpacity,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet, {
   BottomSheetBackdrop,
@@ -23,6 +31,12 @@ type BottomSheetModalProps = {
   closeOnOverlayPress?: boolean;
   backdropOpacity?: number;
   contentMode?: 'fill' | 'auto';
+  onContentLayout?: (event: LayoutChangeEvent) => void;
+  onContentScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onContentScrollBeginDrag?: () => void;
+  onContentScrollEndDrag?: () => void;
+  onContentMomentumScrollBegin?: () => void;
+  onContentMomentumScrollEnd?: () => void;
 };
 
 export default function BottomSheetModal({
@@ -33,14 +47,21 @@ export default function BottomSheetModal({
   heroContent,
   children,
   footer,
-  maxHeight = 560,
+  maxHeight = 500,
   closeOnOverlayPress = true,
   backdropOpacity,
   contentMode = 'fill',
+  onContentLayout,
+  onContentScroll,
+  onContentScrollBeginDrag,
+  onContentScrollEndDrag,
+  onContentMomentumScrollBegin,
+  onContentMomentumScrollEnd,
 }: BottomSheetModalProps) {
   const isDark = useColorScheme() === 'dark';
   const sheetBackgroundColor = isDark ? '#111827' : '#ffffff';
   const sheetRadius = 28;
+  const isAutoSizing = contentMode === 'auto';
   const { height: screenHeight } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
   const [isRendered, setIsRendered] = useState(visible);
@@ -93,7 +114,8 @@ export default function BottomSheetModal({
       ref={sheetRef}
       index={0}
       snapPoints={snapPoints}
-      enableDynamicSizing={false}
+      enableDynamicSizing={isAutoSizing}
+      maxDynamicContentSize={isAutoSizing ? maxHeight : undefined}
       enablePanDownToClose
       animateOnMount
       keyboardBehavior="interactive"
@@ -101,6 +123,15 @@ export default function BottomSheetModal({
       android_keyboardInputMode="adjustResize"
       onChange={handleSheetIndexChange}
       containerLayoutState={containerLayoutState}
+      containerStyle={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        zIndex: 9999,
+        elevation: 9999,
+      }}
       backgroundStyle={{
         backgroundColor: sheetBackgroundColor,
         borderTopLeftRadius: sheetRadius,
@@ -113,6 +144,10 @@ export default function BottomSheetModal({
           appearsOnIndex={0}
           pressBehavior={closeOnOverlayPress ? 'close' : 'none'}
           opacity={backdropOpacity ?? (isDark ? 0.55 : 0.45)}
+          style={{
+            zIndex: 9998,
+            elevation: 9998,
+          }}
         />
       )}
       style={{
@@ -120,6 +155,7 @@ export default function BottomSheetModal({
         shadowOpacity: 0.16,
         shadowRadius: 18,
         elevation: 12,
+        zIndex: 9999,
       }}
     >
       {title || subtitle ? (
@@ -160,18 +196,26 @@ export default function BottomSheetModal({
       <BottomSheetScrollView
         className="w-full"
         style={{
-          flex: 1,
           backgroundColor: sheetBackgroundColor,
           borderTopLeftRadius: sheetRadius,
           borderTopRightRadius: sheetRadius,
           paddingHorizontal: uiTokens.spacing.screenX,
           paddingTop: uiTokens.spacing.rowY,
           paddingBottom: uiTokens.spacing.cardPaddingLg + 12,
+          ...(isAutoSizing ? {} : { flex: 1 }),
         }}
         contentContainerStyle={{
           paddingBottom: uiTokens.spacing.cardPaddingLg + 12,
+          ...(isAutoSizing ? {} : { flexGrow: 1 }),
         }}
         showsVerticalScrollIndicator={false}
+        onLayout={onContentLayout}
+        onScroll={onContentScroll}
+        onScrollBeginDrag={onContentScrollBeginDrag}
+        onScrollEndDrag={onContentScrollEndDrag}
+        onMomentumScrollBegin={onContentMomentumScrollBegin}
+        onMomentumScrollEnd={onContentMomentumScrollEnd}
+        scrollEventThrottle={16}
       >
         <View className={contentMode === 'fill' ? 'flex-1' : 'min-h-[1px]'}>
           {heroContent ? <View className="mb-4 items-center">{heroContent}</View> : null}

@@ -1399,6 +1399,12 @@ export class EventsService {
         },
       });
 
+      await tx.post.deleteMany({
+        where: {
+          eventId,
+        },
+      });
+
       await tx.event.delete({
         where: {
           id: eventId,

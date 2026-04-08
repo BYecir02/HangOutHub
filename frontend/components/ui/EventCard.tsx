@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import MediaFrame from '@/components/ui/MediaFrame';
+import PriceDisplay from '@/components/ui/primitives/PriceDisplay';
 
 interface EventCardProps {
   title: string;
@@ -17,31 +18,34 @@ export default function EventCard({ title, date, location, imageUrl, price, onPr
   return (
     <TouchableOpacity 
       onPress={onPress}
-      className="mr-5 bg-white dark:bg-gray-900 rounded-2xl w-64 shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden"
+      className="mr-5 w-64 overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      activeOpacity={0.85}
     >
-      {/* Image avec Badge de prix */}
       <View className="relative">
         <MediaFrame
           source={imageUrl}
-          className="w-full h-36"
+          className="h-36 w-full bg-gray-200 dark:bg-gray-800"
         />
-        <View className="absolute top-3 right-3 rounded-lg bg-[#4c669f] px-2 py-1">
-          <Text className="text-xs font-bold text-white">{price}</Text>
+
+        <View className="absolute right-3 top-3">
+          <PriceDisplay label={price} size="sm" tone="brand" variant="solid" />
+        </View>
+
+        <View className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1">
+          <Text className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white" numberOfLines={1}>
+            {date}
+          </Text>
         </View>
       </View>
 
-      {/* Infos */}
-      <View className="p-3">
-        <Text className="text-xs text-[#ff4757] font-bold mb-1 uppercase tracking-wider">
-          {date}
-        </Text>
-        <Text className="text-lg font-bold text-gray-800 dark:text-white mb-1" numberOfLines={1}>
+      <View className="p-3.5">
+        <Text className="mb-1 text-base font-bold text-gray-900 dark:text-white" numberOfLines={1}>
           {title}
         </Text>
-        
+
         <View className="flex-row items-center">
           <Ionicons name="location-outline" size={14} color="#9ca3af" />
-          <Text className="text-gray-400 text-xs ml-1" numberOfLines={1}>
+          <Text className="ml-1 flex-1 text-xs text-gray-500 dark:text-gray-400" numberOfLines={1}>
             {location}
           </Text>
         </View>

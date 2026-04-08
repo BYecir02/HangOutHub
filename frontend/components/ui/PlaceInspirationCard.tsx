@@ -1,16 +1,17 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  StyleProp,
   Text,
   TouchableOpacity,
   View,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import MediaFrame from '@/components/ui/MediaFrame';
 import { getImageUrl } from '@/services/api';
+import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
 
 export interface PlaceInspirationCardPlace {
   id: string;
@@ -33,6 +34,7 @@ interface PlaceInspirationCardProps {
   onToggleSave?: () => void;
   saving?: boolean;
   showSaveButton?: boolean;
+  borderColor?: string;
   style?: StyleProp<ViewStyle>;
   shouldPlay?: boolean;
   adaptiveHeight?: boolean;
@@ -47,6 +49,7 @@ export default function PlaceInspirationCard({
   onToggleSave,
   saving = false,
   showSaveButton = true,
+  borderColor,
   style,
   shouldPlay = false,
   adaptiveHeight = true,
@@ -60,8 +63,16 @@ export default function PlaceInspirationCard({
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={style}
-      className="mb-4 overflow-hidden rounded-[30px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+      style={[
+        style,
+        borderColor
+          ? {
+              borderColor,
+              borderWidth: 2,
+            }
+          : undefined,
+      ]}
+      className="mb-3 overflow-hidden rounded-[30px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
       activeOpacity={0.92}
     >
       <View className="relative">
@@ -80,6 +91,7 @@ export default function PlaceInspirationCard({
           maxHeight={380}
           style={{ height: imageHeight }}
         />
+
         {cityLabel ? (
           <View className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5">
             <Text className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
@@ -87,15 +99,6 @@ export default function PlaceInspirationCard({
             </Text>
           </View>
         ) : null}
-
-        <View className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2 py-1">
-          <View className="flex-row items-center">
-            <Ionicons name="star" size={10} color="#f59e0b" />
-            <Text className="ml-1 text-[10px] font-semibold text-white">
-              {ratingLabel || fallbackNewLabel}
-            </Text>
-          </View>
-        </View>
 
         {showSaveButton && onToggleSave ? (
           <TouchableOpacity
@@ -118,6 +121,16 @@ export default function PlaceInspirationCard({
             )}
           </TouchableOpacity>
         ) : null}
+
+        <View className="absolute bottom-3 right-3">
+          <RatingDisplay
+            value={typeof place.avgRating === 'number' ? place.avgRating : null}
+            label={ratingLabel || fallbackNewLabel}
+            size="sm"
+            tone="neutral"
+            variant="solid"
+          />
+        </View>
       </View>
 
       <View className="p-4">

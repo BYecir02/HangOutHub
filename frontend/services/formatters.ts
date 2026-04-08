@@ -17,6 +17,22 @@ interface PriceFormatOptions {
   freeLabel?: string;
   currency?: string;
   fallback?: string;
+  prefix?: string;
+}
+
+export interface EventCardTicketTypeLike {
+  price?: number | string | null;
+  quantity?: number | string | null;
+}
+
+export interface EventCardPriceSource {
+  entryFee?: number | string | null;
+  TicketType?: EventCardTicketTypeLike[] | null;
+}
+
+interface EventCardPriceLabelOptions extends PriceFormatOptions {
+  soldOutLabel?: string;
+  minimumPrefix?: string;
 }
 
 interface RelativeDateFormatOptions {
@@ -79,7 +95,40 @@ export function formatPrice(
   }
 
   const currencyLabel = options.currency || 'FCFA';
-  return `${numericValue.toLocaleString(locale)} ${currencyLabel}`;
+  const formattedPrice = `${numericValue.toLocaleString(locale)} ${currencyLabel}`;
+  return options.prefix ? `${options.prefix}${formattedPrice}` : formattedPrice;
+}
+
+export function formatEventCardPriceLabel(
+  event: EventCardPriceSource,
+  locale: string,
+  options: EventCardPriceLabelOptions = {},
+): string {
+  const { soldOutLabel = 'Sold out', minimumPrefix = '+ ', ...priceOptions } = options;
+  const ticketTypes = event.TicketType || [];
+
+  if (ticketTypes.length > 0) {
+    const availableTicketTypes = ticketTypes.filter((ticketType) => Number(ticketType.quantity || 0) > 0);
+
+    if (availableTicketTypes.length === 0) {
+      return soldOutLabel;
+    }
+
+    const minimumPrice = Math.min(
+      ...availableTicketTypes.map((ticketType) => Number(ticketType.price || 0)),
+    );
+
+    if (minimumPrice <= 0) {
+      return priceOptions.freeLabel ?? 'Free';
+    }
+
+    return formatPrice(minimumPrice, locale, {
+      ...priceOptions,
+      prefix: minimumPrefix,
+    });
+  }
+
+  return formatPrice(event.entryFee, locale, priceOptions);
 }
 
 export function formatRelativeDate(

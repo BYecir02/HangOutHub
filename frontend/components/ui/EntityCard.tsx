@@ -38,59 +38,59 @@ type EntityCardCoverProps = {
   onPress?: () => void;
 };
 
-type EntityCardProps = EntityCardRowProps | EntityCardCoverProps;
+export function EntityCoverCard({
+  imageUrl,
+  title,
+  topContent,
+  metaRows = [],
+  onPress,
+}: EntityCardCoverProps) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+    >
+      <MediaFrame
+        source={imageUrl}
+        className="h-52 w-full bg-gray-200 dark:bg-gray-800"
+      />
 
-export default function EntityCard(props: EntityCardProps) {
-  if (props.variant === 'cover') {
-    const { imageUrl, title, topContent, metaRows = [], onPress } = props;
+      <View className="p-5">
+        {topContent}
 
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-      >
-        <MediaFrame
-          source={imageUrl}
-          className="h-52 w-full bg-gray-200 dark:bg-gray-800"
-        />
+        <Text className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
+          {title}
+        </Text>
 
-        <View className="p-5">
-          {topContent}
-
-          <Text className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
-            {title}
-          </Text>
-
-          {metaRows.map((row, index) => (
-            <View
-              key={`meta-${row.icon}-${row.text}-${index}`}
-              className={`${index === 0 ? 'mt-3' : 'mt-2'} flex-row items-center`}
+        {metaRows.map((row, index) => (
+          <View
+            key={`meta-${row.icon}-${row.text}-${index}`}
+            className={`${index === 0 ? 'mt-3' : 'mt-2'} flex-row items-center`}
+          >
+            <Ionicons name={row.icon} size={16} color={row.iconColor} />
+            <Text
+              className="ml-2 flex-1 text-sm text-gray-500 dark:text-gray-300"
+              numberOfLines={row.numberOfLines ?? 1}
             >
-              <Ionicons name={row.icon} size={16} color={row.iconColor} />
-              <Text
-                className="ml-2 flex-1 text-sm text-gray-500 dark:text-gray-300"
-                numberOfLines={row.numberOfLines ?? 1}
-              >
-                {row.text}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </TouchableOpacity>
-    );
-  }
+              {row.text}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-  const {
-    imageUrl,
-    title,
-    subtitle,
-    badge,
-    meta,
-    footerLeft,
-    footerRight,
-    onPress,
-  } = props;
-
+export function EntityRowCard({
+  imageUrl,
+  title,
+  subtitle,
+  badge,
+  meta,
+  footerLeft,
+  footerRight,
+  onPress,
+}: EntityCardRowProps) {
   const defaultFooterRight = onPress ? (
     <Ionicons name="arrow-forward-circle" size={24} color={badge?.color || '#4c669f'} />
   ) : null;
@@ -147,4 +147,14 @@ export default function EntityCard(props: EntityCardProps) {
       </View>
     </TouchableOpacity>
   );
+}
+
+type EntityCardProps = EntityCardRowProps | EntityCardCoverProps;
+
+export default function EntityCard(props: EntityCardProps) {
+  if (props.variant === 'cover') {
+    return <EntityCoverCard {...props} />;
+  }
+
+  return <EntityRowCard {...props} />;
 }

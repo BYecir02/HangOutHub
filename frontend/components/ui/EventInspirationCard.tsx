@@ -1,15 +1,16 @@
 import React from 'react';
 import {
-  StyleProp,
   Text,
   TouchableOpacity,
   View,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import MediaFrame from '@/components/ui/MediaFrame';
 import { getImageUrl } from '@/services/api';
+import MediaFrame from '@/components/ui/MediaFrame';
+import PriceDisplay from '@/components/ui/primitives/PriceDisplay';
 
 export interface EventInspirationCardEvent {
   id: string;
@@ -25,6 +26,7 @@ interface EventInspirationCardProps {
   placeLabel: string;
   dateLabel: string;
   priceLabel: string;
+  borderColor?: string;
   style?: StyleProp<ViewStyle>;
   shouldPlay?: boolean;
   adaptiveHeight?: boolean;
@@ -41,6 +43,7 @@ export default function EventInspirationCard({
   placeLabel,
   dateLabel,
   priceLabel,
+  borderColor,
   style,
   shouldPlay = false,
   adaptiveHeight = true,
@@ -48,8 +51,16 @@ export default function EventInspirationCard({
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={style}
-      className="mb-4 overflow-hidden rounded-[30px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+      style={[
+        style,
+        borderColor
+          ? {
+              borderColor,
+              borderWidth: 2,
+            }
+          : undefined,
+      ]}
+      className="mb-3 overflow-hidden rounded-[30px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
       activeOpacity={0.92}
     >
       <View className="relative">
@@ -66,16 +77,24 @@ export default function EventInspirationCard({
           style={{ height: imageHeight }}
         />
 
-        {cityLabel ? (
-          <View className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5">
-            <Text className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
-              {cityLabel}
-            </Text>
-          </View>
-        ) : null}
+        <View
+          pointerEvents="box-none"
+          className="absolute left-3 right-3 top-3 flex-row items-start gap-2"
+        >
+          {cityLabel ? (
+            <View className="max-w-[58%] self-start rounded-full bg-black/55 px-3 py-1.5">
+              <Text
+                className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white"
+                numberOfLines={1}
+              >
+                {cityLabel}
+              </Text>
+            </View>
+          ) : null}
 
-        <View className="absolute right-3 top-3 rounded-full bg-black/55 px-3 py-1.5">
-          <Text className="text-[10px] font-semibold text-white">{priceLabel}</Text>
+          <View className="ml-auto max-w-[42%] flex-shrink-0">
+            <PriceDisplay label={priceLabel} size="sm" tone="brand" variant="solid" />
+          </View>
         </View>
 
         <View className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1.5">

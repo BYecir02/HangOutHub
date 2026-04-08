@@ -15,15 +15,16 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import EntityCard from '@/components/ui/EntityCard';
+import { EntityCoverCard } from '@/components/ui/EntityCard';
 import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
 import EventInspirationCard from '@/components/ui/EventInspirationCard';
+import MasonryGrid from '@/components/ui/MasonryGrid';
 import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
 import ScreenState from '@/components/ui/ScreenState';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
-import { formatEventDate, formatPrice } from '@/services/formatters';
+import { formatEventCardPriceLabel, formatEventDate, formatPrice } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
@@ -34,6 +35,11 @@ interface EventItem {
   startTime: string;
   coverUrl: string | null;
   entryFee: number | string | null;
+  TicketType?: {
+    id?: string;
+    price: number | string;
+    quantity: number;
+  }[];
   Place?: {
     id?: string;
     name?: string | null;
@@ -132,7 +138,7 @@ function EventFiltersModal({
           <TouchableOpacity
             onPress={() => {
               onChangeQuery('');
-              onChangeFilter('upcoming');
+              onChangeFilter('all');
               onChangeViewMode('inspiration');
             }}
             className="flex-1 items-center rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900"
@@ -223,6 +229,7 @@ function EventInspirationMasonry({
   fallbackPlaceLabel,
   locale,
   freeLabel,
+  soldOutLabel,
   activeItemId,
   registerLayout,
 }: {
@@ -232,57 +239,40 @@ function EventInspirationMasonry({
   fallbackPlaceLabel: string;
   locale: 'en-US' | 'fr-FR';
   freeLabel: string;
+  soldOutLabel: string;
   activeItemId: string | null;
   registerLayout: (id: string, layout: { y: number; height: number }) => void;
 }) {
-  const columns = useMemo(() => {
-    const nextColumns: Array<Array<{ event: EventItem; imageHeight: number }>> = [
-      [],
-      [],
-    ];
-    const columnHeights = [0, 0];
-    const imageHeights = [184, 242, 208, 264, 196, 232];
-
-    events.forEach((event, index) => {
-      const imageHeight = imageHeights[index % imageHeights.length];
-      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
-      nextColumns[targetColumn].push({ event, imageHeight });
-      columnHeights[targetColumn] += estimateEventCardHeight(index);
-    });
-
-    return nextColumns;
-  }, [events]);
-
   return (
-    <View className="flex-row items-start gap-3">
-      {columns.map((column, columnIndex) => (
-        <View key={`column-${columnIndex}`} className="min-w-0 flex-1">
-          {column.map(({ event, imageHeight }) => (
-            <View
-              key={event.id}
-              onLayout={(eventLayout) => {
-                registerLayout(event.id, eventLayout.nativeEvent.layout);
-              }}
-            >
-              <EventInspirationCard
-                event={event}
-                imageHeight={imageHeight}
-                cityLabel={event.Place?.City?.name || fallbackCityLabel}
-                placeLabel={event.Place?.name || event.address || fallbackPlaceLabel}
-                dateLabel={formatEventDate(event.startTime, locale, {
-                  includeWeekday: true,
-                })}
-                priceLabel={formatPrice(event.entryFee, locale, {
-                  freeLabel,
-                })}
-                onPress={() => onPressEvent(event)}
-                shouldPlay={activeItemId === event.id}
-              />
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
+    <MasonryGrid
+      items={events}
+      getKey={(event) => event.id}
+      estimateItemHeight={(_, index) => estimateEventCardHeight(index)}
+      onItemLayout={(event, layout) => {
+        registerLayout(event.id, layout);
+      }}
+      renderItem={(event, index) => {
+        const imageHeights = [184, 242, 208, 264, 196, 232];
+
+        return (
+          <EventInspirationCard
+            event={event}
+            imageHeight={imageHeights[index % imageHeights.length]}
+            cityLabel={event.Place?.City?.name || fallbackCityLabel}
+            placeLabel={event.Place?.name || event.address || fallbackPlaceLabel}
+            dateLabel={formatEventDate(event.startTime, locale, {
+              includeWeekday: true,
+            })}
+            priceLabel={formatEventCardPriceLabel(event, locale, {
+              freeLabel,
+              soldOutLabel,
+            })}
+            onPress={() => onPressEvent(event)}
+            shouldPlay={activeItemId === event.id}
+          />
+        );
+      }}
+    />
   );
 }
 
@@ -295,7 +285,7 @@ export default function EventsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<EventFilter>('upcoming');
+  const [activeFilter, setActiveFilter] = useState<EventFilter>('all');
   const [viewMode, setViewMode] = useState<EventViewMode>('inspiration');
   const [filtersVisible, setFiltersVisible] = useState(false);
   const { filterByLocation, locationValueLabel } = useLocationScope({
@@ -412,8 +402,7 @@ export default function EventsScreen() {
 
   const renderListEventItem = useCallback(
     ({ item }: { item: EventItem }) => (
-      <EntityCard
-        variant="cover"
+      <EntityCoverCard
         imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
         title={item.title}
         onPress={() =>
@@ -426,7 +415,10 @@ export default function EventsScreen() {
           <View className="flex-row flex-wrap items-center gap-2">
             <View className="rounded-full bg-red-100 px-3 py-2 dark:bg-red-900/30">
               <Text className="text-xs font-semibold text-red-700 dark:text-red-300">
-                {formatPrice(item.entryFee, locale, { freeLabel: t('homePriceFree') })}
+                {formatEventCardPriceLabel(item, locale, {
+                  freeLabel: t('homePriceFree'),
+                  soldOutLabel: t('homePriceSoldOut'),
+                })}
               </Text>
             </View>
             {item.Place?.City?.name ? (
@@ -587,6 +579,7 @@ export default function EventsScreen() {
               fallbackPlaceLabel={t('homeLocationToConfirm')}
               locale={locale}
               freeLabel={t('homePriceFree')}
+              soldOutLabel={t('homePriceSoldOut')}
               activeItemId={inspirationAutoplay.activeId}
               registerLayout={inspirationAutoplay.registerLayout}
               onPressEvent={(event) =>

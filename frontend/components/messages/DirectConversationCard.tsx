@@ -1,7 +1,10 @@
 import React from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
+import Badge from '@/components/ui/primitives/Badge';
+import Divider from '@/components/ui/primitives/Divider';
 import { useI18n } from '@/hooks/use-i18n';
+import Avatar from '@/components/ui/primitives/Avatar';
 import { getImageUrl } from '@/services/api';
 import { stripSystemMarkers } from '@/services/direct-chat-meta';
 import { isVideoUrl } from '@/services/media';
@@ -54,11 +57,6 @@ export default function DirectConversationCard({
     ? formatDate(item.lastMessageAt, locale)
     : '';
   const avatarUrl = getImageUrl(item.partner.avatarUrl);
-  const fallbackInitial =
-    (item.partner.displayName || item.partner.username || '*')
-      .trim()
-      .charAt(0)
-      .toUpperCase();
 
   return (
     <TouchableOpacity
@@ -66,18 +64,13 @@ export default function DirectConversationCard({
       className="mb-3 rounded-3xl bg-white p-4 dark:bg-gray-900"
     >
       <View className="flex-row items-center gap-3">
-        {avatarUrl ? (
-          <Image
-            source={{ uri: avatarUrl }}
-            className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-800"
-          />
-        ) : (
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-[#4c669f]/15">
-            <Text className="text-base font-semibold text-[#4c669f]">
-              {fallbackInitial}
-            </Text>
-          </View>
-        )}
+        <Avatar
+          uri={avatarUrl}
+          label={item.partner.displayName || item.partner.username}
+          size={48}
+          backgroundColor="#eaf0ff"
+          textColor="#4c669f"
+        />
         <View className="flex-1">
           <View className="flex-row items-start justify-between">
             <Text className="mr-2 flex-1 text-base font-semibold text-gray-900 dark:text-white">
@@ -90,14 +83,18 @@ export default function DirectConversationCard({
                 </Text>
               ) : null}
               {item.unreadCount && item.unreadCount > 0 ? (
-                <View className="mt-1 rounded-full bg-red-500 px-2.5 py-0.5">
-                  <Text className="text-[10px] font-semibold text-white">
-                    {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                  </Text>
-                </View>
+                <Badge
+                  label={item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
+                  tone="danger"
+                  variant="solid"
+                  size="sm"
+                  className="mt-1"
+                />
               ) : null}
             </View>
           </View>
+
+          <Divider className="my-3" color="#e5e7eb" />
 
           <Text
             className="mt-2 text-sm text-gray-600 dark:text-gray-300"

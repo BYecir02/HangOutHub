@@ -15,14 +15,22 @@ import { useLocationScope } from '@/hooks/useLocationScope';
 import MediaFrame from '@/components/ui/MediaFrame';
 import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import EntityCard from '@/components/ui/EntityCard';
+import { EntityRowCard } from '@/components/ui/EntityCard';
 import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
+import MasonryGrid from '@/components/ui/MasonryGrid';
 import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
+import EventInspirationCard from '@/components/ui/EventInspirationCard';
+import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import ScreenState from '@/components/ui/ScreenState';
-import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import api, {
+  clearAuthState,
+  getApiErrorMessage,
+  getImageUrl,
+  storage,
+} from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
-import { formatEventDate } from '@/services/formatters';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
@@ -33,6 +41,11 @@ interface DiscoverEvent {
   startTime: string;
   coverUrl: string | null;
   entryFee: number | string | null;
+  TicketType?: {
+    id?: string;
+    price: number | string;
+    quantity: number;
+  }[];
   Place?: {
     id?: string;
     name?: string | null;
@@ -63,6 +76,7 @@ type DiscoverItem =
   | {
       id: string;
       type: 'event';
+  event: DiscoverEvent;
       title: string;
       subtitle: string;
       meta: string;
@@ -74,6 +88,7 @@ type DiscoverItem =
   | {
       id: string;
       type: 'place';
+      place: DiscoverPlace;
       title: string;
       subtitle: string;
       meta: string;
@@ -300,51 +315,75 @@ function DiscoverInspirationMasonry({
   activeItemId,
   registerLayout,
   onPressItem,
+  savedPlaceIds,
+  savingPlaceIds,
+  onTogglePlaceSave,
+  locale,
+  freeLabel,
+  soldOutLabel,
 }: {
   items: DiscoverItem[];
   activeItemId: string | null;
   registerLayout: (id: string, layout: { y: number; height: number }) => void;
   onPressItem: (item: DiscoverItem) => void;
+  savedPlaceIds: Set<string>;
+  savingPlaceIds: Set<string>;
+  onTogglePlaceSave: (placeId: string) => void;
+  locale: string;
+  freeLabel: string;
+  soldOutLabel: string;
 }) {
-  const columns = useMemo(() => {
-    const nextColumns: Array<Array<{ item: DiscoverItem; imageHeight: number }>> = [
-      [],
-      [],
-    ];
-    const columnHeights = [0, 0];
-
-    items.forEach((item, index) => {
-      const imageHeight = [182, 240, 208, 262, 194, 228][index % 6];
-      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
-      nextColumns[targetColumn].push({ item, imageHeight });
-      columnHeights[targetColumn] += estimateDiscoverCardHeight(index);
-    });
-
-    return nextColumns;
-  }, [items]);
-
   return (
-    <View className="flex-row items-start gap-3">
-      {columns.map((column, columnIndex) => (
-        <View key={`discover-column-${columnIndex}`} className="min-w-0 flex-1">
-          {column.map(({ item, imageHeight }) => (
-            <View
-              key={item.id}
-              onLayout={(event) => {
-                registerLayout(item.id, event.nativeEvent.layout);
-              }}
-            >
-              <DiscoverInspirationCard
-                item={item}
-                imageHeight={imageHeight}
-                shouldPlay={activeItemId === item.id}
-                onPress={() => onPressItem(item)}
-              />
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
+    <MasonryGrid
+      items={items}
+      getKey={(item) => item.id}
+      estimateItemHeight={(_, index) => estimateDiscoverCardHeight(index)}
+      onItemLayout={(item, layout) => {
+        registerLayout(item.id, layout);
+      }}
+      renderItem={(item, index) => {
+        const imageHeights = [182, 240, 208, 262, 194, 228];
+
+        if (item.type === 'event') {
+          return (
+            <EventInspirationCard
+              event={item.event}
+              imageHeight={imageHeights[index % imageHeights.length]}
+              cityLabel={item.event.Place?.City?.name || ''}
+              placeLabel={item.event.Place?.name || item.event.address || ''}
+              dateLabel={formatEventDate(item.event.startTime, locale, {
+                includeWeekday: true,
+              })}
+              priceLabel={formatEventCardPriceLabel(item.event, locale, {
+                freeLabel,
+                soldOutLabel,
+              })}
+              borderColor={item.actionColor}
+              onPress={() => onPressItem(item)}
+              shouldPlay={activeItemId === item.id}
+              adaptiveHeight={false}
+            />
+          );
+        }
+
+        if (item.type === 'place') {
+          return (
+            <PlaceInspirationCard
+              place={item.place}
+              imageHeight={imageHeights[index % imageHeights.length]}
+              fallbackNewLabel={item.meta}
+              borderColor={item.actionColor}
+              onPress={() => onPressItem(item)}
+              isSaved={savedPlaceIds.has(item.place.id)}
+              onToggleSave={() => void handleTogglePlaceSave(item.place.id)}
+              saving={savingPlaceIds.has(item.place.id)}
+              shouldPlay={activeItemId === item.id}
+              adaptiveHeight={false}
+            />
+          );
+        }
+      }}
+    />
   );
 }
 
@@ -368,6 +407,8 @@ export default function DiscoverScreen() {
   const [activeFilter, setActiveFilter] = useState<DiscoverFilter>('all');
   const [viewMode, setViewMode] = useState<DiscoverViewMode>('inspiration');
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
+  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
   const { filterByLocation, locationValueLabel } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
@@ -423,6 +464,88 @@ export default function DiscoverScreen() {
     }, [fetchDiscoverData]),
   );
 
+  const loadSavedPlaces = useCallback(async () => {
+    const token = await storage.getItem('userToken');
+
+    if (!token) {
+      setSavedPlaceIds(new Set());
+      return;
+    }
+
+    try {
+      const response = await api.get<{ id: string }[]>('/places/saved/mine');
+      setSavedPlaceIds(new Set(response.data.map((place) => place.id)));
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 401
+      ) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      setSavedPlaceIds(new Set());
+    }
+  }, [router]);
+
+  useEffect(() => {
+    void loadSavedPlaces();
+  }, [loadSavedPlaces]);
+
+  const handleTogglePlaceSave = useCallback(
+    async (placeId: string) => {
+      const token = await storage.getItem('userToken');
+
+      if (!token) {
+        return;
+      }
+
+      if (savingPlaceIds.has(placeId)) {
+        return;
+      }
+
+      setSavingPlaceIds((current) => {
+        const next = new Set(current);
+        next.add(placeId);
+        return next;
+      });
+
+      try {
+        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
+        setSavedPlaceIds((current) => {
+          const next = new Set(current);
+          if (response.data.saved) {
+            next.add(placeId);
+          } else {
+            next.delete(placeId);
+          }
+          return next;
+        });
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'response' in error &&
+          (error as { response?: { status?: number } }).response?.status === 401
+        ) {
+          await clearAuthState();
+          router.replace('/');
+          return;
+        }
+      } finally {
+        setSavingPlaceIds((current) => {
+          const next = new Set(current);
+          next.delete(placeId);
+          return next;
+        });
+      }
+    },
+    [router, savingPlaceIds],
+  );
+
   const filterOptions = useMemo<readonly FilterChipOption<DiscoverFilter>[]>(
     () => [
       { key: 'all', label: t('discoverFilterAll') },
@@ -460,6 +583,7 @@ export default function DiscoverScreen() {
     const topEvents = locationFilteredEvents.slice(0, 6).map((event) => ({
       id: `event-${event.id}`,
       type: 'event' as const,
+      event,
       title: event.title,
       subtitle: event.Place?.name || event.address || '',
       meta: formatEventDate(event.startTime, locale),
@@ -478,6 +602,7 @@ export default function DiscoverScreen() {
       .map((place) => ({
         id: `place-${place.id}`,
         type: 'place' as const,
+        place,
         title: place.name,
         subtitle: place.City?.name || place.address || '',
         meta:
@@ -661,6 +786,12 @@ export default function DiscoverScreen() {
               activeItemId={discoverAutoplay.activeId}
               registerLayout={discoverAutoplay.registerLayout}
               onPressItem={handlePressItem}
+              savedPlaceIds={savedPlaceIds}
+              savingPlaceIds={savingPlaceIds}
+              onTogglePlaceSave={handleTogglePlaceSave}
+              locale={locale}
+              freeLabel={t('homePriceFree')}
+              soldOutLabel={t('homePriceSoldOut')}
             />
           )}
         </ScrollView>
@@ -679,14 +810,13 @@ export default function DiscoverScreen() {
             </Text>
           }
           ListEmptyComponent={
-            <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
-              <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('discoverEmptyTitle')}
-              </Text>
-              <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-                {t('discoverEmptyDescription')}
-              </Text>
-            </View>
+            <ScreenState
+              mode="empty"
+              variant="plain"
+              title={t('discoverEmptyTitle')}
+              description={t('discoverEmptyDescription')}
+              containerClassName="px-0 py-12"
+            />
           }
           refreshControl={
             <RefreshControl
@@ -698,7 +828,7 @@ export default function DiscoverScreen() {
             />
           }
           renderItem={({ item }) => (
-            <EntityCard
+            <EntityRowCard
               imageUrl={item.image}
               title={item.title}
               subtitle={item.subtitle || undefined}

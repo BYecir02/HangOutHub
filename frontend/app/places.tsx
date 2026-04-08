@@ -19,7 +19,9 @@ import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
 import LocationScopeBar from '@/components/ui/LocationScopeBar';
+import MasonryGrid from '@/components/ui/MasonryGrid';
 import SearchBar from '@/components/ui/SearchBar';
+import PlaceCard from '@/components/ui/PlaceCard';
 import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import ScreenState from '@/components/ui/ScreenState';
 import api, {
@@ -102,7 +104,7 @@ function PlaceFiltersModal({
       onClose={onClose}
       title={title}
       subtitle={description}
-      maxHeight={760}
+      maxHeight={700}
       contentMode="auto"
       footer={
         <View className="flex-row gap-3">
@@ -212,50 +214,31 @@ function PlaceInspirationMasonry({
   activeItemId: string | null;
   registerLayout: (id: string, layout: { y: number; height: number }) => void;
 }) {
-  const columns = useMemo(() => {
-    const nextColumns: Array<Array<{ place: PlaceItem; imageHeight: number }>> = [
-      [],
-      [],
-    ];
-    const columnHeights = [0, 0];
-    const imageHeights = [184, 248, 210, 276, 196, 232];
-
-    places.forEach((place, index) => {
-      const imageHeight = imageHeights[index % imageHeights.length];
-      const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
-      nextColumns[targetColumn].push({ place, imageHeight });
-      columnHeights[targetColumn] += estimatePlaceCardHeight(index);
-    });
-
-    return nextColumns;
-  }, [places]);
-
   return (
-    <View className="flex-row items-start gap-3">
-      {columns.map((column, columnIndex) => (
-        <View key={`column-${columnIndex}`} className="min-w-0 flex-1">
-          {column.map(({ place, imageHeight }) => (
-            <View
-              key={place.id}
-              onLayout={(event) => {
-                registerLayout(place.id, event.nativeEvent.layout);
-              }}
-            >
-              <PlaceInspirationCard
-                place={place}
-                imageHeight={imageHeight}
-                fallbackNewLabel={fallbackNewLabel}
-                onPress={() => onPressPlace(place)}
-                isSaved={isPlaceSaved(place.id)}
-                onToggleSave={() => onToggleSavePlace(place.id)}
-                saving={isSavingPlace(place.id)}
-                shouldPlay={activeItemId === place.id}
-              />
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
+    <MasonryGrid
+      items={places}
+      getKey={(place) => place.id}
+      estimateItemHeight={(_, index) => estimatePlaceCardHeight(index)}
+      onItemLayout={(place, layout) => {
+        registerLayout(place.id, layout);
+      }}
+      renderItem={(place, index) => {
+        const imageHeights = [184, 248, 210, 276, 196, 232];
+
+        return (
+          <PlaceInspirationCard
+            place={place}
+            imageHeight={imageHeights[index % imageHeights.length]}
+            fallbackNewLabel={fallbackNewLabel}
+            onPress={() => onPressPlace(place)}
+            isSaved={isPlaceSaved(place.id)}
+            onToggleSave={() => onToggleSavePlace(place.id)}
+            saving={isSavingPlace(place.id)}
+            shouldPlay={activeItemId === place.id}
+          />
+        );
+      }}
+    />
   );
 }
 
@@ -499,90 +482,27 @@ export default function PlacesScreen() {
         addressLabel && addressLabel.toLowerCase() !== cityLabel ? addressLabel : undefined;
 
       return (
-        <TouchableOpacity
+        <PlaceCard
+          name={item.name}
+          location={subtitle || item.City?.name || t('homeLocationToConfirm')}
+          imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
+          rating={typeof item.avgRating === 'number' && item.avgRating > 0 ? item.avgRating : undefined}
+          fallbackRatingLabel={t('placesNewBadge')}
+          badgeLabel={item.City?.name || undefined}
+          badgeTone="success"
+          showSaveButton
+          isSaved={savedPlaceIds.has(item.id)}
+          saving={savingPlaceIds.has(item.id)}
+          onToggleSave={() => {
+            void handleTogglePlaceSave(item.id);
+          }}
           onPress={() =>
             router.push({
               pathname: '/place/[id]',
               params: { id: item.id },
             })
           }
-          className="flex-row overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
-          activeOpacity={0.92}
-        >
-          <View className="relative">
-            <Image
-              source={{ uri: getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER }}
-              className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
-              resizeMode="cover"
-            />
-
-            <View className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2 py-1">
-              <View className="flex-row items-center">
-                <Ionicons name="star" size={10} color="#f59e0b" />
-                <Text className="ml-1 text-[10px] font-semibold text-white">
-                  {typeof item.avgRating === 'number' && item.avgRating > 0
-                    ? item.avgRating.toFixed(1)
-                    : t('placesNewBadge')}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View className="ml-4 flex-1 justify-between py-1">
-            <View>
-            <View
-              className="self-start rounded-full px-3 py-1.5"
-              style={{
-                backgroundColor: '#2ecc7120',
-              }}
-            >
-                {item.City?.name ? (
-                  <Text className="text-xs font-semibold text-[#2ecc71]">
-                    {item.City.name}
-                  </Text>
-                ) : null}
-              </View>
-
-              <Text className="mt-3 text-lg font-bold text-gray-900 dark:text-white" numberOfLines={2}>
-                {item.name}
-              </Text>
-
-              {subtitle ? (
-                <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400" numberOfLines={2}>
-                  {subtitle}
-                </Text>
-              ) : null}
-            </View>
-
-            <View className="mt-3 flex-row items-center justify-between">
-              <View />
-              <TouchableOpacity
-                onPress={() => {
-                  void handleTogglePlaceSave(item.id);
-                }}
-                disabled={savingPlaceIds.has(item.id)}
-                className={`h-7 w-7 items-center justify-center rounded-lg border ${
-                  savedPlaceIds.has(item.id)
-                    ? 'border-[#2ecc71] bg-green-50 dark:bg-green-900/20'
-                    : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
-                }`}
-              >
-                {savingPlaceIds.has(item.id) ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={savedPlaceIds.has(item.id) ? '#2ecc71' : '#4c669f'}
-                  />
-                ) : (
-                  <Ionicons
-                    name={savedPlaceIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
-                    size={14}
-                    color={savedPlaceIds.has(item.id) ? '#2ecc71' : '#4c669f'}
-                  />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
+        />
       );
     },
     [handleTogglePlaceSave, router, t, savedPlaceIds],

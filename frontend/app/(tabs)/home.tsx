@@ -15,13 +15,12 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import CategoryCard from '@/components/ui/CategoryCard';
 import EventInspirationCard from '@/components/ui/EventInspirationCard';
 import Header from '@/components/ui/Header';
-import InspirationCard from '@/components/ui/InspirationCard';
 import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
-import { formatEventDate, formatPrice } from '@/services/formatters';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { getFriendshipOverview } from '@/services/friendships';
 import {
   setStoredLocation,
@@ -73,32 +72,18 @@ type HomeRecommendationItem =
   | {
       id: string;
       type: 'event';
-      title: string;
-      subtitle: string;
-      imageUrl: string;
-      accentColor: string;
-      badgeLabel: string;
-      metaLabel: string;
-      metaIcon: keyof typeof Ionicons.glyphMap;
-      targetId: string;
+      event: HomeEvent;
+      cityLabel: string;
+      placeLabel: string;
+      dateLabel: string;
+      priceLabel: string;
     }
   | {
       id: string;
       type: 'place';
-      title: string;
-      subtitle: string;
-      imageUrl: string;
-      accentColor: string;
-      badgeLabel: string;
-      metaLabel: string;
-      metaIcon: keyof typeof Ionicons.glyphMap;
-      targetId: string;
+      place: HomePlace;
+      fallbackNewLabel: string;
     };
-
-const EVENT_PLACEHOLDER =
-  'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
-const PLACE_PLACEHOLDER =
-  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
 function useCarouselAutoplay<T>(items: T[], getId: (item: T) => string) {
   const [activeId, setActiveId] = useState<string | null>(
@@ -146,34 +131,6 @@ function useCarouselAutoplay<T>(items: T[], getId: (item: T) => string) {
   ).current;
 
   return { activeId, onViewableItemsChanged, viewabilityConfig };
-}
-
-function formatEventPriceLabel(
-  event: HomeEvent,
-  locale: string,
-  t: (key: 'homePriceFree' | 'homePriceFrom' | 'homePriceSoldOut', params?: { price: string }) => string,
-) {
-  const ticketTypes = event.TicketType || [];
-  if (ticketTypes.length > 0) {
-    const available = ticketTypes.filter((ticket) => Number(ticket.quantity || 0) > 0);
-    if (available.length === 0) {
-      return t('homePriceSoldOut');
-    }
-
-    const minPrice = Math.min(
-      ...available.map((ticket) => Number(ticket.price || 0)),
-    );
-
-    if (minPrice <= 0) {
-      return t('homePriceFree');
-    }
-
-    return t('homePriceFrom', {
-      price: minPrice.toLocaleString(locale),
-    });
-  }
-
-  return formatPrice(event.entryFee, locale, { freeLabel: t('homePriceFree') });
 }
 
 function SectionPlaceholder({ message }: { message: string }) {
@@ -503,7 +460,10 @@ export default function HomeScreen() {
         cityLabel: event.Place?.City?.name || '',
         placeLabel: event.Place?.name || event.address || t('homeLocationToConfirm'),
         dateLabel: formatEventDate(event.startTime, locale),
-        priceLabel: formatEventPriceLabel(event, locale, t),
+        priceLabel: formatEventCardPriceLabel(event, locale, {
+          freeLabel: t('homePriceFree'),
+          soldOutLabel: t('homePriceSoldOut'),
+        }),
       })),
     [featuredEvents, locale, t],
   );
@@ -520,17 +480,14 @@ export default function HomeScreen() {
       .map((event) => ({
         id: `event-${event.id}`,
         type: 'event' as const,
-        title: event.title,
-        subtitle: event.Place?.name || event.address || t('homeLocationToConfirm'),
-        imageUrl: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
-        accentColor: '#ff4757',
-        badgeLabel:
-          Number(event.entryFee || 0) > 0
-            ? t('discoverEventBadge')
-            : t('discoverEventBadgeFree'),
-        metaLabel: formatEventDate(event.startTime, locale),
-        metaIcon: 'time-outline',
-        targetId: event.id,
+        event,
+        cityLabel: event.Place?.City?.name || '',
+        placeLabel: event.Place?.name || event.address || t('homeLocationToConfirm'),
+        dateLabel: formatEventDate(event.startTime, locale),
+        priceLabel: formatEventCardPriceLabel(event, locale, {
+          freeLabel: t('homePriceFree'),
+          soldOutLabel: t('homePriceSoldOut'),
+        }),
       }));
 
     const placeSuggestions: HomeRecommendationItem[] = popularPlaces
@@ -538,20 +495,8 @@ export default function HomeScreen() {
       .map((place) => ({
         id: `place-${place.id}`,
         type: 'place' as const,
-        title: place.name,
-        subtitle: place.City?.name || place.address || t('homeAddressToConfirm'),
-        imageUrl: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER,
-        accentColor: '#2ecc71',
-        badgeLabel: t('discoverPlaceBadge'),
-        metaLabel:
-          typeof place.avgRating === 'number' && place.avgRating > 0
-            ? t('discoverPlaceMetaRated', { rating: place.avgRating.toFixed(1) })
-            : t('discoverPlaceMetaDiscover'),
-        metaIcon:
-          typeof place.avgRating === 'number' && place.avgRating > 0
-            ? ('star' as const)
-            : ('sparkles' as const),
-        targetId: place.id,
+        place,
+        fallbackNewLabel: t('discoverPlaceMetaDiscover'),
       }));
 
     const nextItems: HomeRecommendationItem[] = [];
@@ -668,10 +613,17 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View className="mt-1">
-        <Text className="ml-5 mb-4 text-lg font-bold text-gray-800 dark:text-white">
-          {t('homeCategories')}
-        </Text>
+      <View className="mt-3">
+        <View className="mb-4 flex-row items-end justify-between px-5">
+          <Text className="text-lg font-bold text-gray-800 dark:text-white">
+            {t('homeCategories')}
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/categories')}>
+            <Text className="text-xs font-medium text-[#4c669f]">
+              {t('homeSeeAll')}
+            </Text>
+          </TouchableOpacity>
+        </View>
         {loading ? (
           <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
         ) : categories.length > 0 ? (
@@ -740,7 +692,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View className="mt-8 px-5 pb-24">
+      <View className="mt-3 px-5 pb-24">
         <View className="mb-4 flex-row items-end justify-between">
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
             {t('homeRecommended')}
@@ -760,28 +712,49 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             viewabilityConfig={recommendedCarousel.viewabilityConfig}
             onViewableItemsChanged={recommendedCarousel.onViewableItemsChanged}
-            snapToInterval={276}
+            snapToInterval={304}
             decelerationRate="fast"
             snapToAlignment="start"
             contentContainerStyle={{ paddingHorizontal: 20 }}
             renderItem={({ item }) => (
-              <InspirationCard
-                title={item.title}
-                subtitle={item.subtitle || undefined}
-                imageUrl={item.imageUrl}
-                accentColor={item.accentColor}
-                badgeLabel={item.badgeLabel}
-                metaLabel={item.metaLabel}
-                metaIcon={item.metaIcon}
-                adaptiveHeight={false}
-                shouldPlay={recommendedCarousel.activeId === item.id}
-                onPress={() =>
-                  router.push({
-                    pathname: item.type === 'event' ? '/event/[id]' : '/place/[id]',
-                    params: { id: item.targetId },
-                  })
-                }
-              />
+              item.type === 'event' ? (
+                <EventInspirationCard
+                  event={item.event}
+                  cityLabel={item.cityLabel}
+                  placeLabel={item.placeLabel}
+                  dateLabel={item.dateLabel}
+                  priceLabel={item.priceLabel}
+                  borderColor={item.accentColor}
+                  imageHeight={188}
+                  adaptiveHeight={false}
+                  shouldPlay={recommendedCarousel.activeId === item.id}
+                  style={{ width: 288, marginRight: 16 }}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/event/[id]',
+                      params: { id: item.event.id },
+                    })
+                  }
+                />
+              ) : (
+                <PlaceInspirationCard
+                  place={item.place}
+                  imageHeight={188}
+                  fallbackNewLabel={item.fallbackNewLabel}
+                  adaptiveHeight={false}
+                  shouldPlay={recommendedCarousel.activeId === item.id}
+                  style={{ width: 288, marginRight: 16 }}
+                  isSaved={savedPlaceIds.has(item.place.id)}
+                  onToggleSave={() => void handleTogglePlaceSave(item.place.id)}
+                  saving={savingPlaceIds.has(item.place.id)}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/place/[id]',
+                      params: { id: item.place.id },
+                    })
+                  }
+                />
+              )
             )}
           />
         ) : (
