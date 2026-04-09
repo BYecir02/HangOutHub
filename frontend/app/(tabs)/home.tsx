@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Animated,
   FlatList,
+  Easing,
   RefreshControl,
   ScrollView,
   Text,
@@ -15,10 +17,12 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import CategoryCard from '@/components/ui/CategoryCard';
 import EventInspirationCard from '@/components/ui/EventInspirationCard';
 import Header from '@/components/ui/Header';
+import MasonryGrid from '@/components/ui/MasonryGrid';
 import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
-import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
+import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import api, { clearAuthState, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { getFriendshipOverview } from '@/services/friendships';
@@ -83,55 +87,8 @@ type HomeRecommendationItem =
       type: 'place';
       place: HomePlace;
       fallbackNewLabel: string;
+      accentColor: string;
     };
-
-function useCarouselAutoplay<T>(items: T[], getId: (item: T) => string) {
-  const [activeId, setActiveId] = useState<string | null>(
-    items[0] ? getId(items[0]) : null,
-  );
-  const getIdRef = React.useRef(getId);
-
-  useEffect(() => {
-    getIdRef.current = getId;
-  }, [getId]);
-
-  useEffect(() => {
-    if (items.length === 0) {
-      setActiveId(null);
-      return;
-    }
-
-    setActiveId((current) => {
-      if (current && items.some((item) => getIdRef.current(item) === current)) {
-        return current;
-      }
-
-      return getIdRef.current(items[0]);
-    });
-  }, [items]);
-
-  const viewabilityConfig = React.useRef({
-    itemVisiblePercentThreshold: 60,
-  }).current;
-
-  const onViewableItemsChanged = React.useRef(
-    ({
-      viewableItems,
-    }: {
-      viewableItems: Array<{ item: T; isViewable?: boolean }>;
-    }) => {
-      const firstVisible = viewableItems.find(
-        (token) => token.isViewable && token.item,
-      );
-
-      if (firstVisible) {
-        setActiveId(getIdRef.current(firstVisible.item));
-      }
-    },
-  ).current;
-
-  return { activeId, onViewableItemsChanged, viewabilityConfig };
-}
 
 function SectionPlaceholder({ message }: { message: string }) {
   return (
@@ -143,9 +100,13 @@ function SectionPlaceholder({ message }: { message: string }) {
   );
 }
 
+function estimateRecommendationCardHeight(index: number) {
+  const imageHeights = [182, 240, 208, 262, 194, 228];
+  return imageHeights[index % imageHeights.length] + 124;
+}
+
 export default function HomeScreen() {
   const router = useRouter();
-  const placesRoute = '/places' as Href;
   const eventsRoute = '/events' as Href;
   const discoverRoute = '/discover' as Href;
   const { locale, t } = useI18n();
@@ -415,7 +376,7 @@ export default function HomeScreen() {
       country: t('homeLocationCountry'),
     };
 
-    setSelectedLocation(nextLocation);
+    setSelectedLocation(nextLocation); 
     void setStoredLocation(nextLocation);
   }, [locationHydrated, selectedLocation, setSelectedLocation, t]);
 
@@ -449,10 +410,6 @@ export default function HomeScreen() {
     () => locationFilteredEvents.slice(0, 5),
     [locationFilteredEvents],
   );
-  const popularPlaces = useMemo(
-    () => locationFilteredPlaces.slice(0, 6),
-    [locationFilteredPlaces],
-  );
   const featuredInspiration = useMemo(
     () =>
       featuredEvents.map((event) => ({
@@ -467,12 +424,62 @@ export default function HomeScreen() {
       })),
     [featuredEvents, locale, t],
   );
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [featuredDirection, setFeaturedDirection] = useState<1 | -1>(1);
+  const featuredTransition = React.useRef(new Animated.Value(1)).current;
+  const firstFeaturedRender = React.useRef(true);
 
-  const featuredCarousel = useCarouselAutoplay(
-    featuredInspiration,
-    (item) => item.event.id,
-  );
-  const popularCarousel = useCarouselAutoplay(popularPlaces, (item) => item.id);
+  useEffect(() => {
+    if (featuredInspiration.length === 0) {
+      setFeaturedIndex(0);
+      return;
+    }
+
+    setFeaturedIndex((current) => Math.min(current, featuredInspiration.length - 1));
+  }, [featuredInspiration.length]);
+
+  useEffect(() => {
+    if (firstFeaturedRender.current) {
+      firstFeaturedRender.current = false;
+      featuredTransition.setValue(1);
+      return;
+    }
+
+    featuredTransition.stopAnimation();
+    featuredTransition.setValue(0);
+
+    Animated.timing(featuredTransition, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [featuredDirection, featuredIndex, featuredTransition]);
+
+  const currentFeaturedItem = featuredInspiration[featuredIndex] || null;
+  const canNavigateFeatured = featuredInspiration.length > 1;
+
+  const goToPreviousFeatured = useCallback(() => {
+    if (!featuredInspiration.length) {
+      return;
+    }
+
+    setFeaturedDirection(-1);
+    setFeaturedIndex((current) =>
+      current <= 0 ? featuredInspiration.length - 1 : current - 1,
+    );
+  }, [featuredInspiration.length]);
+
+  const goToNextFeatured = useCallback(() => {
+    if (!featuredInspiration.length) {
+      return;
+    }
+
+    setFeaturedDirection(1);
+    setFeaturedIndex((current) =>
+      current >= featuredInspiration.length - 1 ? 0 : current + 1,
+    );
+  }, [featuredInspiration.length]);
 
   const recommendedInspiration = useMemo<HomeRecommendationItem[]>(() => {
     const eventSuggestions: HomeRecommendationItem[] = featuredEvents
@@ -488,15 +495,18 @@ export default function HomeScreen() {
           freeLabel: t('homePriceFree'),
           soldOutLabel: t('homePriceSoldOut'),
         }),
+        accentColor: '#ff4757',
       }));
 
-    const placeSuggestions: HomeRecommendationItem[] = popularPlaces
+    const placeSuggestions: HomeRecommendationItem[] = [...locationFilteredPlaces]
+      .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0))
       .slice(0, 3)
       .map((place) => ({
         id: `place-${place.id}`,
         type: 'place' as const,
         place,
         fallbackNewLabel: t('discoverPlaceMetaDiscover'),
+        accentColor: '#2ecc71',
       }));
 
     const nextItems: HomeRecommendationItem[] = [];
@@ -513,9 +523,9 @@ export default function HomeScreen() {
     }
 
     return nextItems.slice(0, 6);
-  }, [featuredEvents, locale, popularPlaces, t]);
+  }, [featuredEvents, locale, locationFilteredPlaces, t]);
 
-  const recommendedCarousel = useCarouselAutoplay(
+  const recommendedAutoplay = useVisibleItemAutoplay(
     recommendedInspiration,
     (item) => item.id,
   );
@@ -546,6 +556,9 @@ export default function HomeScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
+        onLayout={recommendedAutoplay.onLayout}
+        onScroll={recommendedAutoplay.onScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -564,7 +577,7 @@ export default function HomeScreen() {
         onNotificationPress={() => router.push('/notifications')}
       />
 
-      <View className="mt-6">
+      <View className="mt-2">
         <View className="mb-4 flex-row items-end justify-between px-5">
           <Text className="text-lg font-bold text-gray-800 dark:text-white">
             {t('homeFeatured')}
@@ -576,38 +589,91 @@ export default function HomeScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
-        ) : featuredInspiration.length > 0 ? (
-          <FlatList
-            data={featuredInspiration}
-            keyExtractor={(item) => item.event.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            viewabilityConfig={featuredCarousel.viewabilityConfig}
-            onViewableItemsChanged={featuredCarousel.onViewableItemsChanged}
-            snapToInterval={276}
-            decelerationRate="fast"
-            snapToAlignment="start"
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <EventInspirationCard
-                event={item.event}
-                imageHeight={178}
-                adaptiveHeight={false}
-                cityLabel={item.cityLabel}
-                placeLabel={item.placeLabel}
-                dateLabel={item.dateLabel}
-                priceLabel={item.priceLabel}
-                shouldPlay={featuredCarousel.activeId === item.event.id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/event/[id]',
-                    params: { id: item.event.id },
-                  })
-                }
-                style={{ width: 288, marginRight: 16 }}
-              />
-            )}
-          />
+        ) : currentFeaturedItem ? (
+          <View className="px-5">
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                onPress={goToPreviousFeatured}
+                disabled={!canNavigateFeatured}
+                className={`h-11 w-11 items-center justify-center rounded-full border ${
+                  canNavigateFeatured
+                    ? 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900'
+                    : 'border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-900'
+                }`}
+                style={{ opacity: canNavigateFeatured ? 1 : 0.45 }}
+              >
+                <Ionicons name="chevron-back" size={22} color="#4c669f" />
+              </TouchableOpacity>
+
+              <View className="min-w-0 flex-1">
+                <Animated.View
+                  style={{
+                    opacity: featuredTransition,
+                    transform: [
+                      {
+                        translateX: featuredTransition.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [featuredDirection === 1 ? 22 : -22, 0],
+                        }),
+                      },
+                      {
+                        scale: featuredTransition.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.985, 1],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <EventInspirationCard
+                    event={currentFeaturedItem.event}
+                    imageHeight={190}
+                    adaptiveHeight={false}
+                    cityLabel={currentFeaturedItem.cityLabel}
+                    placeLabel={currentFeaturedItem.placeLabel}
+                    dateLabel={currentFeaturedItem.dateLabel}
+                    priceLabel={currentFeaturedItem.priceLabel}
+                    shouldPlay
+                    onPress={() =>
+                      router.push({
+                        pathname: '/event/[id]',
+                        params: { id: currentFeaturedItem.event.id },
+                      })
+                    }
+                    style={{ width: '100%' }}
+                  />
+                </Animated.View>
+              </View>
+
+              <TouchableOpacity
+                onPress={goToNextFeatured}
+                disabled={!canNavigateFeatured}
+                className={`h-11 w-11 items-center justify-center rounded-full border ${
+                  canNavigateFeatured
+                    ? 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900'
+                    : 'border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-900'
+                }`}
+                style={{ opacity: canNavigateFeatured ? 1 : 0.45 }}
+              >
+                <Ionicons name="chevron-forward" size={22} color="#4c669f" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="mt-3 flex-row justify-center gap-2">
+              {featuredInspiration.map((item, index) => {
+                const isActive = index === featuredIndex;
+
+                return (
+                  <View
+                    key={item.event.id}
+                    className={`rounded-full ${
+                      isActive ? 'h-2.5 w-6 bg-[#4c669f]' : 'h-2.5 w-2.5 bg-gray-300 dark:bg-gray-700'
+                    }`}
+                  />
+                );
+              })}
+            </View>
+          </View>
         ) : (
           <SectionPlaceholder message={t('homeNoEvents')} />
         )}
@@ -645,56 +711,9 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <View className="mt-8">
-        <View className="mb-4 flex-row items-end justify-between px-5">
-          <Text className="text-lg font-bold text-gray-800 dark:text-white">
-            {t('homePopularPlaces')}
-          </Text>
-          <TouchableOpacity onPress={() => router.push(placesRoute)}>
-            <Text className="text-xs font-medium text-[#4c669f]">{t('homeSeeAll')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator size="large" color="#2ecc71" className="mt-4" />
-        ) : popularPlaces.length > 0 ? (
-          <FlatList
-            className="pb-4"
-            data={popularPlaces}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            viewabilityConfig={popularCarousel.viewabilityConfig}
-            onViewableItemsChanged={popularCarousel.onViewableItemsChanged}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <PlaceInspirationCard
-                place={item}
-                imageHeight={178}
-                adaptiveHeight={false}
-                fallbackNewLabel={t('placesNewBadge')}
-                shouldPlay={popularCarousel.activeId === item.id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/place/[id]',
-                    params: { id: item.id },
-                  })
-                }
-                isSaved={savedPlaceIds.has(item.id)}
-                onToggleSave={() => void handleTogglePlaceSave(item.id)}
-                saving={savingPlaceIds.has(item.id)}
-                style={{ width: 288, marginRight: 16 }}
-              />
-            )}
-          />
-        ) : (
-          <SectionPlaceholder message={t('homeNoPlaces')} />
-        )}
-      </View>
-
       <View className="mt-3 px-5 pb-24">
         <View className="mb-4 flex-row items-end justify-between">
-          <Text className="text-lg font-bold text-gray-800 dark:text-white">
+          <Text className="mt-2 text-lg font-bold text-gray-800 dark:text-white">
             {t('homeRecommended')}
           </Text>
           <TouchableOpacity onPress={() => router.push(discoverRoute)}>
@@ -705,45 +724,46 @@ export default function HomeScreen() {
         {loading ? (
           <ActivityIndicator size="large" color="#f39c12" className="mt-4" />
         ) : recommendedInspiration.length > 0 ? (
-          <FlatList
-            data={recommendedInspiration}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            viewabilityConfig={recommendedCarousel.viewabilityConfig}
-            onViewableItemsChanged={recommendedCarousel.onViewableItemsChanged}
-            snapToInterval={304}
-            decelerationRate="fast"
-            snapToAlignment="start"
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              item.type === 'event' ? (
-                <EventInspirationCard
-                  event={item.event}
-                  cityLabel={item.cityLabel}
-                  placeLabel={item.placeLabel}
-                  dateLabel={item.dateLabel}
-                  priceLabel={item.priceLabel}
-                  borderColor={item.accentColor}
-                  imageHeight={188}
-                  adaptiveHeight={false}
-                  shouldPlay={recommendedCarousel.activeId === item.id}
-                  style={{ width: 288, marginRight: 16 }}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/event/[id]',
-                      params: { id: item.event.id },
-                    })
-                  }
-                />
-              ) : (
+          <MasonryGrid
+            items={recommendedInspiration}
+            getKey={(item) => item.id}
+            estimateItemHeight={(_, index) => estimateRecommendationCardHeight(index)}
+            onItemLayout={(item, layout) => {
+              recommendedAutoplay.registerLayout(item.id, layout);
+            }}
+            renderItem={(item, index) => {
+              const imageHeights = [182, 240, 208, 262, 194, 228];
+
+              if (item.type === 'event') {
+                return (
+                  <EventInspirationCard
+                    event={item.event}
+                    cityLabel={item.cityLabel}
+                    placeLabel={item.placeLabel}
+                    dateLabel={item.dateLabel}
+                    priceLabel={item.priceLabel}
+                    borderColor={item.accentColor}
+                    imageHeight={imageHeights[index % imageHeights.length]}
+                    adaptiveHeight={false}
+                    shouldPlay={recommendedAutoplay.activeId === item.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/event/[id]',
+                        params: { id: item.event.id },
+                      })
+                    }
+                  />
+                );
+              }
+
+              return (
                 <PlaceInspirationCard
                   place={item.place}
-                  imageHeight={188}
+                  imageHeight={imageHeights[index % imageHeights.length]}
                   fallbackNewLabel={item.fallbackNewLabel}
+                  borderColor={item.accentColor}
                   adaptiveHeight={false}
-                  shouldPlay={recommendedCarousel.activeId === item.id}
-                  style={{ width: 288, marginRight: 16 }}
+                  shouldPlay={recommendedAutoplay.activeId === item.id}
                   isSaved={savedPlaceIds.has(item.place.id)}
                   onToggleSave={() => void handleTogglePlaceSave(item.place.id)}
                   saving={savingPlaceIds.has(item.place.id)}
@@ -754,8 +774,8 @@ export default function HomeScreen() {
                     })
                   }
                 />
-              )
-            )}
+              );
+            }}
           />
         ) : (
           <SectionPlaceholder message={t('homeNoSuggestions')} />

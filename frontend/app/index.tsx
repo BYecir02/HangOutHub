@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, type Href } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 
 import AuthBrandBadge from '@/components/auth/AuthBrandBadge';
 import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
@@ -25,10 +25,10 @@ import {
 } from '@/services/organizer-access';
 import {
   clearStoredUserSession,
-  resolveStoredUserSession,
   setStoredUserSession,
   type StoredUserSession,
 } from '@/services/user-session';
+import { useAuthBootstrap } from '@/context/auth-bootstrap';
 
 const LOGIN_HIGHLIGHTS = [
   { icon: 'musical-notes-outline', labelKey: 'loginHighlightEventsLive' },
@@ -45,6 +45,23 @@ export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
+  const { status, targetHref } = useAuthBootstrap();
+
+  useEffect(() => {
+    const restoreAuthNotice = async () => {
+      const reason = await storage.getItem('authRedirectReason');
+
+      if (reason === 'session_expired') {
+        setAuthNotice(t('loginSessionExpiredNotice'));
+      }
+
+      if (reason) {
+        await storage.removeItem('authRedirectReason');
+      }
+    };
+
+    void restoreAuthNotice();
+  }, [t]);
 
   const clearSession = async () => {
     await storage.removeItem('userToken');
@@ -70,55 +87,9 @@ export default function LoginScreen() {
     }
   };
 
-  useEffect(() => {
-    const restoreAuthNotice = async () => {
-      const reason = await storage.getItem('authRedirectReason');
-
-      if (reason === 'session_expired') {
-        setAuthNotice(t('loginSessionExpiredNotice'));
-      }
-
-      if (reason) {
-        await storage.removeItem('authRedirectReason');
-      }
-    };
-
-    void restoreAuthNotice();
-
-    const checkLogin = async () => {
-    
-      try {
-        const token = await storage.getItem('userToken');
-
-        if (!token) {
-          return;
-        }
-
-        const user = await resolveStoredUserSession();
-
-        if (!user) {
-          await clearSession();
-          return;
-        }
-
-        if (isOrganizerUser(user)) {
-          if (!canAccessOrganizerPanel(user)) {
-            await clearSession();
-            return;
-          }
-
-          router.replace(getOrganizerEntryPath(user) as Href);
-          return;
-        }
-
-        router.replace('/(tabs)/home');
-      } catch {
-        console.log('Pas de session active');
-      }
-    };
-
-    void checkLogin();
-  }, [router, t]);
+  if (status === 'authenticated' && targetHref) {
+    return <Redirect href={targetHref} />;
+  }
 
   const handleLogin = async () => {
     const normalizedEmail = email.replace(/\s+/g, '').toLowerCase();

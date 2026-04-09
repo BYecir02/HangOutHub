@@ -13,12 +13,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 
-import MediaFrame from '@/components/ui/MediaFrame';
+import EventInspirationCard from '@/components/ui/EventInspirationCard';
 import MasonryGrid from '@/components/ui/MasonryGrid';
+import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
+import {
+  formatEventCardPriceLabel,
+  formatEventDate,
+} from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import {
   AnimationMeta,
@@ -75,15 +80,6 @@ const EVENT_PLACEHOLDER =
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
-function formatEventDate(value: string, locale: string) {
-  return new Date(value).toLocaleString(locale, {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function EmptyBlock({
   title,
   message,
@@ -101,163 +97,12 @@ function EmptyBlock({
   );
 }
 
-type CategoryInspirationItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  meta: string;
-  image: string;
-  targetId: string;
-  metaIcon: keyof typeof Ionicons.glyphMap;
-};
-
 const isUnauthorized = (error: unknown) =>
   (error as { response?: { status?: number } }).response?.status === 401;
 
 function estimateCategoryCardHeight(index: number) {
-  const imageHeights = [182, 238, 204, 258, 194, 228];
+  const imageHeights = [182, 240, 208, 262, 194, 228];
   return imageHeights[index % imageHeights.length] + 124;
-}
-
-function CategoryInspirationCard({
-  item,
-  imageHeight,
-  accentColor,
-  shouldPlay = false,
-  onPress,
-  showSaveButton = false,
-  isSaved = false,
-  onToggleSave,
-  saving = false,
-}: {
-  item: CategoryInspirationItem;
-  imageHeight: number;
-  accentColor: string;
-  shouldPlay?: boolean;
-  onPress: () => void;
-  showSaveButton?: boolean;
-  isSaved?: boolean;
-  onToggleSave?: () => void;
-  saving?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="mb-4 overflow-hidden rounded-[30px] border bg-white dark:bg-gray-900"
-      activeOpacity={0.92}
-      style={{
-        borderColor: accentColor,
-        borderWidth: 2,
-      }}
-    >
-      <View className="relative">
-        <MediaFrame
-          source={item.image}
-          className="w-full bg-gray-200 dark:bg-gray-800"
-          style={{ height: imageHeight }}
-          shouldPlay={shouldPlay}
-          adaptiveHeight
-          minHeight={imageHeight}
-          maxHeight={380}
-        />
-
-        <View className="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1.5">
-          <View className="flex-row items-center">
-            <Ionicons name={item.metaIcon} size={10} color="#ffffff" />
-            <Text className="ml-1 text-[10px] font-semibold text-white">
-              {item.meta}
-            </Text>
-          </View>
-        </View>
-
-        {showSaveButton && onToggleSave ? (
-          <TouchableOpacity
-            onPress={onToggleSave}
-            disabled={saving}
-            className={`absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-2xl border ${
-              isSaved
-                ? 'border-[#2ecc71] bg-green-50/95 dark:bg-green-900/20'
-                : 'border-white/80 bg-white/95 dark:border-gray-700 dark:bg-gray-800'
-            }`}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={isSaved ? '#2ecc71' : '#4c669f'} />
-            ) : (
-              <Ionicons
-                name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                size={18}
-                color={isSaved ? '#2ecc71' : '#4c669f'}
-              />
-            )}
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      <View className="p-4">
-        <Text className="text-base font-bold text-gray-900 dark:text-white" numberOfLines={2}>
-          {item.title}
-        </Text>
-
-        {item.subtitle ? (
-          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400" numberOfLines={2}>
-            {item.subtitle}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function CategoryInspirationMasonry({
-  items,
-  accentColor,
-  activeItemId,
-  registerLayout,
-  onPressItem,
-  showSaveButton = false,
-  isSavedItem,
-  isSavingItem,
-  onToggleSaveItem,
-}: {
-  items: CategoryInspirationItem[];
-  accentColor: string;
-  activeItemId: string | null;
-  registerLayout: (id: string, layout: { y: number; height: number }) => void;
-  onPressItem: (item: CategoryInspirationItem) => void;
-  showSaveButton?: boolean;
-  isSavedItem?: (placeId: string) => boolean;
-  isSavingItem?: (placeId: string) => boolean;
-  onToggleSaveItem?: (placeId: string) => void;
-}) {
-  return (
-    <MasonryGrid
-      items={items}
-      getKey={(item) => item.id}
-      estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
-      onItemLayout={(item, layout) => {
-        registerLayout(item.id, layout);
-      }}
-      renderItem={(item, index) => {
-        const imageHeights = [182, 238, 204, 258, 194, 228];
-
-        return (
-          <CategoryInspirationCard
-            item={item}
-            imageHeight={imageHeights[index % imageHeights.length]}
-            accentColor={accentColor}
-            shouldPlay={activeItemId === item.id}
-            onPress={() => onPressItem(item)}
-            showSaveButton={showSaveButton}
-            isSaved={isSavedItem ? isSavedItem(item.targetId) : false}
-            saving={isSavingItem ? isSavingItem(item.targetId) : false}
-            onToggleSave={
-              onToggleSaveItem ? () => onToggleSaveItem(item.targetId) : undefined
-            }
-          />
-        );
-      }}
-    />
-  );
 }
 
 export default function CategoryDiscoverScreen() {
@@ -424,42 +269,15 @@ export default function CategoryDiscoverScreen() {
     );
   }
 
-  const eventItems = useMemo<CategoryInspirationItem[]>(
-    () =>
-      (data?.events || []).map((item) => ({
-        id: `event-${item.id}`,
-        title: item.title,
-        subtitle: item.Place?.name || item.Place?.City?.name || item.address || '',
-        meta: formatEventDate(item.startTime, locale),
-        image: getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER,
-        targetId: item.id,
-        metaIcon: 'time-outline',
-      })),
-    [data?.events, locale],
+  const eventAutoplay = useVisibleItemAutoplay(
+    data?.events ?? [],
+    (item) => `event-${item.id}`,
   );
-
-  const placeItems = useMemo<CategoryInspirationItem[]>(
-    () =>
-      (data?.places || []).map((item) => ({
-        id: `place-${item.id}`,
-        title: item.name,
-        subtitle: item.City?.name || item.address || '',
-        meta:
-          typeof item.avgRating === 'number' && item.avgRating > 0
-            ? item.avgRating.toFixed(1)
-            : t('discoverPlaceMetaDiscover'),
-        image: getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER,
-        targetId: item.id,
-        metaIcon:
-          typeof item.avgRating === 'number' && item.avgRating > 0
-            ? 'star'
-            : 'sparkles',
-      })),
-    [data?.places, t],
+  const placeAutoplay = useVisibleItemAutoplay(
+    data?.places ?? [],
+    (item) => `place-${item.id}`,
   );
-
-  const activeItems = activeTab === 'events' ? eventItems : placeItems;
-  const categoryAutoplay = useVisibleItemAutoplay(activeItems, (item) => item.id);
+  const categoryAutoplay = activeTab === 'events' ? eventAutoplay : placeAutoplay;
 
   return (
     <ScrollView
@@ -669,18 +487,44 @@ export default function CategoryDiscoverScreen() {
 
           <View className="px-5 pb-24 pt-6">
             {activeTab === 'events' ? (
-              eventItems.length > 0 ? (
-                <CategoryInspirationMasonry
-                  items={eventItems}
-                  accentColor={data.category.color}
-                  activeItemId={categoryAutoplay.activeId}
-                  registerLayout={categoryAutoplay.registerLayout}
-                  onPressItem={(item) =>
-                    router.push({
-                      pathname: '/event/[id]',
-                      params: { id: item.targetId },
-                    })
-                  }
+              data.events.length > 0 ? (
+                <MasonryGrid
+                  items={data.events}
+                  getKey={(item) => `event-${item.id}`}
+                  estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
+                  onItemLayout={(item, layout) => {
+                    eventAutoplay.registerLayout(`event-${item.id}`, layout);
+                  }}
+                  renderItem={(item, index) => {
+                    const imageHeights = [182, 240, 208, 262, 194, 228];
+
+                    return (
+                      <EventInspirationCard
+                        event={{
+                          id: item.id,
+                          title: item.title,
+                          coverUrl: item.coverUrl,
+                        }}
+                        imageHeight={imageHeights[index % imageHeights.length]}
+                        cityLabel={item.Place?.City?.name || ''}
+                        placeLabel={item.Place?.name || item.address || ''}
+                        dateLabel={formatEventDate(item.startTime, locale)}
+                        priceLabel={formatEventCardPriceLabel(item, locale, {
+                          freeLabel: t('homePriceFree'),
+                          soldOutLabel: t('homePriceSoldOut'),
+                        })}
+                        borderColor={data.category.color}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/event/[id]',
+                            params: { id: item.id },
+                          })
+                        }
+                        shouldPlay={categoryAutoplay.activeId === `event-${item.id}`}
+                        adaptiveHeight={false}
+                      />
+                    );
+                  }}
                 />
               ) : (
                 <EmptyBlock
@@ -688,23 +532,36 @@ export default function CategoryDiscoverScreen() {
                   message={t('categoryEmptyEventsDescription')}
                 />
               )
-            ) : placeItems.length > 0 ? (
-              <CategoryInspirationMasonry
-                items={placeItems}
-                accentColor={data.category.color}
-                activeItemId={categoryAutoplay.activeId}
-                registerLayout={categoryAutoplay.registerLayout}
-                onPressItem={(item) =>
-                  router.push({
-                    pathname: '/place/[id]',
-                    params: { id: item.targetId },
-                  })
-                }
-                showSaveButton
-                isSavedItem={(placeId) => savedPlaceIds.has(placeId)}
-                isSavingItem={(placeId) => savingPlaceIds.has(placeId)}
-                onToggleSaveItem={(placeId) => {
-                  void handleTogglePlaceSave(placeId);
+            ) : data.places.length > 0 ? (
+              <MasonryGrid
+                items={data.places}
+                getKey={(item) => `place-${item.id}`}
+                estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
+                onItemLayout={(item, layout) => {
+                  placeAutoplay.registerLayout(`place-${item.id}`, layout);
+                }}
+                renderItem={(item, index) => {
+                  const imageHeights = [182, 240, 208, 262, 194, 228];
+
+                  return (
+                    <PlaceInspirationCard
+                      place={item}
+                      imageHeight={imageHeights[index % imageHeights.length]}
+                      fallbackNewLabel={t('discoverPlaceMetaDiscover')}
+                      borderColor={data.category.color}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/place/[id]',
+                          params: { id: item.id },
+                        })
+                      }
+                      isSaved={savedPlaceIds.has(item.id)}
+                      onToggleSave={() => void handleTogglePlaceSave(item.id)}
+                      saving={savingPlaceIds.has(item.id)}
+                      shouldPlay={categoryAutoplay.activeId === `place-${item.id}`}
+                      adaptiveHeight={false}
+                    />
+                  );
                 }}
               />
             ) : (

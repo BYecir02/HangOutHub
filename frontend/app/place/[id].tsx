@@ -93,7 +93,6 @@ function formatPriceLevel(
 
   return t('placeDetailPriceLevel', { symbols: '$'.repeat(level), level });
 }
-
 function formatEventDate(value: string, locale: string) {
   return new Date(value).toLocaleString(locale, {
     day: '2-digit',
@@ -550,16 +549,6 @@ export default function PlaceDetailScreen() {
           </View>
           <View className="absolute inset-x-0 px-5" style={{ bottom: heroBadgeBottom }}>
             <View className="max-w-[90%] flex-row flex-wrap gap-2">
-              <View className="rounded-full bg-black/55 px-3 py-2">
-                <Text className="text-xs font-semibold text-white">
-                  {place.City?.name || t('placeDetailCityUnknown')}
-                </Text>
-              </View>
-              <View className="rounded-full bg-black/55 px-3 py-2">
-                <Text className="text-xs font-semibold text-white">
-                  {formatPriceLevel(place.priceLevel, t)}
-                </Text>
-              </View>
               {place.category ? (
                 <View className="rounded-full bg-black/55 px-3 py-2">
                   <Text className="text-xs font-semibold text-white">
@@ -587,7 +576,6 @@ export default function PlaceDetailScreen() {
             </Text>
             <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               {place.City?.name || t('placeDetailCityUnknown')}
-              {place.address ? ` • ${place.address}` : ''}
             </Text>
           </View>
           <TouchableOpacity

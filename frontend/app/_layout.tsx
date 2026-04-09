@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LogBox } from 'react-native';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Text, TextInput, View } from 'react-native';
 import type { TextInputProps, TextProps } from 'react-native';
 
 import { useFonts } from 'expo-font';
@@ -17,6 +17,9 @@ const poppinsFonts = {
   Poppins_500Medium: require('../assets/fonts/Poppins_500Medium.ttf'),
   Poppins_600SemiBold: require('../assets/fonts/Poppins_600SemiBold.ttf'),
 };
+
+const DARK_LOGO = require('../assets/images/hangouthub-logo-dark.png');
+const LIGHT_LOGO = require('../assets/images/hangouthub-logo-light.png');
 
 import '../global.css';
 
@@ -30,6 +33,13 @@ import {
   type StoredThemePreference,
 } from '@/services/app-preferences';
 import { getMySettings } from '@/services/settings';
+import { AuthBootstrapProvider } from '@/context/auth-bootstrap';
+import { resolveStoredUserSession } from '@/services/user-session';
+import {
+  canAccessOrganizerPanel,
+  getOrganizerEntryPath,
+  isOrganizerUser,
+} from '@/services/organizer-access';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -37,6 +47,61 @@ export const unstable_settings = {
 
 const isUnauthorized = (error: unknown) =>
   (error as { response?: { status?: number } }).response?.status === 401;
+
+const HOME_ROUTE = '/(tabs)/home' as Href;
+const BOOTSTRAP_MIN_DISPLAY_MS = __DEV__ ? 2200 : 0;
+
+const wait = (duration: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, duration);
+  });
+
+function AppBootstrapScreen({ isDark }: { isDark: boolean }) {
+  return (
+    <View
+      className={`flex-1 items-center justify-center px-6 ${
+        isDark ? 'bg-[#050816]' : 'bg-[#f7fbff]'
+      }`}
+    >
+      <View className="items-center">
+        <View
+          className={`items-center justify-center rounded-[36px] border p-5 shadow-sm ${
+            isDark
+              ? 'border-white/10 bg-white/5'
+              : 'border-slate-200 bg-white'
+          }`}
+        >
+          <Image
+            source={isDark ? DARK_LOGO : LIGHT_LOGO}
+            style={{ width: 140, height: 140 }}
+            resizeMode="contain"
+          />
+        </View>
+
+        <Text
+          className={`mt-6 text-center text-2xl font-bold ${
+            isDark ? 'text-white' : 'text-slate-950'
+          }`}
+        >
+          HangOutHub
+        </Text>
+
+        <ActivityIndicator
+          size="large"
+          color="#4c669f"
+          className="mt-6"
+        />
+        <Text
+          className={`mt-3 text-center text-sm ${
+            isDark ? 'text-slate-400' : 'text-slate-500'
+          }`}
+        >
+          Verification de la session...
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 LogBox.ignoreLogs([
   'SafeAreaView has been deprecated and will be removed in a future release.',
@@ -49,6 +114,13 @@ export default function RootLayout() {
   const [themePreference, setThemePreference] = useState<StoredThemePreference>(
     getCurrentThemePreference(),
   );
+  const [authState, setAuthState] = useState<{
+    status: 'loading' | 'unauthenticated' | 'authenticated';
+    targetHref: Href | null;
+  }>({
+    status: 'loading',
+    targetHref: null,
+  });
 
   useEffect(() => {
     const unsubscribe = subscribeThemePreference(setThemePreference);
@@ -101,145 +173,209 @@ export default function RootLayout() {
   useEffect(() => {
     let isMounted = true;
 
-    const bootstrapPreferences = async () => {
-      await loadAppPreferences();
+    const bootstrapAuth = async () => {
+      const bootstrapStartedAt = Date.now();
 
       const token = await storage.getItem('userToken');
 
-      if (!token || !isMounted) {
+      const ensureMinimumDisplay = async () => {
+        const elapsed = Date.now() - bootstrapStartedAt;
+        const remaining = BOOTSTRAP_MIN_DISPLAY_MS - elapsed;
+
+        if (remaining > 0) {
+          await wait(remaining);
+        }
+      };
+
+      if (!token) {
+        await ensureMinimumDisplay();
+
+        if (isMounted) {
+          setAuthState({
+            status: 'unauthenticated',
+            targetHref: null,
+          });
+        }
+
         return;
       }
 
       try {
-        const settings = await getMySettings();
+        const user = await resolveStoredUserSession();
 
-        if (isMounted) {
-          await syncAppPreferencesFromSettings(settings);
-        }
-      } catch (error) {
-        if (isUnauthorized(error)) {
-          await clearAuthState();
+        if (!isMounted) {
           return;
         }
 
-        // Ignore l'erreur: l'app continue sur les preferences locales.
+        if (!user) {
+          await ensureMinimumDisplay();
+
+          setAuthState({
+            status: 'unauthenticated',
+            targetHref: null,
+          });
+          return;
+        }
+
+        const nextTargetHref = isOrganizerUser(user)
+          ? (getOrganizerEntryPath(user) as Href)
+          : HOME_ROUTE;
+
+        if (isOrganizerUser(user) && !canAccessOrganizerPanel(user)) {
+          await clearAuthState();
+          await ensureMinimumDisplay();
+
+          setAuthState({
+            status: 'unauthenticated',
+            targetHref: null,
+          });
+          return;
+        }
+
+        await ensureMinimumDisplay();
+
+        setAuthState({
+          status: 'authenticated',
+          targetHref: nextTargetHref,
+        });
+
+        void (async () => {
+          try {
+            const settings = await getMySettings();
+            if (isMounted) {
+              await syncAppPreferencesFromSettings(settings);
+            }
+          } catch (error) {
+            if (isUnauthorized(error)) {
+              await clearAuthState();
+            }
+          }
+        })();
+      } catch (error) {
+        if (isUnauthorized(error)) {
+          await clearAuthState();
+        }
+
+        await ensureMinimumDisplay();
+
+        if (isMounted) {
+          setAuthState({
+            status: 'unauthenticated',
+            targetHref: null,
+          });
+        }
       }
     };
 
-    void bootstrapPreferences();
+    void bootstrapAuth();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  if (!fontsLoaded) {
-    return (
-      <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
-        <Text className="mt-2 text-gray-500 dark:text-gray-400">
-          Chargement en cours…
-        </Text>
-      </View>
-    );
+  if (!fontsLoaded || authState.status === 'loading') {
+    return <AppBootstrapScreen isDark={colorScheme === 'dark'} />;
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="register" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="activate-pro"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-          <Stack.Screen name="preferences" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="settings"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="notification-settings"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="help-support"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="create-modal"
-            options={{
-              presentation: 'transparentModal',
-              headerShown: false,
-              animation: 'none',
-            }}
-          />
-          <Stack.Screen
-            name="event"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="event-booking/[id]" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="location"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen
-            name="outing"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen name="outing/[id]" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="place"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen name="place/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="events" options={{ headerShown: false }} />
-          <Stack.Screen name="event-scans/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="my-tickets" options={{ headerShown: false }} />
-          <Stack.Screen name="my-ticket/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="places" options={{ headerShown: false }} />
-          <Stack.Screen name="discover" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="post"
-            options={{ headerShown: false, presentation: 'fullScreenModal' }}
-          />
-          <Stack.Screen name="organizer" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="comments"
-            options={{
-              presentation: 'transparentModal',
-              headerShown: false,
-              animation: 'fade',
-            }}
-          />
-          <Stack.Screen name="search" options={{ headerShown: false }} />
-          <Stack.Screen name="notifications" options={{ headerShown: false }} />
-          <Stack.Screen name="friend-requests" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="outing-invitations"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="connections" options={{ headerShown: false }} />
-          <Stack.Screen name="messages" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="outing-chat/[id]"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
-          </Stack>
+          <AuthBootstrapProvider value={authState}>
+            <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="register" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="activate-pro"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
+            <Stack.Screen name="preferences" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="settings"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="notification-settings"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="help-support"
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="create-modal"
+              options={{
+                presentation: 'transparentModal',
+                headerShown: false,
+                animation: 'none',
+              }}
+            />
+            <Stack.Screen
+              name="event"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen name="event-edit/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="event-booking/[id]" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="location"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen
+              name="outing"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen name="outing/[id]" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="place"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen name="place/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="events" options={{ headerShown: false }} />
+            <Stack.Screen name="event-scans/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="my-tickets" options={{ headerShown: false }} />
+            <Stack.Screen name="my-ticket/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="places" options={{ headerShown: false }} />
+            <Stack.Screen name="discover" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="post"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen name="organizer" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="comments"
+              options={{
+                presentation: 'transparentModal',
+                headerShown: false,
+                animation: 'fade',
+              }}
+            />
+            <Stack.Screen name="search" options={{ headerShown: false }} />
+            <Stack.Screen name="notifications" options={{ headerShown: false }} />
+            <Stack.Screen name="friend-requests" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="outing-invitations"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="connections" options={{ headerShown: false }} />
+            <Stack.Screen name="messages" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="outing-chat/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
+            </Stack>
+          </AuthBootstrapProvider>
           <StatusBar style="auto" />
         </ThemeProvider>
       </SafeAreaProvider>
