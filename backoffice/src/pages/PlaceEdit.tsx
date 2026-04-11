@@ -15,8 +15,9 @@ import SectionTitle from '../components/SectionTitle';
 import FormField from '../components/FormField';
 import LoadingState from '../components/LoadingState';
 import MediaPreview from '../components/MediaPreview';
-import SelectField from '../components/SelectField';
 import Card from '../components/Card';
+import CitySelector from '../components/CitySelector';
+import SelectField from '../components/SelectField';
 import { getMediaUploadErrorMessage } from '../lib/media';
 
 interface CityOption {
@@ -358,6 +359,19 @@ export default function PlaceEditPage() {
   );
   const [showModerationAdvanced, setShowModerationAdvanced] = useState(false);
   const [error, setError] = useState('');
+
+  const handleCreateCity = async (payload: { name: string; country: string }) => {
+    const created = await apiPost<CityOption>('/cities', payload);
+    setCities((current) => {
+      const next = current.some((item) => item.id === created.id)
+        ? current
+        : [...current, created];
+
+      return [...next].sort((left, right) => left.name.localeCompare(right.name));
+    });
+
+    return created;
+  };
 
   const buildCreateDraft = (source: DuplicatePlaceSource): PlaceDetails => ({
     ...EMPTY_PLACE,
@@ -736,21 +750,11 @@ export default function PlaceEditPage() {
             </FormField>
           </div>
           <FormField label="Ville">
-            <SelectField
-              value={place.City?.id ?? ''}
-              onChange={(value) => {
-                const cityId = Number(value || 0);
-                const city = cities.find((item) => item.id === cityId) || null;
-                setPlace({ ...place, City: city });
-              }}
-              className="w-full"
-              options={[
-                { label: 'Selectionner', value: '' },
-                ...cities.map((city) => ({
-                  label: `${city.name} - ${city.country}`,
-                  value: city.id,
-                })),
-              ]}
+            <CitySelector
+              value={place.City ?? null}
+              cities={cities}
+              onChange={(city) => setPlace({ ...place, City: city })}
+              onCreate={handleCreateCity}
             />
           </FormField>
           <FormField label="Niveau de prix">

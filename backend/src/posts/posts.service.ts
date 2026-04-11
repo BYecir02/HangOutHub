@@ -464,13 +464,10 @@ export class PostsService {
     };
   }
 
-  async findAllByPlace(placeId: string, userId: string, userRole: string) {
-    await this.ensureStructurePublicationPermission(userId, userRole, placeId);
-
+  async findAllByPlace(placeId: string, userId: string) {
     const posts = await this.prisma.post.findMany({
       where: {
         placeId,
-        publicationScope: 'structure',
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       include: {
@@ -526,7 +523,34 @@ export class PostsService {
       },
     });
 
-    return posts.map((post) => this.serializePost(post, userId));
+    const connectionIds = await this.getConnectionIds(userId);
+    const visiblePosts = posts.filter((post) => {
+      if (post.userId === userId) {
+        return true;
+      }
+
+      const visibility = post.visibility || 'public';
+
+      if (visibility === 'public') {
+        return true;
+      }
+
+      if (visibility === 'private') {
+        return false;
+      }
+
+      if (visibility === 'custom') {
+        return (post.visibilityUserIds || []).includes(userId);
+      }
+
+      if (visibility === 'friends') {
+        return connectionIds.includes(post.userId);
+      }
+
+      return false;
+    });
+
+    return visiblePosts.map((post) => this.serializePost(post, userId));
   }
 
   async findOneForUser(id: string, currentUserId: string) {

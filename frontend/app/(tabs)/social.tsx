@@ -5,7 +5,7 @@ import SocialFeed from '../../components/social/SocialFeed';
 
 export default function SocialScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-gray-900" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-black" edges={['top']}>
       <SocialFeed />
     </SafeAreaView>
   );

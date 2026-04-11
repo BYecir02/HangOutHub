@@ -10,6 +10,7 @@ interface HeaderProps {
   onNotificationPress?: () => void;
   onLocationPress?: () => void;
   onSearchPress?: () => void;
+  onFilterPress?: () => void;
   notificationCount?: number;
 }
 
@@ -19,6 +20,7 @@ export default function Header({
   onNotificationPress,
   onLocationPress,
   onSearchPress,
+  onFilterPress,
   notificationCount = 0,
 }: HeaderProps) {
   const colorScheme = useColorScheme();
@@ -26,11 +28,15 @@ export default function Header({
   const safeCount = Number.isFinite(notificationCount) ? notificationCount : 0;
   const badgeLabel = safeCount > 99 ? '99+' : String(safeCount);
   const hasSearchAction = typeof onSearchPress === 'function';
+  const hasFilterAction = typeof onFilterPress === 'function';
+  const actionCount = 1 + Number(hasSearchAction) + Number(hasFilterAction);
+  const actionWidthClass =
+    actionCount >= 3 ? 'w-28' : actionCount === 2 ? 'w-20' : 'w-10';
 
   return (
-    <View className="bg-white dark:bg-black px-5 pt-14 pb-4 shadow-sm flex-row justify-between items-center">
+    <View className="bg-gray-50 dark:bg-black px-5 pt-14 pb-4  flex-row justify-between items-center">
       {/* Espace vide pour ÃƒÂ©quilibrer le header et garder le titre centrÃƒÂ© */}
-      <View className={hasSearchAction ? 'w-20' : 'w-10'} />
+      <View className={actionWidthClass} />
 
       {/* Localisation Centrale */}
       <TouchableOpacity className="flex-row items-center" onPress={onLocationPress}>
@@ -48,9 +54,11 @@ export default function Header({
       {/* Actions ÃƒÂ  droite */}
       <View
         className={
-          hasSearchAction
-            ? 'flex-row items-center justify-end w-20'
-            : 'flex-row items-center justify-end w-10'
+          actionWidthClass === 'w-28'
+            ? 'flex-row items-center justify-end w-28'
+            : actionWidthClass === 'w-20'
+              ? 'flex-row items-center justify-end w-20'
+              : 'flex-row items-center justify-end w-10'
         }
       >
         {hasSearchAction ? (
@@ -59,6 +67,15 @@ export default function Header({
             className="h-10 w-10 justify-center items-center mr-1"
           >
             <Ionicons name="search-outline" size={24} color={isDark ? "#fff" : "#333"} />
+          </TouchableOpacity>
+        ) : null}
+
+        {hasFilterAction ? (
+          <TouchableOpacity
+            onPress={onFilterPress}
+            className="h-10 w-10 justify-center items-center mr-1"
+          >
+            <Ionicons name="funnel-outline" size={22} color={isDark ? "#fff" : "#333"} />
           </TouchableOpacity>
         ) : null}
 

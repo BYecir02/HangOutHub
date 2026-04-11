@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 type AvatarProps = {
@@ -42,6 +42,11 @@ export default function Avatar({
   style,
 }: AvatarProps) {
   const initials = useMemo(() => getInitials(label), [label]);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [uri]);
 
   return (
     <View
@@ -58,11 +63,12 @@ export default function Avatar({
       ]}
       className="overflow-hidden"
     >
-      {uri ? (
+      {uri && !imageFailed ? (
         <Image
           source={{ uri }}
           resizeMode="cover"
           style={{ width: size, height: size, borderRadius: size / 2 }}
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <View className="flex-1 items-center justify-center">

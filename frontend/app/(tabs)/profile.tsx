@@ -21,7 +21,7 @@ import { SkeletonBlock } from '../../components/ui/Skeleton';
 import Tabs from '../../components/ui/Tabs';
 import { getImageUrl } from '../../services/api';
 import {
-  canAccessOrganizerPanel,
+  canAccessOrganizerPanel, 
   getOrganizerEntryPath,
   isOrganizerPending,
   isOrganizerRejected,

@@ -1333,7 +1333,7 @@ export default function SocialFeed() {
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
-        className="flex-1 bg-white dark:bg-gray-900"
+        className="flex-1 bg-gray-50 dark:bg-black"
       />
 
       <SocialFeedFiltersSheet

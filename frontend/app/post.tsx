@@ -409,6 +409,20 @@ export default function CreatePostScreen() {
   const hasContextDetails = Boolean(
     ambiance || placeName.trim() || cityName.trim() || eventTitle,
   );
+  const previewLocation = [placeName.trim(), cityName.trim()].filter(Boolean).join(' • ');
+  const isLocalImage = (uri: string) =>
+    uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
+
+  function resolveMediaUri(uri: string) {
+    if (!uri) {
+      return uri;
+    }
+    if (isLocalImage(uri) || uri.startsWith('http://') || uri.startsWith('https://')) {
+      return uri;
+    }
+    return getImageUrl(uri) || uri;
+  }
+
   const previewPostCreatedAt = new Date().toISOString();
   const previewPost: PostItemData = {
     id: 'post-preview',
@@ -499,19 +513,6 @@ export default function CreatePostScreen() {
   }, [isEditing, t]);
   const isEditStep = currentStep === 1;
   const isPreviewStep = currentStep === 2;
-
-  const isLocalImage = (uri: string) =>
-    uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://');
-
-  const resolveMediaUri = (uri: string) => {
-    if (!uri) {
-      return uri;
-    }
-    if (isLocalImage(uri) || uri.startsWith('http://') || uri.startsWith('https://')) {
-      return uri;
-    }
-    return getImageUrl(uri) || uri;
-  };
 
   const buildUploadPayload = (media: PostMediaItem, index: number) =>
     buildMediaUploadPayload(

@@ -18,8 +18,7 @@ const poppinsFonts = {
   Poppins_600SemiBold: require('../assets/fonts/Poppins_600SemiBold.ttf'),
 };
 
-const DARK_LOGO = require('../assets/images/hangouthub-logo-dark.png');
-const LIGHT_LOGO = require('../assets/images/hangouthub-logo-light.png');
+const BOOTSTRAP_LOGO = require('../assets/images/hangouthub-logo-mark-512.png');
 
 import '../global.css';
 
@@ -49,7 +48,7 @@ const isUnauthorized = (error: unknown) =>
   (error as { response?: { status?: number } }).response?.status === 401;
 
 const HOME_ROUTE = '/(tabs)/home' as Href;
-const BOOTSTRAP_MIN_DISPLAY_MS = __DEV__ ? 2200 : 0;
+const BOOTSTRAP_MIN_DISPLAY_MS = __DEV__ ? 350 : 0;
 
 const wait = (duration: number) =>
   new Promise<void>((resolve) => {
@@ -72,8 +71,8 @@ function AppBootstrapScreen({ isDark }: { isDark: boolean }) {
           }`}
         >
           <Image
-            source={isDark ? DARK_LOGO : LIGHT_LOGO}
-            style={{ width: 140, height: 140 }}
+            source={BOOTSTRAP_LOGO}
+            style={{ width: 112, height: 112 }}
             resizeMode="contain"
           />
         </View>

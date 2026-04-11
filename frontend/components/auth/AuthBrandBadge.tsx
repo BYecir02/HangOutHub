@@ -6,8 +6,7 @@ type AuthBrandBadgeProps = {
   showName?: boolean;
 };
 
-const DARK_LOGO = require('../../assets/images/hangouthub-logo-dark.png');
-const LIGHT_LOGO = require('../../assets/images/hangouthub-logo-light.png');
+const BRAND_MARK = require('../../assets/images/hangouthub-logo-mark-512.png');
 
 export default function AuthBrandBadge({
   isDark,
@@ -23,7 +22,7 @@ export default function AuthBrandBadge({
     >
       <View className="h-7 w-7 overflow-hidden rounded-full">
         <Image
-          source={isDark ? DARK_LOGO : LIGHT_LOGO}
+          source={BRAND_MARK}
           className="h-full w-full"
           resizeMode="contain"
         />

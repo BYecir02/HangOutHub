@@ -343,7 +343,7 @@ function PostItem({
 
   return (
     <View
-      className={`overflow-hidden bg-white shadow-sm ring-1 ring-gray-100/70 dark:bg-gray-900 dark:ring-gray-800/70 ${
+      className={`overflow-hidden bg-white shadow-sm ring-1 ring-gray-100/70 dark:bg-black dark:ring-white/10 ${
         isInstagramPresentation ? '' : 'mx-4'
       } ${
         isInstagramPresentation ? 'rounded-none' : 'rounded-3xl'

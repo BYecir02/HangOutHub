@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,10 +14,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 
 import EventInspirationCard from '@/components/ui/EventInspirationCard';
+import LocationFilterSheet, {
+  type LocationCityOption,
+} from '@/components/ui/LocationFilterSheet';
 import MasonryGrid from '@/components/ui/MasonryGrid';
 import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLocationScope } from '@/hooks/useLocationScope';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
 import {
@@ -30,6 +34,7 @@ import {
   getCategoryAnimation,
 } from '@/utils/category-animations';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import { setStoredLocation, type StoredLocation } from '@/services/location-preferences';
 
 interface CategoryTag {
   id: number;
@@ -74,6 +79,8 @@ interface CategoryResult {
     address?: string | null;
   }[];
 }
+
+interface CityOption extends LocationCityOption {}
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
@@ -120,6 +127,19 @@ export default function CategoryDiscoverScreen() {
   const [activeTab, setActiveTab] = useState<'events' | 'places'>('events');
   const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
   const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const {
+    filterByLocation,
+    selectedLocation,
+    setSelectedLocation,
+  } = useLocationScope({
+    defaultCountry: t('homeLocationCountry'),
+    currentLabel: t('homeLocationCurrentLabel'),
+    allCitiesLabel: t('homeLocationAllCities'),
+    allCountriesLabel: t('homeLocationAllCountries'),
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -173,6 +193,19 @@ export default function CategoryDiscoverScreen() {
       isMounted = false;
     };
   }, [params.id]);
+
+  useEffect(() => {
+    const loadCities = async () => {
+      try {
+        const response = await api.get<CityOption[]>('/cities');
+        setCities(response.data);
+      } catch {
+        setCities([]);
+      }
+    };
+
+    void loadCities();
+  }, []);
 
   useEffect(() => {
     const loadSavedPlaces = async () => {
@@ -253,6 +286,69 @@ export default function CategoryDiscoverScreen() {
     [router, savingPlaceIds, t],
   );
 
+  const locationFilteredEvents = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+
+    return filterByLocation(data.events, (event) => ({
+      city: event.Place?.City?.name,
+      country: event.Place?.City?.country,
+      address: event.address,
+    }));
+  }, [data, filterByLocation]);
+
+  const locationFilteredPlaces = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+
+    return filterByLocation(data.places, (place) => ({
+      city: place.City?.name,
+      country: place.City?.country,
+      address: place.address,
+    }));
+  }, [data, filterByLocation]);
+
+  const visibleEvents = locationFilteredEvents;
+  const visiblePlaces = locationFilteredPlaces;
+
+  const handleSelectCity = useCallback(
+    (city: CityOption) => {
+      const nextLocation: StoredLocation = {
+        mode: 'city',
+        cityId: city.id,
+        cityName: city.name,
+        region: city.region ?? null,
+        country: city.country || t('homeLocationCountry'),
+        latitude: city.latitude ?? undefined,
+        longitude: city.longitude ?? undefined,
+      };
+
+      setSelectedLocation(nextLocation);
+      void setStoredLocation(nextLocation);
+      setFiltersVisible(false);
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      });
+    },
+    [setSelectedLocation, t],
+  );
+
+  const handleSelectAllCities = useCallback(() => {
+    const nextLocation: StoredLocation = {
+      mode: 'all',
+      country: selectedLocation?.country || t('homeLocationCountry'),
+    };
+
+    setSelectedLocation(nextLocation);
+    void setStoredLocation(nextLocation);
+    setFiltersVisible(false);
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, [selectedLocation?.country, setSelectedLocation, t]);
+
   if (!data && !loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 px-8 dark:bg-black">
@@ -280,108 +376,119 @@ export default function CategoryDiscoverScreen() {
   const categoryAutoplay = activeTab === 'events' ? eventAutoplay : placeAutoplay;
 
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-black"
-      showsVerticalScrollIndicator={false}
-      onLayout={categoryAutoplay.onLayout}
-      onScroll={categoryAutoplay.onScroll}
-      scrollEventThrottle={16}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            const categoryId = params.id;
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView
+        ref={scrollViewRef}
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        onLayout={categoryAutoplay.onLayout}
+        onScroll={categoryAutoplay.onScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              const categoryId = params.id;
 
-            if (!categoryId) {
-              return;
-            }
-
-            void (async () => {
-              setRefreshing(true);
-              try {
-                const response = await api.get<CategoryResult>(
-                  `/categories/${categoryId}/discover`,
-                );
-                setData(response.data);
-                setCategoryCache(categoryId, response.data);
-                setBadgeAnimation(getCategoryAnimation(response.data.category));
-              } finally {
-                setRefreshing(false);
+              if (!categoryId) {
+                return;
               }
-            })();
-          }}
-          tintColor="#4c669f"
-        />
-      }
-    >
-      {loading && !data ? (
-        <View className="px-5 pb-24 pt-16">
-          <SkeletonBlock className="h-11 w-11 rounded-full" />
-          <SkeletonBlock className="mt-6 h-4 w-24 rounded-lg" />
-          <SkeletonBlock className="mt-3 h-8 w-48 rounded-lg" />
-          <SkeletonBlock className="mt-4 h-4 w-64 rounded-lg" />
 
-          <View className="mt-10">
-            <View className="mb-4 flex-row items-center justify-between">
-              <SkeletonBlock className="h-6 w-32 rounded-lg" />
-              <SkeletonBlock className="h-4 w-10 rounded-lg" />
-            </View>
-            <FlatList
-              data={[0, 1]}
-              keyExtractor={(item) => `event-skeleton-${item}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 8 }}
-              renderItem={() => (
-                <View className="mr-4 w-64 overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
-                  <SkeletonBlock className="h-36 w-full" />
-                  <View className="p-4">
-                    <SkeletonBlock className="h-4 w-24 rounded-lg" />
-                    <SkeletonBlock className="mt-2 h-5 w-40 rounded-lg" />
-                    <SkeletonBlock className="mt-2 h-4 w-28 rounded-lg" />
-                  </View>
-                </View>
-              )}
-            />
-          </View>
+              void (async () => {
+                setRefreshing(true);
+                try {
+                  const response = await api.get<CategoryResult>(
+                    `/categories/${categoryId}/discover`,
+                  );
+                  setData(response.data);
+                  setCategoryCache(categoryId, response.data);
+                  setBadgeAnimation(getCategoryAnimation(response.data.category));
+                } finally {
+                  setRefreshing(false);
+                }
+              })();
+            }}
+            tintColor="#4c669f"
+          />
+        }
+      >
+        {loading && !data ? (
+          <View className="px-5 pb-24 pt-16">
+            <SkeletonBlock className="h-11 w-11 rounded-full" />
+            <SkeletonBlock className="mt-6 h-4 w-24 rounded-lg" />
+            <SkeletonBlock className="mt-3 h-8 w-48 rounded-lg" />
+            <SkeletonBlock className="mt-4 h-4 w-64 rounded-lg" />
 
-          <View className="mt-10">
-            <View className="mb-4 flex-row items-center justify-between">
-              <SkeletonBlock className="h-6 w-24 rounded-lg" />
-              <SkeletonBlock className="h-4 w-10 rounded-lg" />
-            </View>
-            <FlatList
-              data={[0, 1]}
-              keyExtractor={(item) => `place-skeleton-${item}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 8 }}
-              renderItem={() => (
-                <View className="mr-4 w-64 overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
-                  <SkeletonBlock className="h-36 w-full" />
-                  <View className="p-4">
-                    <SkeletonBlock className="h-4 w-24 rounded-lg" />
-                    <SkeletonBlock className="mt-2 h-5 w-40 rounded-lg" />
-                    <SkeletonBlock className="mt-2 h-4 w-28 rounded-lg" />
+            <View className="mt-10">
+              <View className="mb-4 flex-row items-center justify-between">
+                <SkeletonBlock className="h-6 w-32 rounded-lg" />
+                <SkeletonBlock className="h-4 w-10 rounded-lg" />
+              </View>
+              <FlatList
+                data={[0, 1]}
+                keyExtractor={(item) => `event-skeleton-${item}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 8 }}
+                renderItem={() => (
+                  <View className="mr-4 w-64 overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+                    <SkeletonBlock className="h-36 w-full" />
+                    <View className="p-4">
+                      <SkeletonBlock className="h-4 w-24 rounded-lg" />
+                      <SkeletonBlock className="mt-2 h-5 w-40 rounded-lg" />
+                      <SkeletonBlock className="mt-2 h-4 w-28 rounded-lg" />
+                    </View>
                   </View>
-                </View>
-              )}
-            />
+                )}
+              />
+            </View>
+
+            <View className="mt-10">
+              <View className="mb-4 flex-row items-center justify-between">
+                <SkeletonBlock className="h-6 w-24 rounded-lg" />
+                <SkeletonBlock className="h-4 w-10 rounded-lg" />
+              </View>
+              <FlatList
+                data={[0, 1]}
+                keyExtractor={(item) => `place-skeleton-${item}`}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 8 }}
+                renderItem={() => (
+                  <View className="mr-4 w-64 overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+                    <SkeletonBlock className="h-36 w-full" />
+                    <View className="p-4">
+                      <SkeletonBlock className="h-4 w-24 rounded-lg" />
+                      <SkeletonBlock className="mt-2 h-5 w-40 rounded-lg" />
+                      <SkeletonBlock className="mt-2 h-4 w-28 rounded-lg" />
+                    </View>
+                  </View>
+                )}
+              />
+            </View>
           </View>
-        </View>
-      ) : null}
-      {data ? (
-        <>
-          <View
-            className="px-5 pb-8 pt-16"
-            style={{ backgroundColor: `${data.category.color}18` }}
-          >
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="mb-6 h-11 w-11 items-center justify-center rounded-full bg-white/90 dark:bg-gray-900/80"
+        ) : null}
+        {data ? (
+          <>
+            <View
+              className="px-5 pb-8 pt-16"
+              style={{ backgroundColor: `${data.category.color}18` }}
             >
-              <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#111827'} />
-            </TouchableOpacity>
+              <View className="mb-6 flex-row items-center justify-between">
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  className="h-11 w-11 items-center justify-center rounded-full bg-white/90 dark:bg-gray-900/80"
+                >
+                  <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#111827'} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setFiltersVisible(true)}
+                  className="h-11 w-11 items-center justify-center rounded-full bg-white/90 dark:bg-gray-900/80"
+                >
+                  <Ionicons name="funnel-outline" size={22} color={isDark ? '#fff' : '#111827'} />
+                </TouchableOpacity>
+              </View>
 
           <View className="flex-row items-center">
             <View className="mr-2 flex-shrink">
@@ -425,13 +532,13 @@ export default function CategoryDiscoverScreen() {
                 {
                   key: 'events' as const,
                   label: t('categoryEventsTitle'),
-                  count: data.events.length,
+                  count: visibleEvents.length,
                   activeColor: '#ff4757',
                 },
                 {
                   key: 'places' as const,
                   label: t('categoryPlacesTitle'),
-                  count: data.places.length,
+                  count: visiblePlaces.length,
                   activeColor: '#2ecc71',
                 },
               ].map((option) => {
@@ -467,29 +574,13 @@ export default function CategoryDiscoverScreen() {
               })}
             </View>
 
-            {data.category.Tag.length > 0 ? (
-              <FlatList
-                data={data.category.Tag}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingTop: 20 }}
-                renderItem={({ item }) => (
-                  <View className="mr-2 rounded-full bg-white px-3 py-2 dark:bg-gray-900">
-                    <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                      {item.name}
-                    </Text>
-                  </View>
-                )}
-              />
-            ) : null}
           </View>
 
           <View className="px-5 pb-24 pt-6">
             {activeTab === 'events' ? (
-              data.events.length > 0 ? (
+              visibleEvents.length > 0 ? (
                 <MasonryGrid
-                  items={data.events}
+                  items={visibleEvents}
                   getKey={(item) => `event-${item.id}`}
                   estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
                   onItemLayout={(item, layout) => {
@@ -532,9 +623,9 @@ export default function CategoryDiscoverScreen() {
                   message={t('categoryEmptyEventsDescription')}
                 />
               )
-            ) : data.places.length > 0 ? (
+            ) : visiblePlaces.length > 0 ? (
               <MasonryGrid
-                items={data.places}
+                items={visiblePlaces}
                 getKey={(item) => `place-${item.id}`}
                 estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
                 onItemLayout={(item, layout) => {
@@ -570,9 +661,20 @@ export default function CategoryDiscoverScreen() {
                 message={t('categoryEmptyPlacesDescription')}
               />
             )}
-          </View>
-        </>
-      ) : null}
-    </ScrollView>
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+
+      <LocationFilterSheet
+        visible={filtersVisible}
+        onClose={() => setFiltersVisible(false)}
+        loading={loading}
+        cities={cities}
+        selectedLocation={selectedLocation}
+        onSelectAllCities={handleSelectAllCities}
+        onSelectCity={handleSelectCity}
+      />
+    </View>
   );
 }

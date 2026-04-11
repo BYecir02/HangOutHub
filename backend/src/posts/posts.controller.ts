@@ -97,11 +97,7 @@ export class PostsController {
     @Param('placeId', ParseUUIDPipe) placeId: string,
     @Request() req: AuthenticatedRequest,
   ) {
-    return this.postsService.findAllByPlace(
-      placeId,
-      req.user.userId,
-      req.user.role || 'USER',
-    );
+    return this.postsService.findAllByPlace(placeId, req.user.userId);
   }
 
   @UseGuards(AuthGuard('jwt'))
