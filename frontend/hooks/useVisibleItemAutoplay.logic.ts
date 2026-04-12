@@ -3,6 +3,65 @@ export type VisibleRect = {
   height: number;
 };
 
+type VisibleItemCandidate = {
+  id: string;
+  visibleRatio: number;
+  centerDistance: number;
+};
+
+function collectVisibleItemCandidates<T>(params: {
+  items: T[];
+  getId: (item: T) => string;
+  layouts: Map<string, VisibleRect>;
+  scrollY: number;
+  viewportHeight: number;
+}) {
+  const {
+    items,
+    getId,
+    layouts,
+    scrollY,
+    viewportHeight,
+  } = params;
+
+  const viewportTop = scrollY;
+  const viewportBottom = viewportTop + viewportHeight;
+  const viewportCenter = viewportTop + viewportHeight / 2;
+
+  const candidates: VisibleItemCandidate[] = [];
+
+  items.forEach((item) => {
+    const id = getId(item);
+    const layout = layouts.get(id);
+
+    if (!layout) {
+      return;
+    }
+
+    const itemTop = layout.y;
+    const itemBottom = layout.y + layout.height;
+    const visibleHeight = Math.min(itemBottom, viewportBottom) - Math.max(itemTop, viewportTop);
+
+    if (visibleHeight <= 0) {
+      return;
+    }
+
+    candidates.push({
+      id,
+      visibleRatio: visibleHeight / Math.max(layout.height, 1),
+      centerDistance: Math.abs(itemTop + layout.height / 2 - viewportCenter),
+    });
+  });
+
+  candidates.sort(
+    (left, right) =>
+      right.visibleRatio - left.visibleRatio ||
+      left.centerDistance - right.centerDistance,
+  );
+
+  return candidates;
+}
+
 export function selectVisibleItemId<T>(params: {
   items: T[];
   getId: (item: T) => string;
@@ -86,4 +145,54 @@ export function selectVisibleItemId<T>(params: {
   }
 
   return currentActiveId;
+}
+
+export function selectVisibleItemIds<T>(params: {
+  items: T[];
+  getId: (item: T) => string;
+  layouts: Map<string, VisibleRect>;
+  scrollY: number;
+  viewportHeight: number;
+  currentActiveId: string | null;
+  minVisibleRatio?: number;
+}) {
+  const {
+    items,
+    getId,
+    layouts,
+    scrollY,
+    viewportHeight,
+    currentActiveId,
+    minVisibleRatio = 0.45,
+  } = params;
+
+  if (items.length === 0) {
+    return [];
+  }
+
+  if (viewportHeight <= 0) {
+    return currentActiveId ? [currentActiveId] : [];
+  }
+
+  const candidates = collectVisibleItemCandidates({
+    items,
+    getId,
+    layouts,
+    scrollY,
+    viewportHeight,
+  });
+
+  const visibleIds = candidates
+    .filter((candidate) => candidate.visibleRatio >= minVisibleRatio)
+    .map((candidate) => candidate.id);
+
+  if (visibleIds.length > 0) {
+    return visibleIds;
+  }
+
+  if (candidates.length > 0) {
+    return [candidates[0].id];
+  }
+
+  return currentActiveId ? [currentActiveId] : [];
 }

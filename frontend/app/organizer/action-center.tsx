@@ -83,6 +83,11 @@ export default function OrganizerActionCenterScreen() {
     }
 
     if (canAccessOrganizerCapability(user, 'places')) {
+      const createPlacePath =
+        user.role === 'PLACE_OWNER' && !user.hasPlace
+          ? '/organizer/place-onboarding'
+          : '/organizer/create-place';
+
       items.push({
         id: 'manage-places',
         title: t('organizerActionCenterManagePlaces'),
@@ -99,7 +104,7 @@ export default function OrganizerActionCenterScreen() {
         icon: 'add-circle-outline',
         iconColor: '#2e9f62',
         bgColor: '#2ecc7118',
-        path: '/organizer/create-place',
+        path: createPlacePath,
       });
     }
 

@@ -137,7 +137,7 @@ export function getOrganizerAccessDenialReason(
 
 export function getOrganizerEntryPath(
   user?: OrganizerAccessUser | null,
-): '/organizer/create-place' | '/organizer/dashboard' | '/organizer/events' | '/organizer/scanner' {
+): '/organizer/place-onboarding' | '/organizer/create-place' | '/organizer/dashboard' | '/organizer/events' | '/organizer/scanner' {
   const teamRole = normalizeTeamWorkspaceRole(user?.teamRole);
   if (teamRole === 'SCANNER') {
     return '/organizer/scanner';
@@ -151,7 +151,7 @@ export function getOrganizerEntryPath(
 
   // Redirect to place creation only when we explicitly know the owner has no place.
   if (user?.role === 'PLACE_OWNER' && user?.hasPlace === false) {
-    return '/organizer/create-place';
+    return '/organizer/place-onboarding';
   }
 
   return '/organizer/dashboard';

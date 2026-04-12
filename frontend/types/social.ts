@@ -53,13 +53,16 @@ export interface OutingInvitation {
 
 export interface NotificationActivityItem {
   id: string;
-  type: 'EVENT_SAVED_PLACE';
-  title: string;
+  type: 'EVENT_SAVED_PLACE' | 'PLACE_CLAIM_REVIEWED';
+  title: string | null;
   date: string;
   place?: {
     id: string;
     name?: string | null;
     city?: string | null;
+    coverUrl?: string | null;
   } | null;
   eventId?: string | null;
+  claimDecision?: 'APPROVED' | 'REJECTED' | null;
+  targetPath?: string | null;
 }

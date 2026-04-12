@@ -1,4 +1,4 @@
-import { selectVisibleItemId } from './useVisibleItemAutoplay.logic';
+import { selectVisibleItemId, selectVisibleItemIds } from './useVisibleItemAutoplay.logic';
 
 describe('selectVisibleItemId', () => {
   it('picks the most visible item inside the viewport', () => {
@@ -79,5 +79,24 @@ describe('selectVisibleItemId', () => {
         currentActiveId: 'a',
       }),
     ).toBe('a');
+  });
+
+  it('returns every sufficiently visible item for autoplay', () => {
+    const layouts = new Map([
+      ['a', { y: 0, height: 100 }],
+      ['b', { y: 70, height: 100 }],
+      ['c', { y: 220, height: 100 }],
+    ]);
+
+    expect(
+      selectVisibleItemIds({
+        items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+        getId: (item: { id: string }) => item.id,
+        layouts,
+        scrollY: 0,
+        viewportHeight: 180,
+        currentActiveId: 'a',
+      }),
+    ).toEqual(['a', 'b']);
   });
 });

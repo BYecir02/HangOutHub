@@ -93,6 +93,7 @@ export function usePlaceDetail(placeId?: string) {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [publicationsOpen, setPublicationsOpen] = useState(false);
   const publicationsScrollRef = useRef<ScrollView | null>(null);
   const placePublicationsLoadingRef = useRef(false);
@@ -217,6 +218,7 @@ export function usePlaceDetail(placeId?: string) {
       }
 
       setCurrentUserId(session?.id ?? null);
+      setCurrentUserRole(session?.role ?? null);
     };
 
     void resolveUser();
@@ -358,6 +360,19 @@ export function usePlaceDetail(placeId?: string) {
       },
     });
   }, [place, router, t]);
+
+  const handleOpenClaimPlace = useCallback(() => {
+    if (!place) {
+      return;
+    }
+
+    router.push({
+      pathname: '/organizer/claim-place',
+      params: {
+        placeId: place.id,
+      },
+    });
+  }, [place, router]);
 
   const handleToggleSave = useCallback(async () => {
     if (!place) {
@@ -507,6 +522,9 @@ export function usePlaceDetail(placeId?: string) {
     reviewsLoading,
     reviewSubmitting,
     currentUserId,
+    currentUserRole,
+    canClaimPlace:
+      currentUserRole === 'PLACE_OWNER' || currentUserRole === 'ADMIN',
     myReview,
     gallery,
     openingHoursLines,
@@ -520,6 +538,7 @@ export function usePlaceDetail(placeId?: string) {
     handleOpenPublications,
     handleClosePublications,
     handleOpenCreateModal,
+    handleOpenClaimPlace,
     handleToggleSave,
     handleContactPlace,
     handleSubmitReportReason,

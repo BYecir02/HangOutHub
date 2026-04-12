@@ -7,14 +7,12 @@ import {
 
 import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  ORGANIZER_NOTIFICATION_TYPES,
+  ORGANIZER_PLACE_CLAIM_REVIEWED_NOTIFICATION_TYPE,
+} from './notification-types';
 
-const ORGANIZER_NOTIFICATION_TYPES = [
-  'ORGANIZER_BOOKING_CREATED',
-  'ORGANIZER_EVENT_UPDATED',
-  'ORGANIZER_COLLABORATOR_UPDATED',
-  'ORGANIZER_EVENT_REMINDER',
-  'ORGANIZER_SYSTEM',
-];
+const ORGANIZER_NOTIFICATION_TYPE_VALUES = [...ORGANIZER_NOTIFICATION_TYPES];
 
 export interface OrganizerNotificationItem {
   id: string;
@@ -163,7 +161,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     payload: unknown;
     isRead: boolean | null;
     createdAt: Date | null;
-    User_Notification_actorIdToUser: {
+    User_Notification_actorIdToUser?: {
       id: string;
       username: string;
       displayName: string | null;
@@ -206,7 +204,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         userId,
         isRead: false,
         type: {
-          in: ORGANIZER_NOTIFICATION_TYPES,
+          in: ORGANIZER_NOTIFICATION_TYPE_VALUES,
         },
       },
     });
@@ -227,7 +225,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         userId,
         isRead: false,
         type: {
-          in: ORGANIZER_NOTIFICATION_TYPES,
+          in: ORGANIZER_NOTIFICATION_TYPE_VALUES,
         },
       },
       data: { isRead: true },
@@ -251,7 +249,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     const whereClause = {
       userId,
       type: {
-        in: ORGANIZER_NOTIFICATION_TYPES,
+        in: ORGANIZER_NOTIFICATION_TYPE_VALUES,
       },
       ...(options?.unreadOnly ? { isRead: false } : {}),
       ...(options?.urgentOnly ? { severity: 'URGENT' } : {}),
@@ -298,7 +296,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         id: notificationId,
         userId,
         type: {
-          in: ORGANIZER_NOTIFICATION_TYPES,
+          in: ORGANIZER_NOTIFICATION_TYPE_VALUES,
         },
       },
       data: {
@@ -336,7 +334,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         },
         userId,
         type: {
-          in: ORGANIZER_NOTIFICATION_TYPES,
+          in: ORGANIZER_NOTIFICATION_TYPE_VALUES,
         },
       },
       data: {
@@ -497,25 +495,80 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     const savedPlaceIds = savedPlaces.map((place) => place.placeId);
 
-    const events = await this.prisma.event.findMany({
-      where: {
-        placeId: { in: savedPlaceIds },
-        startTime: { gte: new Date() },
-      },
-      orderBy: { startTime: 'asc' },
-      take: 12,
-      include: {
-        Place: {
-          select: {
-            id: true,
-            name: true,
-            City: { select: { id: true, name: true } },
+    const [events, placeClaimNotifications] = await Promise.all([
+      this.prisma.event.findMany({
+        where: {
+          placeId: { in: savedPlaceIds },
+          startTime: { gte: new Date() },
+        },
+        orderBy: { startTime: 'asc' },
+        take: 12,
+        include: {
+          Place: {
+            select: {
+              id: true,
+              name: true,
+              City: { select: { id: true, name: true } },
+            },
           },
         },
-      },
+      }),
+      this.prisma.notification.findMany({
+        where: {
+          userId,
+          type: ORGANIZER_PLACE_CLAIM_REVIEWED_NOTIFICATION_TYPE,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+        select: {
+          id: true,
+          createdAt: true,
+          targetPath: true,
+          payload: true,
+        },
+      }),
+    ]);
+
+    const claimItems = placeClaimNotifications.map((notification) => {
+      const rawPayload = notification.payload;
+      const payload =
+        rawPayload &&
+        typeof rawPayload === 'object' &&
+        !Array.isArray(rawPayload)
+          ? (rawPayload as {
+              placeId?: string;
+              placeName?: string | null;
+              placeCity?: string | null;
+              placeCountry?: string | null;
+              placeCoverUrl?: string | null;
+              decision?: string | null;
+            })
+          : null;
+
+      const decision =
+        payload?.decision === 'APPROVED' || payload?.decision === 'REJECTED'
+          ? payload.decision
+          : null;
+
+      return {
+        id: `claim-${notification.id}`,
+        type: 'PLACE_CLAIM_REVIEWED',
+        title: null,
+        date: notification.createdAt || new Date(),
+        place: payload?.placeId
+          ? {
+              id: payload.placeId,
+              name: payload.placeName || null,
+              city: payload.placeCity || null,
+              coverUrl: payload.placeCoverUrl || null,
+            }
+          : null,
+        claimDecision: decision,
+        targetPath: notification.targetPath,
+      };
     });
 
-    return events.map((event) => ({
+    const eventItems = events.map((event) => ({
       id: `event-${event.id}`,
       type: 'EVENT_SAVED_PLACE',
       title: event.title,
@@ -525,9 +578,13 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             id: event.Place.id,
             name: event.Place.name,
             city: event.Place.City?.name || null,
+            coverUrl: null,
           }
         : null,
       eventId: event.id,
+      targetPath: `/event/${event.id}`,
     }));
+
+    return [...claimItems, ...eventItems];
   }
 }

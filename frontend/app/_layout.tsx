@@ -1,3 +1,5 @@
+import '../config/react-native-warnings';
+
 import { useEffect, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, type Href } from 'expo-router';
@@ -6,7 +8,6 @@ import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { LogBox } from 'react-native';
 import { ActivityIndicator, Image, Text, TextInput, View } from 'react-native';
 import type { TextInputProps, TextProps } from 'react-native';
 
@@ -101,11 +102,6 @@ function AppBootstrapScreen({ isDark }: { isDark: boolean }) {
     </View>
   );
 }
-
-LogBox.ignoreLogs([
-  'SafeAreaView has been deprecated and will be removed in a future release.',
-  "Due to changes in Androids permission requirements, Expo Go can no longer provide full access to the media library.",
-]);
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

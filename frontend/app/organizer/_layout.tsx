@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Tabs, useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { PlatformPressable } from '@react-navigation/elements';
 
 import { HapticTab } from '@/components/haptic-tab';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
@@ -269,25 +270,34 @@ export default function OrganizerLayout() {
             tabBarItemStyle: showActionCenter
               ? undefined
               : { display: 'none' },
-            tabBarButton: () =>
+            tabBarButton: (props) =>
               showActionCenter ? (
-                <TouchableOpacity
+                <PlatformPressable
+                  {...props}
                   onPress={() => setActionCenterOpen(true)}
-                  activeOpacity={0.9}
-                  className="h-16 w-16 items-center justify-center rounded-full bg-[#4c669f]"
-                  style={{
-                    marginTop: -20,
-                    borderWidth: 4,
-                    borderColor: isDark ? '#030712' : '#ffffff',
-                    shadowColor: '#4c669f',
-                    shadowOpacity: 0.32,
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowRadius: 12,
-                    elevation: 8,
-                  }}
+                  style={[
+                    props.style,
+                    {
+                      alignItems: 'center',
+                      alignSelf: 'center',
+                      justifyContent: 'center',
+                    },
+                  ]}
                 >
-                  <Ionicons name="add" size={28} color="#FFFFFF" />
-                </TouchableOpacity>
+                  <View
+                    className="h-14 w-14 items-center justify-center rounded-full bg-[#4c669f]"
+                    style={{
+                      marginBottom: 20,
+                      shadowColor: '#4c669f',
+                      shadowOpacity: 0.32,
+                      shadowOffset: { width: 0, height: 8 },
+                      shadowRadius: 12,
+                      elevation: 8,
+                    }}
+                  >
+                    <Ionicons name="add" size={35} color="#FFFFFF" />
+                  </View>
+                </PlatformPressable>
               ) : null,
           }}
         />
@@ -357,6 +367,8 @@ export default function OrganizerLayout() {
         />
         <Tabs.Screen name="places" options={{ href: null }} />
         <Tabs.Screen name="create-place" options={{ href: null }} />
+        <Tabs.Screen name="place-onboarding" options={{ href: null }} />
+        <Tabs.Screen name="claim-place" options={{ href: null }} />
         <Tabs.Screen name="event-team" options={{ href: null }} />
         <Tabs.Screen name="event-revisions" options={{ href: null }} />
         <Tabs.Screen name="place-team" options={{ href: null }} />

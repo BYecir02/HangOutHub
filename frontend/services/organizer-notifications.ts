@@ -4,6 +4,7 @@ export type OrganizerNotificationType =
   | 'ORGANIZER_BOOKING_CREATED'
   | 'ORGANIZER_EVENT_UPDATED'
   | 'ORGANIZER_COLLABORATOR_UPDATED'
+  | 'ORGANIZER_PLACE_CLAIM_REVIEWED'
   | 'ORGANIZER_SYSTEM';
 
 export interface OrganizerNotificationItem {

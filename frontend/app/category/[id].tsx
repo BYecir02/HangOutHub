@@ -373,7 +373,10 @@ export default function CategoryDiscoverScreen() {
     data?.places ?? [],
     (item) => `place-${item.id}`,
   );
+  const eventGridOffsetYRef = useRef(0);
+  const placeGridOffsetYRef = useRef(0);
   const categoryAutoplay = activeTab === 'events' ? eventAutoplay : placeAutoplay;
+  const hasVisibleAutoplayTargets = categoryAutoplay.visibleIdSet.size > 0;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
@@ -579,44 +582,57 @@ export default function CategoryDiscoverScreen() {
           <View className="px-5 pb-24 pt-6">
             {activeTab === 'events' ? (
               visibleEvents.length > 0 ? (
-                <MasonryGrid
-                  items={visibleEvents}
-                  getKey={(item) => `event-${item.id}`}
-                  estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
-                  onItemLayout={(item, layout) => {
-                    eventAutoplay.registerLayout(`event-${item.id}`, layout);
+                <View
+                  onLayout={(event) => {
+                    eventGridOffsetYRef.current = event.nativeEvent.layout.y;
                   }}
-                  renderItem={(item, index) => {
-                    const imageHeights = [182, 240, 208, 262, 194, 228];
+                >
+                  <MasonryGrid
+                    items={visibleEvents}
+                    getKey={(item) => `event-${item.id}`}
+                    estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
+                    onItemLayout={(item, layout) => {
+                      eventAutoplay.registerLayout(`event-${item.id}`, {
+                        y: eventGridOffsetYRef.current + layout.y,
+                        height: layout.height,
+                      });
+                    }}
+                    renderItem={(item, index) => {
+                      const imageHeights = [182, 240, 208, 262, 194, 228];
 
-                    return (
-                      <EventInspirationCard
-                        event={{
-                          id: item.id,
-                          title: item.title,
-                          coverUrl: item.coverUrl,
-                        }}
-                        imageHeight={imageHeights[index % imageHeights.length]}
-                        cityLabel={item.Place?.City?.name || ''}
-                        placeLabel={item.Place?.name || item.address || ''}
-                        dateLabel={formatEventDate(item.startTime, locale)}
-                        priceLabel={formatEventCardPriceLabel(item, locale, {
-                          freeLabel: t('homePriceFree'),
-                          soldOutLabel: t('homePriceSoldOut'),
-                        })}
-                        borderColor={data.category.color}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/event/[id]',
-                            params: { id: item.id },
-                          })
-                        }
-                        shouldPlay={categoryAutoplay.activeId === `event-${item.id}`}
-                        adaptiveHeight={false}
-                      />
-                    );
-                  }}
-                />
+                      return (
+                        <EventInspirationCard
+                          event={{
+                            id: item.id,
+                            title: item.title,
+                            coverUrl: item.coverUrl,
+                          }}
+                          imageHeight={imageHeights[index % imageHeights.length]}
+                          cityLabel={item.Place?.City?.name || ''}
+                          placeLabel={item.Place?.name || item.address || ''}
+                          dateLabel={formatEventDate(item.startTime, locale)}
+                          priceLabel={formatEventCardPriceLabel(item, locale, {
+                            freeLabel: t('homePriceFree'),
+                            soldOutLabel: t('homePriceSoldOut'),
+                          })}
+                          borderColor={data.category.color}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/event/[id]',
+                              params: { id: item.id },
+                            })
+                          }
+                          shouldPlay={
+                            hasVisibleAutoplayTargets
+                              ? categoryAutoplay.visibleIdSet.has(`event-${item.id}`)
+                              : categoryAutoplay.activeId === `event-${item.id}`
+                          }
+                          adaptiveHeight={false}
+                        />
+                      );
+                    }}
+                  />
+                </View>
               ) : (
                 <EmptyBlock
                   title={t('categoryEmptyEventsTitle')}
@@ -624,37 +640,50 @@ export default function CategoryDiscoverScreen() {
                 />
               )
             ) : visiblePlaces.length > 0 ? (
-              <MasonryGrid
-                items={visiblePlaces}
-                getKey={(item) => `place-${item.id}`}
-                estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
-                onItemLayout={(item, layout) => {
-                  placeAutoplay.registerLayout(`place-${item.id}`, layout);
+              <View
+                onLayout={(event) => {
+                  placeGridOffsetYRef.current = event.nativeEvent.layout.y;
                 }}
-                renderItem={(item, index) => {
-                  const imageHeights = [182, 240, 208, 262, 194, 228];
+              >
+                <MasonryGrid
+                  items={visiblePlaces}
+                  getKey={(item) => `place-${item.id}`}
+                  estimateItemHeight={(_, index) => estimateCategoryCardHeight(index)}
+                  onItemLayout={(item, layout) => {
+                    placeAutoplay.registerLayout(`place-${item.id}`, {
+                      y: placeGridOffsetYRef.current + layout.y,
+                      height: layout.height,
+                    });
+                  }}
+                  renderItem={(item, index) => {
+                    const imageHeights = [182, 240, 208, 262, 194, 228];
 
-                  return (
-                    <PlaceInspirationCard
-                      place={item}
-                      imageHeight={imageHeights[index % imageHeights.length]}
-                      fallbackNewLabel={t('discoverPlaceMetaDiscover')}
-                      borderColor={data.category.color}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/place/[id]',
-                          params: { id: item.id },
-                        })
-                      }
-                      isSaved={savedPlaceIds.has(item.id)}
-                      onToggleSave={() => void handleTogglePlaceSave(item.id)}
-                      saving={savingPlaceIds.has(item.id)}
-                      shouldPlay={categoryAutoplay.activeId === `place-${item.id}`}
-                      adaptiveHeight={false}
-                    />
-                  );
-                }}
-              />
+                    return (
+                      <PlaceInspirationCard
+                        place={item}
+                        imageHeight={imageHeights[index % imageHeights.length]}
+                        fallbackNewLabel={t('discoverPlaceMetaDiscover')}
+                        borderColor={data.category.color}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/place/[id]',
+                            params: { id: item.id },
+                          })
+                        }
+                        isSaved={savedPlaceIds.has(item.id)}
+                        onToggleSave={() => void handleTogglePlaceSave(item.id)}
+                        saving={savingPlaceIds.has(item.id)}
+                        shouldPlay={
+                          hasVisibleAutoplayTargets
+                            ? categoryAutoplay.visibleIdSet.has(`place-${item.id}`)
+                            : categoryAutoplay.activeId === `place-${item.id}`
+                        }
+                        adaptiveHeight={false}
+                      />
+                    );
+                  }}
+                />
+              </View>
             ) : (
               <EmptyBlock
                 title={t('categoryEmptyPlacesTitle')}

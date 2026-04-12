@@ -43,6 +43,7 @@ export default function PlaceDetailScreen() {
     reviewsLoading,
     reviewSubmitting,
     myReview,
+    canClaimPlace,
     gallery,
     openingHoursLines,
     publicationsCount,
@@ -55,6 +56,7 @@ export default function PlaceDetailScreen() {
     handleOpenPublications,
     handleClosePublications,
     handleOpenCreateModal,
+    handleOpenClaimPlace,
     handleToggleSave,
     handleContactPlace,
     handleSubmitReportReason,
@@ -157,6 +159,8 @@ export default function PlaceDetailScreen() {
                   saveLoading={saveLoading}
                   onToggleSave={handleToggleSave}
                   onOpenCreateModal={handleOpenCreateModal}
+                  canClaimPlace={canClaimPlace}
+                  onOpenClaimPlace={handleOpenClaimPlace}
                   onReportPlace={handleReportPlace}
                   onContactPlace={handleContactPlace}
                   onOpenGallery={(index) => {

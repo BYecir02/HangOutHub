@@ -14,8 +14,8 @@ import FormTextField from '@/components/forms/FormTextField';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { getApiErrorMessage, storage } from '@/services/api';
-import { clearStoredUserSession } from '@/services/user-session';
+import api, { getApiErrorMessage } from '@/services/api';
+import { setStoredUserSession } from '@/services/user-session';
 
 type ProAccountType = 'PLACE' | 'NOMAD';
 
@@ -52,7 +52,7 @@ export default function ActivateProScreen() {
 
     setLoading(true);
     try {
-      await api.post('/users/me/activate-pro', {
+      const response = await api.post('/users/me/activate-pro', {
         accountType,
         companyName,
         ifuNumber,
@@ -65,16 +65,12 @@ export default function ActivateProScreen() {
         websiteUrl: websiteUrl || undefined,
       });
 
-      await Promise.all([
-        storage.removeItem('userToken'),
-        storage.removeItem('refreshToken'),
-        clearStoredUserSession(),
-      ]);
+      await setStoredUserSession(response.data);
 
       Alert.alert(t('activateProSuccessTitle'), t('activateProSuccessMessage'), [
         {
-          text: t('activateProBackToLogin'),
-          onPress: () => router.replace('/'),
+          text: t('activateProContinue'),
+          onPress: () => router.replace('/(tabs)/profile'),
         },
       ]);
     } catch (error: unknown) {

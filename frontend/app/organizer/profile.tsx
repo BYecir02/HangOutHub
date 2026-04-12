@@ -10,13 +10,14 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import OrganizerClaimHistory from '@/components/organizer/OrganizerClaimHistory';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import api, { getImageUrl, storage } from '@/services/api';
+import api, { getImageUrl } from '@/services/api';
 import {
   normalizeTeamWorkspaceRole,
 } from '@/services/organizer-access';
@@ -211,6 +212,8 @@ export default function OrganizerProfileScreen() {
         </Text>
       </View>
 
+      <OrganizerClaimHistory />
+
       <View className="mt-6">
         <Text className="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
           {t('organizerProfilePlacesTitle')}
@@ -229,7 +232,11 @@ export default function OrganizerProfileScreen() {
           onAction={
             canCreatePlace
               ? () => {
-                  router.push('/organizer/create-place');
+                  router.push(
+                    user.role === 'PLACE_OWNER' && !user.hasPlace
+                      ? '/organizer/place-onboarding'
+                      : '/organizer/create-place',
+                  );
                 }
               : undefined
           }

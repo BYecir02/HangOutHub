@@ -40,6 +40,56 @@ const ACTIVITY_PLACEHOLDER =
 
 type NotificationsView = 'all' | 'requests' | 'invites' | 'activity';
 
+function getActivityTitle(
+  item: NotificationActivityItem,
+  t: ReturnType<typeof useI18n>['t'],
+) {
+  if (item.type === 'PLACE_CLAIM_REVIEWED') {
+    if (item.claimDecision === 'APPROVED') {
+      return t('notificationsPlaceClaimApprovedTitle');
+    }
+
+    if (item.claimDecision === 'REJECTED') {
+      return t('notificationsPlaceClaimRejectedTitle');
+    }
+
+    return t('notificationsPlaceClaimTitle');
+  }
+
+  return item.title || t('notificationsPlaceUpdateGeneric');
+}
+
+function getActivitySubtitle(
+  item: NotificationActivityItem,
+  t: ReturnType<typeof useI18n>['t'],
+) {
+  if (item.type === 'PLACE_CLAIM_REVIEWED') {
+    const placeName = item.place?.name || t('notificationsPlaceFallback');
+
+    if (item.claimDecision === 'APPROVED') {
+      return t('notificationsPlaceClaimApprovedDescription', {
+        place: placeName,
+      });
+    }
+
+    if (item.claimDecision === 'REJECTED') {
+      return t('notificationsPlaceClaimRejectedDescription', {
+        place: placeName,
+      });
+    }
+
+    return t('notificationsPlaceClaimDescription', {
+      place: placeName,
+    });
+  }
+
+  if (item.place?.name) {
+    return t('notificationsPlaceUpdateWithName', { place: item.place.name });
+  }
+
+  return t('notificationsPlaceUpdateGeneric');
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
@@ -267,13 +317,9 @@ export default function NotificationsScreen() {
                 {activityItems.map((item) => (
                   <EntityRowCard
                     key={item.id}
-                    imageUrl={ACTIVITY_PLACEHOLDER}
-                    title={item.title}
-                    subtitle={
-                      item.place?.name
-                        ? t('notificationsPlaceUpdateWithName', { place: item.place.name })
-                        : t('notificationsPlaceUpdateGeneric')
-                    }
+                    imageUrl={item.place?.coverUrl || ACTIVITY_PLACEHOLDER}
+                    title={getActivityTitle(item, t)}
+                    subtitle={getActivitySubtitle(item, t)}
                     badge={
                       item.place?.city
                         ? {
@@ -285,7 +331,10 @@ export default function NotificationsScreen() {
                     }
                     meta={formatEventDate(item.date, locale)}
                     onPress={
-                      item.eventId
+                      item.targetPath
+                        ? () =>
+                            router.push(item.targetPath as never)
+                        : item.eventId
                         ? () =>
                             router.push({
                               pathname: '/event/[id]',

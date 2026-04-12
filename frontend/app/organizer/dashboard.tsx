@@ -358,7 +358,7 @@ export default function DashboardScreen() {
             {t('organizerDashboardEmptyPlacesDescription')}
           </Text>
           <TouchableOpacity
-            onPress={() => router.push('/organizer/create-place')}
+            onPress={() => router.push('/organizer/place-onboarding')}
             className="mt-4 items-center rounded-2xl bg-amber-600 py-3"
           >
             <Text className="font-semibold text-white">

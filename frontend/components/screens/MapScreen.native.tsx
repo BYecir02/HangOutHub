@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -188,6 +189,35 @@ function offsetMarkerCoordinate(
   };
 }
 
+function collectMapSheetPrefetchUrls(
+  tiles: MapSuggestionTile[],
+  selectedPlaceHeroSource: string,
+  selectedEventHeroSource: string | null,
+) {
+  const urls = new Set<string>();
+
+  if (selectedPlaceHeroSource && selectedPlaceHeroSource !== PLACE_PLACEHOLDER) {
+    urls.add(selectedPlaceHeroSource);
+  }
+
+  if (selectedEventHeroSource && selectedEventHeroSource !== PLACE_PLACEHOLDER) {
+    urls.add(selectedEventHeroSource);
+  }
+
+  tiles.slice(0, 8).forEach((tile) => {
+    const source =
+      tile.kind === 'place'
+        ? getImageUrl(tile.place.coverUrl)
+        : getImageUrl(tile.event.coverUrl);
+
+    if (source && source !== PLACE_PLACEHOLDER) {
+      urls.add(source);
+    }
+  });
+
+  return Array.from(urls).slice(0, 10);
+}
+
 function MapSuggestionsMasonry({
   tiles,
   activeItemId,
@@ -228,35 +258,45 @@ function MapSuggestionsMasonry({
         const imageHeight = imageHeights[index % imageHeights.length];
 
         if (tile.kind === 'place') {
+          const place = {
+            ...tile.place,
+            coverUrl: tile.place.coverUrl ?? null,
+          };
+
           return (
             <PlaceInspirationCard
-              place={tile.place}
+              place={place}
               imageHeight={imageHeight}
               fallbackNewLabel={fallbackNewLabel}
-              onPress={() => onPressPlace(tile.place)}
-              isSaved={isPlaceSaved(tile.place.id)}
-              onToggleSave={() => onToggleSavePlace(tile.place.id)}
-              saving={isSavingPlace(tile.place.id)}
+              onPress={() => onPressPlace(place)}
+              isSaved={isPlaceSaved(place.id)}
+              onToggleSave={() => onToggleSavePlace(place.id)}
+              saving={isSavingPlace(place.id)}
               shouldPlay={activeItemId === tile.id}
               adaptiveHeight={false}
             />
           );
         }
 
+        const event = {
+          ...tile.event,
+          coverUrl: tile.event.coverUrl ?? null,
+        };
+
         return (
           <EventInspirationCard
-            event={tile.event}
+            event={event}
             imageHeight={imageHeight}
-            cityLabel={tile.event.Place?.City?.name || ''}
-            placeLabel={tile.event.Place?.name || tile.event.Place?.City?.name || ''}
-            dateLabel={formatEventDate(tile.event.startTime, locale, {
+            cityLabel={event.Place?.City?.name || ''}
+            placeLabel={event.Place?.name || event.Place?.City?.name || ''}
+            dateLabel={formatEventDate(event.startTime, locale, {
               includeWeekday: true,
             })}
-            priceLabel={formatEventCardPriceLabel(tile.event, locale, {
+            priceLabel={formatEventCardPriceLabel(event, locale, {
               freeLabel,
               soldOutLabel,
             })}
-            onPress={() => onPressEvent(tile.event)}
+            onPress={() => onPressEvent(event)}
             shouldPlay={activeItemId === tile.id}
             adaptiveHeight={false}
           />
@@ -321,6 +361,7 @@ export default function MapScreen() {
         selectedPlace?.coverUrl ||
         PLACE_PLACEHOLDER,
     ) || PLACE_PLACEHOLDER;
+  const selectedEventHeroSource = selectedEvent ? getImageUrl(selectedEvent.coverUrl) || PLACE_PLACEHOLDER : null;
 
   const updateMapCamera = useCallback((center: MapCenter, zoom: number) => {
     setMapCenter(center);
@@ -630,6 +671,22 @@ export default function MapScreen() {
     mapSuggestionTiles,
     (item) => item.id,
   );
+
+  useEffect(() => {
+    const urlsToPrefetch = collectMapSheetPrefetchUrls(
+      mapSuggestionTiles,
+      selectedPlace ? selectedPlaceHeroSource : '',
+      selectedEvent ? selectedEventHeroSource : null,
+    );
+
+    if (urlsToPrefetch.length === 0) {
+      return;
+    }
+
+    void Promise.all(urlsToPrefetch.map((url) => ExpoImage.prefetch(url))).catch(() => {
+      // Préchargement opportuniste: on ignore les erreurs réseau.
+    });
+  }, [mapSuggestionTiles, selectedEvent, selectedEventHeroSource, selectedPlace, selectedPlaceHeroSource]);
 
   const renderedMarkers = useMemo<MapMarkerRenderItem[]>(() => {
     const rawMarkers: Array<

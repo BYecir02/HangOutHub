@@ -28,7 +28,51 @@ import {
   type OrganizerNotificationItem,
 } from '@/services/organizer-notifications';
 
-function getTypeTone(type: OrganizerNotificationItem['type']) {
+function getPlaceClaimDecision(item: OrganizerNotificationItem) {
+  const payload = item.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  const decision = (payload as { decision?: string }).decision?.toUpperCase();
+  if (decision === 'APPROVED' || decision === 'REJECTED') {
+    return decision;
+  }
+
+  return null;
+}
+
+function getPlaceClaimName(
+  item: OrganizerNotificationItem,
+  t: ReturnType<typeof useI18n>['t'],
+) {
+  const payload = item.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return t('notificationsPlaceFallback');
+  }
+
+  const placeName = (payload as { placeName?: string | null }).placeName?.trim();
+  return placeName || t('notificationsPlaceFallback');
+}
+
+function getTypeTone(
+  type: OrganizerNotificationItem['type'],
+  item: OrganizerNotificationItem,
+) {
+  if (type === 'ORGANIZER_PLACE_CLAIM_REVIEWED') {
+    const decision = getPlaceClaimDecision(item);
+
+    if (decision === 'APPROVED') {
+      return 'border-emerald-200 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-900/20';
+    }
+
+    if (decision === 'REJECTED') {
+      return 'border-rose-200 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-900/20';
+    }
+
+    return 'border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-900/20';
+  }
+
   if (type === 'ORGANIZER_BOOKING_CREATED') {
     return 'border-emerald-200 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-900/20';
   }
@@ -48,7 +92,24 @@ function getTypeTone(type: OrganizerNotificationItem['type']) {
   return 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800';
 }
 
-function getTypeIcon(type: OrganizerNotificationItem['type']) {
+function getTypeIcon(
+  type: OrganizerNotificationItem['type'],
+  item: OrganizerNotificationItem,
+) {
+  if (type === 'ORGANIZER_PLACE_CLAIM_REVIEWED') {
+    const decision = getPlaceClaimDecision(item);
+
+    if (decision === 'APPROVED') {
+      return 'checkmark-circle-outline' as const;
+    }
+
+    if (decision === 'REJECTED') {
+      return 'close-circle-outline' as const;
+    }
+
+    return 'business-outline' as const;
+  }
+
   if (type === 'ORGANIZER_BOOKING_CREATED') {
     return 'ticket-outline' as const;
   }
@@ -66,6 +127,31 @@ function getTypeIcon(type: OrganizerNotificationItem['type']) {
   }
 
   return 'notifications-outline' as const;
+}
+
+function getTypeIconColor(
+  type: OrganizerNotificationItem['type'],
+  item: OrganizerNotificationItem,
+) {
+  if (type === 'ORGANIZER_PLACE_CLAIM_REVIEWED') {
+    const decision = getPlaceClaimDecision(item);
+
+    if (decision === 'APPROVED') {
+      return '#059669';
+    }
+
+    if (decision === 'REJECTED') {
+      return '#e11d48';
+    }
+
+    return '#d97706';
+  }
+
+  if (type === 'ORGANIZER_EVENT_REMINDER') {
+    return '#e11d48';
+  }
+
+  return '#4c669f';
 }
 
 function getSeverityTone(severity: OrganizerNotificationItem['severity']) {
@@ -256,6 +342,39 @@ export default function OrganizerNotificationsScreen() {
             ...item,
             title: t('organizerNotificationsTypeReminderTitle'),
             description: t('organizerNotificationsTypeReminderDescription'),
+          };
+        }
+
+        if (item.type === 'ORGANIZER_PLACE_CLAIM_REVIEWED') {
+          const placeName = getPlaceClaimName(item, t);
+          const decision = getPlaceClaimDecision(item);
+
+          if (decision === 'APPROVED') {
+            return {
+              ...item,
+              title: t('organizerNotificationsTypePlaceClaimApprovedTitle'),
+              description: t('organizerNotificationsTypePlaceClaimApprovedDescription', {
+                place: placeName,
+              }),
+            };
+          }
+
+          if (decision === 'REJECTED') {
+            return {
+              ...item,
+              title: t('organizerNotificationsTypePlaceClaimRejectedTitle'),
+              description: t('organizerNotificationsTypePlaceClaimRejectedDescription', {
+                place: placeName,
+              }),
+            };
+          }
+
+          return {
+            ...item,
+            title: t('organizerNotificationsTypePlaceClaimTitle'),
+            description: t('organizerNotificationsTypePlaceClaimDescription', {
+              place: placeName,
+            }),
           };
         }
 
@@ -461,14 +580,14 @@ export default function OrganizerNotificationsScreen() {
                 router.push(item.targetPath as never);
               }
             }}
-            className={`mb-3 rounded-[24px] border p-4 ${getTypeTone(item.type)}`}
+            className={`mb-3 rounded-[24px] border p-4 ${getTypeTone(item.type, item)}`}
           >
             <View className="flex-row items-center justify-between">
               <View className="mr-3 flex-row items-center">
                 <Ionicons
-                  name={getTypeIcon(item.type)}
+                  name={getTypeIcon(item.type, item)}
                   size={18}
-                  color="#4c669f"
+                  color={getTypeIconColor(item.type, item)}
                 />
                 <Text className="ml-2 text-sm font-semibold text-gray-900 dark:text-white">
                   {item.title}

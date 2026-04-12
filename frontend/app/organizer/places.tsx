@@ -41,6 +41,10 @@ export default function OrganizerPlacesScreen() {
   });
 
   const canCreatePlace = user?.role === 'PLACE_OWNER' || user?.role === 'ADMIN';
+  const createPlacePath =
+    user?.role === 'PLACE_OWNER' && !user?.hasPlace
+      ? '/organizer/place-onboarding'
+      : '/organizer/create-place';
 
   const places = useMemo(() => {
     const map = new Map<string, PlaceRowItem>();
@@ -120,7 +124,7 @@ export default function OrganizerPlacesScreen() {
         rightSlot={
           canCreatePlace ? (
             <TouchableOpacity
-              onPress={() => router.push('/organizer/create-place')}
+              onPress={() => router.push(createPlacePath)}
               className="rounded-full border border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
             >
               <Text className="text-sm font-semibold text-[#2ecc71]">
@@ -141,7 +145,7 @@ export default function OrganizerPlacesScreen() {
           }
           onAction={
             canCreatePlace
-              ? () => router.push('/organizer/create-place')
+              ? () => router.push(createPlacePath)
               : undefined
           }
           containerClassName="px-0 pb-0 pt-5"

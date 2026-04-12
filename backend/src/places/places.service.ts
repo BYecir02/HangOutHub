@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -8,11 +9,47 @@ import { Prisma } from '@prisma/client';
 
 import { hasPlaceTeamRoleAtLeast } from '../permissions/place-team-permissions';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  ORGANIZER_PLACE_CLAIM_REVIEWED_NOTIFICATION_TYPE,
+  type PlaceClaimDecision,
+} from '../notifications/notification-types';
 import { StorageService } from '../storage/storage.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
 import { CreatePlaceReviewDto } from './dto/create-place-review.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
+
+type PlaceClaimPlaceSnapshot = {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  ownerId: string | null;
+  moderationStatus: string | null;
+  City: {
+    id: number;
+    name: string;
+    country: string | null;
+  } | null;
+};
+
+type PlaceClaimUserSnapshot = {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+
+type PlaceClaimHistoryItem = {
+  id: string;
+  userId: string;
+  placeId: string;
+  documentUrl: string;
+  status: string | null;
+  createdAt: Date;
+  updatedAt: Date | null;
+  Place: PlaceClaimPlaceSnapshot;
+  User?: PlaceClaimUserSnapshot;
+};
 
 @Injectable()
 export class PlacesService {
@@ -424,6 +461,220 @@ export class PlacesService {
     return trimmed || 'PENDING';
   }
 
+  private normalizePlaceClaimStatus(value?: string | null) {
+    const trimmed = value?.trim().toUpperCase();
+
+    if (trimmed === 'APPROVED' || trimmed === 'REJECTED') {
+      return trimmed;
+    }
+
+    return 'PENDING';
+  }
+
+  private getPlaceClaimPlaceSelect() {
+    return {
+      id: true,
+      name: true,
+      coverUrl: true,
+      ownerId: true,
+      moderationStatus: true,
+      City: {
+        select: {
+          id: true,
+          name: true,
+          country: true,
+        },
+      },
+    } as const;
+  }
+
+  private buildMissingPlaceClaimPlace(placeId: string): PlaceClaimPlaceSnapshot {
+    return {
+      id: placeId,
+      name: 'Lieu supprimé',
+      coverUrl: null,
+      ownerId: null,
+      moderationStatus: 'UNKNOWN',
+      City: null,
+    };
+  }
+
+  private buildMissingPlaceClaimUser(userId: string): PlaceClaimUserSnapshot {
+    return {
+      id: userId,
+      username: null,
+      displayName: null,
+      avatarUrl: null,
+    };
+  }
+
+  private async loadPlaceClaimPlaces(placeIds: string[]) {
+    if (placeIds.length === 0) {
+      return new Map<string, PlaceClaimPlaceSnapshot>();
+    }
+
+    const places = await this.prisma.place.findMany({
+      where: {
+        id: {
+          in: placeIds,
+        },
+      },
+      select: this.getPlaceClaimPlaceSelect(),
+    });
+
+    return new Map<string, PlaceClaimPlaceSnapshot>(
+      places.map((place) => [place.id, place as PlaceClaimPlaceSnapshot]),
+    );
+  }
+
+  private async loadPlaceClaimUsers(userIds: string[]) {
+    if (userIds.length === 0) {
+      return new Map<string, PlaceClaimUserSnapshot>();
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: {
+          in: userIds,
+        },
+      },
+      select: this.getPlaceClaimUserSelect(),
+    });
+
+    return new Map<string, PlaceClaimUserSnapshot>(
+      users.map((user) => [user.id, user as PlaceClaimUserSnapshot]),
+    );
+  }
+
+  private async loadMyPlaceClaims(userId: string): Promise<PlaceClaimHistoryItem[]> {
+    try {
+      const claims = await this.prisma.placeClaim.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userId: true,
+          placeId: true,
+          documentUrl: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      const placeMap = await this.loadPlaceClaimPlaces(
+        Array.from(new Set(claims.map((claim) => claim.placeId))),
+      );
+
+      return claims.map((claim) => ({
+        ...claim,
+        Place:
+          placeMap.get(claim.placeId) ||
+          this.buildMissingPlaceClaimPlace(claim.placeId),
+      }));
+    } catch (error) {
+      console.error('Failed to load my place claims:', error);
+      return [];
+    }
+  }
+
+  private async loadAdminPlaceClaims(): Promise<PlaceClaimHistoryItem[]> {
+    try {
+      const claims = await this.prisma.placeClaim.findMany({
+        orderBy: [
+          {
+            status: 'asc',
+          },
+          {
+            createdAt: 'desc',
+          },
+        ],
+        select: {
+          id: true,
+          userId: true,
+          placeId: true,
+          documentUrl: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      const [placeMap, userMap] = await Promise.all([
+        this.loadPlaceClaimPlaces(
+          Array.from(new Set(claims.map((claim) => claim.placeId))),
+        ).catch((error) => {
+          console.error('Failed to load admin place snapshots:', error);
+          return new Map<string, PlaceClaimPlaceSnapshot>();
+        }),
+        this.loadPlaceClaimUsers(
+          Array.from(new Set(claims.map((claim) => claim.userId))),
+        ).catch((error) => {
+          console.error('Failed to load admin claim users:', error);
+          return new Map<string, PlaceClaimUserSnapshot>();
+        }),
+      ]);
+
+      return claims.map((claim) => ({
+        ...claim,
+        Place:
+          placeMap.get(claim.placeId) ||
+          this.buildMissingPlaceClaimPlace(claim.placeId),
+        User:
+          userMap.get(claim.userId) ||
+          this.buildMissingPlaceClaimUser(claim.userId),
+      }));
+    } catch (error) {
+      console.error('Failed to load admin place claims:', error);
+      return [];
+    }
+  }
+
+  private getPlaceClaimUserSelect() {
+    return {
+      id: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+    } as const;
+  }
+
+  private async createPlaceClaimDecisionNotification(
+    tx: Prisma.TransactionClient,
+    payload: {
+      userId: string;
+      actorUserId: string;
+      placeId: string;
+      placeName: string;
+      placeCity?: string | null;
+      placeCountry?: string | null;
+      placeCoverUrl?: string | null;
+      decision: PlaceClaimDecision;
+    },
+  ) {
+    await tx.notification.create({
+      data: {
+        userId: payload.userId,
+        actorId: payload.actorUserId,
+        type: ORGANIZER_PLACE_CLAIM_REVIEWED_NOTIFICATION_TYPE,
+        severity: 'IMPORTANT',
+        targetPath:
+          payload.decision === 'APPROVED'
+            ? `/organizer/place-profile/${payload.placeId}`
+            : '/organizer/place-onboarding',
+        payload: {
+          placeId: payload.placeId,
+          placeName: payload.placeName,
+          placeCity: payload.placeCity || null,
+          placeCountry: payload.placeCountry || null,
+          placeCoverUrl: payload.placeCoverUrl || null,
+          decision: payload.decision,
+        } as Prisma.InputJsonValue,
+        isRead: false,
+      },
+    });
+  }
+
   private async getPlaceAuthorizationContext(placeId: string) {
     const place = await this.prisma.place.findUnique({
       where: { id: placeId },
@@ -784,6 +1035,294 @@ export class PlacesService {
           orderBy: { startTime: 'asc' },
         },
       },
+    });
+  }
+
+  async submitPlaceClaim(
+    placeId: string,
+    userId: string,
+    role: string,
+    documentFile: Express.Multer.File,
+  ) {
+    const normalizedRole = role.toUpperCase();
+    if (normalizedRole !== 'PLACE_OWNER' && normalizedRole !== 'ADMIN') {
+      throw new ForbiddenException(
+        'Seuls les proprietaires de lieux peuvent revendiquer un etablissement.',
+      );
+    }
+
+    const place = await this.prisma.place.findUnique({
+      where: { id: placeId },
+      select: {
+        id: true,
+        ownerId: true,
+      },
+    });
+
+    if (!place) {
+      throw new NotFoundException('Lieu introuvable');
+    }
+
+    if (place.ownerId === userId) {
+      throw new ConflictException('Vous gerez deja ce lieu.');
+    }
+
+    if (place.ownerId && place.ownerId !== userId) {
+      throw new ConflictException('Ce lieu a deja un proprietaire.');
+    }
+
+    const documentUrl = await this.storageService.uploadFile(
+      'place-claims',
+      documentFile,
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const otherPendingClaim = await tx.placeClaim.findFirst({
+        where: {
+          placeId,
+          status: 'PENDING',
+          userId: {
+            not: userId,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (otherPendingClaim) {
+        throw new ConflictException(
+          'Ce lieu est deja en cours de revendication.',
+        );
+      }
+
+      const existingClaim = await tx.placeClaim.findUnique({
+        where: {
+          placeId_userId: {
+            placeId,
+            userId,
+          },
+        },
+      });
+
+      if (existingClaim?.status === 'PENDING') {
+        throw new ConflictException(
+          'Votre revendication est deja en attente.',
+        );
+      }
+
+      if (existingClaim?.status === 'APPROVED') {
+        throw new ConflictException(
+          'Ce lieu vous a deja ete attribue.',
+        );
+      }
+
+      if (existingClaim) {
+        return tx.placeClaim.update({
+          where: {
+            placeId_userId: {
+              placeId,
+              userId,
+            },
+          },
+          data: {
+            documentUrl,
+            status: 'PENDING',
+          },
+          include: {
+            Place: {
+              select: this.getPlaceClaimPlaceSelect(),
+            },
+          },
+        });
+      }
+
+      return tx.placeClaim.create({
+        data: {
+          placeId,
+          userId,
+          documentUrl,
+          status: 'PENDING',
+        },
+        include: {
+          Place: {
+            select: this.getPlaceClaimPlaceSelect(),
+          },
+        },
+      });
+    });
+  }
+
+  async listMyPlaceClaims(userId: string) {
+    return this.loadMyPlaceClaims(userId);
+  }
+
+  async listPlaceClaims() {
+    return this.loadAdminPlaceClaims();
+  }
+
+  async updatePlaceClaimStatus(
+    claimId: string,
+    status: string,
+    actorUserId: string,
+  ) {
+    const normalizedStatus = this.normalizePlaceClaimStatus(status);
+
+    if (normalizedStatus !== 'APPROVED' && normalizedStatus !== 'REJECTED') {
+      throw new BadRequestException(
+        'Le statut de la revendication doit etre APPROVED ou REJECTED.',
+      );
+    }
+
+    const claim = await this.prisma.placeClaim.findUnique({
+      where: { id: claimId },
+      select: {
+        id: true,
+        userId: true,
+        placeId: true,
+        documentUrl: true,
+        status: true,
+      },
+    });
+
+    if (!claim) {
+      throw new NotFoundException('Demande de revendication introuvable');
+    }
+
+    const place = await this.prisma.place.findUnique({
+      where: { id: claim.placeId },
+      select: {
+        id: true,
+        ownerId: true,
+        name: true,
+        coverUrl: true,
+        City: {
+          select: {
+            name: true,
+            country: true,
+          },
+        },
+      },
+    });
+
+    if (!place) {
+      throw new NotFoundException('Lieu introuvable');
+    }
+
+    if (normalizedStatus === 'REJECTED') {
+      return this.prisma.$transaction(async (tx) => {
+        const updatedClaim = await tx.placeClaim.update({
+          where: { id: claimId },
+          data: {
+            status: 'REJECTED',
+          },
+          include: {
+            Place: {
+              select: this.getPlaceClaimPlaceSelect(),
+            },
+            User: {
+              select: this.getPlaceClaimUserSelect(),
+            },
+          },
+        });
+
+        await this.createPlaceClaimDecisionNotification(tx, {
+          userId: claim.userId,
+          actorUserId,
+          placeId: claim.placeId,
+          placeName: place.name,
+          placeCity: place.City?.name || null,
+          placeCountry: place.City?.country || null,
+          placeCoverUrl: place.coverUrl || null,
+          decision: 'REJECTED',
+        });
+
+        return updatedClaim;
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (place.ownerId && place.ownerId !== claim.userId) {
+        throw new ConflictException(
+          'Ce lieu a deja ete attribue a un autre proprietaire.',
+        );
+      }
+
+      const rejectedClaims = await tx.placeClaim.findMany({
+        where: {
+          placeId: claim.placeId,
+          status: 'PENDING',
+          id: {
+            not: claimId,
+          },
+        },
+        select: {
+          id: true,
+          userId: true,
+          placeId: true,
+        },
+      });
+
+      await tx.place.update({
+        where: { id: claim.placeId },
+        data: {
+          ownerId: claim.userId,
+        },
+      });
+
+      if (rejectedClaims.length > 0) {
+        await tx.placeClaim.updateMany({
+          where: {
+            id: {
+              in: rejectedClaims.map((rejectedClaim) => rejectedClaim.id),
+            },
+          },
+          data: {
+            status: 'REJECTED',
+          },
+        });
+      }
+
+      const approvedClaim = await tx.placeClaim.update({
+        where: { id: claimId },
+        data: {
+          status: 'APPROVED',
+        },
+        include: {
+          Place: {
+            select: this.getPlaceClaimPlaceSelect(),
+          },
+          User: {
+            select: this.getPlaceClaimUserSelect(),
+          },
+        },
+      });
+
+      await this.createPlaceClaimDecisionNotification(tx, {
+        userId: claim.userId,
+        actorUserId,
+        placeId: claim.placeId,
+        placeName: place.name,
+        placeCity: place.City?.name || null,
+        placeCountry: place.City?.country || null,
+        placeCoverUrl: place.coverUrl || null,
+        decision: 'APPROVED',
+      });
+
+      for (const rejectedClaim of rejectedClaims) {
+        await this.createPlaceClaimDecisionNotification(tx, {
+          userId: rejectedClaim.userId,
+          actorUserId,
+          placeId: rejectedClaim.placeId,
+          placeName: place.name,
+          placeCity: place.City?.name || null,
+          placeCountry: place.City?.country || null,
+          placeCoverUrl: place.coverUrl || null,
+          decision: 'REJECTED',
+        });
+      }
+
+      return approvedClaim;
     });
   }
 

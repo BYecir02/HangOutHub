@@ -1,4 +1,4 @@
-import type { StoredLanguagePreference } from '@/services/app-preferences';
+﻿import type { StoredLanguagePreference } from '@/services/app-preferences';
 
 type TranslationParams = Record<string, string | number>;
 
@@ -73,6 +73,16 @@ const fr = {
   notificationsRecentActivity: 'Activité récente',
   notificationsPlaceUpdateWithName: 'Nouveau dans {place}',
   notificationsPlaceUpdateGeneric: 'Nouveau dans un lieu enregistré',
+  notificationsPlaceFallback: 'ce lieu',
+  notificationsPlaceClaimTitle: 'Revendication de lieu',
+  notificationsPlaceClaimDescription:
+    'Une mise à jour a été faite pour {place}.',
+  notificationsPlaceClaimApprovedTitle: 'Revendication approuvée',
+  notificationsPlaceClaimApprovedDescription:
+    'Ta revendication pour {place} a été approuvée.',
+  notificationsPlaceClaimRejectedTitle: 'Revendication rejetée',
+  notificationsPlaceClaimRejectedDescription:
+    'Ta revendication pour {place} a été rejetée.',
   notificationsEmptyTitle: 'Aucune activité pour le moment',
   notificationsEmptyDescription:
     "Enregistre un lieu pour recevoir des alertes d'activité.",
@@ -645,8 +655,8 @@ const fr = {
   activateProSocialHint: 'Ajoute tes réseaux si tu veux (optionnel).',
   activateProSuccessTitle: 'Demande envoyée',
   activateProSuccessMessage:
-    "Ton espace pro est en attente de vérification. Reconnecte-toi pour appliquer la mise à jour.",
-  activateProBackToLogin: 'Se reconnecter',
+    'Ta demande est en attente de vérification. Tu peux continuer à utiliser ton compte utilisateur normalement.',
+  activateProContinue: 'Continuer',
   registerExistingAccount: 'Déjà un compte ?',
   exploreLabel: 'Explorer',
   exploreTitle: 'Tous les événements',
@@ -1034,6 +1044,10 @@ const fr = {
     'Connecte-toi pour voir les publications de ce lieu.',
   placeDetailPublicationsRetry: 'Réessayer',
   placeDetailPublicationsClose: 'Fermer',
+  placeDetailClaimPanelTitle: "Ce lieu n'a pas encore de propriétaire",
+  placeDetailClaimPanelDescription:
+    "Si c'est ton établissement, revendique-le pour demander l'accès à son espace pro.",
+  placeDetailClaimPanelAction: 'Revendiquer ce lieu',
   placeDetailDescriptionFallback: 'Aucune description disponible pour le moment.',
   placeDetailRelatedEvents: 'Événements liés au lieu',
   placeDetailNoRelatedEvents: 'Aucun événement rattaché à ce lieu pour le moment.',
@@ -1465,6 +1479,24 @@ const fr = {
   organizerProfileManagePlaces: 'Gérer les lieux',
   organizerProfileManageTeam: "Gérer l'équipe des lieux",
   organizerProfileOpenPlace: 'Ouvrir la fiche',
+  organizerProfileClaimsLabel: 'Revendications',
+  organizerProfileClaimsTitle: 'Mes revendications',
+  organizerProfileClaimsSubtitle:
+    'Suis l’état de tes demandes de propriété et leurs réponses.',
+  organizerProfileClaimsLoading: 'Chargement des revendications...',
+  organizerProfileClaimsLoadFailed:
+    'Impossible de charger tes revendications.',
+  organizerProfileClaimsEmptyTitle: 'Aucune revendication pour le moment',
+  organizerProfileClaimsEmptyDescription:
+    'Les lieux que tu revendiques apparaîtront ici.',
+  organizerProfileClaimsStatusPending: 'En attente',
+  organizerProfileClaimsStatusApproved: 'Approuvée',
+  organizerProfileClaimsStatusRejected: 'Rejetée',
+  organizerProfileClaimsSentAt: 'Envoyée le {date}',
+  organizerProfileClaimsUpdatedAt: 'Mise à jour le {date}',
+  organizerProfileClaimsOpenPlace: 'Voir le lieu',
+  organizerProfileClaimsOpenWorkspace: 'Ouvrir l’espace',
+  organizerProfileClaimsRetry: 'Revendiquer à nouveau',
   organizerProfileEmptyPlacesTitle: 'Aucun lieu rattaché',
   organizerProfileEmptyPlacesDescription:
     "Ajoute un lieu pour représenter ta structure dans l'espace pro.",
@@ -1498,6 +1530,129 @@ const fr = {
   organizerDashboardEmptyPlacesTitle: 'Lieu manquant',
   organizerDashboardEmptyPlacesDescription:
     'Ajoute ton lieu pour structurer tes événements et rassurer les participants.',
+  organizerPlaceOnboardingLabel: 'Établissement',
+  organizerPlaceOnboardingTitle: 'Choisir ton point d’entrée',
+  organizerPlaceOnboardingSubtitle:
+    'Crée un nouvel établissement ou revendique un lieu déjà présent sur la plateforme.',
+  organizerPlaceOnboardingCreateTitle: 'Créer un nouvel établissement',
+  organizerPlaceOnboardingCreateDescription:
+    'Ouvre un formulaire guidé pour ajouter un lieu inédit avec ses infos, horaires et médias.',
+  organizerPlaceOnboardingCreateAction: 'Créer un lieu',
+  organizerPlaceOnboardingClaimTitle: 'Revendiquer un établissement existant',
+  organizerPlaceOnboardingClaimDescription:
+    'Recherche un lieu déjà listé, ajoute une preuve et envoie ta demande de propriété.',
+  organizerPlaceOnboardingClaimAction: 'Revendiquer',
+  organizerPlaceOnboardingAlreadyOwnedTitle: 'Tu as déjà un ou plusieurs lieux',
+  organizerPlaceOnboardingAlreadyOwnedDescription:
+    'Tu peux ouvrir ton tableau de bord, gérer tes lieux ou créer une nouvelle fiche si besoin.',
+  organizerPlaceOnboardingDashboardAction: 'Ouvrir le tableau de bord',
+  organizerPlaceClaimLabel: 'Revendiquer',
+  organizerPlaceClaimTitle: 'Revendiquer un établissement',
+  organizerPlaceClaimSubtitle:
+    'Recherche le lieu concerné, ajoute une preuve et envoie ta demande au backoffice.',
+  organizerPlaceClaimIntroLabel: 'Étape de revendication',
+  organizerPlaceClaimIntroDescription:
+    "On vérifie la preuve envoyée avant d'attribuer le lieu à ton espace pro.",
+  organizerPlaceClaimSearchLabel: 'Rechercher un lieu',
+  organizerPlaceClaimSearchPlaceholder: 'Nom, ville ou adresse',
+  organizerPlaceClaimLoadFailed: 'Impossible de charger les lieux revendicables.',
+  organizerPlaceClaimLoadingPlaces: 'Chargement des lieux...',
+  organizerPlaceClaimEmptyTitle: 'Aucun lieu revendicable',
+  organizerPlaceClaimEmptyDescription:
+    'Aucun lieu public disponible pour une revendication dans ta zone.',
+  organizerPlaceClaimSelectedTitle: 'Lieu sélectionné',
+  organizerPlaceClaimSelectedBadge: 'Sélectionné',
+  organizerPlaceClaimSelectBadge: 'Choisir',
+  organizerPlaceClaimUploadLabel: 'Ajouter une preuve',
+  organizerPlaceClaimProofSelected: 'Preuve sélectionnée',
+  organizerPlaceClaimProofHint:
+    "Ajoute une photo claire d'un document, d'une enseigne ou d'une preuve officielle.",
+  organizerPlaceClaimSelectRequired: 'Sélectionne un lieu avant de continuer.',
+  organizerPlaceClaimProofRequired: "Ajoute une preuve avant d'envoyer ta demande.",
+  organizerPlaceClaimSubmit: 'Envoyer la demande',
+  organizerPlaceClaimSubmitting: 'Envoi en cours...',
+  organizerPlaceClaimSuccessTitle: 'Demande envoyée',
+  organizerPlaceClaimSuccessMessage:
+    'Ta revendication a été transmise et sera vérifiée par le backoffice.',
+  organizerPlaceClaimSubmitFailed: "Impossible d'envoyer la revendication.",
+  organizerPlaceClaimAccessTitle: 'Accès requis',
+  organizerPlaceClaimAccessDescription:
+    'Active un compte pro avant de revendiquer un établissement.',
+  organizerPlaceClaimAccessAction: "Activer l'espace pro",
+  adminPlaceClaimsLabel: 'Backoffice',
+  adminPlaceClaimsTitle: 'Revendications de lieux',
+  adminPlaceClaimsSubtitle:
+    'Vérifie les preuves puis approuve ou rejette les demandes de propriété.',
+  adminPlaceClaimsLoading: 'Chargement des demandes...',
+  adminPlaceClaimsLoadFailed: 'Impossible de charger les revendications.',
+  adminPlaceClaimsEmptyTitle: 'Aucune revendication en attente',
+  adminPlaceClaimsEmptyDescription:
+    'Toutes les demandes de propriété ont déjà été traitées.',
+  adminPlaceClaimsAccessTitle: 'Accès administrateur requis',
+  adminPlaceClaimsAccessDescription:
+    'Cette zone est réservée aux administrateurs.',
+  adminPlaceClaimsDocumentOpenFailed: "Impossible d'ouvrir la preuve.",
+  adminPlaceClaimsUpdateFailed: 'Impossible de mettre à jour la revendication.',
+  adminPlaceClaimsApprovedMessage: 'La revendication a été approuvée.',
+  adminPlaceClaimsRejectedMessage: 'La revendication a été rejetée.',
+  adminPlaceClaimsApprove: 'Approuver',
+  adminPlaceClaimsReject: 'Rejeter',
+  adminPlaceClaimsOpenDocument: 'Ouvrir la preuve',
+  profileAdminClaimsTitle: 'Revendications de lieux',
+  profileAdminClaimsDescription:
+    'Accède au backoffice pour vérifier les preuves et traiter les demandes de propriété.',
+  profileAdminClaimsAction: 'Ouvrir le backoffice',
+  adminBackofficeLabel: 'Administration',
+  adminBackofficeTitle: 'Backoffice',
+  adminBackofficeSubtitle:
+    'Revois les revendications de lieux et les dossiers pro avant validation.',
+  adminBackofficeTabClaims: 'Lieux',
+  adminBackofficeTabOrganizers: 'Dossiers pro',
+  adminOrganizerApplicationsTitle: 'Dossiers pro',
+  adminOrganizerApplicationsSubtitle:
+    "Examine les informations du formulaire avant d'approuver, refuser ou suspendre le compte.",
+  adminOrganizerApplicationsLoading: 'Chargement des dossiers...',
+  adminOrganizerApplicationsDetailsLoading: 'Chargement du dossier...',
+  adminOrganizerApplicationsEmptyTitle: 'Aucun dossier en attente',
+  adminOrganizerApplicationsEmptyDescription:
+    'Les demandes pro en attente apparaîtront ici.',
+  adminOrganizerApplicationsNoSelectionTitle: 'Sélectionne un dossier',
+  adminOrganizerApplicationsNoSelectionDescription:
+    'Choisis une demande dans la liste pour voir le dossier complet.',
+  adminOrganizerApplicationsLoadFailed: 'Impossible de charger les dossiers pro.',
+  adminOrganizerApplicationsDetailLoadFailed:
+    'Impossible de charger le détail du dossier.',
+  adminOrganizerApplicationsUpdateFailed:
+    'Impossible de mettre à jour ce dossier.',
+  adminOrganizerApplicationsApprovedMessage:
+    'Le dossier pro a été approuvé.',
+  adminOrganizerApplicationsRejectedMessage:
+    'Le dossier pro a été refusé.',
+  adminOrganizerApplicationsSuspendedMessage:
+    'Le dossier pro a été suspendu.',
+  adminOrganizerApplicationsFieldAccountType: 'Type de compte',
+  adminOrganizerApplicationsFieldCompanyName: 'Structure',
+  adminOrganizerApplicationsFieldJobTitle: 'Fonction',
+  adminOrganizerApplicationsFieldEmail: 'Email',
+  adminOrganizerApplicationsFieldIfu: 'Numéro IFU',
+  adminOrganizerApplicationsFieldPayout: 'Infos de paiement',
+  adminOrganizerApplicationsFieldPlaces: 'Lieux rattachés',
+  adminOrganizerApplicationsFieldCreatedAt: 'Créé le',
+  adminOrganizerApplicationsFieldUpdatedAt: 'Mis à jour le',
+  adminOrganizerApplicationsFieldSocials: 'Réseaux sociaux',
+  adminOrganizerApplicationsRevealSensitive: 'Afficher les infos sensibles',
+  adminOrganizerApplicationsHideSensitive: 'Masquer les infos sensibles',
+  adminOrganizerApplicationsDetailsTitle: 'Dossier pro',
+  adminOrganizerApplicationsDetailsSubtitle:
+    "Les informations ci-dessous proviennent du formulaire d'activation.",
+  adminOrganizerApplicationsSelectCta: 'Voir le détail',
+  adminOrganizerApplicationsReject: 'Refuser',
+  adminOrganizerApplicationsSuspend: 'Suspendre',
+  adminOrganizerApplicationsApprove: 'Approuver',
+  adminOrganizerStatusPending: 'En attente',
+  adminOrganizerStatusApproved: 'Approuvé',
+  adminOrganizerStatusRejected: 'Refusé',
+  adminOrganizerStatusSuspended: 'Suspendu',
   organizerGuardNotAllowedTitle: 'Accès refusé',
   organizerGuardNotAllowedMessage:
     'Cette zone est réservée aux organisateurs et gérants de lieux.',
@@ -1646,6 +1801,15 @@ const fr = {
   organizerNotificationsTypeReminderTitle: 'Rappel événement',
   organizerNotificationsTypeReminderDescription:
     'Ton événement commence bientôt. Vérifie tes opérations.',
+  organizerNotificationsTypePlaceClaimTitle: 'Revendication de lieu',
+  organizerNotificationsTypePlaceClaimDescription:
+    'Une mise à jour a été faite pour {place}.',
+  organizerNotificationsTypePlaceClaimApprovedTitle: 'Revendication approuvée',
+  organizerNotificationsTypePlaceClaimApprovedDescription:
+    'Ta revendication pour {place} a été approuvée.',
+  organizerNotificationsTypePlaceClaimRejectedTitle: 'Revendication rejetée',
+  organizerNotificationsTypePlaceClaimRejectedDescription:
+    'Ta revendication pour {place} a été rejetée.',
   organizerNotificationsTypeSystemTitle: 'Info',
   organizerNotificationsTypeSystemDescription:
     'Une nouvelle information organisateur est disponible.',
@@ -1785,6 +1949,16 @@ const en: Record<keyof typeof fr, string> = {
   notificationsRecentActivity: 'Recent activity',
   notificationsPlaceUpdateWithName: 'New at {place}',
   notificationsPlaceUpdateGeneric: 'New activity at a saved place',
+  notificationsPlaceFallback: 'this place',
+  notificationsPlaceClaimTitle: 'Place claim update',
+  notificationsPlaceClaimDescription:
+    'An update was made for {place}.',
+  notificationsPlaceClaimApprovedTitle: 'Claim approved',
+  notificationsPlaceClaimApprovedDescription:
+    'Your claim for {place} has been approved.',
+  notificationsPlaceClaimRejectedTitle: 'Claim rejected',
+  notificationsPlaceClaimRejectedDescription:
+    'Your claim for {place} has been rejected.',
   notificationsEmptyTitle: 'No activity yet',
   notificationsEmptyDescription:
     'Save a place to receive activity alerts.',
@@ -2350,8 +2524,8 @@ const en: Record<keyof typeof fr, string> = {
   activateProSocialHint: 'Add your social links if you want (optional).',
   activateProSuccessTitle: 'Request sent',
   activateProSuccessMessage:
-    'Your pro workspace is pending verification. Please sign in again to apply updates.',
-  activateProBackToLogin: 'Sign in again',
+    'Your pro request is pending verification. You can keep using your user account normally.',
+  activateProContinue: 'Continue',
   registerExistingAccount: 'Already have an account?',
   exploreLabel: 'Explore',
   exploreTitle: 'All events',
@@ -2734,6 +2908,10 @@ const en: Record<keyof typeof fr, string> = {
     "Sign in to view this place's posts.",
   placeDetailPublicationsRetry: 'Retry',
   placeDetailPublicationsClose: 'Close',
+  placeDetailClaimPanelTitle: 'This place does not have an owner yet',
+  placeDetailClaimPanelDescription:
+    'If this is your venue, claim it to request access to its pro space.',
+  placeDetailClaimPanelAction: 'Claim this place',
   placeDetailDescriptionFallback: 'No description available right now.',
   placeDetailRelatedEvents: 'Events linked to this place',
   placeDetailNoRelatedEvents: 'No event is linked to this place yet.',
@@ -3163,6 +3341,23 @@ const en: Record<keyof typeof fr, string> = {
   organizerProfileManagePlaces: 'Manage venues',
   organizerProfileManageTeam: 'Manage venue team',
   organizerProfileOpenPlace: 'Open profile',
+  organizerProfileClaimsLabel: 'Claims',
+  organizerProfileClaimsTitle: 'My claims',
+  organizerProfileClaimsSubtitle:
+    'Track the ownership requests you have sent and their replies.',
+  organizerProfileClaimsLoading: 'Loading claims...',
+  organizerProfileClaimsLoadFailed: 'Unable to load your claims.',
+  organizerProfileClaimsEmptyTitle: 'No claims yet',
+  organizerProfileClaimsEmptyDescription:
+    'The places you claim will appear here.',
+  organizerProfileClaimsStatusPending: 'Pending',
+  organizerProfileClaimsStatusApproved: 'Approved',
+  organizerProfileClaimsStatusRejected: 'Rejected',
+  organizerProfileClaimsSentAt: 'Sent on {date}',
+  organizerProfileClaimsUpdatedAt: 'Updated on {date}',
+  organizerProfileClaimsOpenPlace: 'View place',
+  organizerProfileClaimsOpenWorkspace: 'Open workspace',
+  organizerProfileClaimsRetry: 'Claim again',
   organizerProfileEmptyPlacesTitle: 'No attached venue',
   organizerProfileEmptyPlacesDescription:
     'Add a venue to represent your business in the pro workspace.',
@@ -3209,6 +3404,129 @@ const en: Record<keyof typeof fr, string> = {
   organizerGuardSuspendedMessage:
     'Your organizer access is suspended. Please contact support.',
   organizerGuardActionOk: 'OK',
+  organizerPlaceOnboardingLabel: 'Venue',
+  organizerPlaceOnboardingTitle: 'Choose your starting point',
+  organizerPlaceOnboardingSubtitle:
+    'Create a new venue or claim one that already exists on the platform.',
+  organizerPlaceOnboardingCreateTitle: 'Create a new venue',
+  organizerPlaceOnboardingCreateDescription:
+    'Open a guided form to add a brand-new place with its details, hours and media.',
+  organizerPlaceOnboardingCreateAction: 'Create a place',
+  organizerPlaceOnboardingClaimTitle: 'Claim an existing venue',
+  organizerPlaceOnboardingClaimDescription:
+    'Search for a listed place, add proof and submit your ownership request.',
+  organizerPlaceOnboardingClaimAction: 'Claim',
+  organizerPlaceOnboardingAlreadyOwnedTitle: 'You already own one or more places',
+  organizerPlaceOnboardingAlreadyOwnedDescription:
+    'You can open your dashboard, manage your venues or create a new listing if needed.',
+  organizerPlaceOnboardingDashboardAction: 'Open dashboard',
+  organizerPlaceClaimLabel: 'Claim',
+  organizerPlaceClaimTitle: 'Claim a venue',
+  organizerPlaceClaimSubtitle:
+    'Find the place, add proof and send your request to the backoffice.',
+  organizerPlaceClaimIntroLabel: 'Claim step',
+  organizerPlaceClaimIntroDescription:
+    'We verify the proof before assigning the place to your pro space.',
+  organizerPlaceClaimSearchLabel: 'Search a place',
+  organizerPlaceClaimSearchPlaceholder: 'Name, city or address',
+  organizerPlaceClaimLoadFailed: 'Unable to load claimable places.',
+  organizerPlaceClaimLoadingPlaces: 'Loading places...',
+  organizerPlaceClaimEmptyTitle: 'No claimable place',
+  organizerPlaceClaimEmptyDescription:
+    'There is no public place available for a claim in your area.',
+  organizerPlaceClaimSelectedTitle: 'Selected place',
+  organizerPlaceClaimSelectedBadge: 'Selected',
+  organizerPlaceClaimSelectBadge: 'Choose',
+  organizerPlaceClaimUploadLabel: 'Add proof',
+  organizerPlaceClaimProofSelected: 'Proof selected',
+  organizerPlaceClaimProofHint:
+    'Add a clear photo of a document, storefront sign or official proof.',
+  organizerPlaceClaimSelectRequired: 'Select a place before continuing.',
+  organizerPlaceClaimProofRequired: 'Add proof before sending your request.',
+  organizerPlaceClaimSubmit: 'Send request',
+  organizerPlaceClaimSubmitting: 'Sending...',
+  organizerPlaceClaimSuccessTitle: 'Request sent',
+  organizerPlaceClaimSuccessMessage:
+    'Your claim has been sent and will be reviewed by the backoffice.',
+  organizerPlaceClaimSubmitFailed: 'Unable to send the claim request.',
+  organizerPlaceClaimAccessTitle: 'Access required',
+  organizerPlaceClaimAccessDescription:
+    'Activate a pro account before claiming a venue.',
+  organizerPlaceClaimAccessAction: 'Activate pro space',
+  adminPlaceClaimsLabel: 'Backoffice',
+  adminPlaceClaimsTitle: 'Place claims',
+  adminPlaceClaimsSubtitle:
+    'Check proofs and approve or reject venue ownership requests.',
+  adminPlaceClaimsLoading: 'Loading requests...',
+  adminPlaceClaimsLoadFailed: 'Unable to load claims.',
+  adminPlaceClaimsEmptyTitle: 'No pending claims',
+  adminPlaceClaimsEmptyDescription:
+    'All ownership requests have already been processed.',
+  adminPlaceClaimsAccessTitle: 'Admin access required',
+  adminPlaceClaimsAccessDescription:
+    'This area is reserved for administrators.',
+  adminPlaceClaimsDocumentOpenFailed: 'Unable to open the proof.',
+  adminPlaceClaimsUpdateFailed: 'Unable to update the claim.',
+  adminPlaceClaimsApprovedMessage: 'The claim has been approved.',
+  adminPlaceClaimsRejectedMessage: 'The claim has been rejected.',
+  adminPlaceClaimsApprove: 'Approve',
+  adminPlaceClaimsReject: 'Reject',
+  adminPlaceClaimsOpenDocument: 'Open proof',
+  profileAdminClaimsTitle: 'Place claims',
+  profileAdminClaimsDescription:
+    'Access the backoffice to review proofs and process ownership requests.',
+  profileAdminClaimsAction: 'Open backoffice',
+  adminBackofficeLabel: 'Admin',
+  adminBackofficeTitle: 'Backoffice',
+  adminBackofficeSubtitle:
+    'Review venue claims and pro dossiers before approving them.',
+  adminBackofficeTabClaims: 'Place claims',
+  adminBackofficeTabOrganizers: 'Pro dossiers',
+  adminOrganizerApplicationsTitle: 'Pro dossiers',
+  adminOrganizerApplicationsSubtitle:
+    'Review the form details before approving, rejecting, or suspending the account.',
+  adminOrganizerApplicationsLoading: 'Loading dossiers...',
+  adminOrganizerApplicationsDetailsLoading: 'Loading dossier...',
+  adminOrganizerApplicationsEmptyTitle: 'No pending dossier',
+  adminOrganizerApplicationsEmptyDescription:
+    'Pending pro requests will appear here.',
+  adminOrganizerApplicationsNoSelectionTitle: 'Select a dossier',
+  adminOrganizerApplicationsNoSelectionDescription:
+    'Pick one request from the list to see the full application.',
+  adminOrganizerApplicationsLoadFailed: 'Unable to load pro dossiers.',
+  adminOrganizerApplicationsDetailLoadFailed:
+    'Unable to load the dossier details.',
+  adminOrganizerApplicationsUpdateFailed:
+    'Unable to update this dossier.',
+  adminOrganizerApplicationsApprovedMessage:
+    'The pro dossier has been approved.',
+  adminOrganizerApplicationsRejectedMessage:
+    'The pro dossier has been rejected.',
+  adminOrganizerApplicationsSuspendedMessage:
+    'The pro dossier has been suspended.',
+  adminOrganizerApplicationsFieldAccountType: 'Account type',
+  adminOrganizerApplicationsFieldCompanyName: 'Business name',
+  adminOrganizerApplicationsFieldJobTitle: 'Role',
+  adminOrganizerApplicationsFieldEmail: 'Email',
+  adminOrganizerApplicationsFieldIfu: 'IFU number',
+  adminOrganizerApplicationsFieldPayout: 'Payout info',
+  adminOrganizerApplicationsFieldPlaces: 'Linked venues',
+  adminOrganizerApplicationsFieldCreatedAt: 'Created at',
+  adminOrganizerApplicationsFieldUpdatedAt: 'Updated at',
+  adminOrganizerApplicationsFieldSocials: 'Social links',
+  adminOrganizerApplicationsRevealSensitive: 'Show sensitive info',
+  adminOrganizerApplicationsHideSensitive: 'Hide sensitive info',
+  adminOrganizerApplicationsDetailsTitle: 'Pro dossier',
+  adminOrganizerApplicationsDetailsSubtitle:
+    'The data below comes from the activation form.',
+  adminOrganizerApplicationsSelectCta: 'View details',
+  adminOrganizerApplicationsReject: 'Reject',
+  adminOrganizerApplicationsSuspend: 'Suspend',
+  adminOrganizerApplicationsApprove: 'Approve',
+  adminOrganizerStatusPending: 'Pending',
+  adminOrganizerStatusApproved: 'Approved',
+  adminOrganizerStatusRejected: 'Rejected',
+  adminOrganizerStatusSuspended: 'Suspended',
   createModalTitle: 'What do you want to create?',
   createModalSubtitle:
     'Shortcuts change based on your profile to keep the flow clean.',
@@ -3344,6 +3662,15 @@ const en: Record<keyof typeof fr, string> = {
   organizerNotificationsTypeReminderTitle: 'Event reminder',
   organizerNotificationsTypeReminderDescription:
     'Your event is starting soon. Check operations.',
+  organizerNotificationsTypePlaceClaimTitle: 'Place claim update',
+  organizerNotificationsTypePlaceClaimDescription:
+    'An update was made for {place}.',
+  organizerNotificationsTypePlaceClaimApprovedTitle: 'Claim approved',
+  organizerNotificationsTypePlaceClaimApprovedDescription:
+    'Your claim for {place} has been approved.',
+  organizerNotificationsTypePlaceClaimRejectedTitle: 'Claim rejected',
+  organizerNotificationsTypePlaceClaimRejectedDescription:
+    'Your claim for {place} has been rejected.',
   organizerNotificationsTypeSystemTitle: 'Info',
   organizerNotificationsTypeSystemDescription:
     'A new organizer information item is available.',
@@ -3445,3 +3772,4 @@ export const getLocaleForLanguage = (
   language: StoredLanguagePreference,
 ): AppLocale =>
   language === 'en' ? 'en-US' : 'fr-FR';
+

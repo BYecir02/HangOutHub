@@ -109,11 +109,7 @@ export default function ProfileScreen() {
   const isPendingOrganizer = isOrganizerPending(user);
   const isRejectedOrganizer = isOrganizerRejected(user);
   const isSuspendedOrganizer = isOrganizerSuspended(user);
-  const isOrganizer =
-    isProfessionalAccount &&
-    !isPendingOrganizer &&
-    !isRejectedOrganizer &&
-    !isSuspendedOrganizer;
+  const isOrganizer = false;
   const normalizedTeamRole = normalizeTeamWorkspaceRole(user?.teamRole);
   const canAccessProPanel = canAccessOrganizerPanel(user);
   const canActivateProPanel = !canAccessProPanel && user?.role === 'USER';
@@ -191,8 +187,8 @@ export default function ProfileScreen() {
       return;
     }
 
-    setActiveTab(isOrganizer ? 'overview' : 'outings');
-  }, [activeTab, isOrganizer, user]);
+    setActiveTab('outings');
+  }, [activeTab, user]);
 
   const displayUser = useMemo(() => {
     if (isOrganizer && user?.OrganizerProfile) {
@@ -248,6 +244,8 @@ export default function ProfileScreen() {
 
   const featuredOuting = filteredOutings[0] ?? null;
   const profilePostsAutoplay = useVisibleItemAutoplay(posts, (post) => post.id);
+  const savedPlacesAutoplay = useVisibleItemAutoplay(savedPlaces, (place) => place.id);
+  const savedPlacesGridOffsetYRef = React.useRef(0);
   const savedPlaceColumns = useMemo(() => {
     const nextColumns: Array<Array<{ place: (typeof savedPlaces)[number]; imageHeight: number }>> =
       [[], []];
@@ -315,6 +313,13 @@ export default function ProfileScreen() {
     [t],
   );
 
+  const activeVisibleAutoplay =
+    activeTab === 'posts'
+      ? profilePostsAutoplay
+      : activeTab === 'saved'
+        ? savedPlacesAutoplay
+        : null;
+
   if (loading && !user) {
     return (
       <ScrollView className="flex-1 bg-white dark:bg-black" showsVerticalScrollIndicator={false}>
@@ -349,13 +354,12 @@ export default function ProfileScreen() {
     <ScrollView
       className="flex-1 bg-white dark:bg-black"
       showsVerticalScrollIndicator={false}
-      onScroll={activeTab === 'posts' ? profilePostsAutoplay.onScroll : undefined}
+      onScroll={activeVisibleAutoplay ? activeVisibleAutoplay.onScroll : undefined}
       scrollEventThrottle={16}
-      onLayout={activeTab === 'posts' ? profilePostsAutoplay.onLayout : undefined}
+      onLayout={activeVisibleAutoplay ? activeVisibleAutoplay.onLayout : undefined}
     >
       <ProfileHeader
         user={displayUser}
-        isOrganizer={isOrganizer}
         canAccessProPanel={canAccessProPanel}
         canActivateProPanel={canActivateProPanel}
         proPanelLabel={proPanelLabel}
@@ -398,14 +402,39 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      {user?.role === 'ADMIN' ? (
+        <View className="mt-4 px-5">
+          <View className="rounded-3xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+            <View className="flex-row items-start">
+              <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-[#4c669f]/12">
+                <Ionicons name="shield-checkmark-outline" size={18} color="#4c669f" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('profileAdminClaimsTitle')}
+                </Text>
+                <Text className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {t('profileAdminClaimsDescription')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/admin/place-claims')}
+                  className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2.5"
+                >
+                  <Text className="text-xs font-semibold text-white">
+                    {t('profileAdminClaimsAction')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       <ProfileStats
         postsCount={posts.length}
         outingsCount={outings.length}
         connectionsCount={connectionsCount}
         savedCount={savedPlaces.length}
-        isOrganizer={isOrganizer}
-        placesCount={ownedPlaces.length}
-        eventsCount={organizerEvents.length}
         onConnectionsPress={() => router.push('/connections')}
       />
 
@@ -494,27 +523,41 @@ export default function ProfileScreen() {
           ) : null}
 
           {!isOrganizer && activeTab === 'saved' ? (
-            <View className="px-5">
+            <View
+              className="px-5"
+              onLayout={(event) => {
+                savedPlacesGridOffsetYRef.current = event.nativeEvent.layout.y;
+              }}
+            >
               {savedPlaces.length > 0 ? (
                 <>
                   <View className="flex-row items-start gap-3">
                     {savedPlaceColumns.map((column, columnIndex) => (
                       <View key={`saved-column-${columnIndex}`} className="min-w-0 flex-1">
                         {column.map(({ place, imageHeight }) => (
-                          <PlaceInspirationCard
+                          <View
                             key={place.id}
-                            place={{ ...place, coverUrl: place.coverUrl ?? null }}
-                            imageHeight={imageHeight}
-                            fallbackNewLabel={t('discoverPlaceMetaDiscover')}
-                            onPress={() =>
-                              router.push({
-                                pathname: '/place/[id]',
-                                params: { id: place.id },
+                            onLayout={(event) =>
+                              savedPlacesAutoplay.registerLayout(place.id, {
+                                y: savedPlacesGridOffsetYRef.current + event.nativeEvent.layout.y,
+                                height: event.nativeEvent.layout.height,
                               })
                             }
-                            showSaveButton={false}
-                            shouldPlay={false}
-                          />
+                          >
+                            <PlaceInspirationCard
+                              place={{ ...place, coverUrl: place.coverUrl ?? null }}
+                              imageHeight={imageHeight}
+                              fallbackNewLabel={t('discoverPlaceMetaDiscover')}
+                              onPress={() =>
+                                router.push({
+                                  pathname: '/place/[id]',
+                                  params: { id: place.id },
+                                })
+                              }
+                              showSaveButton={false}
+                              shouldPlay={savedPlacesAutoplay.activeId === place.id}
+                            />
+                          </View>
                         ))}
                       </View>
                     ))}

@@ -57,6 +57,8 @@ type PlaceDetailContentProps = {
   saveLoading: boolean;
   onToggleSave: () => void;
   onOpenCreateModal: () => void;
+  canClaimPlace: boolean;
+  onOpenClaimPlace: () => void;
   onReportPlace: () => void;
   onContactPlace: () => void;
   onOpenGallery: (index: number) => void;
@@ -76,6 +78,8 @@ export default function PlaceDetailContent({
   saveLoading,
   onToggleSave,
   onOpenCreateModal,
+  canClaimPlace,
+  onOpenClaimPlace,
   onReportPlace,
   onContactPlace,
   onOpenGallery,
@@ -115,11 +119,11 @@ export default function PlaceDetailContent({
           />
         </View>
 
-        <View className="mt-4 flex-row flex-wrap gap-2">
-          <TouchableOpacity
-            onPress={onOpenCreateModal}
-            className="flex-1 min-w-[140px] flex-row items-center justify-center rounded-full bg-[#4c669f] px-3 py-3"
-          >
+      <View className="mt-4 flex-row flex-wrap gap-2">
+        <TouchableOpacity
+          onPress={onOpenCreateModal}
+          className="flex-1 min-w-[140px] flex-row items-center justify-center rounded-full bg-[#4c669f] px-3 py-3"
+        >
             <Ionicons name="add" size={13} color="#fff" />
             <Text className="ml-1.5 text-xs font-semibold text-white">
               {t('placeDetailCreateCta')}
@@ -130,16 +134,42 @@ export default function PlaceDetailContent({
             className="flex-1 min-w-[120px] flex-row items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900/30 dark:bg-rose-900/20"
           >
             <Ionicons name="flag-outline" size={13} color="#e11d48" />
-            <Text className="ml-1.5 text-xs font-semibold text-rose-600">
-              {t('reportAction')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <Text className="ml-1.5 text-xs font-semibold text-rose-600">
+            {t('reportAction')}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-        <View className="mt-6 rounded-3xl bg-white p-4 dark:bg-gray-900">
-          <Tabs
-            items={tabItems}
-            activeTab={activeTab}
+      {!place.Owner?.id && canClaimPlace ? (
+        <View className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/20">
+          <View className="flex-row items-start">
+            <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/40">
+              <Ionicons name="shield-checkmark-outline" size={20} color="#b45309" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-amber-900 dark:text-amber-200">
+                {t('placeDetailClaimPanelTitle')}
+              </Text>
+              <Text className="mt-1 text-sm leading-6 text-amber-800/90 dark:text-amber-200/90">
+                {t('placeDetailClaimPanelDescription')}
+              </Text>
+              <TouchableOpacity
+                onPress={onOpenClaimPlace}
+                className="mt-4 self-start rounded-full bg-amber-600 px-4 py-2.5"
+              >
+                <Text className="text-xs font-semibold text-white">
+                  {t('placeDetailClaimPanelAction')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      <View className="mt-6 rounded-3xl bg-white p-4 dark:bg-gray-900">
+        <Tabs
+          items={tabItems}
+          activeTab={activeTab}
             onTabChange={(id) => onTabChange(id as PlaceDetailTab)}
           />
 
