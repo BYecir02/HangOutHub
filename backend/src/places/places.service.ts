@@ -45,8 +45,8 @@ type PlaceClaimHistoryItem = {
   placeId: string;
   documentUrl: string;
   status: string | null;
-  createdAt: Date;
-  updatedAt: Date | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
   Place: PlaceClaimPlaceSnapshot;
   User?: PlaceClaimUserSnapshot;
 };
@@ -471,6 +471,15 @@ export class PlacesService {
     return 'PENDING';
   }
 
+  private isMissingPlaceClaimTimestampColumn(error: unknown) {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2022'
+    );
+  }
+
   private getPlaceClaimPlaceSelect() {
     return {
       id: true,
@@ -560,6 +569,22 @@ export class PlacesService {
           createdAt: true,
           updatedAt: true,
         },
+      }).catch(async (error) => {
+        if (!this.isMissingPlaceClaimTimestampColumn(error)) {
+          throw error;
+        }
+
+        return this.prisma.placeClaim.findMany({
+          where: { userId },
+          orderBy: { status: 'asc' },
+          select: {
+            id: true,
+            userId: true,
+            placeId: true,
+            documentUrl: true,
+            status: true,
+          },
+        });
       });
 
       const placeMap = await this.loadPlaceClaimPlaces(
@@ -598,6 +623,25 @@ export class PlacesService {
           createdAt: true,
           updatedAt: true,
         },
+      }).catch(async (error) => {
+        if (!this.isMissingPlaceClaimTimestampColumn(error)) {
+          throw error;
+        }
+
+        return this.prisma.placeClaim.findMany({
+          orderBy: [
+            {
+              status: 'asc',
+            },
+          ],
+          select: {
+            id: true,
+            userId: true,
+            placeId: true,
+            documentUrl: true,
+            status: true,
+          },
+        });
       });
 
       const [placeMap, userMap] = await Promise.all([
