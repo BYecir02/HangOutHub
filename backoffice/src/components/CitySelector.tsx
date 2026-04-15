@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-interface CityOption {
+export interface CityOption {
   id: number;
   name: string;
   country: string | null;
@@ -36,7 +36,6 @@ export default function CitySelector({
   const [countryQuery, setCountryQuery] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('');
   const [cityQuery, setCityQuery] = useState('');
-  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [showCountryCreate, setShowCountryCreate] = useState(false);
   const [showCityCreate, setShowCityCreate] = useState(false);
   const [cityName, setCityName] = useState('');
@@ -104,14 +103,12 @@ export default function CitySelector({
 
     setSelectedCountry(value.country ?? '');
     setCountryQuery(value.country ?? '');
-    setSelectedCityId(value.id);
     setCityQuery(value.name);
   }, [value]);
 
   const handleSelectCountry = (country: string) => {
     setSelectedCountry(country);
     setCountryQuery(country);
-    setSelectedCityId(null);
     setCityQuery('');
     setShowCountryCreate(false);
     setShowCityCreate(false);
@@ -130,14 +127,12 @@ export default function CitySelector({
     setSelectedCountry(normalizedCountry);
     setCountryQuery(normalizedCountry);
     setShowCountryCreate(false);
-    setSelectedCityId(null);
     setCityQuery('');
     setCreationError('');
     onChange(null);
   };
 
   const handleSelectCity = (city: CityOption) => {
-    setSelectedCityId(city.id);
     setCityQuery(city.name);
     setShowCityCreate(false);
     setCreationError('');
@@ -167,7 +162,6 @@ export default function CitySelector({
         country: normalizedCountry,
       });
 
-      setSelectedCityId(created.id);
       setCityQuery(created.name);
       setShowCityCreate(false);
       onChange(created);
@@ -211,7 +205,6 @@ export default function CitySelector({
               const nextValue = event.target.value;
               setCountryQuery(nextValue);
               setSelectedCountry(nextValue);
-              setSelectedCityId(null);
               setCityQuery('');
               setShowCountryCreate(false);
               setShowCityCreate(false);
@@ -303,7 +296,6 @@ export default function CitySelector({
               type="button"
               onClick={() => {
                 onChange(null);
-                setSelectedCityId(null);
                 setCityQuery('');
                 setCreationError('');
               }}
@@ -344,7 +336,6 @@ export default function CitySelector({
             value={cityQuery}
             onChange={(event) => {
               setCityQuery(event.target.value);
-              setSelectedCityId(null);
               setShowCityCreate(false);
               setCreationError('');
               onChange(null);

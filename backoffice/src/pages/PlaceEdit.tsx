@@ -16,15 +16,9 @@ import FormField from '../components/FormField';
 import LoadingState from '../components/LoadingState';
 import MediaPreview from '../components/MediaPreview';
 import Card from '../components/Card';
-import CitySelector from '../components/CitySelector';
+import CitySelector, { type CityOption } from '../components/CitySelector';
 import SelectField from '../components/SelectField';
 import { getMediaUploadErrorMessage } from '../lib/media';
-
-interface CityOption {
-  id: number;
-  name: string;
-  country: string;
-}
 
 interface PlaceDetails {
   id: string;
