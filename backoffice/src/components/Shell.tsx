@@ -4,6 +4,7 @@ import { clearSession, getSession } from '../lib/auth';
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
+  { to: '/parcours', label: 'Parcours' },
   { to: '/approvals', label: 'Validations' },
   { to: '/categories', label: 'Categories & tags' },
   { to: '/reports', label: 'Signalements' },

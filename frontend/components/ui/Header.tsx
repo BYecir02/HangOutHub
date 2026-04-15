@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -34,7 +35,18 @@ export default function Header({
     actionCount >= 3 ? 'w-28' : actionCount === 2 ? 'w-20' : 'w-10';
 
   return (
-    <View className="bg-gray-50 dark:bg-black px-5 pt-14 pb-4  flex-row justify-between items-center">
+    <View className="px-5 pt-14 pb-4 flex-row justify-between items-center">
+      <View className="absolute inset-0 overflow-hidden">
+        <BlurView
+          intensity={isDark ? 24 : 32}
+          tint={isDark ? 'dark' : 'light'}
+          className="flex-1"
+        />
+        <View
+          pointerEvents="none"
+          className={isDark ? 'absolute inset-0 bg-black/35' : 'absolute inset-0 bg-white/35'}
+        />
+      </View>
       {/* Espace vide pour ÃƒÂ©quilibrer le header et garder le titre centrÃƒÂ© */}
       <View className={actionWidthClass} />
 

@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 import { AnalyticsService } from './analytics.service';
 import { DashboardTrendRange } from './analytics.types';
+import { UserFlowAnalyticsService } from './user-flow-analytics.service';
 
 interface AuthenticatedRequest {
   user: {
@@ -19,7 +20,10 @@ interface DashboardQuery {
 
 @Controller('admin/analytics')
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly userFlowAnalyticsService: UserFlowAnalyticsService,
+  ) {}
 
   private ensureAdmin(req: AuthenticatedRequest) {
     if (req.user.role !== 'ADMIN') {
@@ -32,5 +36,12 @@ export class AnalyticsController {
   getDashboard(@Request() req: AuthenticatedRequest, @Query() query: DashboardQuery) {
     this.ensureAdmin(req);
     return this.analyticsService.getDashboardOverview(query);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('flow-tree')
+  getFlowTree(@Request() req: AuthenticatedRequest, @Query() query: DashboardQuery) {
+    this.ensureAdmin(req);
+    return this.userFlowAnalyticsService.getFlowTree(query);
   }
 }

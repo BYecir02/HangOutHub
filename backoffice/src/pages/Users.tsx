@@ -457,6 +457,14 @@ export default function UsersPage() {
                               ? 'Reactivier'
                               : 'Suspendre'}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(user)}
+                          disabled={detailBusy === user.id}
+                          className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                        >
+                          {detailBusy === user.id ? 'Suppression...' : 'Supprimer'}
+                        </button>
                       </TableRowActions>
                     </td>
                   </tr>

@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { ActivateProProfileDto } from './dto/activate-pro-profile.dto';
+import { EmailService } from '../email/email.service';
 
 interface OrganizerDetailsInput {
   accountType: string;
@@ -56,6 +57,10 @@ export interface UserPreferenceCategory {
 export interface UserTagPreferencesResponse {
   categories: UserPreferenceCategory[];
   selectedTagIds: number[];
+}
+
+export interface UserCityPreferencesResponse {
+  selectedCityIds: number[];
 }
 
 export interface UserSettingsResponse {
@@ -138,7 +143,10 @@ type StoredUserSettings = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private normalizeReminderOffsets(
     offsets: number[] | null | undefined,
@@ -279,29 +287,79 @@ export class UsersService {
     roleName = 'USER',
     organizerDetails?: OrganizerDetailsInput,
   ) {
+    const normalizedEmail = createUserDto.email?.trim().toLowerCase();
+    const normalizedUsername = createUserDto.username?.trim();
+    const normalizedPhone = createUserDto.phoneNumber?.trim();
+
+    if (!normalizedPhone) {
+      throw new BadRequestException('Le numero de telephone est requis.');
+    }
+
+    const uniqueChecks: Prisma.UserWhereInput[] = [];
+
+    if (normalizedEmail) {
+      uniqueChecks.push({
+        email: { equals: normalizedEmail, mode: 'insensitive' },
+      });
+    }
+
+    if (normalizedUsername) {
+      uniqueChecks.push({
+        username: { equals: normalizedUsername, mode: 'insensitive' },
+      });
+    }
+
+    uniqueChecks.push({ phoneNumber: normalizedPhone });
+
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { email: createUserDto.email },
-          { phoneNumber: createUserDto.phoneNumber },
-          { username: createUserDto.username },
-        ],
+        OR: uniqueChecks,
+      },
+      select: {
+        email: true,
+        phoneNumber: true,
+        username: true,
       },
     });
 
     if (existingUser) {
-      throw new ConflictException(
-        'Un utilisateur avec cet email, telephone ou pseudo existe deja.',
-      );
+      const conflicts: string[] = [];
+
+      if (
+        normalizedEmail &&
+        existingUser.email &&
+        existingUser.email.toLowerCase() === normalizedEmail
+      ) {
+        conflicts.push('email');
+      }
+
+      if (
+        normalizedUsername &&
+        existingUser.username &&
+        existingUser.username.toLowerCase() === normalizedUsername.toLowerCase()
+      ) {
+        conflicts.push('pseudo');
+      }
+
+      if (existingUser.phoneNumber === normalizedPhone) {
+        conflicts.push('telephone');
+      }
+
+      const message =
+        conflicts.length > 0
+          ? `Un utilisateur avec ce ${conflicts.join(', ')} existe deja.`
+          : 'Un utilisateur avec cet email, telephone ou pseudo existe deja.';
+
+      throw new ConflictException(message);
     }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(createUserDto.password, salt);
 
     const userData: Omit<CreateUserDto, 'password'> = {
-      username: createUserDto.username,
-      email: createUserDto.email,
-      phoneNumber: createUserDto.phoneNumber,
+      username: normalizedUsername || createUserDto.username,
+      email: normalizedEmail,
+      phoneNumber: normalizedPhone,
       residenceCityId: createUserDto.residenceCityId,
     };
 
@@ -394,6 +452,16 @@ export class UsersService {
       include: {
         OrganizerProfile: true,
         UserRole: { include: { Role: true } },
+        UserCityInterest: {
+          select: {
+            cityId: true,
+          },
+        },
+        UserTagInterest: {
+          select: {
+            tagId: true,
+          },
+        },
         Session: {
           select: {
             id: true,
@@ -584,11 +652,324 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    await this.prisma.user.delete({
-      where: { id },
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const uniqueIds = (values: string[]) => Array.from(new Set(values));
+
+    await this.prisma.$transaction(async (tx) => {
+      const ownedPlaces = await tx.place.findMany({
+        where: { ownerId: id },
+        select: { id: true },
+      });
+      const placeIds = ownedPlaces.map((place) => place.id);
+
+      const events = await tx.event.findMany({
+        where: placeIds.length
+          ? { OR: [{ organizerId: id }, { placeId: { in: placeIds } }] }
+          : { organizerId: id },
+        select: { id: true },
+      });
+      const eventIds = events.map((event) => event.id);
+
+      const outings = await tx.outing.findMany({
+        where: placeIds.length
+          ? { OR: [{ creatorId: id }, { placeId: { in: placeIds } }] }
+          : { creatorId: id },
+        select: { id: true },
+      });
+      const outingIds = outings.map((outing) => outing.id);
+
+      const posts = await tx.post.findMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(placeIds.length ? [{ placeId: { in: placeIds } }] : []),
+            ...(eventIds.length ? [{ eventId: { in: eventIds } }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const postIds = posts.map((post) => post.id);
+
+      const stories = await tx.story.findMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(placeIds.length ? [{ placeId: { in: placeIds } }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const storyIds = stories.map((story) => story.id);
+
+      const reviews = await tx.review.findMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(placeIds.length ? [{ placeId: { in: placeIds } }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const reviewIds = reviews.map((review) => review.id);
+
+      const conversations = await tx.directConversation.findMany({
+        where: { OR: [{ userOneId: id }, { userTwoId: id }] },
+        select: { id: true },
+      });
+      const conversationIds = conversations.map((conversation) => conversation.id);
+
+      const outingMedias = outingIds.length
+        ? await tx.outingMedia.findMany({
+            where: { outingId: { in: outingIds } },
+            select: { id: true },
+          })
+        : [];
+      const outingMediaIds = outingMedias.map((media) => media.id);
+
+      const bookings = await tx.booking.findMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(eventIds.length ? [{ eventId: { in: eventIds } }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const bookingIds = bookings.map((booking) => booking.id);
+
+      const uniqueEventIds = uniqueIds(eventIds);
+      const uniqueOutingIds = uniqueIds(outingIds);
+      const uniquePostIds = uniqueIds(postIds);
+      const uniqueStoryIds = uniqueIds(storyIds);
+      const uniqueReviewIds = uniqueIds(reviewIds);
+      const uniquePlaceIds = uniqueIds(placeIds);
+      const uniqueBookingIds = uniqueIds(bookingIds);
+      const uniqueConversationIds = uniqueIds(conversationIds);
+      const uniqueOutingMediaIds = uniqueIds(outingMediaIds);
+
+      await tx.notification.deleteMany({
+        where: { OR: [{ userId: id }, { actorId: id }] },
+      });
+      await tx.friendship.deleteMany({
+        where: { OR: [{ requesterId: id }, { receiverId: id }] },
+      });
+      await tx.userFlowEvent.deleteMany({ where: { userId: id } });
+
+      await tx.directMessageReaction.deleteMany({ where: { userId: id } });
+      if (uniqueConversationIds.length) {
+        await tx.directConversation.deleteMany({
+          where: { id: { in: uniqueConversationIds } },
+        });
+      }
+
+      await tx.postShareEvent.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniquePostIds.length ? [{ postId: { in: uniquePostIds } }] : []),
+          ],
+        },
+      });
+      await tx.postLike.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniquePostIds.length ? [{ postId: { in: uniquePostIds } }] : []),
+          ],
+        },
+      });
+      await tx.postComment.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniquePostIds.length ? [{ postId: { in: uniquePostIds } }] : []),
+          ],
+        },
+      });
+      if (uniquePostIds.length) {
+        await tx.post.deleteMany({ where: { id: { in: uniquePostIds } } });
+      }
+
+      await tx.storyLike.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueStoryIds.length ? [{ storyId: { in: uniqueStoryIds } }] : []),
+          ],
+        },
+      });
+      await tx.storyView.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueStoryIds.length ? [{ storyId: { in: uniqueStoryIds } }] : []),
+          ],
+        },
+      });
+      if (uniqueStoryIds.length) {
+        await tx.story.deleteMany({ where: { id: { in: uniqueStoryIds } } });
+      }
+
+      await tx.reviewLike.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueReviewIds.length ? [{ reviewId: { in: uniqueReviewIds } }] : []),
+          ],
+        },
+      });
+      await tx.reviewComment.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueReviewIds.length ? [{ reviewId: { in: uniqueReviewIds } }] : []),
+          ],
+        },
+      });
+      if (uniqueReviewIds.length) {
+        await tx.review.deleteMany({ where: { id: { in: uniqueReviewIds } } });
+      }
+
+      await tx.outingMediaLike.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueOutingMediaIds.length
+              ? [{ mediaId: { in: uniqueOutingMediaIds } }]
+              : []),
+          ],
+        },
+      });
+      await tx.outingMediaComment.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueOutingMediaIds.length
+              ? [{ mediaId: { in: uniqueOutingMediaIds } }]
+              : []),
+          ],
+        },
+      });
+      if (uniqueOutingMediaIds.length) {
+        await tx.outingMedia.deleteMany({
+          where: { id: { in: uniqueOutingMediaIds } },
+        });
+      }
+      await tx.chatMessage.deleteMany({
+        where: {
+          OR: [
+            { senderId: id },
+            ...(uniqueOutingIds.length ? [{ outingId: { in: uniqueOutingIds } }] : []),
+          ],
+        },
+      });
+      await tx.outingParticipant.deleteMany({
+        where: {
+          OR: [
+            { userId: id },
+            ...(uniqueOutingIds.length ? [{ outingId: { in: uniqueOutingIds } }] : []),
+          ],
+        },
+      });
+      if (uniqueOutingIds.length) {
+        await tx.outing.deleteMany({ where: { id: { in: uniqueOutingIds } } });
+      }
+
+      if (uniqueBookingIds.length) {
+        await tx.payment.deleteMany({
+          where: { bookingId: { in: uniqueBookingIds } },
+        });
+        await tx.booking.deleteMany({
+          where: { id: { in: uniqueBookingIds } },
+        });
+      }
+
+      if (uniqueEventIds.length) {
+        await tx.ticketType.deleteMany({
+          where: { eventId: { in: uniqueEventIds } },
+        });
+        await tx.eventTag.deleteMany({
+          where: { eventId: { in: uniqueEventIds } },
+        });
+        await tx.eventCollaborator.deleteMany({
+          where: {
+            OR: [
+              { userId: id },
+              { eventId: { in: uniqueEventIds } },
+            ],
+          },
+        });
+        await tx.eventRevision.deleteMany({
+          where: { eventId: { in: uniqueEventIds } },
+        });
+        await tx.promotion.deleteMany({
+          where: {
+            OR: [
+              { eventId: { in: uniqueEventIds } },
+              ...(uniquePlaceIds.length ? [{ placeId: { in: uniquePlaceIds } }] : []),
+            ],
+          },
+        });
+        await tx.event.deleteMany({ where: { id: { in: uniqueEventIds } } });
+      }
+
+      if (uniquePlaceIds.length) {
+        await tx.placeTag.deleteMany({
+          where: { placeId: { in: uniquePlaceIds } },
+        });
+        await tx.placeTeamMember.deleteMany({
+          where: {
+            OR: [
+              { userId: id },
+              { placeId: { in: uniquePlaceIds } },
+            ],
+          },
+        });
+        await tx.placeClaim.deleteMany({
+          where: {
+            OR: [
+              { userId: id },
+              { placeId: { in: uniquePlaceIds } },
+            ],
+          },
+        });
+        await tx.savedPlace.deleteMany({
+          where: {
+            OR: [
+              { userId: id },
+              { placeId: { in: uniquePlaceIds } },
+            ],
+          },
+        });
+        await tx.subscription.deleteMany({
+          where: { placeId: { in: uniquePlaceIds } },
+        });
+        await tx.place.deleteMany({ where: { id: { in: uniquePlaceIds } } });
+      }
+
+      await tx.deviceToken.deleteMany({ where: { userId: id } });
+      await tx.session.deleteMany({ where: { userId: id } });
+      await tx.emailVerificationToken.deleteMany({ where: { userId: id } });
+      await tx.organizerProfile.deleteMany({ where: { userId: id } });
+      await tx.userSettings.deleteMany({ where: { userId: id } });
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      await tx.userCityInterest.deleteMany({ where: { userId: id } });
+      await tx.userTagInterest.deleteMany({ where: { userId: id } });
+
+      await tx.report.updateMany({
+        where: { resolvedByUserId: id },
+        data: { resolvedByUserId: null },
+      });
+
+      await tx.user.delete({ where: { id } });
     });
 
-    return { success: true };
+    return { success: true, mode: 'deleted' as const };
   }
 
   async update(id: string, updateUserDto: Prisma.UserUpdateInput) {
@@ -601,10 +982,7 @@ export class UsersService {
   }
 
   async approveOrganizer(userId: string) {
-    return this.prisma.organizerProfile.update({
-      where: { userId },
-      data: { status: 'APPROVED' },
-    });
+    return this.updateOrganizerStatus(userId, 'APPROVED');
   }
 
   async listOrganizerProfiles() {
@@ -654,9 +1032,74 @@ export class UsersService {
       throw new BadRequestException('Statut organisateur invalide.');
     }
 
-    return this.prisma.organizerProfile.update({
+    const organizer = await this.prisma.organizerProfile.update({
       where: { userId },
       data: { status: normalized },
+      include: {
+        User: {
+          select: {
+            email: true,
+            username: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+
+    await this.sendOrganizerStatusEmail(organizer.User, {
+      status: normalized,
+      companyName: organizer.companyName,
+      accountType: organizer.accountType,
+    });
+
+    return organizer;
+  }
+
+  private async sendOrganizerStatusEmail(
+    user: { email: string | null; username: string | null; displayName: string | null } | null,
+    payload: { status: string; companyName?: string | null; accountType?: string | null },
+  ) {
+    if (!user?.email) {
+      return;
+    }
+
+    const name = user.displayName || user.username || 'la';
+    const company = payload.companyName ? ` (${payload.companyName})` : '';
+
+    let subject = '';
+    let message = '';
+
+    if (payload.status === 'APPROVED') {
+      subject = 'Ton compte pro est approuve';
+      message =
+        `Bonne nouvelle ${name}, ton compte pro${company} a ete approuve. ` +
+        "Tu peux maintenant acceder a l'espace organisateur.";
+    } else if (payload.status === 'REJECTED') {
+      subject = 'Ton compte pro a ete refuse';
+      message =
+        `Bonjour ${name}, ton compte pro${company} a ete refuse. ` +
+        "Tu peux contacter l'equipe si tu veux plus de details.";
+    } else if (payload.status === 'SUSPENDED') {
+      subject = 'Ton compte pro est suspendu';
+      message =
+        `Bonjour ${name}, ton compte pro${company} a ete suspendu. ` +
+        "Contacte l'equipe si tu as besoin d'aide.";
+    } else {
+      return;
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin: 0 0 12px;">${subject}</h2>
+        <p>${message}</p>
+      </div>
+    `;
+
+    await this.emailService.sendEmail({
+      toEmail: user.email,
+      toName: user.username || user.displayName || undefined,
+      subject,
+      html,
     });
   }
 
@@ -822,6 +1265,49 @@ export class UsersService {
     ]);
 
     return this.getTagPreferences(userId);
+  }
+
+  async updateCityPreferences(
+    userId: string,
+    cityIds: number[],
+  ): Promise<UserCityPreferencesResponse> {
+    const uniqueCityIds = Array.from(new Set(cityIds));
+
+    if (uniqueCityIds.length > 0) {
+      const existingCities = await this.prisma.city.findMany({
+        where: {
+          id: {
+            in: uniqueCityIds,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existingCities.length !== uniqueCityIds.length) {
+        throw new NotFoundException('Certaines villes sont introuvables.');
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.userCityInterest.deleteMany({
+        where: { userId },
+      }),
+      ...(uniqueCityIds.length > 0
+        ? [
+            this.prisma.userCityInterest.createMany({
+              data: uniqueCityIds.map((cityId) => ({
+                userId,
+                cityId,
+              })),
+              skipDuplicates: true,
+            }),
+          ]
+        : []),
+    ]);
+
+    return {
+      selectedCityIds: uniqueCityIds,
+    };
   }
 
   async getSettings(userId: string): Promise<UserSettingsResponse> {

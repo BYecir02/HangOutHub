@@ -51,9 +51,6 @@ interface PlaceItem {
 type PlaceFilter = 'all' | 'top' | 'budget';
 type PlaceViewMode = 'list' | 'inspiration';
 
-const PLACE_PLACEHOLDER =
-  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
-
 function estimatePlaceCardHeight(index: number) {
   const imageHeights = [184, 248, 210, 276, 196, 232];
   return imageHeights[index % imageHeights.length] + 144;
@@ -485,7 +482,7 @@ export default function PlacesScreen() {
         <PlaceCard
           name={item.name}
           location={subtitle || item.City?.name || t('homeLocationToConfirm')}
-          imageUrl={getImageUrl(item.coverUrl) || PLACE_PLACEHOLDER}
+          imageUrl={getImageUrl(item.coverUrl)}
           rating={typeof item.avgRating === 'number' && item.avgRating > 0 ? item.avgRating : undefined}
           fallbackRatingLabel={t('placesNewBadge')}
           badgeLabel={item.City?.name || undefined}
@@ -532,6 +529,7 @@ export default function PlacesScreen() {
       title={t('placesTitle')}
       subtitle={t('placesSubtitle')}
       onBack={() => router.back()}
+      withHeroBackground
       locationScopeBar={
         <LocationScopeBar
           locationLabel={locationValueLabel}

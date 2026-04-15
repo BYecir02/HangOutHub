@@ -51,9 +51,16 @@ type CityOption = {
   country?: string | null;
 };
 
+type PlaceTagOption = {
+  id: number;
+  name: string;
+  status?: string | null;
+};
+
 type PlaceCategoryOption = {
   id: number;
   name: string;
+  Tag?: PlaceTagOption[];
 };
 
 type DaySchedule = {
@@ -104,6 +111,8 @@ export default function CreatePlaceScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [weeklySchedule, setWeeklySchedule] = useState<Record<DayKey, DaySchedule>>(
@@ -138,6 +147,11 @@ export default function CreatePlaceScreen() {
     }
     return { lat, lng };
   }, [latitudeInput, longitudeInput]);
+  const selectedCategoryOption = useMemo(
+    () => categories.find((option) => option.id === selectedCategoryId) || null,
+    [categories, selectedCategoryId],
+  );
+  const availableTags = selectedCategoryOption?.Tag || [];
   const stepTitle = useMemo(() => {
     if (currentStep === 1) {
       return t('createPlaceStepTitleBasics');
@@ -187,6 +201,8 @@ export default function CreatePlaceScreen() {
       name.trim()
       || description.trim()
       || selectedCategory.trim()
+      || selectedCategoryId !== null
+      || selectedTagIds.length > 0
       || phone.trim()
       || whatsapp.trim()
       || selectedCountry.trim()
@@ -206,6 +222,8 @@ export default function CreatePlaceScreen() {
     phone,
     priceLevel,
     selectedCategory,
+    selectedCategoryId,
+    selectedTagIds.length,
     selectedCity,
     selectedCountry,
     whatsapp,
@@ -217,10 +235,7 @@ export default function CreatePlaceScreen() {
     setCategoriesError(null);
     try {
       const response = await api.get<PlaceCategoryOption[]>('/categories');
-      const nextCategories = (response.data || []).map((item) => ({
-        id: item.id,
-        name: item.name,
-      }));
+      const nextCategories = response.data || [];
       setCategories(nextCategories);
       setCache('categories', nextCategories);
     } catch (error) {
@@ -233,11 +248,36 @@ export default function CreatePlaceScreen() {
   }, [t]);
 
   useEffect(() => {
-    if (categories.length > 0) {
+    if (categories.length > 0 && categories.some((category) => Array.isArray(category.Tag))) {
       return;
     }
     void loadCategories();
   }, [categories.length, loadCategories]);
+
+  useEffect(() => {
+    if (!selectedCategoryOption) {
+      return;
+    }
+
+    if (availableTags.length === 0) {
+      if (selectedTagIds.length > 0) {
+        setSelectedTagIds([]);
+      }
+      return;
+    }
+
+    const allowedTagIds = new Set(availableTags.map((tag) => tag.id));
+    const filteredTagIds = selectedTagIds.filter((tagId) => allowedTagIds.has(tagId));
+
+    if (filteredTagIds.length === 0) {
+      setSelectedTagIds([availableTags[0].id]);
+      return;
+    }
+
+    if (filteredTagIds.length !== selectedTagIds.length) {
+      setSelectedTagIds(filteredTagIds);
+    }
+  }, [availableTags, selectedCategoryOption, selectedTagIds]);
 
   useEffect(() => {
     if (!selectedCountry || !selectedCity?.country) {
@@ -301,6 +341,21 @@ export default function CreatePlaceScreen() {
     }));
     setSubmitError(null);
   };
+
+  const toggleTag = useCallback((tagId: number) => {
+    setSelectedTagIds((current) => {
+      if (current.includes(tagId)) {
+        if (current.length === 1) {
+          return current;
+        }
+
+        return current.filter((currentTagId) => currentTagId !== tagId);
+      }
+
+      return [...current, tagId];
+    });
+    setSubmitError(null);
+  }, []);
 
   const padTimePart = (value: string) => value.padStart(2, '0');
 
@@ -370,6 +425,11 @@ export default function CreatePlaceScreen() {
         Alert.alert(t('commonErrorTitle'), t('createPlaceStepBasicsInvalid'));
         return false;
       }
+
+      if (categories.length > 0 && !selectedCategoryId) {
+        Alert.alert(t('commonErrorTitle'), t('createPlaceCategoryRequired'));
+        return false;
+      }
     }
 
     if (step === 3 && !parsedCoordinates) {
@@ -436,6 +496,11 @@ export default function CreatePlaceScreen() {
 
     if (!selectedCity) {
       Alert.alert(t('commonErrorTitle'), t('createPlaceValidationCityRequired'));
+      return;
+    }
+
+    if (categories.length > 0 && !selectedCategoryId) {
+      Alert.alert(t('commonErrorTitle'), t('createPlaceCategoryRequired'));
       return;
     }
 
@@ -522,6 +587,9 @@ export default function CreatePlaceScreen() {
       formData.append('description', description.trim());
       if (normalizedCategory) {
         formData.append('category', normalizedCategory);
+      }
+      if (selectedTagIds.length > 0) {
+        formData.append('tagIds', JSON.stringify(selectedTagIds));
       }
       formData.append('address', normalizedAddress);
       if (normalizedPhone) {
@@ -729,12 +797,14 @@ export default function CreatePlaceScreen() {
             ) : categories.length > 0 ? (
               <View className="flex-row flex-wrap gap-2">
                 {categories.map((option) => {
-                  const active = selectedCategory === option.name;
+                  const active = selectedCategoryId === option.id;
                   return (
                     <TouchableOpacity
                       key={option.id}
                       onPress={() => {
                         setSelectedCategory(option.name);
+                        setSelectedCategoryId(option.id);
+                        setSelectedTagIds(option.Tag?.length > 0 ? [option.Tag[0].id] : []);
                         setSubmitError(null);
                       }}
                       className={`rounded-full px-4 py-2.5 ${
@@ -759,6 +829,49 @@ export default function CreatePlaceScreen() {
                 {t('createPlaceCategoryEmpty')}
               </Text>
             )}
+
+            {selectedCategoryOption ? (
+              <View className="mt-4">
+                <Text className="mb-3 ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {t('createEventTagsTitle')}
+                </Text>
+                {availableTags.length > 0 ? (
+                  <View className="flex-row flex-wrap gap-2">
+                    {availableTags.map((tag) => {
+                      const active = selectedTagIds.includes(tag.id);
+
+                      return (
+                        <TouchableOpacity
+                          key={tag.id}
+                          onPress={() => toggleTag(tag.id)}
+                          className={`rounded-full px-3 py-2 ${
+                            active
+                              ? 'bg-[#2ecc71]'
+                              : 'border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
+                          }`}
+                        >
+                          <Text
+                            className={`text-xs font-semibold ${
+                              active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+                            }`}
+                          >
+                            #{tag.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text className="text-xs text-gray-400 dark:text-gray-500">
+                    {t('createPlaceTagsEmpty')}
+                  </Text>
+                )}
+              </View>
+            ) : categories.length > 0 ? (
+              <Text className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                {t('createPlaceTagsSelectCategoryFirst')}
+              </Text>
+            ) : null}
 
             {categoriesError ? (
               <View className="mt-3 flex-row items-center justify-between gap-3">
@@ -1036,10 +1149,23 @@ export default function CreatePlaceScreen() {
                   {name.trim() || '-'}
                 </Text>
                 <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {[selectedCategory || '-', selectedCity?.name || '-', selectedCountry || '-'].join(' • ')}
+                  {[
+                    selectedCategoryOption?.name || selectedCategory || '-',
+                    selectedCity?.name || '-',
+                    selectedCountry || '-',
+                  ].join(' • ')}
                 </Text>
                 <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   {phone.trim() || '-'} | {whatsapp.trim() || '-'}
+                </Text>
+                <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {selectedTagIds.length > 0
+                    ? selectedTagIds
+                        .map((tagId) => availableTags.find((tag) => tag.id === tagId)?.name)
+                        .filter((tagName): tagName is string => Boolean(tagName))
+                        .map((tagName) => `#${tagName}`)
+                        .join(', ')
+                    : '-'}
                 </Text>
               </View>
 

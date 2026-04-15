@@ -34,12 +34,17 @@ import {
 } from '@/services/app-preferences';
 import { getMySettings } from '@/services/settings';
 import { AuthBootstrapProvider } from '@/context/auth-bootstrap';
-import { resolveStoredUserSession } from '@/services/user-session';
+import {
+  hasCompletedTasteOnboarding,
+  resolveStoredUserSession,
+} from '@/services/user-session';
 import {
   canAccessOrganizerPanel,
   getOrganizerEntryPath,
   isOrganizerUser,
 } from '@/services/organizer-access';
+import UserFlowTracker from '@/components/analytics/UserFlowTracker';
+import { subscribeAuthBootstrapReset } from '@/context/auth-bootstrap';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -166,6 +171,15 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
+    return subscribeAuthBootstrapReset(() => {
+      setAuthState({
+        status: 'unauthenticated',
+        targetHref: null,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     const bootstrapAuth = async () => {
@@ -212,9 +226,24 @@ export default function RootLayout() {
           return;
         }
 
+        if (user.email && !user.emailVerifiedAt) {
+          await ensureMinimumDisplay();
+
+          setAuthState({
+            status: 'authenticated',
+            targetHref: {
+              pathname: '/verify-email',
+              params: { email: user.email },
+            } as Href,
+          });
+          return;
+        }
+
         const nextTargetHref = isOrganizerUser(user)
           ? (getOrganizerEntryPath(user) as Href)
-          : HOME_ROUTE;
+          : hasCompletedTasteOnboarding(user)
+            ? HOME_ROUTE
+            : ({ pathname: '/preferences', params: { mode: 'onboarding' } } as Href);
 
         if (isOrganizerUser(user) && !canAccessOrganizerPanel(user)) {
           await clearAuthState();
@@ -278,9 +307,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <AuthBootstrapProvider value={authState}>
+            <UserFlowTracker />
             <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="register" options={{ headerShown: false }} />
+            <Stack.Screen name="verify-email" options={{ headerShown: false }} />
             <Stack.Screen
               name="activate-pro"
               options={{ headerShown: false, presentation: 'fullScreenModal' }}

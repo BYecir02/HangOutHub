@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Tabs, useFocusEffect, useRouter } from 'expo-router';
+import { Tabs, useFocusEffect, useRootNavigationState, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { PlatformPressable } from '@react-navigation/elements';
@@ -23,6 +23,7 @@ import {
   resolveStoredUserSession,
 } from '@/services/user-session';
 import { clearAuthState } from '@/services/api';
+import { safeReplace } from '@/services/navigation';
 
 interface ActionItem {
   id: string;
@@ -34,6 +35,8 @@ interface ActionItem {
 
 export default function OrganizerLayout() {
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
+  const isNavigationReady = Boolean(rootNavigationState?.key);
   const { t } = useI18n();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -51,11 +54,15 @@ export default function OrganizerLayout() {
   }, []);
 
   const hydrateAccessUser = useCallback(async () => {
+    if (!isNavigationReady) {
+      return;
+    }
+
     const session = await resolveStoredUserSession();
     if (!session) {
       await clearAuthState();
       await clearStoredUserSession();
-      router.replace('/');
+      safeReplace('/');
       setAccessUser(null);
       return;
     }
@@ -77,7 +84,7 @@ export default function OrganizerLayout() {
       organizerStatus: session.organizerStatus || null,
       teamRole,
     });
-  }, []);
+  }, [isNavigationReady, router]);
 
   const canAccessTab = useCallback(
     (capability: OrganizerCapability) =>
@@ -133,6 +140,10 @@ export default function OrganizerLayout() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!isNavigationReady) {
+        return;
+      }
+
       void hydrateAccessUser();
       if (showNotifications) {
         void loadUnreadCount();
@@ -149,7 +160,7 @@ export default function OrganizerLayout() {
       return () => {
         clearInterval(timer);
       };
-    }, [hydrateAccessUser, loadUnreadCount, showNotifications]),
+    }, [hydrateAccessUser, isNavigationReady, loadUnreadCount, showNotifications]),
   );
 
   const actionItems = useMemo(() => {

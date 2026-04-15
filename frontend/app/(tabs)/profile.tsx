@@ -19,7 +19,7 @@ import type { PostItemData } from '../../components/social/PostItem';
 import PlaceInspirationCard from '../../components/ui/PlaceInspirationCard';
 import { SkeletonBlock } from '../../components/ui/Skeleton';
 import Tabs from '../../components/ui/Tabs';
-import { getImageUrl } from '../../services/api';
+import api, { clearAuthState, getImageUrl, storage } from '../../services/api';
 import {
   canAccessOrganizerPanel, 
   getOrganizerEntryPath,
@@ -103,6 +103,9 @@ export default function ProfileScreen() {
     loading,
     deletePost,
   } = useUserProfile();
+  const [savedPlacesView, setSavedPlacesView] = useState(savedPlaces);
+  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
+  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
 
   const isProfessionalAccount =
     user?.role === 'ORGANIZER' || user?.role === 'PLACE_OWNER';
@@ -216,6 +219,10 @@ export default function ProfileScreen() {
       ),
     [outings],
   );
+  React.useEffect(() => {
+    setSavedPlacesView(savedPlaces);
+    setSavedPlaceIds(new Set(savedPlaces.map((place) => place.id)));
+  }, [savedPlaces]);
   const filteredOutings = useMemo(() => {
     const now = Date.now();
     const ongoingWindowMs = 3 * 60 * 60 * 1000;
@@ -244,7 +251,7 @@ export default function ProfileScreen() {
 
   const featuredOuting = filteredOutings[0] ?? null;
   const profilePostsAutoplay = useVisibleItemAutoplay(posts, (post) => post.id);
-  const savedPlacesAutoplay = useVisibleItemAutoplay(savedPlaces, (place) => place.id);
+  const savedPlacesAutoplay = useVisibleItemAutoplay(savedPlacesView, (place) => place.id);
   const savedPlacesGridOffsetYRef = React.useRef(0);
   const savedPlaceColumns = useMemo(() => {
     const nextColumns: Array<Array<{ place: (typeof savedPlaces)[number]; imageHeight: number }>> =
@@ -252,7 +259,7 @@ export default function ProfileScreen() {
     const columnHeights = [0, 0];
     const imageHeights = [184, 242, 208, 264, 196, 232];
 
-    savedPlaces.forEach((place, index) => {
+    savedPlacesView.forEach((place, index) => {
       const imageHeight = imageHeights[index % imageHeights.length];
       const targetColumn = columnHeights[0] <= columnHeights[1] ? 0 : 1;
       nextColumns[targetColumn].push({ place, imageHeight });
@@ -260,7 +267,7 @@ export default function ProfileScreen() {
     });
 
     return nextColumns;
-  }, [savedPlaces]);
+  }, [savedPlacesView]);
   const tabItems = isOrganizer
     ? [
         { id: 'overview', label: t('profileTabOverview') },
@@ -319,6 +326,68 @@ export default function ProfileScreen() {
       : activeTab === 'saved'
         ? savedPlacesAutoplay
         : null;
+
+  const handleToggleSavedPlace = async (placeId: string) => {
+    const token = await storage.getItem('userToken');
+
+    if (!token) {
+      Alert.alert(
+        t('placeDetailLoginRequiredTitle'),
+        t('placeDetailLoginRequiredMessage'),
+      );
+      return;
+    }
+
+    if (savingPlaceIds.has(placeId)) {
+      return;
+    }
+
+    setSavingPlaceIds((current) => {
+      const next = new Set(current);
+      next.add(placeId);
+      return next;
+    });
+
+    try {
+      const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
+      const isSaved = response.data.saved;
+
+      setSavedPlaceIds((current) => {
+        const next = new Set(current);
+        if (isSaved) {
+          next.add(placeId);
+        } else {
+          next.delete(placeId);
+        }
+        return next;
+      });
+
+      if (!isSaved) {
+        setSavedPlacesView((current) =>
+          current.filter((place) => place.id !== placeId),
+        );
+      }
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 401
+      ) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
+    } finally {
+      setSavingPlaceIds((current) => {
+        const next = new Set(current);
+        next.delete(placeId);
+        return next;
+      });
+    }
+  };
 
   if (loading && !user) {
     return (
@@ -434,7 +503,7 @@ export default function ProfileScreen() {
         postsCount={posts.length}
         outingsCount={outings.length}
         connectionsCount={connectionsCount}
-        savedCount={savedPlaces.length}
+        savedCount={savedPlacesView.length}
         onConnectionsPress={() => router.push('/connections')}
       />
 
@@ -529,7 +598,7 @@ export default function ProfileScreen() {
                 savedPlacesGridOffsetYRef.current = event.nativeEvent.layout.y;
               }}
             >
-              {savedPlaces.length > 0 ? (
+              {savedPlacesView.length > 0 ? (
                 <>
                   <View className="flex-row items-start gap-3">
                     {savedPlaceColumns.map((column, columnIndex) => (
@@ -554,7 +623,10 @@ export default function ProfileScreen() {
                                   params: { id: place.id },
                                 })
                               }
-                              showSaveButton={false}
+                              showSaveButton
+                              isSaved={savedPlaceIds.has(place.id)}
+                              saving={savingPlaceIds.has(place.id)}
+                              onToggleSave={() => handleToggleSavedPlace(place.id)}
                               shouldPlay={savedPlacesAutoplay.activeId === place.id}
                             />
                           </View>

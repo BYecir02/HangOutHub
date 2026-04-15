@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Linking from 'expo-linking';
@@ -558,8 +559,17 @@ export default function SocialFeed() {
               : mergePosts(freshPosts, keepOlderCachedPosts(postsRef.current), 'prepend');
         await persistFeedCache(postsForCache, nextForCache || null);
       } catch (error) {
-        console.error(t('socialFeedLoadError'), error);
-        setFeedErrorMessage(t('socialFeedLoadError'));
+        const errorMessage =
+          error instanceof Error ? error.message : String(error || '');
+        const isTimeoutError = errorMessage.toLowerCase().includes('timeout');
+
+        if (!isTimeoutError) {
+          console.error(t('socialFeedLoadError'), error);
+        }
+
+        if (!isTimeoutError || postsRef.current.length === 0) {
+          setFeedErrorMessage(t('socialFeedLoadError'));
+        }
       } finally {
         if (mode === 'initial') {
           setLoading(false);

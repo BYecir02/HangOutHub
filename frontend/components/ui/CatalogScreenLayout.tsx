@@ -2,6 +2,7 @@ import React, { type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import HeroBackground from '@/components/ui/HeroBackground';
 
 type CatalogScreenLayoutProps = {
   title: string;
@@ -13,6 +14,7 @@ type CatalogScreenLayoutProps = {
   searchBar?: ReactNode;
   filterBar?: ReactNode;
   children: ReactNode;
+  withHeroBackground?: boolean;
   containerClassName?: string;
   contentClassName?: string;
 };
@@ -27,11 +29,17 @@ export default function CatalogScreenLayout({
   searchBar,
   filterBar,
   children,
+  withHeroBackground = false,
   containerClassName = '',
   contentClassName = '',
 }: CatalogScreenLayoutProps) {
   return (
-    <View className={`flex-1 bg-gray-50 pt-16 dark:bg-black ${containerClassName}`.trim()}>
+    <View
+      className={`flex-1 ${
+        withHeroBackground ? 'bg-transparent' : 'bg-gray-50 dark:bg-black'
+      } pt-16 ${containerClassName}`.trim()}
+    >
+      {withHeroBackground ? <HeroBackground variant="catalog" /> : null}
       <View className="px-5 pb-4">
         <ScreenHeader
           label={label}

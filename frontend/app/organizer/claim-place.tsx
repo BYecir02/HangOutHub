@@ -20,6 +20,7 @@ import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import api, { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
 import { submitPlaceClaim, type PlaceClaimPlace } from '@/services/place-claims';
+import { trackUserFlowEvent } from '@/services/user-flow-analytics';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
@@ -167,6 +168,15 @@ export default function OrganizerClaimPlaceScreen() {
     }
 
     setProofs([result.assets[0]]);
+
+    void trackUserFlowEvent({
+      eventName: 'claim_place_proof_selected',
+      screenPath: '/organizer/claim-place',
+      metadata: {
+        proofCount: 1,
+        placeId: selectedPlace?.id || null,
+      },
+    });
   };
 
   const handleSubmit = async () => {
@@ -186,7 +196,24 @@ export default function OrganizerClaimPlaceScreen() {
 
     setSubmitting(true);
     try {
+      void trackUserFlowEvent({
+        eventName: 'claim_place_submit_attempted',
+        screenPath: '/organizer/claim-place',
+        metadata: {
+          placeId: selectedPlace.id,
+        },
+      });
+
       await submitPlaceClaim(selectedPlace.id, proofs[0]);
+
+      void trackUserFlowEvent({
+        eventName: 'claim_place_submitted',
+        screenPath: '/organizer/claim-place',
+        metadata: {
+          placeId: selectedPlace.id,
+        },
+      });
+
       Alert.alert(
         t('organizerPlaceClaimSuccessTitle'),
         t('organizerPlaceClaimSuccessMessage'),
@@ -305,6 +332,13 @@ export default function OrganizerClaimPlaceScreen() {
                   key={place.id}
                   onPress={() => {
                     setSelectedPlaceId(place.id);
+                    void trackUserFlowEvent({
+                      eventName: 'claim_place_place_selected',
+                      screenPath: '/organizer/claim-place',
+                      metadata: {
+                        placeId: place.id,
+                      },
+                    });
                   }}
                   className={`overflow-hidden rounded-[26px] border p-3 ${
                     selected

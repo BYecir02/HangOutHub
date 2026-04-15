@@ -6,21 +6,31 @@ const USER_INFO_KEY = 'userInfo';
 export interface StoredUserSession {
   id?: string;
   username?: string;
+  email?: string;
+  emailVerifiedAt?: string | Date | null;
   displayName?: string | null;
   role?: string;
   hasPlace?: boolean;
   organizerStatus?: string;
   teamRole?: string;
+  residenceCityId?: number | null;
+  cityInterestIds?: number[];
+  tagInterestIds?: number[];
 }
 
 type UserSessionLike = {
   id?: string | null;
   username?: string | null;
+  email?: string | null;
+  emailVerifiedAt?: string | Date | null;
   displayName?: string | null;
   role?: string | null;
   hasPlace?: boolean | null;
   organizerStatus?: string | null;
   teamRole?: string | null;
+  residenceCityId?: number | null;
+  UserCityInterest?: Array<{ cityId?: number | null } | null> | null;
+  UserTagInterest?: Array<{ tagId?: number | null } | null> | null;
   OrganizerProfile?: {
     status?: string | null;
   } | null;
@@ -33,12 +43,24 @@ function normalizeUserSession(input: UserSessionLike): StoredUserSession {
   return {
     id: input.id || undefined,
     username: input.username || undefined,
+    email: input.email || undefined,
+    emailVerifiedAt: input.emailVerifiedAt ?? null,
     displayName: input.displayName || null,
     role: input.role || undefined,
     // Preserve unknown state to avoid false redirects for PLACE_OWNER on cold start.
     hasPlace: input.hasPlace ?? undefined,
     organizerStatus,
     teamRole: input.teamRole || undefined,
+    residenceCityId:
+      typeof input.residenceCityId === 'number' ? input.residenceCityId : null,
+    cityInterestIds: Array.isArray(input.UserCityInterest)
+      ? input.UserCityInterest.map((item) => item?.cityId)
+          .filter((value): value is number => typeof value === 'number')
+      : undefined,
+    tagInterestIds: Array.isArray(input.UserTagInterest)
+      ? input.UserTagInterest.map((item) => item?.tagId)
+          .filter((value): value is number => typeof value === 'number')
+      : undefined,
   };
 }
 
@@ -136,4 +158,16 @@ export async function resolveStoredUserSession(): Promise<StoredUserSession | nu
   }
 
   return getStoredUserSession();
+}
+
+export function hasCompletedTasteOnboarding(
+  session: StoredUserSession | null,
+): boolean {
+  if (!session) {
+    return false;
+  }
+
+  const selectedTagIds = session.tagInterestIds || [];
+
+  return Boolean(session.residenceCityId) && selectedTagIds.length >= 3;
 }

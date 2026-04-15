@@ -901,6 +901,26 @@ export default function Dashboard() {
       </SectionCard>
 
       <SectionCard>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <SectionTitle
+              label="Parcours utilisateurs"
+              subtitle="Le diagramme React Flow est maintenant dans son onglet dedie."
+            />
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Ouvre la section Parcours dans la sidebar pour explorer le tree interactif du frontend mobile.
+            </p>
+          </div>
+          <Link
+            to="/parcours"
+            className="inline-flex items-center justify-center rounded-full border border-brand-300 bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+          >
+            Ouvrir Parcours
+          </Link>
+        </div>
+      </SectionCard>
+
+      <SectionCard>
         <SectionTitle
           label="Repartition"
           subtitle="Lecture rapide des principaux equilibres de la plateforme."

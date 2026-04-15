@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 import api, { clearAuthState, storage } from '@/services/api';
 import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
@@ -232,38 +232,25 @@ export function useHomeScreen() {
     [router, savingPlaceIds, t],
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
+  useEffect(() => {
+    let isMounted = true;
 
-      const run = async () => {
-        setLoading(true);
-        await loadHomeData();
+    const run = async () => {
+      setLoading(true);
 
-        if (isMounted) {
-          setLoading(false);
-        }
-      };
+      await Promise.all([loadHomeData(), loadSavedPlaces()]);
 
-      void run();
+      if (isMounted) {
+        setLoading(false);
+      }
+    };
 
-      return () => {
-        isMounted = false;
-      };
-    }, [loadHomeData]),
-  );
+    void run();
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadSavedPlaces();
-    }, [loadSavedPlaces]),
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadNotificationCount();
-    }, [loadNotificationCount]),
-  );
+    return () => {
+      isMounted = false;
+    };
+  }, [loadHomeData, loadSavedPlaces]);
 
   useEffect(() => {
     if (!locationHydrated) {

@@ -14,6 +14,7 @@ import {
   type PlaceClaimDecision,
 } from '../notifications/notification-types';
 import { StorageService } from '../storage/storage.service';
+import { EmailService } from '../email/email.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
 import { CreatePlaceReviewDto } from './dto/create-place-review.dto';
@@ -56,6 +57,7 @@ export class PlacesService {
   constructor(
     private prisma: PrismaService,
     private storageService: StorageService,
+    private emailService: EmailService,
   ) {}
 
   async create(
@@ -719,6 +721,59 @@ export class PlacesService {
     });
   }
 
+  private async sendPlaceClaimDecisionEmail(
+    userId: string,
+    payload: {
+      decision: PlaceClaimDecision;
+      placeName: string;
+      placeCity?: string | null;
+      placeCountry?: string | null;
+    },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        username: true,
+        displayName: true,
+      },
+    });
+
+    if (!user?.email) {
+      return;
+    }
+
+    const name = user.displayName || user.username || 'la';
+    const location = [payload.placeCity, payload.placeCountry]
+      .filter(Boolean)
+      .join(', ');
+
+    const subject =
+      payload.decision === 'APPROVED'
+        ? 'Revendication de lieu approuvee'
+        : 'Revendication de lieu refusee';
+
+    const statusMessage =
+      payload.decision === 'APPROVED'
+        ? 'a ete approuvee'
+        : 'a ete refusee';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin: 0 0 12px;">${subject}</h2>
+        <p>Bonjour ${name}, ta revendication pour <strong>${payload.placeName}</strong> ${statusMessage}.</p>
+        ${location ? `<p>Lieu : ${location}</p>` : ''}
+      </div>
+    `;
+
+    await this.emailService.sendEmail({
+      toEmail: user.email,
+      toName: user.username || user.displayName || undefined,
+      subject,
+      html,
+    });
+  }
+
   private async getPlaceAuthorizationContext(placeId: string) {
     const place = await this.prisma.place.findUnique({
       where: { id: placeId },
@@ -1254,7 +1309,7 @@ export class PlacesService {
     }
 
     if (normalizedStatus === 'REJECTED') {
-      return this.prisma.$transaction(async (tx) => {
+      const updatedClaim = await this.prisma.$transaction(async (tx) => {
         const updatedClaim = await tx.placeClaim.update({
           where: { id: claimId },
           data: {
@@ -1283,9 +1338,19 @@ export class PlacesService {
 
         return updatedClaim;
       });
+
+      await this.sendPlaceClaimDecisionEmail(claim.userId, {
+        decision: 'REJECTED',
+        placeName: place.name,
+        placeCity: place.City?.name || null,
+        placeCountry: place.City?.country || null,
+      });
+
+      return updatedClaim;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    let rejectedUserIds: string[] = [];
+    const approvedClaim = await this.prisma.$transaction(async (tx) => {
       if (place.ownerId && place.ownerId !== claim.userId) {
         throw new ConflictException(
           'Ce lieu a deja ete attribue a un autre proprietaire.',
@@ -1306,6 +1371,7 @@ export class PlacesService {
           placeId: true,
         },
       });
+      rejectedUserIds = rejectedClaims.map((rejectedClaim) => rejectedClaim.userId);
 
       await tx.place.update({
         where: { id: claim.placeId },
@@ -1368,6 +1434,25 @@ export class PlacesService {
 
       return approvedClaim;
     });
+
+    await this.sendPlaceClaimDecisionEmail(claim.userId, {
+      decision: 'APPROVED',
+      placeName: place.name,
+      placeCity: place.City?.name || null,
+      placeCountry: place.City?.country || null,
+    });
+
+    const uniqueRejectedIds = Array.from(new Set(rejectedUserIds));
+    for (const rejectedUserId of uniqueRejectedIds) {
+      await this.sendPlaceClaimDecisionEmail(rejectedUserId, {
+        decision: 'REJECTED',
+        placeName: place.name,
+        placeCity: place.City?.name || null,
+        placeCountry: place.City?.country || null,
+      });
+    }
+
+    return approvedClaim;
   }
 
   async getReviews(placeId: string) {

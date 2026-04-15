@@ -16,6 +16,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
 import { setStoredUserSession } from '@/services/user-session';
+import { trackUserFlowEvent } from '@/services/user-flow-analytics';
 
 type ProAccountType = 'PLACE' | 'NOMAD';
 
@@ -52,6 +53,14 @@ export default function ActivateProScreen() {
 
     setLoading(true);
     try {
+      void trackUserFlowEvent({
+        eventName: 'activate_pro_submit_attempted',
+        screenPath: '/activate-pro',
+        metadata: {
+          accountType,
+        },
+      });
+
       const response = await api.post('/users/me/activate-pro', {
         accountType,
         companyName,
@@ -66,6 +75,14 @@ export default function ActivateProScreen() {
       });
 
       await setStoredUserSession(response.data);
+
+      void trackUserFlowEvent({
+        eventName: 'activate_pro_submitted',
+        screenPath: '/activate-pro',
+        metadata: {
+          accountType,
+        },
+      });
 
       Alert.alert(t('activateProSuccessTitle'), t('activateProSuccessMessage'), [
         {
@@ -89,6 +106,25 @@ export default function ActivateProScreen() {
         Alert.alert(t('commonErrorTitle'), t('registerSelectRoleRequired'));
         return;
       }
+
+      void trackUserFlowEvent({
+        eventName: 'activate_pro_account_type_selected',
+        screenPath: '/activate-pro',
+        metadata: {
+          accountType,
+        },
+      });
+
+      void trackUserFlowEvent({
+        eventName: 'activate_pro_step_continue',
+        screenPath: '/activate-pro',
+        metadata: {
+          fromStep: 1,
+          toStep: 2,
+          accountType,
+        },
+      });
+
       setStep(2);
       return;
     }
@@ -98,6 +134,17 @@ export default function ActivateProScreen() {
         Alert.alert(t('commonErrorTitle'), t('registerProInfoRequired'));
         return;
       }
+
+      void trackUserFlowEvent({
+        eventName: 'activate_pro_step_continue',
+        screenPath: '/activate-pro',
+        metadata: {
+          fromStep: 2,
+          toStep: 3,
+          accountType,
+        },
+      });
+
       setStep(3);
       return;
     }
@@ -144,7 +191,16 @@ export default function ActivateProScreen() {
               accentColor="#2ecc71"
               isDark={isDark}
               selected={accountType === 'PLACE'}
-              onPress={() => setAccountType('PLACE')}
+              onPress={() => {
+                setAccountType('PLACE');
+                void trackUserFlowEvent({
+                  eventName: 'activate_pro_account_type_selected',
+                  screenPath: '/activate-pro',
+                  metadata: {
+                    accountType: 'PLACE',
+                  },
+                });
+              }}
             />
             <RoleOptionCard
               title={t('registerRoleNomadTitle')}
@@ -153,7 +209,16 @@ export default function ActivateProScreen() {
               accentColor="#ff4757"
               isDark={isDark}
               selected={accountType === 'NOMAD'}
-              onPress={() => setAccountType('NOMAD')}
+              onPress={() => {
+                setAccountType('NOMAD');
+                void trackUserFlowEvent({
+                  eventName: 'activate_pro_account_type_selected',
+                  screenPath: '/activate-pro',
+                  metadata: {
+                    accountType: 'NOMAD',
+                  },
+                });
+              }}
             />
           </View>
         ) : null}

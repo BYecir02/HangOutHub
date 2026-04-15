@@ -46,7 +46,6 @@ interface PlaceItem {
 
 function resolveCategories(place: PlaceItem) {
   const categories = [
-    place.category?.trim(),
     ...(place.PlaceTag || [])
       .map((entry) => entry.Tag?.Category?.name?.trim())
       .filter((value): value is string => Boolean(value)),
@@ -111,7 +110,6 @@ export default function PlacesPage() {
       new Set(
         places
           .flatMap((place) => [
-            place.category?.trim(),
             ...(place.PlaceTag || [])
               .map((entry) => entry.Tag?.Category?.name?.trim())
               .filter((value): value is string => Boolean(value)),
@@ -144,7 +142,6 @@ export default function PlacesPage() {
 
       if (categoryFilter !== 'all') {
         const placeCategories = [
-          place.category,
           ...(place.PlaceTag || [])
             .map((entry) => entry.Tag?.Category?.name)
             .filter((value): value is string => Boolean(value)),

@@ -7,10 +7,12 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 import { getImageUrl } from '@/services/api';
 import MediaFrame from '@/components/ui/MediaFrame';
 import PriceDisplay from '@/components/ui/primitives/PriceDisplay';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export interface EventInspirationCardEvent {
   id: string;
@@ -48,6 +50,8 @@ export default function EventInspirationCard({
   shouldPlay = false,
   adaptiveHeight = true,
 }: EventInspirationCardProps) {
+  const isDark = useColorScheme() === 'dark';
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -59,7 +63,7 @@ export default function EventInspirationCard({
               borderWidth: 2,
             }
           : undefined,
-      ]}
+      ]} 
       className="mb-3 overflow-hidden rounded-[30px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
       activeOpacity={0.92}
     >
@@ -105,20 +109,30 @@ export default function EventInspirationCard({
         </View>
       </View>
 
-      <View className="p-4">
-        <Text className="text-base font-bold text-gray-900 dark:text-white" numberOfLines={2}>
-          {event.title}
-        </Text>
-
-        <View className="mt-2 flex-row items-center">
-          <Ionicons name="location-outline" size={13} color="#4c669f" />
-          <Text
-            className="ml-1.5 flex-1 text-sm text-gray-500 dark:text-gray-400"
-            numberOfLines={1}
-          >
-            {placeLabel}
+      <View className="overflow-hidden rounded-b-[30px]">
+        <BlurView
+          intensity={isDark ? 28 : 36}
+          tint={isDark ? 'dark' : 'light'}
+          className="px-4 py-4"
+        >
+          <Text className="text-base font-bold text-gray-900 dark:text-white" numberOfLines={2}>
+            {event.title}
           </Text>
-        </View>
+
+          <View className="mt-2 flex-row items-center">
+            <Ionicons name="location-outline" size={13} color={isDark ? '#93a8d0' : '#4c669f'} />
+            <Text
+              className="ml-1.5 flex-1 text-sm text-gray-600 dark:text-gray-300"
+              numberOfLines={1}
+            >
+              {placeLabel}
+            </Text>
+          </View>
+        </BlurView>
+        <View
+          pointerEvents="none"
+          className={isDark ? 'absolute inset-0 bg-black/30' : 'absolute inset-0 bg-white/30'}
+        />
       </View>
     </TouchableOpacity>
   );

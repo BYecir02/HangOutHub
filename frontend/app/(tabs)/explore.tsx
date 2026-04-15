@@ -10,6 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import EventCard from '@/components/ui/EventCard';
+import HeroBackground from '@/components/ui/HeroBackground';
 import LocationScopeBar from '@/components/ui/LocationScopeBar';
 import SearchBar from '@/components/ui/SearchBar';
 import ScreenState from '@/components/ui/ScreenState';
@@ -122,7 +123,8 @@ export default function ExploreScreen() {
   }, [events, filterByLocation, query]);
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black pt-16">
+    <View className="flex-1 bg-transparent pt-16">
+      <HeroBackground variant="catalog" />
       <View className="flex-row items-center px-5 pb-4">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#4c669f" />

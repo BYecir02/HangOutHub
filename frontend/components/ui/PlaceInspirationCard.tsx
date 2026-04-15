@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import MediaFrame from '@/components/ui/MediaFrame';
+import PlaceCoverFallback from '@/components/ui/PlaceCoverFallback';
 import { getImageUrl } from '@/services/api';
 import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
 
@@ -59,6 +60,7 @@ export default function PlaceInspirationCard({
     typeof place.avgRating === 'number' && place.avgRating > 0
       ? place.avgRating.toFixed(1)
       : '';
+  const coverUrl = getImageUrl(place.coverUrl);
 
   return (
     <TouchableOpacity
@@ -76,21 +78,26 @@ export default function PlaceInspirationCard({
       activeOpacity={0.92}
     >
       <View className="relative">
-        <MediaFrame
-          source={
-            getImageUrl(place.coverUrl) ||
-            'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200'
-          }
-          className="w-full bg-gray-200 dark:bg-gray-800"
-          shouldPlay={shouldPlay}
-          muted
-          loop
-          showControls={false}
-          adaptiveHeight={adaptiveHeight}
-          minHeight={imageHeight}
-          maxHeight={380}
-          style={{ height: imageHeight }}
-        />
+        {coverUrl ? (
+          <MediaFrame
+            source={coverUrl}
+            className="w-full bg-gray-200 dark:bg-gray-800"
+            shouldPlay={shouldPlay}
+            muted
+            loop
+            showControls={false}
+            adaptiveHeight={adaptiveHeight}
+            minHeight={imageHeight}
+            maxHeight={380}
+            style={{ height: imageHeight }}
+          />
+        ) : (
+          <PlaceCoverFallback
+            className="w-full"
+            style={{ height: imageHeight }}
+            logoSize={Math.max(44, Math.min(72, Math.round(imageHeight * 0.28)))}
+          />
+        )}
 
         {cityLabel ? (
           <View className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5">

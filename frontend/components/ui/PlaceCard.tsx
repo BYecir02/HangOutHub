@@ -3,13 +3,14 @@ import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import MediaFrame from '@/components/ui/MediaFrame';
+import PlaceCoverFallback from '@/components/ui/PlaceCoverFallback';
 import Badge from '@/components/ui/primitives/Badge';
 import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
 
 interface PlaceCardProps {
   name: string;
   location: string;
-  imageUrl: string;
+  imageUrl?: string | null;
   rating?: number; // Optionnel
   badgeLabel?: string;
   badgeTone?: 'brand' | 'success' | 'warning' | 'danger' | 'neutral';
@@ -43,10 +44,14 @@ export default function PlaceCard({
     >
       <View className="flex-row">
         <View className="relative">
-          <MediaFrame
-            source={imageUrl}
-            className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
-          />
+          {imageUrl ? (
+            <MediaFrame
+              source={imageUrl}
+              className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
+            />
+          ) : (
+            <PlaceCoverFallback className="h-28 w-28 rounded-2xl" logoSize={34} />
+          )}
 
           {typeof rating === 'number' && !Number.isNaN(rating) ? (
             <View className="absolute right-2 top-2">

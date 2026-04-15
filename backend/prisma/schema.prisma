@@ -432,6 +432,35 @@ model PostShareEvent {
   @@index([createdAt])
 }
 
+model UserFlowEvent {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  distinctId        String   @db.VarChar(80)
+  sessionId         String   @db.VarChar(80)
+  userId            String?  @db.Uuid
+  eventName         String   @db.VarChar(64)
+  actionName        String?  @db.VarChar(120)
+  screenKey         String?  @db.VarChar(180)
+  screenName        String?  @db.VarChar(120)
+  path              String?  @db.VarChar(255)
+  previousScreenKey String?  @db.VarChar(180)
+  previousPath      String?  @db.VarChar(255)
+  entityType        String?  @db.VarChar(64)
+  entityId          String?  @db.VarChar(64)
+  platform          String?  @db.VarChar(20)
+  appVersion        String?  @db.VarChar(20)
+  buildChannel      String?  @db.VarChar(30)
+  locale            String?  @db.VarChar(16)
+  metadata          Json?
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  User              User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([createdAt])
+  @@index([screenKey, createdAt])
+  @@index([eventName, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([userId, createdAt])
+}
+
 model Report {
     id         String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
     reporterId String  @db.Uuid
@@ -673,6 +702,7 @@ model User {
   isSuspended                            Boolean              @default(false)
   passwordHash                            String?              @db.VarChar(255)
   isVerified                              Boolean?             @default(false)
+  emailVerifiedAt                         DateTime?            @db.Timestamp(6)
   bio                                     String?
   avatarUrl                               String?              @db.VarChar(255)
   coverUrl                                String?              @db.VarChar(255)
@@ -726,6 +756,35 @@ model User {
   UserSettings                            UserSettings?
   UserRole                                UserRole[]
   UserTagInterest                         UserTagInterest[]
+  UserFlowEvents                          UserFlowEvent[]
+  EmailVerificationToken                  EmailVerificationToken[]
+  PasswordResetToken                      PasswordResetToken[]
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @db.VarChar(128)
+  expiresAt  DateTime  @db.Timestamp(6)
+  usedAt     DateTime? @db.Timestamp(6)
+  createdAt  DateTime  @default(now()) @db.Timestamp(6)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @db.VarChar(128)
+  expiresAt  DateTime  @db.Timestamp(6)
+  usedAt     DateTime? @db.Timestamp(6)
+  createdAt  DateTime  @default(now()) @db.Timestamp(6)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 model UserCityInterest {

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useRouter, type Href } from 'expo-router';
 
 import AuthBrandBadge from '@/components/auth/AuthBrandBadge';
 import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
@@ -25,7 +25,9 @@ import {
 } from '@/services/organizer-access';
 import {
   clearStoredUserSession,
+  hasCompletedTasteOnboarding,
   setStoredUserSession,
+  syncStoredUserSessionFromApi,
   type StoredUserSession,
 } from '@/services/user-session';
 import { useAuthBootstrap } from '@/context/auth-bootstrap';
@@ -114,19 +116,37 @@ export default function LoginScreen() {
       await storage.setItem('userToken', access_token);
       await storage.setItem('refreshToken', refresh_token);
       const persistedUser = await setStoredUserSession(user);
+      const syncedUser = await syncStoredUserSessionFromApi();
+      const activeUser = syncedUser || persistedUser;
 
-      if (!isOrganizerUser(persistedUser)) {
+      if (activeUser.email && !activeUser.emailVerifiedAt) {
+        router.replace({
+          pathname: '/verify-email',
+          params: { email: activeUser.email },
+        });
+        return;
+      }
+
+      if (!isOrganizerUser(activeUser)) {
+        if (syncedUser && !hasCompletedTasteOnboarding(syncedUser)) {
+          router.replace({
+            pathname: '/preferences',
+            params: { mode: 'onboarding' },
+          });
+          return;
+        }
+
         router.replace('/(tabs)/home');
         return;
       }
 
-      if (!canAccessOrganizerPanel(persistedUser)) {
-        showOrganizerDeniedAlert(persistedUser);
+      if (!canAccessOrganizerPanel(activeUser)) {
+        showOrganizerDeniedAlert(activeUser);
         await clearSession();
         return;
       }
 
-      router.replace(getOrganizerEntryPath(persistedUser) as Href);
+      router.replace(getOrganizerEntryPath(activeUser) as Href);
     } catch (error) {
       Alert.alert(
         t('commonErrorTitle'),
@@ -267,6 +287,13 @@ export default function LoginScreen() {
                 secureTextEntry
                 placeholder={t('loginPasswordPlaceholder')}
               />
+              <View className="mb-2 flex-row items-center justify-end">
+                <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+                  <Text className="text-sm font-semibold text-[#4c669f]">
+                    {t('loginForgotPassword')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 onPress={handleLogin}

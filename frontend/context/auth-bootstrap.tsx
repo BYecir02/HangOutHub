@@ -13,6 +13,28 @@ const AuthBootstrapContext = createContext<AuthBootstrapState>({
   targetHref: null,
 });
 
+type AuthBootstrapResetListener = () => void;
+
+const authBootstrapResetListeners = new Set<AuthBootstrapResetListener>();
+
+export function subscribeAuthBootstrapReset(listener: AuthBootstrapResetListener) {
+  authBootstrapResetListeners.add(listener);
+
+  return () => {
+    authBootstrapResetListeners.delete(listener);
+  };
+}
+
+export function notifyAuthBootstrapReset() {
+  for (const listener of authBootstrapResetListeners) {
+    try {
+      listener();
+    } catch {
+      // Ignore listener failures during auth teardown.
+    }
+  }
+}
+
 type AuthBootstrapProviderProps = {
   value: AuthBootstrapState;
   children: ReactNode;

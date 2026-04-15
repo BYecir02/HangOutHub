@@ -3,6 +3,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 
 import Header from '@/components/ui/Header';
+import HeroBackground from '@/components/ui/HeroBackground';
 import { useI18n } from '@/hooks/use-i18n';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
 
@@ -55,7 +56,8 @@ export default function HomeContent({
   );
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black">
+    <View className="flex-1 bg-transparent">
+      <HeroBackground variant="home" />
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}

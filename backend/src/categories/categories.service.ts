@@ -272,75 +272,21 @@ export class CategoriesService {
       throw new NotFoundException('Categorie introuvable');
     }
 
-    const keywords = Array.from(
-      new Set(
-        [category.name, ...category.Tag.map((tag) => tag.name)]
-          .map((value) => value.trim())
-          .filter(Boolean),
-      ),
-    );
-
-    const eventTextFilters: Prisma.EventWhereInput[] = keywords.flatMap(
-      (keyword) => [
-        {
-          title: {
-            contains: keyword,
-            mode: 'insensitive',
-          },
-        },
-        {
-          description: {
-            contains: keyword,
-            mode: 'insensitive',
-          },
-        },
-        {
-          address: {
-            contains: keyword,
-            mode: 'insensitive',
-          },
-        },
-      ],
-    );
-
-    const placeTextFilters: Prisma.PlaceWhereInput[] = keywords.flatMap(
-      (keyword) => [
-        {
-          name: {
-            contains: keyword,
-            mode: 'insensitive',
-          },
-        },
-        {
-          description: {
-            contains: keyword,
-            mode: 'insensitive',
-          },
-        },
-        {
-          address: {
-            contains: keyword,
-            mode: 'insensitive',
-          },
-        },
-      ],
-    );
+    const now = new Date();
 
     const [events, places] = await Promise.all([
       this.prisma.event.findMany({
         where: {
-          OR: [
-            {
-              EventTag: {
-                some: {
-                  Tag: {
-                    categoryId: id,
-                  },
-                },
+          startTime: {
+            gte: now,
+          },
+          EventTag: {
+            some: {
+              Tag: {
+                categoryId: id,
               },
             },
-            ...eventTextFilters,
-          ],
+          },
         },
         include: {
           Place: {
@@ -361,18 +307,13 @@ export class CategoriesService {
       }),
       this.prisma.place.findMany({
         where: {
-          OR: [
-            {
-              PlaceTag: {
-                some: {
-                  Tag: {
-                    categoryId: id,
-                  },
-                },
+          PlaceTag: {
+            some: {
+              Tag: {
+                categoryId: id,
               },
             },
-            ...placeTextFilters,
-          ],
+          },
         },
         include: {
           City: true,

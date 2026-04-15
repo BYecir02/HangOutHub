@@ -2,7 +2,8 @@ import axios, { InternalAxiosRequestConfig, isAxiosError } from 'axios';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
-import { router } from 'expo-router';
+import { safeReplace } from './navigation';
+import { notifyAuthBootstrapReset } from '@/context/auth-bootstrap';
 import { Platform } from 'react-native';
 
 import { getCurrentDataSaver } from './app-preferences';
@@ -159,6 +160,8 @@ export const clearAuthState = async () => {
   } catch {
     // Ignore socket cleanup failures during auth teardown.
   }
+
+  notifyAuthBootstrapReset();
 };
 
 const isAuthRoute = (url: string) =>
@@ -246,14 +249,14 @@ api.interceptors.response.use(
       } catch (refreshError) {
         await storage.setItem(AUTH_REDIRECT_REASON_KEY, 'session_expired');
         await clearAuthState();
-        router.replace('/');
+        safeReplace('/');
         return Promise.reject(refreshError);
       }
     }
 
     if (status === 401 && isAuthRoute(error.config?.url || '')) {
       await clearAuthState();
-      router.replace('/');
+      safeReplace('/');
     }
 
     return Promise.reject(error);

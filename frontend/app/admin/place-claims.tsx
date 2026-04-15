@@ -13,9 +13,11 @@ import { useRouter } from 'expo-router';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
+import AdminAnalyticsPanel from '@/components/admin/AdminAnalyticsPanel';
 import { useI18n } from '@/hooks/use-i18n';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import api, { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
+import { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
+import { deleteAdminUser, listAdminUsers, type AdminUserSummary } from '@/services/admin-users';
 import {
   getAdminOrganizerProfile,
   listAdminOrganizerProfiles,
@@ -33,7 +35,7 @@ import {
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
-type BackofficeSection = 'claims' | 'organizers';
+type BackofficeSection = 'claims' | 'organizers' | 'analytics' | 'users';
 
 function isUnauthorizedError(error: unknown) {
   return (
@@ -534,6 +536,72 @@ function OrganizerDetailCard({
   );
 }
 
+function getUserStatusTone(isSuspended?: boolean | null) {
+  if (isSuspended) {
+    return {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-700 dark:text-red-300',
+      label: 'SUSPENDED',
+    };
+  }
+
+  return {
+    bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    label: 'ACTIVE',
+  };
+}
+
+function AdminUserCard({
+  user,
+  onDelete,
+  deleting,
+  t,
+}: {
+  user: AdminUserSummary;
+  onDelete: (id: string) => void;
+  deleting: boolean;
+  t: ReturnType<typeof useI18n>['t'];
+}) {
+  const statusTone = getUserStatusTone(user.isSuspended);
+  const displayName =
+    user.displayName || user.username || user.email || t('adminUsersUnknown');
+
+  return (
+    <View className="mb-4 rounded-[28px] border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="flex-1">
+          <Text className="text-lg font-bold text-gray-900 dark:text-white">
+            {displayName}
+          </Text>
+          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {user.email || '-'}
+          </Text>
+          <Text className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {t('adminUsersRoleLabel')}: {user.role || 'USER'}
+          </Text>
+        </View>
+        <View className={`rounded-full px-3 py-1.5 ${statusTone.bg}`}>
+          <Text className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${statusTone.text}`}>
+            {user.isSuspended ? t('adminUsersStatusSuspended') : t('adminUsersStatusActive')}
+          </Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        onPress={() => onDelete(user.id)}
+        disabled={deleting}
+        className="mt-4 items-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-900/20"
+        style={{ opacity: deleting ? 0.7 : 1 }}
+      >
+        <Text className="text-sm font-semibold text-red-600">
+          {t('adminUsersDeleteCta')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function AdminPlaceClaimsScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
@@ -553,6 +621,10 @@ export default function AdminPlaceClaimsScreen() {
   const [actionOrganizerId, setActionOrganizerId] = useState<string | null>(null);
   const [revealSensitive, setRevealSensitive] = useState(false);
   const [activeSection, setActiveSection] = useState<BackofficeSection>('claims');
+  const [users, setUsers] = useState<AdminUserSummary[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -637,9 +709,34 @@ export default function AdminPlaceClaimsScreen() {
     [isAdmin, router, t],
   );
 
+  const loadUsers = useCallback(async () => {
+    if (!isAdmin) {
+      return;
+    }
+
+    setUsersLoading(true);
+    setUsersError(null);
+
+    try {
+      const nextUsers = await listAdminUsers();
+      setUsers(nextUsers);
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      setUsers([]);
+      setUsersError(getApiErrorMessage(error, t('adminUsersLoadFailed')));
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [isAdmin, router, t]);
+
   const loadBackoffice = useCallback(async () => {
-    await Promise.all([loadClaims(), loadOrganizers()]);
-  }, [loadClaims, loadOrganizers]);
+    await Promise.all([loadClaims(), loadOrganizers(), loadUsers()]);
+  }, [loadClaims, loadOrganizers, loadUsers]);
 
   useEffect(() => {
     void loadBackoffice();
@@ -747,6 +844,42 @@ export default function AdminPlaceClaimsScreen() {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (deletingUserId) {
+      return;
+    }
+
+    Alert.alert(
+      t('adminUsersDeleteConfirmTitle'),
+      t('adminUsersDeleteConfirmMessage'),
+      [
+        { text: t('genericCancel'), style: 'cancel' },
+        {
+          text: t('adminUsersDeleteConfirmCta'),
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingUserId(userId);
+            try {
+              await deleteAdminUser(userId);
+              await loadUsers();
+              Alert.alert(
+                t('adminUsersDeleteSuccessTitle'),
+                t('adminUsersDeleteSuccessMessage'),
+              );
+            } catch (error) {
+              Alert.alert(
+                t('commonErrorTitle'),
+                getApiErrorMessage(error, t('adminUsersDeleteFailed')),
+              );
+            } finally {
+              setDeletingUserId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <ScreenState
@@ -805,25 +938,116 @@ export default function AdminPlaceClaimsScreen() {
           onPress={() => setActiveSection('claims')}
           className={`flex-1 rounded-full px-4 py-2.5 ${activeSection === 'claims' ? 'bg-[#4c669f]' : 'bg-transparent'}`}
         >
-          <Text
-            className={`text-center text-xs font-semibold ${
-              activeSection === 'claims' ? 'text-white' : 'text-gray-700 dark:text-gray-300'
-            }`}
-          >
-            {t('adminBackofficeTabClaims')} ({claims.length})
-          </Text>
+          <View className="items-center justify-center gap-1">
+            <Ionicons
+              name="clipboard-outline"
+              size={14}
+              color={activeSection === 'claims' ? '#fff' : '#374151'}
+            />
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'claims'
+                  ? 'text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              numberOfLines={1}
+            >
+              {t('adminBackofficeTabClaims')}
+            </Text>
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'claims'
+                  ? 'text-white/80'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              ({claims.length})
+            </Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setActiveSection('organizers')}
           className={`flex-1 rounded-full px-4 py-2.5 ${activeSection === 'organizers' ? 'bg-[#4c669f]' : 'bg-transparent'}`}
         >
-          <Text
-            className={`text-center text-xs font-semibold ${
-              activeSection === 'organizers' ? 'text-white' : 'text-gray-700 dark:text-gray-300'
-            }`}
-          >
-            {t('adminBackofficeTabOrganizers')} ({pendingOrganizers.length})
-          </Text>
+          <View className="items-center justify-center gap-1">
+            <Ionicons
+              name="briefcase-outline"
+              size={14}
+              color={activeSection === 'organizers' ? '#fff' : '#374151'}
+            />
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'organizers'
+                  ? 'text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              numberOfLines={1}
+            >
+              {t('adminBackofficeTabOrganizers')}
+            </Text>
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'organizers'
+                  ? 'text-white/80'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              ({pendingOrganizers.length})
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveSection('analytics')}
+          className={`flex-1 rounded-full px-4 py-2.5 ${activeSection === 'analytics' ? 'bg-[#4c669f]' : 'bg-transparent'}`}
+        >
+          <View className="items-center justify-center gap-1">
+            <Ionicons
+              name="analytics-outline"
+              size={14}
+              color={activeSection === 'analytics' ? '#fff' : '#374151'}
+            />
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'analytics'
+                  ? 'text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              numberOfLines={1}
+            >
+              {t('adminBackofficeTabAnalytics')}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveSection('users')}
+          className={`flex-1 rounded-full px-4 py-2.5 ${activeSection === 'users' ? 'bg-[#4c669f]' : 'bg-transparent'}`}
+        >
+          <View className="items-center justify-center gap-1">
+            <Ionicons
+              name="people-outline"
+              size={14}
+              color={activeSection === 'users' ? '#fff' : '#374151'}
+            />
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'users'
+                  ? 'text-white'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}
+              numberOfLines={1}
+            >
+              {t('adminBackofficeTabUsers')}
+            </Text>
+            <Text
+              className={`text-center text-[10px] font-semibold leading-4 ${
+                activeSection === 'users'
+                  ? 'text-white/80'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              ({users.length})
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -883,7 +1107,7 @@ export default function AdminPlaceClaimsScreen() {
             />
           )}
         </>
-      ) : (
+      ) : activeSection === 'organizers' ? (
         <>
           <View className="mt-5">
             <Text className="text-lg font-bold text-gray-900 dark:text-white">
@@ -979,6 +1203,59 @@ export default function AdminPlaceClaimsScreen() {
               icon="people-outline"
               title={t('adminOrganizerApplicationsEmptyTitle')}
               description={t('adminOrganizerApplicationsEmptyDescription')}
+              containerClassName="px-0 pt-4"
+            />
+          )}
+        </>
+      ) : activeSection === 'analytics' ? (
+        <AdminAnalyticsPanel />
+      ) : (
+        <>
+          <View className="mt-5">
+            <Text className="text-lg font-bold text-gray-900 dark:text-white">
+              {t('adminUsersTitle')}
+            </Text>
+            <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {t('adminUsersSubtitle')}
+            </Text>
+          </View>
+
+          {usersError ? (
+            <ScreenState
+              mode="error"
+              title={usersError}
+              actionLabel={t('organizerDataRetry')}
+              onAction={() => {
+                void loadUsers();
+              }}
+              containerClassName="px-0 pt-4"
+            />
+          ) : usersLoading ? (
+            <ScreenState
+              mode="loading"
+              title={t('adminUsersLoading')}
+              containerClassName="px-0 pt-4"
+            />
+          ) : users.length > 0 ? (
+            <View className="mt-5">
+              {users.map((item) => (
+                <AdminUserCard
+                  key={item.id}
+                  user={item}
+                  onDelete={(id) => {
+                    void handleDeleteUser(id);
+                  }}
+                  deleting={deletingUserId === item.id}
+                  t={t}
+                />
+              ))}
+            </View>
+          ) : (
+            <ScreenState
+              mode="empty"
+              icon="people-outline"
+              title={t('adminUsersEmptyTitle')}
+              description={t('adminUsersEmptyDescription')}
               containerClassName="px-0 pt-4"
             />
           )}

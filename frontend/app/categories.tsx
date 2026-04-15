@@ -63,6 +63,7 @@ export default function CategoriesScreen() {
       label="Voir toutes les catégories"
       title={t('homeCategories')}
       onBack={() => router.back()}
+      withHeroBackground
     >
       {!loading && errorMessage && categories.length === 0 ? (
         <ScreenState

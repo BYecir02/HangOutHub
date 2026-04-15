@@ -453,6 +453,7 @@ export default function EventsScreen() {
       title={t('eventsTitle')}
       subtitle={t('eventsSubtitle')}
       onBack={() => router.back()}
+      withHeroBackground
       locationScopeBar={
         <LocationScopeBar
           locationLabel={locationValueLabel}

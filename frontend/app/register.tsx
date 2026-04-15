@@ -176,11 +176,10 @@ export default function RegisterScreen() {
           websiteUrl: websiteUrl || undefined,
         });
 
-        Alert.alert(
-          t('registerRequestSentTitle'),
-          t('registerRequestSentMessage'),
-          [{ text: t('registerBackToLogin'), onPress: () => router.replace('/') }],
-        );
+        router.replace({
+          pathname: '/verify-email',
+          params: { email },
+        });
       } else {
         await api.post('/auth/register', {
           username,
@@ -188,12 +187,10 @@ export default function RegisterScreen() {
           phoneNumber,
           password,
         });
-
-        Alert.alert(
-          t('registerAccountCreatedTitle'),
-          t('registerAccountCreatedMessage'),
-          [{ text: t('registerLoginCta'), onPress: () => router.replace('/') }],
-        );
+        router.replace({
+          pathname: '/verify-email',
+          params: { email },
+        });
       }
     } catch (error: unknown) {
       Alert.alert(

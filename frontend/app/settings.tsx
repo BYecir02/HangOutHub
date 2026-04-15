@@ -38,6 +38,10 @@ export default function SettingsScreen() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isAuthTeardownError = (error: unknown) =>
+    error instanceof Error &&
+    error.message.includes('Aucun refresh token disponible.');
+
   const loadSettings = useCallback(async () => {
     setLoading(true);
 
@@ -55,6 +59,12 @@ export default function SettingsScreen() {
           : undefined;
 
       if (status === 401) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      if (isAuthTeardownError(error)) {
         await clearAuthState();
         router.replace('/');
         return;
@@ -106,6 +116,12 @@ export default function SettingsScreen() {
           : undefined;
 
       if (status === 401) {
+        await clearAuthState();
+        router.replace('/');
+        return;
+      }
+
+      if (isAuthTeardownError(error)) {
         await clearAuthState();
         router.replace('/');
         return;

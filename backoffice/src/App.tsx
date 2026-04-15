@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import EventEditPage from './pages/EventEdit';
 import EventsPage from './pages/Events';
 import LoginPage from './pages/Login';
+import UserFlowPage from './pages/UserFlow';
 import PlaceEditPage from './pages/PlaceEdit';
 import PlacesPage from './pages/Places';
 import PlaceViewPage from './pages/PlaceView';
@@ -24,6 +25,7 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<Shell />}>
             <Route index element={<Dashboard />} />
+            <Route path="/parcours" element={<UserFlowPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/categories" element={<CategoriesTagsPage />} />
             <Route path="/reports" element={<ReportsPage />} />

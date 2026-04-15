@@ -23,12 +23,16 @@ import { memoryStorage } from 'multer';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserCityPreferencesDto } from './dto/update-user-city-preferences.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UpdateUserTagPreferencesDto } from './dto/update-user-tag-preferences.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateOrganizerStatusDto } from './dto/update-organizer-status.dto';
 import { ActivateProProfileDto } from './dto/activate-pro-profile.dto';
-import { UserTagPreferencesResponse } from './users.service';
+import {
+  UserCityPreferencesResponse,
+  UserTagPreferencesResponse,
+} from './users.service';
 
 interface AuthenticatedRequest {
   user: {
@@ -79,6 +83,18 @@ export class UsersController {
     @Request() req: AuthenticatedRequest,
   ): Promise<UserTagPreferencesResponse> {
     return this.usersService.getTagPreferences(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('me/city-preferences')
+  updateCityPreferences(
+    @Request() req: AuthenticatedRequest,
+    @Body() updatePreferencesDto: UpdateUserCityPreferencesDto,
+  ): Promise<UserCityPreferencesResponse> {
+    return this.usersService.updateCityPreferences(
+      req.user.userId,
+      updatePreferencesDto.cityIds,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

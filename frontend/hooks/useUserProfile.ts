@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import api from '../services/api';
+import api, { storage } from '../services/api';
 import { getHighestTeamWorkspaceRole } from '@/services/organizer-access';
 import { listMyPlaceTeams, type MyPlaceTeamMembershipItem } from '@/services/place-team';
 import { setStoredUserSession } from '@/services/user-session';
@@ -139,24 +139,66 @@ export function useUserProfile() {
     setError(null);
 
     try {
+      const accessToken = await storage.getItem('userToken');
+      const refreshToken = await storage.getItem('refreshToken');
+
+      if (!accessToken && !refreshToken) {
+        if (!isRefresh) {
+          setUser(null);
+          setPosts([]);
+          setOutings([]);
+          setSavedPlaces([]);
+          setOrganizerEvents([]);
+          setPlaceTeamMemberships([]);
+          setConnectionsCount(0);
+        }
+
+        setLoading(false);
+        setRefreshing(false);
+        setHasLoaded(true);
+        return;
+      }
+
       const userRes = await api.get<UserProfile>('/users/me');
       const currentUser = userRes.data;
-      const isOrganizer =
-        currentUser.role === 'ORGANIZER' || currentUser.role === 'PLACE_OWNER';
 
       if (currentUser.id) {
-        const [postsRes, outingsRes, savedPlacesRes, friendshipsRes, myTeams] =
-          await Promise.all([
-            api.get<UserPost[]>(`/posts/user/${currentUser.id}`),
-            api.get<UserOuting[]>('/outings/mine'),
-            api.get<SavedPlace[]>('/places/saved/mine'),
-            api.get<{
-              counts?: {
-                connections?: number;
-              };
-            }>('/friendships/mine'),
-            listMyPlaceTeams().catch(() => [] as MyPlaceTeamMembershipItem[]),
-          ]);
+        const [
+          postsRes,
+          outingsRes,
+          savedPlacesRes,
+          friendshipsRes,
+          myTeamsRes,
+          eventsRes,
+        ] = await Promise.allSettled([
+          api.get<UserPost[]>(`/posts/user/${currentUser.id}`),
+          api.get<UserOuting[]>('/outings/mine'),
+          api.get<SavedPlace[]>('/places/saved/mine'),
+          api.get<{
+            counts?: {
+              connections?: number;
+            };
+          }>('/friendships/mine'),
+          listMyPlaceTeams(),
+          api.get<OrganizerEvent[]>('/events/mine'),
+        ]);
+
+        const posts =
+          postsRes.status === 'fulfilled' ? postsRes.value.data : ([] as UserPost[]);
+        const outings =
+          outingsRes.status === 'fulfilled' ? outingsRes.value.data : ([] as UserOuting[]);
+        const saved =
+          savedPlacesRes.status === 'fulfilled'
+            ? savedPlacesRes.value.data
+            : ([] as SavedPlace[]);
+        const connections =
+          friendshipsRes.status === 'fulfilled'
+            ? friendshipsRes.value.data.counts?.connections || 0
+            : 0;
+        const myTeams =
+          myTeamsRes.status === 'fulfilled'
+            ? myTeamsRes.value
+            : ([] as MyPlaceTeamMembershipItem[]);
         const highestTeamRole = getHighestTeamWorkspaceRole(
           myTeams.map((team) => team.role),
         );
@@ -169,10 +211,16 @@ export function useUserProfile() {
         await setStoredUserSession(nextUser);
         setPlaceTeamMemberships(myTeams);
 
-        setPosts(postsRes.data);
-        setOutings(outingsRes.data);
-        setSavedPlaces(savedPlacesRes.data);
-        setConnectionsCount(friendshipsRes.data.counts?.connections || 0);
+        setPosts(posts);
+        setOutings(outings);
+        setSavedPlaces(saved);
+        setConnectionsCount(connections);
+
+        if (eventsRes.status === 'fulfilled') {
+          setOrganizerEvents(eventsRes.value.data);
+        } else {
+          setOrganizerEvents([]);
+        }
       } else {
         setUser(currentUser);
         await setStoredUserSession(currentUser);
@@ -181,18 +229,7 @@ export function useUserProfile() {
         setSavedPlaces([]);
         setConnectionsCount(0);
         setPlaceTeamMemberships([]);
-      }
-
-      if (isOrganizer) {
-        const eventsRes = await api.get<OrganizerEvent[]>('/events/mine');
-        setOrganizerEvents(eventsRes.data);
-      } else {
-        try {
-          const eventsRes = await api.get<OrganizerEvent[]>('/events/mine');
-          setOrganizerEvents(eventsRes.data);
-        } catch {
-          setOrganizerEvents([]);
-        }
+        setOrganizerEvents([]);
       }
     } catch (error) {
       debugProfileError('fetchUserProfile failed', error);

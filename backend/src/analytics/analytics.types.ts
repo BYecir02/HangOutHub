@@ -150,3 +150,27 @@ export interface AdminAnalyticsDashboardResponse {
   };
   topShared: DashboardTopSharedItem[];
 }
+
+export interface FlowTreeSummary {
+  totalEvents: number;
+  uniqueSessions: number;
+  uniqueUsers: number;
+  screenViews: number;
+  actionEvents: number;
+}
+
+export interface AnalyticsFlowTreeNode {
+  id: string;
+  label: string;
+  value?: number | string;
+  hint?: string;
+  children?: AnalyticsFlowTreeNode[];
+}
+
+export interface AdminAnalyticsFlowTreeResponse {
+  window: DashboardTrendWindow;
+  summary: FlowTreeSummary;
+  tree: AnalyticsFlowTreeNode;
+  topScreens: DashboardBucket[];
+  topActions: DashboardBucket[];
+}
