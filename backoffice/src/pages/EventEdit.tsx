@@ -590,8 +590,8 @@ export default function EventEditPage() {
           label="Informations"
           subtitle="Modifie les informations principales."
         />
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="lg:col-span-2">
             <FormField label="Titre">
               <input
                 value={event.title}
@@ -668,7 +668,7 @@ export default function EventEditPage() {
             />
           </FormField>
           {!placeId ? (
-            <div className="md:col-span-2">
+            <div className="lg:col-span-2">
               <FormField label="Ville de l evenement">
                 <CitySelector
                   value={selectedCity}
@@ -702,7 +702,7 @@ export default function EventEditPage() {
           </FormField>
         </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <FormField label="Politique d'annulation">
             <textarea
               rows={3}
@@ -753,8 +753,8 @@ export default function EventEditPage() {
               key={`${ticket.id || index}`}
               className="rounded-xl border border-slate-200 p-4"
             >
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="md:col-span-2">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="xl:col-span-2">
                   <FormField label="Nom">
                     <input
                       value={ticket.name}
@@ -798,7 +798,7 @@ export default function EventEditPage() {
                   />
                 </FormField>
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
                 <FormField label="Description">
                   <input
                     value={ticket.description ?? ''}
@@ -960,7 +960,7 @@ export default function EventEditPage() {
           </button>
         </div>
         {promoEnabled ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <FormField label="Code">
               <input
                 value={promoCode}
@@ -995,7 +995,7 @@ export default function EventEditPage() {
                 className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700"
               />
             </FormField>
-            <div className="md:col-span-2">
+            <div className="lg:col-span-2">
               <FormField label="Fin promo">
                 <input
                   type="datetime-local"
@@ -1013,7 +1013,7 @@ export default function EventEditPage() {
 
       <SectionCard>
         <SectionTitle label="Medias" subtitle="Gere la couverture et la galerie." />
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
             <p className="text-xs font-semibold text-slate-600">
               Couverture actuelle
@@ -1115,17 +1115,17 @@ export default function EventEditPage() {
         </div>
       ) : null}
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button
           onClick={() => navigate('/events')}
-          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+          className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 sm:w-auto"
         >
           Annuler
         </button>
         <button
           onClick={handleSubmit}
           disabled={saving}
-          className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+          className="btn-primary w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60 sm:w-auto"
         >
           {saving
             ? 'Sauvegarde...'
