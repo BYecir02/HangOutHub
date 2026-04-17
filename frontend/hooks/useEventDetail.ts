@@ -43,6 +43,7 @@ export interface EventDetail {
     id?: string;
     displayName?: string | null;
     username?: string | null;
+    role?: string | null;
   } | null;
   Place?: {
     id: string;

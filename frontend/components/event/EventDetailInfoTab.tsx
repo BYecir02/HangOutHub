@@ -28,6 +28,12 @@ export default function EventDetailInfoTab({
   onOpenPlace,
   onContactOrganizer,
 }: EventDetailInfoTabProps) {
+  const authorRole = (event.User?.role || '').toUpperCase();
+  const isHangOutHubAdminPublisher = authorRole === 'ADMIN' || authorRole === 'SUPER_ADMIN';
+  const authorSectionLabel = isHangOutHubAdminPublisher
+    ? t('placeDetailPublishedBy')
+    : t('eventDetailOrganizer');
+
   return (
     <View className="pt-5">
       <View className="mt-5 flex-row items-start">
@@ -81,7 +87,7 @@ export default function EventDetailInfoTab({
           <View className="flex-row items-start justify-between gap-3">
             <View className="flex-1">
               <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                {t('eventDetailOrganizer')}
+                {authorSectionLabel}
               </Text>
               <Text className="mt-1 text-base text-gray-800 dark:text-gray-100">
                 {event.User?.displayName ||
