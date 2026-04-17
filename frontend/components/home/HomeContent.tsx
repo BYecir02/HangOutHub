@@ -58,12 +58,24 @@ export default function HomeContent({
   return (
     <View className="flex-1 bg-transparent">
       <HeroBackground variant="home" />
+
+      <View className="absolute inset-x-0 top-0 z-20">
+        <Header
+          notificationCount={notificationCount}
+          location={locationLabel}
+          locationLabel={t('homeLocationLabel')}
+          onLocationPress={() => router.push('/location')}
+          onNotificationPress={() => router.push('/notifications')}
+        />
+      </View>
+
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
         onLayout={recommendedAutoplay.onLayout}
         onScroll={recommendedAutoplay.onScroll}
         scrollEventThrottle={16}
+        contentContainerStyle={{ paddingTop: 96, paddingBottom: 24 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -74,14 +86,6 @@ export default function HomeContent({
           />
         }
       >
-        <Header
-          notificationCount={notificationCount}
-          location={locationLabel}
-          locationLabel={t('homeLocationLabel')}
-          onLocationPress={() => router.push('/location')}
-          onNotificationPress={() => router.push('/notifications')}
-        />
-
         <HomeFeaturedSection
           title={t('homeFeatured')}
           seeAllLabel={t('homeSeeAll')}
