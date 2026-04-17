@@ -15,6 +15,7 @@ import SectionTitle from '../components/SectionTitle';
 import FormField from '../components/FormField';
 import LoadingState from '../components/LoadingState';
 import MediaPreview from '../components/MediaPreview';
+import CitySelector, { type CityOption } from '../components/CitySelector';
 import SelectField from '../components/SelectField';
 import Card from '../components/Card';
 import { getMediaUploadErrorMessage } from '../lib/media';
@@ -23,6 +24,7 @@ interface EventDetails {
   id: string;
   title: string;
   description?: string | null;
+  address?: string | null;
   startTime: string;
   endTime?: string | null;
   entryFee?: number | null;
@@ -54,6 +56,7 @@ interface EventDetails {
       status?: string | null;
     } | null;
   }>;
+  City?: CityOption | null;
   Place?: {
     id: string;
     name?: string | null;
@@ -79,6 +82,8 @@ interface DuplicateEventSource {
   id: string;
   title: string;
   description?: string | null;
+  address?: string | null;
+  images?: string[];
   startTime: string;
   endTime?: string | null;
   entryFee?: number | null;
@@ -98,6 +103,7 @@ interface DuplicateEventSource {
   EventTag?: Array<{
     tagId: number;
   }>;
+  City?: CityOption | null;
   Promotion?: Array<{
     code?: string | null;
     discountType?: 'PERCENT' | 'FIXED' | null;
@@ -112,6 +118,7 @@ function createEmptyEvent(): EventDetails {
     id: '',
     title: '',
     description: '',
+    address: '',
     startTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     endTime: null,
     entryFee: 0,
@@ -123,6 +130,7 @@ function createEmptyEvent(): EventDetails {
     TicketType: [],
     Promotion: [],
     EventTag: [],
+    City: null,
     Place: null,
   };
 }
@@ -168,8 +176,11 @@ export default function EventEditPage() {
     null,
   );
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [cities, setCities] = useState<CityOption[]>([]);
   const [places, setPlaces] = useState<PlaceOption[]>([]);
   const [placeId, setPlaceId] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<CityOption | null>(null);
+  const [address, setAddress] = useState('');
   const [promoEnabled, setPromoEnabled] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoType, setPromoType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
@@ -182,11 +193,13 @@ export default function EventEditPage() {
     ...createEmptyEvent(),
     title: source.title ? `${source.title} (copie)` : 'Nouvel evenement',
     description: source.description ?? '',
+    address: source.address ?? '',
     startTime: source.startTime,
     endTime: source.endTime ?? null,
     entryFee: source.entryFee ?? 0,
     cancellationPolicy: source.cancellationPolicy ?? '',
     refundPolicy: source.refundPolicy ?? '',
+    City: source.City ?? null,
   });
 
   useEffect(() => {
@@ -195,22 +208,57 @@ export default function EventEditPage() {
       setLoading(true);
       try {
         const duplicateFrom = searchParams.get('duplicateFrom');
-        const [data, categoryData, placeData] = await Promise.all([
+        const [data, categoryData, cityData, placeData] = await Promise.all([
           params.id
             ? apiGet<EventDetails>(`/events/${params.id}`)
             : duplicateFrom
               ? apiGet<DuplicateEventSource>(`/events/${duplicateFrom}`)
               : Promise.resolve(createEmptyEvent()),
           apiGet<CategoryOption[]>('/categories'),
+          apiGet<CityOption[]>('/cities'),
           apiGet<PlaceOption[]>('/places'),
         ]);
         if (isMounted) {
           if (params.id) {
             setEvent(data as EventDetails);
+            const existingEvent = data as EventDetails;
+            setGalleryImages(existingEvent.images || []);
+            setTicketTypes(
+              existingEvent.TicketType?.map((ticket) => ({
+                id: ticket.id,
+                name: ticket.name,
+                description: ticket.description ?? '',
+                price: Number(ticket.price || 0),
+                quantity: Number(ticket.quantity || 0),
+              })) || [],
+            );
+            setSelectedTagIds(existingEvent.EventTag?.map((item) => item.tagId) || []);
+            setPlaceId(existingEvent.placeId || '');
+            setSelectedCity(existingEvent.City ?? null);
+            setAddress(existingEvent.address ?? '');
+
+            const promo = existingEvent.Promotion?.[0];
+            if (promo?.code) {
+              setPromoEnabled(true);
+              setPromoCode(promo.code);
+              setPromoType((promo.discountType as 'PERCENT' | 'FIXED') || 'PERCENT');
+              setPromoValue(promo.discountValue ? String(promo.discountValue) : '');
+              setPromoMaxRedemptions(
+                promo.maxRedemptions ? String(promo.maxRedemptions) : '',
+              );
+              setPromoEndsAt(promo.endDate ? toDateTimeLocal(promo.endDate) : '');
+            } else {
+              setPromoEnabled(false);
+              setPromoCode('');
+              setPromoType('PERCENT');
+              setPromoValue('');
+              setPromoMaxRedemptions('');
+              setPromoEndsAt('');
+            }
           } else if (duplicateFrom) {
             const source = data as DuplicateEventSource;
             setEvent(buildCreateDraft(source));
-            setGalleryImages([]);
+            setGalleryImages(source.images || []);
             setTicketTypes(
               source.TicketType?.map((ticket) => ({
                 id: ticket.id,
@@ -222,6 +270,8 @@ export default function EventEditPage() {
             );
             setSelectedTagIds(source.EventTag?.map((item) => item.tagId) || []);
             setPlaceId(source.placeId || source.Place?.id || '');
+              setSelectedCity(source.City ?? null);
+              setAddress(source.address ?? '');
 
             const promo = source.Promotion?.[0];
             if (promo?.code) {
@@ -247,6 +297,8 @@ export default function EventEditPage() {
             setTicketTypes([]);
             setSelectedTagIds([]);
             setPlaceId('');
+            setSelectedCity(null);
+            setAddress('');
             setPromoEnabled(false);
             setPromoCode('');
             setPromoType('PERCENT');
@@ -255,6 +307,7 @@ export default function EventEditPage() {
             setPromoEndsAt('');
           }
           setCategories(categoryData);
+          setCities(cityData);
           setPlaces(placeData);
         }
       } finally {
@@ -375,6 +428,11 @@ export default function EventEditPage() {
       return;
     }
 
+    if (!placeId && !selectedCity) {
+      setError('Choisis une ville si l evenement n est pas rattache a un lieu.');
+      return;
+    }
+
     if (!event.startTime) {
       setError('La date de debut est obligatoire.');
       return;
@@ -394,6 +452,7 @@ export default function EventEditPage() {
       const formData = new FormData();
       formData.append('title', event.title);
       formData.append('description', event.description ?? '');
+      formData.append('address', address.trim());
       formData.append('startTime', event.startTime);
       if (event.endTime) {
         formData.append('endTime', event.endTime);
@@ -409,6 +468,10 @@ export default function EventEditPage() {
       formData.append('existingImages', JSON.stringify(galleryImages));
       formData.append('tagIds', JSON.stringify(selectedTagIds));
       formData.append('ticketTypes', JSON.stringify(ticketTypes));
+
+      if (!placeId && selectedCity) {
+        formData.append('cityId', String(selectedCity.id));
+      }
 
       if (promoEnabled) {
         formData.append('promoCode', promoCode.trim().toUpperCase());
@@ -583,7 +646,9 @@ export default function EventEditPage() {
           <FormField label="Lieu rattache">
             <SelectField
               value={placeId}
-              onChange={setPlaceId}
+              onChange={(value) => {
+                setPlaceId(value);
+              }}
               className="w-full"
               options={[
                 { label: 'Aucun', value: '' },
@@ -594,6 +659,34 @@ export default function EventEditPage() {
               ]}
             />
           </FormField>
+          <FormField label="Adresse">
+            <input
+              value={address}
+              onChange={(evt) => setAddress(evt.target.value)}
+              placeholder="Adresse, point de repere ou precisions"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
+            />
+          </FormField>
+          {!placeId ? (
+            <div className="md:col-span-2">
+              <FormField label="Ville de l evenement">
+                <CitySelector
+                  value={selectedCity}
+                  cities={cities}
+                  onChange={setSelectedCity}
+                  onCreate={async (payload) => {
+                    const created = await apiPost<CityOption>('/cities', payload);
+                    setCities((current) =>
+                      current.some((city) => city.id === created.id)
+                        ? current
+                        : [...current, created],
+                    );
+                    return created;
+                  }}
+                />
+              </FormField>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-4">

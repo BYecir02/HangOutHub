@@ -103,7 +103,10 @@ export default function PlaceDetailContent({
       <View className="-mt-6 rounded-t-[28px] bg-gray-50 px-5 pt-6 dark:bg-black">
         <View className="flex-row items-start justify-between gap-4">
           <View className="flex-1">
-            <Text className="text-3xl font-bold text-gray-900 dark:text-white">
+            <Text
+              className="text-3xl font-bold text-gray-900 dark:text-white"
+              style={{ marginTop: 2 }}
+            >
               {place.name}
             </Text>
             <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">

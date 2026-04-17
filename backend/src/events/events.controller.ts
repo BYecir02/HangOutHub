@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Patch,
+  Query,
   ParseUUIDPipe,
   Param,
   Post,
@@ -89,8 +90,8 @@ export class EventsController {
   }
 
   @Get()
-  findAll() {
-    return this.eventsService.findAll();
+  findAll(@Query('upcoming') upcoming?: string) {
+    return this.eventsService.findAll({ upcomingOnly: upcoming === 'true' });
   }
 
   @UseGuards(AuthGuard('jwt'))

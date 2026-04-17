@@ -1,3 +1,4 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module.js';
 import { resolveCorsOptions } from '../src/cors-options.js';
@@ -21,6 +22,15 @@ async function getHandler(): Promise<RequestHandler> {
       const app = await NestFactory.create(AppModule);
       app.setGlobalPrefix('api/v1');
       app.enableCors(resolveCorsOptions());
+      app.useGlobalPipes(
+        new ValidationPipe({
+          whitelist: true,
+          transform: true,
+          transformOptions: {
+            enableImplicitConversion: true,
+          },
+        }),
+      );
       await app.init();
 
       return app.getHttpAdapter().getInstance() as RequestHandler;

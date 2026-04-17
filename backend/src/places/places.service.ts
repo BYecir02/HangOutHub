@@ -1035,7 +1035,17 @@ export class PlacesService {
     return this.prisma.place.findMany({
       include: {
         City: true,
-        PlaceTag: { include: { Tag: { include: { Category: true } } } },
+        PlaceTag: {
+          include: {
+            Tag: {
+              select: {
+                id: true,
+                name: true,
+                categoryId: true,
+              },
+            },
+          },
+        },
       },
     });
   }

@@ -101,6 +101,15 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Get('event/:eventId')
+  findAllByEvent(
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.postsService.findAllByEvent(eventId, req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get('admin/analytics/shares')
   getShareAnalytics(@Request() req: AuthenticatedRequest) {
     this.ensureAdmin(req);

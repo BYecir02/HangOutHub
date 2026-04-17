@@ -87,7 +87,7 @@ export default function HomeFeaturedSection({
                 <EventInspirationCard
                   event={item.event}
                   imageHeight={190}
-                  adaptiveHeight={false}
+                  adaptiveHeight
                   cityLabel={item.cityLabel}
                   placeLabel={item.placeLabel}
                   dateLabel={item.dateLabel}

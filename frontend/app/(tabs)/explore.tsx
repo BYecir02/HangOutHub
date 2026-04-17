@@ -42,12 +42,19 @@ interface EventItem {
     } | null;
   } | null;
   address?: string | null;
+  City?: {
+    id?: number | null;
+    name?: string | null;
+    country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
 }
 
 export default function ExploreScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
-  const cachedEvents = getCache<EventItem[]>('events');
+  const cachedEvents = getCache<EventItem[]>('exploreEvents');
   const [events, setEvents] = useState<EventItem[]>(cachedEvents ?? []);
   const [query, setQuery] = useState('');
   const {
@@ -71,8 +78,8 @@ export default function ExploreScreen() {
       const runner = mode === 'refresh' ? runRefresh : runInitial;
       const nextEvents = await runner(
         async () => {
-          const response = await api.get<EventItem[]>('/events');
-          setCache('events', response.data);
+          const response = await api.get<EventItem[]>('/events?upcoming=true');
+          setCache('exploreEvents', response.data);
           return response.data;
         },
         {
@@ -86,7 +93,7 @@ export default function ExploreScreen() {
         return;
       }
 
-      if (!getCache('events')) {
+      if (!getCache('exploreEvents')) {
         setEvents([]);
       }
     },
@@ -105,8 +112,8 @@ export default function ExploreScreen() {
 
   const filteredEvents = useMemo(() => {
     const locationFilteredEvents = filterByLocation(events, (event) => ({
-      city: event.Place?.City?.name || event.Place?.name,
-      country: event.Place?.City?.country,
+      city: event.City?.name || event.Place?.City?.name || event.Place?.name,
+      country: event.City?.country || event.Place?.City?.country,
       address: event.Place?.address || event.address,
     }));
     const normalizedQuery = query.trim().toLowerCase();
@@ -211,7 +218,7 @@ export default function ExploreScreen() {
             <EventCard
               title={item.title}
               date={formatEventDate(item.startTime, locale)}
-              location={item.Place?.name || item.address || t('homeLocationToConfirm')}
+              location={item.Place?.name || item.City?.name || item.address || t('homeLocationToConfirm')}
               imageUrl={
                 getImageUrl(item.coverUrl) ||
                 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200'

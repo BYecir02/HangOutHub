@@ -31,6 +31,8 @@ import api, {
 } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
+import { getRecommendationOnboardingPreferences } from '@/services/recommendation-onboarding';
+import { resolveStoredUserSession } from '@/services/user-session';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
@@ -50,11 +52,27 @@ interface DiscoverEvent {
     id?: string;
     name?: string | null;
     City?: {
+      id?: number | null;
       name?: string | null;
       country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
     } | null;
   } | null;
   address?: string | null;
+  City?: {
+    id?: number | null;
+    name?: string | null;
+    country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
+  EventTag?: Array<{
+    tagId?: number | null;
+    Tag?: {
+      id?: number | null;
+    } | null;
+  } | null>;
 }
 
 interface DiscoverPlace {
@@ -63,14 +81,315 @@ interface DiscoverPlace {
   coverUrl: string | null;
   avgRating?: number | null;
   City?: {
+    id?: number | null;
     name?: string | null;
     country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   } | null;
   address?: string | null;
+  PlaceTag?: Array<{
+    tagId?: number | null;
+    Tag?: {
+      id?: number | null;
+    } | null;
+  } | null>;
 }
 
 type DiscoverFilter = 'all' | 'events' | 'places';
 type DiscoverViewMode = 'list' | 'inspiration';
+
+type RecommendationPreferencesSnapshot = {
+  tagIds: number[];
+  cityIds: number[];
+  budget: 'low' | 'medium' | 'high';
+  radiusKm: 2 | 5 | 10 | 20 | 'unlimited';
+};
+
+type StoredLocationLike = {
+  cityId?: number | null;
+  cityName?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+} | null;
+
+type CandidateLocation = {
+  cityId?: number | null;
+  city?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+type CandidateTagRelation = {
+  tagId?: number | null;
+  Tag?: {
+    id?: number | null;
+  } | null;
+} | null;
+
+function normalizeText(value?: string | null): string {
+  return value?.trim().toLowerCase() || '';
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function extractCandidateTagIds(relations?: CandidateTagRelation[] | null): number[] {
+  if (!Array.isArray(relations)) {
+    return [];
+  }
+
+  return relations
+    .map((relation) => relation?.tagId ?? relation?.Tag?.id ?? null)
+    .filter((value): value is number => typeof value === 'number');
+}
+
+function getCandidateLocation(candidate: {
+  Place?: { City?: DiscoverEvent['Place'] extends infer P ? P extends { City?: infer C } ? C : never : never } | null;
+  City?: DiscoverPlace['City'];
+}): CandidateLocation {
+  const sourceLocation = candidate.Place?.City || candidate.City || null;
+
+  return {
+    cityId: sourceLocation?.id ?? null,
+    city: sourceLocation?.name ?? null,
+    country: sourceLocation?.country ?? null,
+    latitude: sourceLocation?.latitude ?? null,
+    longitude: sourceLocation?.longitude ?? null,
+  };
+}
+
+function haversineDistanceKm(
+  startLatitude: number,
+  startLongitude: number,
+  endLatitude: number,
+  endLongitude: number,
+): number {
+  const earthRadiusKm = 6371;
+  const latitudeDelta = ((endLatitude - startLatitude) * Math.PI) / 180;
+  const longitudeDelta = ((endLongitude - startLongitude) * Math.PI) / 180;
+  const startLatitudeRadians = (startLatitude * Math.PI) / 180;
+  const endLatitudeRadians = (endLatitude * Math.PI) / 180;
+
+  const a =
+    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+    Math.sin(longitudeDelta / 2) *
+      Math.sin(longitudeDelta / 2) *
+      Math.cos(startLatitudeRadians) *
+      Math.cos(endLatitudeRadians);
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function scoreLocationMatch(
+  selectedLocation: StoredLocationLike,
+  candidate: CandidateLocation,
+): number {
+  if (!selectedLocation) {
+    return 0;
+  }
+
+  let score = 0;
+
+  if (
+    typeof selectedLocation.cityId === 'number' &&
+    typeof candidate.cityId === 'number' &&
+    selectedLocation.cityId === candidate.cityId
+  ) {
+    score += 5;
+  } else if (
+    normalizeText(selectedLocation.cityName) &&
+    normalizeText(candidate.city) &&
+    normalizeText(selectedLocation.cityName) === normalizeText(candidate.city)
+  ) {
+    score += 3.5;
+  }
+
+  if (
+    normalizeText(selectedLocation.country) &&
+    normalizeText(candidate.country) &&
+    normalizeText(selectedLocation.country) === normalizeText(candidate.country)
+  ) {
+    score += 1.5;
+  }
+
+  return score;
+}
+
+function scoreRadiusMatch(
+  selectedLocation: StoredLocationLike,
+  candidate: CandidateLocation,
+  radiusKm: RecommendationPreferencesSnapshot['radiusKm'],
+): number {
+  if (radiusKm === 'unlimited') {
+    return 0;
+  }
+
+  const selectedLatitude = toFiniteNumber(selectedLocation?.latitude);
+  const selectedLongitude = toFiniteNumber(selectedLocation?.longitude);
+  const candidateLatitude = toFiniteNumber(candidate.latitude);
+  const candidateLongitude = toFiniteNumber(candidate.longitude);
+
+  if (
+    selectedLatitude === null ||
+    selectedLongitude === null ||
+    candidateLatitude === null ||
+    candidateLongitude === null
+  ) {
+    return 0;
+  }
+
+  const distanceKm = haversineDistanceKm(
+    selectedLatitude,
+    selectedLongitude,
+    candidateLatitude,
+    candidateLongitude,
+  );
+
+  if (distanceKm <= radiusKm) {
+    return 3;
+  }
+
+  if (distanceKm <= radiusKm * 2) {
+    return 1;
+  }
+
+  return -1;
+}
+
+function getEventBasePrice(event: DiscoverEvent): number | null {
+  const ticketPrices = (event.TicketType || [])
+    .map((ticketType) => toFiniteNumber(ticketType.price))
+    .filter((value): value is number => value !== null);
+
+  if (ticketPrices.length > 0) {
+    return Math.min(...ticketPrices);
+  }
+
+  return toFiniteNumber(event.entryFee);
+}
+
+function scoreBudgetMatch(
+  price: number | null,
+  budget: RecommendationPreferencesSnapshot['budget'],
+): number {
+  if (price === null) {
+    return 0;
+  }
+
+  const priceBand = price <= 15 ? 'low' : price <= 45 ? 'medium' : 'high';
+
+  if (priceBand === budget) {
+    return 3;
+  }
+
+  if (budget === 'medium' && priceBand !== 'high') {
+    return 1.5;
+  }
+
+  if (budget === 'low' && priceBand === 'medium') {
+    return 1;
+  }
+
+  if (budget === 'high' && priceBand === 'medium') {
+    return 1;
+  }
+
+  return 0.5;
+}
+
+function scoreTagMatch(candidateTagIds: number[], preferredTagIds: Set<number>): number {
+  if (preferredTagIds.size === 0 || candidateTagIds.length === 0) {
+    return 0;
+  }
+
+  let matches = 0;
+
+  for (const tagId of candidateTagIds) {
+    if (preferredTagIds.has(tagId)) {
+      matches += 1;
+    }
+  }
+
+  return matches * 6;
+}
+
+function scoreSoonness(startTime: string): number {
+  const startDate = new Date(startTime);
+
+  if (Number.isNaN(startDate.getTime())) {
+    return 0;
+  }
+
+  const diffDays = (startDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+
+  if (diffDays <= 2) {
+    return 2;
+  }
+
+  if (diffDays <= 7) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function scoreRatingMatch(avgRating?: number | null): number {
+  if (typeof avgRating !== 'number' || !Number.isFinite(avgRating)) {
+    return 0;
+  }
+
+  return Math.min(avgRating, 5) * 0.75;
+}
+
+function scoreDiscoverEvent(
+  event: DiscoverEvent,
+  selectedLocation: StoredLocationLike,
+  preferences: RecommendationPreferencesSnapshot,
+  preferredTagSet: Set<number>,
+): number {
+  const candidateLocation = getCandidateLocation(event);
+  const candidateTagIds = extractCandidateTagIds(event.EventTag);
+
+  return (
+    scoreTagMatch(candidateTagIds, preferredTagSet) +
+    (preferences.cityIds.includes(candidateLocation.cityId || -1) ? 4 : 0) +
+    scoreLocationMatch(selectedLocation, candidateLocation) +
+    scoreRadiusMatch(selectedLocation, candidateLocation, preferences.radiusKm) +
+    scoreBudgetMatch(getEventBasePrice(event), preferences.budget) +
+    scoreSoonness(event.startTime)
+  );
+}
+
+function scoreDiscoverPlace(
+  place: DiscoverPlace,
+  selectedLocation: StoredLocationLike,
+  preferences: RecommendationPreferencesSnapshot,
+  preferredTagSet: Set<number>,
+): number {
+  const candidateLocation = getCandidateLocation(place);
+  const candidateTagIds = extractCandidateTagIds(place.PlaceTag);
+
+  return (
+    scoreTagMatch(candidateTagIds, preferredTagSet) +
+    (preferences.cityIds.includes(candidateLocation.cityId || -1) ? 4 : 0) +
+    scoreLocationMatch(selectedLocation, candidateLocation) +
+    scoreRadiusMatch(selectedLocation, candidateLocation, preferences.radiusKm) +
+    scoreRatingMatch(place.avgRating)
+  );
+}
 
 type DiscoverItem =
   | {
@@ -349,7 +668,7 @@ function DiscoverInspirationMasonry({
             <EventInspirationCard
               event={item.event}
               imageHeight={imageHeights[index % imageHeights.length]}
-              cityLabel={item.event.Place?.City?.name || ''}
+              cityLabel={item.event.City?.name || item.event.Place?.City?.name || ''}
               placeLabel={item.event.Place?.name || item.event.address || ''}
               dateLabel={formatEventDate(item.event.startTime, locale, {
                 includeWeekday: true,
@@ -409,7 +728,13 @@ export default function DiscoverScreen() {
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
   const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
-  const { filterByLocation, locationValueLabel } = useLocationScope({
+  const [recommendationPreferences, setRecommendationPreferences] = useState<RecommendationPreferencesSnapshot>({
+    tagIds: [],
+    cityIds: [],
+    budget: 'medium',
+    radiusKm: 5,
+  });
+  const { filterByLocation, locationValueLabel, selectedLocation } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
     allCitiesLabel: t('homeLocationAllCities'),
@@ -427,7 +752,7 @@ export default function DiscoverScreen() {
       }
 
       const results = await Promise.allSettled([
-        api.get<DiscoverEvent[]>('/events'),
+        api.get<DiscoverEvent[]>('/events?upcoming=true'),
         api.get<DiscoverPlace[]>('/places'),
       ]);
 
@@ -450,6 +775,28 @@ export default function DiscoverScreen() {
       setCache('discover', { events: nextEvents, places: nextPlaces });
       setLoading(false);
       setRefreshing(false);
+
+      try {
+        const storedSession = await resolveStoredUserSession();
+        const onboardingPreferences = await getRecommendationOnboardingPreferences(
+          storedSession?.id || null,
+        );
+
+        setRecommendationPreferences({
+          tagIds: storedSession?.tagInterestIds || [],
+          cityIds: storedSession?.cityInterestIds || [],
+          budget: onboardingPreferences.budget,
+          radiusKm: onboardingPreferences.radiusKm,
+        });
+      } catch (error) {
+        console.error('Erreur chargement preferences recommandations discover:', error);
+        setRecommendationPreferences({
+          tagIds: [],
+          cityIds: [],
+          budget: 'medium',
+          radiusKm: 5,
+        });
+      }
     },
     [t],
   );
@@ -565,8 +912,8 @@ export default function DiscoverScreen() {
 
   const locationFilteredEvents = useMemo(() => {
     return filterByLocation(events, (event) => ({
-      city: event.Place?.City?.name,
-      country: event.Place?.City?.country,
+      city: event.City?.name || event.Place?.City?.name,
+      country: event.City?.country || event.Place?.City?.country,
       address: event.address,
     }));
   }, [events, filterByLocation]);
@@ -580,26 +927,57 @@ export default function DiscoverScreen() {
   }, [filterByLocation, places]);
 
   const discoverItems = useMemo<DiscoverItem[]>(() => {
-    const topEvents = locationFilteredEvents.slice(0, 6).map((event) => ({
-      id: `event-${event.id}`,
-      type: 'event' as const,
-      event,
-      title: event.title,
-      subtitle: event.Place?.name || event.address || '',
-      meta: formatEventDate(event.startTime, locale),
-      image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
-      badge:
-        Number(event.entryFee || 0) > 0
-          ? t('discoverEventBadge')
-          : t('discoverEventBadgeFree'),
-      actionColor: '#ff4757',
-      targetId: event.id,
-    }));
+    const preferredTagSet = new Set(recommendationPreferences.tagIds);
+
+    const topEvents = [...locationFilteredEvents]
+      .map((event) => ({
+        event,
+        score: scoreDiscoverEvent(
+          event,
+          selectedLocation,
+          recommendationPreferences,
+          preferredTagSet,
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          new Date(left.event.startTime).getTime() - new Date(right.event.startTime).getTime(),
+      )
+      .slice(0, 6)
+      .map(({ event }) => ({
+        id: `event-${event.id}`,
+        type: 'event' as const,
+        event,
+        title: event.title,
+        subtitle: event.Place?.name || event.City?.name || event.address || '',
+        meta: formatEventDate(event.startTime, locale),
+        image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER,
+        badge:
+          Number(event.entryFee || 0) > 0
+            ? t('discoverEventBadge')
+            : t('discoverEventBadgeFree'),
+        actionColor: '#ff4757',
+        targetId: event.id,
+      }));
 
     const topPlaces = [...locationFilteredPlaces]
-      .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0))
-      .slice(0, 6)
       .map((place) => ({
+        place,
+        score: scoreDiscoverPlace(
+          place,
+          selectedLocation,
+          recommendationPreferences,
+          preferredTagSet,
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          (right.place.avgRating || 0) - (left.place.avgRating || 0),
+      )
+      .slice(0, 6)
+      .map(({ place }) => ({
         id: `place-${place.id}`,
         type: 'place' as const,
         place,
@@ -616,7 +994,14 @@ export default function DiscoverScreen() {
       }));
 
     return [...topEvents, ...topPlaces];
-  }, [locationFilteredEvents, locale, locationFilteredPlaces, t]);
+  }, [
+    locale,
+    locationFilteredEvents,
+    locationFilteredPlaces,
+    recommendationPreferences,
+    selectedLocation,
+    t,
+  ]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();

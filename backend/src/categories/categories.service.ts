@@ -298,6 +298,19 @@ export class CategoriesService {
                 select: {
                   id: true,
                   name: true,
+                  country: true,
+                  latitude: true,
+                  longitude: true,
+                },
+              },
+            },
+          },
+          EventTag: {
+            include: {
+              Tag: {
+                select: {
+                  id: true,
+                  name: true,
                 },
               },
             },
@@ -316,7 +329,25 @@ export class CategoriesService {
           },
         },
         include: {
-          City: true,
+          City: {
+            select: {
+              id: true,
+              name: true,
+              country: true,
+              latitude: true,
+              longitude: true,
+            },
+          },
+          PlaceTag: {
+            include: {
+              Tag: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
         orderBy: [{ avgRating: 'desc' }, { name: 'asc' }],
       }),

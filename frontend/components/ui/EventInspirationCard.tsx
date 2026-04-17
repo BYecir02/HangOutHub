@@ -78,7 +78,7 @@ export default function EventInspirationCard({
           adaptiveHeight={adaptiveHeight}
           minHeight={imageHeight}
           maxHeight={380}
-          style={{ height: imageHeight }}
+          style={adaptiveHeight ? undefined : { height: imageHeight }}
         />
 
         <View

@@ -87,6 +87,15 @@ export class EventsService {
         coverUrl: true,
         images: true,
         address: true,
+        City: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
         organizerId: true,
         placeId: true,
         Place: {
@@ -172,6 +181,7 @@ export class EventsService {
       coverUrl: event.coverUrl,
       images: event.images,
       address: event.address,
+      City: event.City,
       organizerId: event.organizerId,
       placeId: event.placeId,
       place: event.Place,
@@ -1191,6 +1201,25 @@ export class EventsService {
         ? Math.min(...ticketTypes.map((ticketType) => ticketType.price))
         : fallbackEntryFee;
 
+    const nextCityId = createEventDto.placeId ? null : createEventDto.cityId ?? null;
+
+    if (!createEventDto.placeId && !nextCityId) {
+      throw new BadRequestException(
+        'Choisis une ville si l evenement n est pas rattache a un lieu.',
+      );
+    }
+
+    if (nextCityId !== null) {
+      const city = await this.prisma.city.findUnique({
+        where: { id: nextCityId },
+        select: { id: true },
+      });
+
+      if (!city) {
+        throw new BadRequestException('Ville introuvable pour cet evenement.');
+      }
+    }
+
     if (tagIds.length > 0) {
       const existingTags = await this.prisma.tag.count({
         where: {
@@ -1220,6 +1249,7 @@ export class EventsService {
           description: createEventDto.description,
           cancellationPolicy: createEventDto.cancellationPolicy,
           refundPolicy: createEventDto.refundPolicy,
+          address: createEventDto.address,
           startTime: new Date(createEventDto.startTime),
           endTime: createEventDto.endTime
             ? new Date(createEventDto.endTime)
@@ -1232,6 +1262,7 @@ export class EventsService {
           images: galleryUrls,
           organizerId: userId,
           placeId: createEventDto.placeId || null,
+          cityId: nextCityId,
           ...(ticketTypes.length > 0
             ? {
                 TicketType: {
@@ -1269,15 +1300,55 @@ export class EventsService {
     });
   }
 
-  findAll() {
+  findAll(options: { upcomingOnly?: boolean } = {}) {
+    const now = new Date();
+    const where = options.upcomingOnly
+      ? {
+          OR: [
+            {
+              endTime: null,
+              startTime: {
+                gte: now,
+              },
+            },
+            {
+              endTime: {
+                gte: now,
+              },
+            },
+          ],
+        }
+      : undefined;
+
     return this.prisma.event.findMany({
+      where,
       include: {
         User: { select: { username: true, avatarUrl: true } },
+        City: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
         TicketType: {
           select: {
             id: true,
             price: true,
             quantity: true,
+          },
+        },
+        EventTag: {
+          include: {
+            Tag: {
+              select: {
+                id: true,
+                name: true,
+                categoryId: true,
+              },
+            },
           },
         },
         Place: {
@@ -1345,6 +1416,15 @@ export class EventsService {
             id: true,
             name: true,
             address: true,
+          },
+        },
+        City: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            latitude: true,
+            longitude: true,
           },
         },
       },
@@ -1729,6 +1809,7 @@ export class EventsService {
         id: true,
         organizerId: true,
         placeId: true,
+        cityId: true,
         startTime: true,
         endTime: true,
         checkInOpensAtOffsetMin: true,
@@ -1750,6 +1831,15 @@ export class EventsService {
         },
         coverUrl: true,
         images: true,
+        City: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
         TicketType: {
           select: {
             name: true,
@@ -1814,6 +1904,24 @@ export class EventsService {
 
       if (normalizedRole === 'PLACE_OWNER' && place.ownerId !== userId) {
         throw new ForbiddenException('Vous ne pouvez pas lier ce lieu.');
+      }
+    }
+
+    const nextCityId =
+      payload.placeId !== undefined
+        ? null
+        : payload.cityId !== undefined
+          ? payload.cityId
+          : event.cityId ?? null;
+
+    if (payload.cityId !== undefined && nextCityId !== null) {
+      const city = await this.prisma.city.findUnique({
+        where: { id: nextCityId },
+        select: { id: true },
+      });
+
+      if (!city) {
+        throw new BadRequestException('Ville introuvable pour cet evenement.');
       }
     }
 
@@ -1981,6 +2089,7 @@ export class EventsService {
           ...(payload.refundPolicy !== undefined
             ? { refundPolicy: payload.refundPolicy }
             : {}),
+          ...(payload.address !== undefined ? { address: payload.address } : {}),
           ...(payload.startTime !== undefined
             ? { startTime: new Date(payload.startTime) }
             : {}),
@@ -2001,6 +2110,9 @@ export class EventsService {
             : {}),
           ...(payload.placeId !== undefined
             ? { placeId: payload.placeId }
+            : {}),
+          ...(payload.cityId !== undefined || payload.placeId !== undefined
+            ? { cityId: nextCityId }
             : {}),
           ...(nextCoverUrl !== undefined ? { coverUrl: nextCoverUrl } : {}),
           ...(nextImages !== undefined ? { images: nextImages } : {}),
@@ -2716,6 +2828,15 @@ export class EventsService {
             username: true,
             displayName: true,
             avatarUrl: true,
+          },
+        },
+        City: {
+          select: {
+            id: true,
+            name: true,
+            country: true,
+            latitude: true,
+            longitude: true,
           },
         },
         Place: {

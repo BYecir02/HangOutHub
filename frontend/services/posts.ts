@@ -66,6 +66,11 @@ export async function getPlacePosts(placeId: string) {
   return response.data;
 }
 
+export async function getEventPosts(eventId: string) {
+  const response = await api.get<PostDetails[]>(`/posts/event/${eventId}`);
+  return response.data;
+}
+
 export async function trackPostShare(id: string) {
   const response = await api.post<{ shareCount?: number }>(`/posts/${id}/share`);
   return response.data;

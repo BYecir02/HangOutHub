@@ -29,6 +29,10 @@ export class CreateEventDto {
   @IsString()
   refundPolicy?: string;
 
+  @IsOptional()
+  @IsString()
+  address?: string;
+
   @IsNotEmpty()
   @IsDateString()
   startTime: string; // Le frontend envoie une ISO string (ex: "2024-05-20T20:00:00Z")
@@ -46,6 +50,12 @@ export class CreateEventDto {
   @IsOptional()
   @IsUUID()
   placeId?: string; // Si l'événement se passe dans un lieu référencé (Bar, etc.)
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  cityId?: number;
 
   @IsOptional()
   @IsString()

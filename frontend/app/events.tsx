@@ -49,6 +49,11 @@ interface EventItem {
     } | null;
   } | null;
   address?: string | null;
+  City?: {
+    id?: number | null;
+    name?: string | null;
+    country?: string | null;
+  } | null;
 }
 
 type EventFilter = 'all' | 'upcoming' | 'free' | 'week';
@@ -258,7 +263,7 @@ function EventInspirationMasonry({
           <EventInspirationCard
             event={event}
             imageHeight={imageHeights[index % imageHeights.length]}
-            cityLabel={event.Place?.City?.name || fallbackCityLabel}
+            cityLabel={event.City?.name || event.Place?.City?.name || fallbackCityLabel}
             placeLabel={event.Place?.name || event.address || fallbackPlaceLabel}
             dateLabel={formatEventDate(event.startTime, locale, {
               includeWeekday: true,
@@ -354,8 +359,8 @@ export default function EventsScreen() {
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const locationFilteredEvents = filterByLocation(events, (event) => ({
-      city: event.Place?.City?.name,
-      country: event.Place?.City?.country,
+      city: event.City?.name || event.Place?.City?.name,
+      country: event.City?.country || event.Place?.City?.country,
       address: event.address,
     }));
 
@@ -421,10 +426,10 @@ export default function EventsScreen() {
                 })}
               </Text>
             </View>
-            {item.Place?.City?.name ? (
+            {item.City?.name || item.Place?.City?.name ? (
               <View className="rounded-full bg-gray-100 px-3 py-2 dark:bg-gray-800">
                 <Text className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                  {item.Place.City.name}
+                  {item.City?.name || item.Place?.City?.name}
                 </Text>
               </View>
             ) : null}
@@ -439,7 +444,7 @@ export default function EventsScreen() {
           {
             icon: 'location-outline',
             iconColor: '#4c669f',
-            text: item.Place?.name || item.address || t('homeLocationToConfirm'),
+            text: item.Place?.name || item.City?.name || item.address || t('homeLocationToConfirm'),
           },
         ]}
       />

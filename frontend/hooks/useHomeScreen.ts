@@ -3,17 +3,20 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import api, { clearAuthState, storage } from '@/services/api';
-import { getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
+import { getCache, getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { getFriendshipOverview } from '@/services/friendships';
-import {
-  setStoredLocation,
-  type StoredLocation,
-} from '@/services/location-preferences';
+import { getRecommendationOnboardingPreferences } from '@/services/recommendation-onboarding';
+import { setStoredLocation, type StoredLocation } from '@/services/location-preferences';
+import { resolveStoredUserSession } from '@/services/user-session';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
 import type { Category } from '@/types';
 import type { OutingInvitation } from '@/types/social';
+import type {
+  OnboardingBudgetPreference,
+  OnboardingRadiusPreference,
+} from '@/services/recommendation-onboarding';
 
 import type {
   HomeEvent,
@@ -32,15 +35,327 @@ function isUnauthorizedError(error: unknown) {
   return response?.status === 401;
 }
 
+type RecommendationPreferencesSnapshot = {
+  tagIds: number[];
+  cityIds: number[];
+  budget: OnboardingBudgetPreference;
+  radiusKm: OnboardingRadiusPreference;
+};
+
+type CandidateTagRelation = {
+  tagId?: number | null;
+  Tag?: {
+    id?: number | null;
+  } | null;
+} | null;
+
+type CandidateLocation = {
+  cityId?: number | null;
+  city?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+function normalizeText(value?: string | null): string {
+  return value?.trim().toLowerCase() || '';
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function extractCandidateTagIds(relations?: CandidateTagRelation[] | null): number[] {
+  if (!Array.isArray(relations)) {
+    return [];
+  }
+
+  return relations
+    .map((relation) => relation?.tagId ?? relation?.Tag?.id ?? null)
+    .filter((value): value is number => typeof value === 'number');
+}
+
+function getCandidateLocation(candidate: {
+  Place?: {
+    City?: {
+      id?: number | null;
+      name?: string | null;
+      country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+    } | null;
+  } | null;
+  City?: {
+    id?: number | null;
+    name?: string | null;
+    country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
+}): CandidateLocation {
+  const sourceLocation = candidate.Place?.City || candidate.City || null;
+
+  return {
+    cityId: sourceLocation?.id ?? null,
+    city: sourceLocation?.name ?? null,
+    country: sourceLocation?.country ?? null,
+    latitude: sourceLocation?.latitude ?? null,
+    longitude: sourceLocation?.longitude ?? null,
+  };
+}
+
+function haversineDistanceKm(
+  startLatitude: number,
+  startLongitude: number,
+  endLatitude: number,
+  endLongitude: number,
+): number {
+  const earthRadiusKm = 6371;
+  const latitudeDelta = ((endLatitude - startLatitude) * Math.PI) / 180;
+  const longitudeDelta = ((endLongitude - startLongitude) * Math.PI) / 180;
+  const startLatitudeRadians = (startLatitude * Math.PI) / 180;
+  const endLatitudeRadians = (endLatitude * Math.PI) / 180;
+
+  const a =
+    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+    Math.sin(longitudeDelta / 2) *
+      Math.sin(longitudeDelta / 2) *
+      Math.cos(startLatitudeRadians) *
+      Math.cos(endLatitudeRadians);
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function scoreLocationMatch(
+  selectedLocation: StoredLocation | null,
+  candidate: CandidateLocation,
+): number {
+  if (!selectedLocation) {
+    return 0;
+  }
+
+  let score = 0;
+  const selectedCityId = selectedLocation.cityId;
+  const candidateCityId = candidate.cityId;
+
+  if (
+    typeof selectedCityId === 'number' &&
+    typeof candidateCityId === 'number' &&
+    selectedCityId === candidateCityId
+  ) {
+    score += 5;
+  } else if (
+    normalizeText(selectedLocation.cityName) &&
+    normalizeText(candidate.city) &&
+    normalizeText(selectedLocation.cityName) === normalizeText(candidate.city)
+  ) {
+    score += 3.5;
+  }
+
+  if (
+    normalizeText(selectedLocation.country) &&
+    normalizeText(candidate.country) &&
+    normalizeText(selectedLocation.country) === normalizeText(candidate.country)
+  ) {
+    score += 1.5;
+  }
+
+  return score;
+}
+
+function scoreRadiusMatch(
+  selectedLocation: StoredLocation | null,
+  candidate: CandidateLocation,
+  radiusKm: OnboardingRadiusPreference,
+): number {
+  if (radiusKm === 'unlimited') {
+    return 0;
+  }
+
+  const selectedLatitude = toFiniteNumber(selectedLocation?.latitude);
+  const selectedLongitude = toFiniteNumber(selectedLocation?.longitude);
+  const candidateLatitude = toFiniteNumber(candidate.latitude);
+  const candidateLongitude = toFiniteNumber(candidate.longitude);
+
+  if (
+    selectedLatitude === null ||
+    selectedLongitude === null ||
+    candidateLatitude === null ||
+    candidateLongitude === null
+  ) {
+    return 0;
+  }
+
+  const distanceKm = haversineDistanceKm(
+    selectedLatitude,
+    selectedLongitude,
+    candidateLatitude,
+    candidateLongitude,
+  );
+
+  if (distanceKm <= radiusKm) {
+    return 3;
+  }
+
+  if (distanceKm <= radiusKm * 2) {
+    return 1;
+  }
+
+  return -1;
+}
+
+function getEventBasePrice(event: HomeEvent): number | null {
+  const ticketPrices = (event.TicketType || [])
+    .map((ticketType) => toFiniteNumber(ticketType.price))
+    .filter((value): value is number => value !== null);
+
+  if (ticketPrices.length > 0) {
+    return Math.min(...ticketPrices);
+  }
+
+  return toFiniteNumber(event.entryFee);
+}
+
+function scoreBudgetMatch(
+  price: number | null,
+  budget: OnboardingBudgetPreference,
+): number {
+  if (price === null) {
+    return 0;
+  }
+
+  const priceBand =
+    price <= 15 ? 'low' : price <= 45 ? 'medium' : 'high';
+
+  if (priceBand === budget) {
+    return 3;
+  }
+
+  if (budget === 'medium' && priceBand !== 'high') {
+    return 1.5;
+  }
+
+  if (budget === 'low' && priceBand === 'medium') {
+    return 1;
+  }
+
+  if (budget === 'high' && priceBand === 'medium') {
+    return 1;
+  }
+
+  return 0.5;
+}
+
+function scoreTagMatch(
+  candidateTagIds: number[],
+  preferredTagIds: Set<number>,
+): number {
+  if (preferredTagIds.size === 0 || candidateTagIds.length === 0) {
+    return 0;
+  }
+
+  let matches = 0;
+
+  for (const tagId of candidateTagIds) {
+    if (preferredTagIds.has(tagId)) {
+      matches += 1;
+    }
+  }
+
+  return matches * 6;
+}
+
+function scoreSoonness(startTime: string): number {
+  const startDate = new Date(startTime);
+
+  if (Number.isNaN(startDate.getTime())) {
+    return 0;
+  }
+
+  const diffDays = (startDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+
+  if (diffDays <= 2) {
+    return 2;
+  }
+
+  if (diffDays <= 7) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function scoreRatingMatch(avgRating?: number | null): number {
+  if (typeof avgRating !== 'number' || !Number.isFinite(avgRating)) {
+    return 0;
+  }
+
+  return Math.min(avgRating, 5) * 0.75;
+}
+
+function scoreEventRecommendation(
+  event: HomeEvent,
+  selectedLocation: StoredLocation | null,
+  preferences: RecommendationPreferencesSnapshot,
+  preferredTagSet: Set<number>,
+): number {
+  const candidateLocation = getCandidateLocation(event);
+  const candidateTagIds = extractCandidateTagIds(event.EventTag);
+
+  return (
+    scoreTagMatch(candidateTagIds, preferredTagSet) +
+    (preferences.cityIds.includes(candidateLocation.cityId || -1) ? 4 : 0) +
+    scoreLocationMatch(selectedLocation, candidateLocation) +
+    scoreRadiusMatch(selectedLocation, candidateLocation, preferences.radiusKm) +
+    scoreBudgetMatch(getEventBasePrice(event), preferences.budget) +
+    scoreSoonness(event.startTime)
+  );
+}
+
+function scorePlaceRecommendation(
+  place: HomePlace,
+  selectedLocation: StoredLocation | null,
+  preferences: RecommendationPreferencesSnapshot,
+  preferredTagSet: Set<number>,
+): number {
+  const candidateLocation = getCandidateLocation(place);
+  const candidateTagIds = extractCandidateTagIds(place.PlaceTag);
+
+  return (
+    scoreTagMatch(candidateTagIds, preferredTagSet) +
+    (preferences.cityIds.includes(candidateLocation.cityId || -1) ? 4 : 0) +
+    scoreLocationMatch(selectedLocation, candidateLocation) +
+    scoreRadiusMatch(selectedLocation, candidateLocation, preferences.radiusKm) +
+    scoreRatingMatch(place.avgRating)
+  );
+}
+
 export function useHomeScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [events, setEvents] = useState<HomeEvent[]>([]);
+  const cachedHomeEvents = getCache<HomeEvent[]>('homeEvents');
+  const [events, setEvents] = useState<HomeEvent[]>(cachedHomeEvents ?? []);
   const [places, setPlaces] = useState<HomePlace[]>([]);
   const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
   const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
   const [notificationCount, setNotificationCount] = useState(0);
+  const [recommendationPreferences, setRecommendationPreferences] =
+    useState<RecommendationPreferencesSnapshot>({
+      tagIds: [],
+      cityIds: [],
+      budget: 'medium',
+      radiusKm: 5,
+    });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const {
@@ -102,7 +417,7 @@ export function useHomeScreen() {
   const loadHomeData = useCallback(async () => {
     const results = await Promise.allSettled([
       api.get<Category[]>('/categories'),
-      api.get<HomeEvent[]>('/events'),
+      api.get<HomeEvent[]>('/events?upcoming=true'),
       api.get<HomePlace[]>('/places'),
     ]);
 
@@ -130,12 +445,12 @@ export function useHomeScreen() {
 
     if (eventsResult.status === 'fulfilled') {
       setEvents(eventsResult.value.data);
-      setCache('events', eventsResult.value.data);
+      setCache('homeEvents', eventsResult.value.data);
     } else {
       if (!isUnauthorizedError(eventsResult.reason)) {
         console.error('Erreur chargement evenements:', eventsResult.reason);
       }
-      setEvents([]);
+      setEvents(cachedHomeEvents ?? []);
     }
 
     if (placesResult.status === 'fulfilled') {
@@ -148,14 +463,34 @@ export function useHomeScreen() {
       setPlaces([]);
     }
 
-    if (eventsResult.status === 'fulfilled' && placesResult.status === 'fulfilled') {
-      setCache('discover', {
-        events: eventsResult.value.data,
-        places: placesResult.value.data,
+    try {
+      const storedSession = await resolveStoredUserSession();
+      const onboardingPreferences = await getRecommendationOnboardingPreferences(
+        storedSession?.id || null,
+      );
+
+      setRecommendationPreferences({
+        tagIds: storedSession?.tagInterestIds || [],
+        cityIds: storedSession?.cityInterestIds || [],
+        budget: onboardingPreferences.budget,
+        radiusKm: onboardingPreferences.radiusKm,
+      });
+    } catch (error) {
+      console.error('Erreur chargement preferences recommandations:', error);
+      setRecommendationPreferences({
+        tagIds: [],
+        cityIds: [],
+        budget: 'medium',
+        radiusKm: 5,
       });
     }
 
-    await loadNotificationCount();
+    try {
+      await loadNotificationCount();
+    } catch (error) {
+      console.error('Erreur chargement notifications home:', error);
+      setNotificationCount(0);
+    }
   }, [loadNotificationCount, router]);
 
   const loadSavedPlaces = useCallback(async () => {
@@ -284,8 +619,8 @@ export function useHomeScreen() {
 
   const locationFilteredEvents = useMemo(() => {
     return filterByLocation(events, (event) => ({
-      city: event.Place?.City?.name,
-      country: event.Place?.City?.country,
+      city: event.City?.name || event.Place?.City?.name,
+      country: event.City?.country || event.Place?.City?.country,
       address: event.address,
     }));
   }, [events, filterByLocation]);
@@ -306,7 +641,7 @@ export function useHomeScreen() {
     () =>
       featuredEvents.map((event) => ({
         event,
-        cityLabel: event.Place?.City?.name || '',
+        cityLabel: event.City?.name || event.Place?.City?.name || '',
         placeLabel: event.Place?.name || event.address || t('homeLocationToConfirm'),
         dateLabel: formatEventDate(event.startTime, locale),
         priceLabel: formatEventCardPriceLabel(event, locale, {
@@ -318,13 +653,29 @@ export function useHomeScreen() {
   );
 
   const recommendedInspiration = useMemo<HomeRecommendationItem[]>(() => {
-    const eventSuggestions: HomeRecommendationItem[] = featuredEvents
-      .slice(0, 3)
+    const preferredTagSet = new Set(recommendationPreferences.tagIds);
+
+    const rankedEventSuggestions: HomeRecommendationItem[] = [...locationFilteredEvents]
       .map((event) => ({
+        event,
+        score: scoreEventRecommendation(
+          event,
+          selectedLocation,
+          recommendationPreferences,
+          preferredTagSet,
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          new Date(left.event.startTime).getTime() - new Date(right.event.startTime).getTime(),
+      )
+      .slice(0, 3)
+      .map(({ event }) => ({
         id: `event-${event.id}`,
         type: 'event' as const,
         event,
-        cityLabel: event.Place?.City?.name || '',
+        cityLabel: event.City?.name || event.Place?.City?.name || '',
         placeLabel: event.Place?.name || event.address || t('homeLocationToConfirm'),
         dateLabel: formatEventDate(event.startTime, locale),
         priceLabel: formatEventCardPriceLabel(event, locale, {
@@ -334,10 +685,23 @@ export function useHomeScreen() {
         accentColor: '#ff4757',
       }));
 
-    const placeSuggestions: HomeRecommendationItem[] = [...locationFilteredPlaces]
-      .sort((left, right) => (right.avgRating || 0) - (left.avgRating || 0))
-      .slice(0, 3)
+    const rankedPlaceSuggestions: HomeRecommendationItem[] = [...locationFilteredPlaces]
       .map((place) => ({
+        place,
+        score: scorePlaceRecommendation(
+          place,
+          selectedLocation,
+          recommendationPreferences,
+          preferredTagSet,
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          right.score - left.score ||
+          (right.place.avgRating || 0) - (left.place.avgRating || 0),
+      )
+      .slice(0, 3)
+      .map(({ place }) => ({
         id: `place-${place.id}`,
         type: 'place' as const,
         place,
@@ -346,20 +710,30 @@ export function useHomeScreen() {
       }));
 
     const nextItems: HomeRecommendationItem[] = [];
-    const maxLength = Math.max(eventSuggestions.length, placeSuggestions.length);
+    const maxLength = Math.max(
+      rankedEventSuggestions.length,
+      rankedPlaceSuggestions.length,
+    );
 
     for (let index = 0; index < maxLength; index += 1) {
-      if (eventSuggestions[index]) {
-        nextItems.push(eventSuggestions[index]);
+      if (rankedEventSuggestions[index]) {
+        nextItems.push(rankedEventSuggestions[index]);
       }
 
-      if (placeSuggestions[index]) {
-        nextItems.push(placeSuggestions[index]);
+      if (rankedPlaceSuggestions[index]) {
+        nextItems.push(rankedPlaceSuggestions[index]);
       }
     }
 
     return nextItems.slice(0, 6);
-  }, [featuredEvents, locale, locationFilteredPlaces, t]);
+  }, [
+    locale,
+    locationFilteredEvents,
+    locationFilteredPlaces,
+    recommendationPreferences,
+    selectedLocation,
+    t,
+  ]);
 
   const handleCategoryPress = useCallback(
     (categoryId: number) => {

@@ -1,3 +1,14 @@
+type HomeTag = {
+  id: number;
+  name: string;
+  categoryId?: number | null;
+};
+
+type HomeTagRelation = {
+  tagId?: number | null;
+  Tag?: HomeTag | null;
+};
+
 export interface HomeEvent {
   id: string;
   title: string;
@@ -15,9 +26,19 @@ export interface HomeEvent {
       id?: number;
       name?: string | null;
       country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
     } | null;
   } | null;
+  City?: {
+    id?: number;
+    name?: string | null;
+    country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
   address?: string | null;
+  EventTag?: HomeTagRelation[];
 }
 
 export interface HomePlace {
@@ -29,8 +50,11 @@ export interface HomePlace {
     id?: number;
     name?: string | null;
     country?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   } | null;
   address?: string | null;
+  PlaceTag?: HomeTagRelation[];
 }
 
 export interface NotificationCountResponse {

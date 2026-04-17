@@ -1,5 +1,7 @@
 type CacheKey =
   | 'events'
+  | 'homeEvents'
+  | 'exploreEvents'
   | 'places'
   | 'discover'
   | 'explore'

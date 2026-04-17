@@ -29,6 +29,10 @@ export class UpdateEventDto {
   refundPolicy?: string;
 
   @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
   @IsDateString()
   startTime?: string;
 
@@ -45,6 +49,12 @@ export class UpdateEventDto {
   @IsOptional()
   @IsUUID()
   placeId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  cityId?: number;
 
   @IsOptional()
   @IsString()

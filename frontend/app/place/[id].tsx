@@ -122,7 +122,7 @@ export default function PlaceDetailScreen() {
   }
 
   return (
-    <View className="relative flex-1 bg-gray-50 dark:bg-black">
+    <View className="relative flex-1 bg-gray-50 dark:bg-black mt-2">
       <ScrollView
         className="flex-1 bg-gray-50 dark:bg-black"
         showsVerticalScrollIndicator={false}
