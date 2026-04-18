@@ -1,10 +1,8 @@
 import React from 'react';
-import { TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import Badge from '@/components/ui/primitives/Badge';
-import Button from '@/components/ui/primitives/Button';
 import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
 import MediaFrame from '@/components/ui/MediaFrame';
 
@@ -94,30 +92,22 @@ export default function PlaceDetailHero({
             ) : null}
           </View>
 
-          <Button
-            label={publicationsCtaLabel}
+          <TouchableOpacity
             onPress={onOpenPublications}
-            variant="filled"
-            tone="brand"
-            size="sm"
-            leftIcon={<Ionicons name="apps-outline" size={13} color="#ffffff" />}
-            rightIcon={
-              publicationsLoaded && publicationsCount > 0 ? (
-                <Badge
-                  label={String(publicationsCount)}
-                  tone="neutral"
-                  variant="solid"
-                  size="sm"
-                  className="self-center"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
-                  textStyle={{ color: '#fff' }}
-                />
-              ) : null
-            }
-            className="px-4 shadow-lg"
+            className="relative rounded-full bg-black/45 p-3 shadow-lg"
             style={{ transform: [{ translateY: 8 }] }}
-            contentClassName="gap-2"
-          />
+            accessibilityRole="button"
+            accessibilityLabel={publicationsCtaLabel}
+          >
+            <Ionicons name="apps-outline" size={22} color="#fff" />
+            {publicationsLoaded && publicationsCount > 0 ? (
+              <View className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 py-0.5">
+                <Text className="text-center text-[10px] font-bold text-white">
+                  {publicationsCount > 99 ? '99+' : String(publicationsCount)}
+                </Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
         </View>
       </View>
     </View>
