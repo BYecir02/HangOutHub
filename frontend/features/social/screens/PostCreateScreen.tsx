@@ -20,21 +20,21 @@ import PostItem, { type PostItemData } from '@/components/social/PostItem';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import MediaFrame from '@/components/ui/MediaFrame';
 import ScreenHeader from '@/components/ui/ScreenHeader';
-import api, { getImageUrl } from '../services/api';
+import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '@/services/api';
 import {
   buildMediaUploadPayload,
   inferMediaKind,
   isMediaFileTooLarge,
   isSupportedMediaAsset,
 } from '@/services/media-upload';
-import { emitPostChanged } from '../services/post-events';
+import { emitPostChanged } from '@/services/post-events';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import type { TranslationKey } from '@/services/i18n';
 import { getFriendshipOverview } from '@/services/friendships';
 import { formatEventDate } from '@/services/formatters';
 import type { FriendshipItem } from '@/types/social';
 import { getMySettings } from '@/services/settings';
-import { clearAuthState } from '../services/api';
 
 type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 type PostType = 'post' | 'plan';
@@ -43,19 +43,46 @@ type PublicationScope = 'personal' | 'structure';
 const MAX_IMAGES = 5;
 const MAX_CHARS = 500;
 
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
-
 type PostMediaItem = {
   uri: string;
   assetType?: ImagePicker.ImagePickerAsset['type'];
+  mimeType?: string | null;
+  fileName?: string | null;
+  duration?: number | null;
+  fileSize?: number | null;
+};
+
+type CategoryOption = {
+  id: number | string;
+  name: string;
+  color?: string | null;
+};
+
+type PlaceOption = {
+  id: string;
+  name: string;
+  address?: string | null;
+  City?: { name?: string | null } | null;
+};
+
+type EventOption = {
+  id: string;
+  title: string;
+  startTime: string;
+  address?: string | null;
+  placeId?: string | null;
+  Place?: {
+    id?: string;
+    name?: string | null;
+    City?: { name?: string | null } | null;
+  } | null;
 };
 
 type VisibilityOption = {
   id: PostVisibility;
-  labelKey: string;
+  labelKey: TranslationKey;
   icon: keyof typeof Ionicons.glyphMap;
-  descriptionKey: string;
+  descriptionKey: TranslationKey;
 };
 
 const VISIBILITY_OPTIONS: VisibilityOption[] = [
@@ -219,7 +246,7 @@ export default function CreatePostScreen() {
           setVisibility(settings.defaultPostVisibility);
         }
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -250,7 +277,7 @@ export default function CreatePostScreen() {
           setAudienceConnections(data.connections || []);
         }
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -284,7 +311,7 @@ export default function CreatePostScreen() {
           setCategories(response.data || []);
         }
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -318,21 +345,19 @@ export default function CreatePostScreen() {
       setSelectedEventId(eventId);
     }
 
-    let isMounted = true;
+    const controller = new AbortController();
 
     const loadPlaces = async () => {
       setPlacesLoading(true);
       try {
-        const response = await api.get<PlaceOption[]>('/places');
-        if (isMounted) {
-          setPlaces(response.data || []);
-        }
+        const response = await api.get<PlaceOption[]>('/places', { signal: controller.signal });
+        setPlaces(response.data || []);
       } catch {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setPlaces([]);
         }
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setPlacesLoading(false);
         }
       }
@@ -341,16 +366,14 @@ export default function CreatePostScreen() {
     const loadEvents = async () => {
       setEventsLoading(true);
       try {
-        const response = await api.get<EventOption[]>('/events');
-        if (isMounted) {
-          setEvents(response.data || []);
-        }
+        const response = await api.get<{ items: EventOption[]; nextCursor: string | null; hasMore: boolean }>('/events?limit=50', { signal: controller.signal });
+        setEvents(response.data.items || []);
       } catch {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setEvents([]);
         }
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setEventsLoading(false);
         }
       }
@@ -360,7 +383,7 @@ export default function CreatePostScreen() {
     void loadEvents();
 
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [eventId, placeId, showPlanModal]);
 
@@ -703,7 +726,7 @@ export default function CreatePostScreen() {
     } catch (error) {
       console.error(error);
 
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -867,7 +890,7 @@ export default function CreatePostScreen() {
                     <View key={index} className="relative mr-3">
                       <MediaFrame
                         source={resolveMediaUri(media.uri)}
-                        mediaType={inferMediaKind(media)}
+                        mediaType={inferMediaKind(media) ?? undefined}
                         className="w-48 rounded-2xl bg-gray-100"
                         style={{ aspectRatio: 4 / 3 }}
                         shouldPlay={inferMediaKind(media) === 'video'}

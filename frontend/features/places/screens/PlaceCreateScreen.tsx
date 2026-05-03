@@ -151,7 +151,10 @@ export default function CreatePlaceScreen() {
     () => categories.find((option) => option.id === selectedCategoryId) || null,
     [categories, selectedCategoryId],
   );
-  const availableTags = selectedCategoryOption?.Tag || [];
+  const availableTags = useMemo(
+    () => selectedCategoryOption?.Tag || [],
+    [selectedCategoryOption],
+  );
   const stepTitle = useMemo(() => {
     if (currentStep === 1) {
       return t('createPlaceStepTitleBasics');
@@ -230,20 +233,23 @@ export default function CreatePlaceScreen() {
     weeklySchedule,
   ]);
 
-  const loadCategories = useCallback(async () => {
+  const loadCategories = useCallback(async (signal?: AbortSignal) => {
     setCategoriesLoading(true);
     setCategoriesError(null);
     try {
-      const response = await api.get<PlaceCategoryOption[]>('/categories');
+      const response = await api.get<PlaceCategoryOption[]>('/categories', { signal });
       const nextCategories = response.data || [];
       setCategories(nextCategories);
       setCache('categories', nextCategories);
     } catch (error) {
+      if (signal?.aborted) return;
       setCategoriesError(
         getApiErrorMessage(error, t('createPlaceCategoryLoadFailed')),
       );
     } finally {
-      setCategoriesLoading(false);
+      if (!signal?.aborted) {
+        setCategoriesLoading(false);
+      }
     }
   }, [t]);
 
@@ -251,7 +257,9 @@ export default function CreatePlaceScreen() {
     if (categories.length > 0 && categories.some((category) => Array.isArray(category.Tag))) {
       return;
     }
-    void loadCategories();
+    const controller = new AbortController();
+    void loadCategories(controller.signal);
+    return () => controller.abort();
   }, [categories.length, loadCategories]);
 
   useEffect(() => {
@@ -804,7 +812,7 @@ export default function CreatePlaceScreen() {
                       onPress={() => {
                         setSelectedCategory(option.name);
                         setSelectedCategoryId(option.id);
-                        setSelectedTagIds(option.Tag?.length > 0 ? [option.Tag[0].id] : []);
+                        setSelectedTagIds((option.Tag?.length ?? 0) > 0 ? [option.Tag![0].id] : []);
                         setSubmitError(null);
                       }}
                       className={`rounded-full px-4 py-2.5 ${

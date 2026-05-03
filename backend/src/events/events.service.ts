@@ -16,6 +16,27 @@ import { CreatePlaceTeamMemberDto } from './dto/create-place-team-member.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
+type BookingStatusValue =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'SCANNED'
+  | 'PAID'
+  | 'USED'
+  | 'CHECKED_IN';
+
+const BOOKING_STATUS = {
+  PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  CANCELLED: 'CANCELLED',
+  SCANNED: 'SCANNED',
+  PAID: 'PAID',
+  USED: 'USED',
+  CHECKED_IN: 'CHECKED_IN',
+} as const satisfies Record<string, BookingStatusValue>;
+
+type EventCollaboratorPermissionValue = 'EDIT' | 'SCAN';
+
 export interface OrganizerAnalyticsOverview {
   summary: {
     totalEvents: number;
@@ -706,7 +727,9 @@ export class EventsService {
       }
     }
 
-    const permission = (payload.permission || 'EDIT').toUpperCase();
+    const permission = (
+      payload.permission || 'EDIT'
+    ).toUpperCase() as EventCollaboratorPermissionValue;
 
     await this.prisma.eventCollaborator.upsert({
       where: {
@@ -1138,7 +1161,9 @@ export class EventsService {
     return {
       id: booking.id,
       eventId: booking.eventId,
-      status: (booking.status || 'PENDING').toUpperCase(),
+      status: (booking.status ?? BOOKING_STATUS.PENDING)
+        .toString()
+        .toUpperCase(),
       qrCode: booking.qrCode,
       event: booking.Event
         ? {
@@ -1162,12 +1187,26 @@ export class EventsService {
 
   async create(
     userId: string,
+    role: string,
     createEventDto: CreateEventDto,
     files: {
       cover?: Express.Multer.File[];
       gallery?: Express.Multer.File[];
     } = {},
   ) {
+    if (role === 'ORGANIZER') {
+      const organizerProfile = await this.prisma.organizerProfile.findUnique({
+        where: { userId },
+        select: { status: true },
+      });
+
+      if (!organizerProfile || organizerProfile.status !== 'APPROVED') {
+        throw new ForbiddenException(
+          'Votre profil organisateur doit etre approuve avant de creer un evenement.',
+        );
+      }
+    }
+
     const coverFile = files?.cover?.[0] ?? null;
     const coverUrl = coverFile
       ? await this.storageService.uploadFile('events', coverFile)
@@ -1201,7 +1240,9 @@ export class EventsService {
         ? Math.min(...ticketTypes.map((ticketType) => ticketType.price))
         : fallbackEntryFee;
 
-    const nextCityId = createEventDto.placeId ? null : createEventDto.cityId ?? null;
+    const nextCityId = createEventDto.placeId
+      ? null
+      : (createEventDto.cityId ?? null);
 
     if (!createEventDto.placeId && !nextCityId) {
       throw new BadRequestException(
@@ -1300,27 +1341,31 @@ export class EventsService {
     });
   }
 
-  findAll(options: { upcomingOnly?: boolean } = {}) {
+  async findAll(
+    options: { upcomingOnly?: boolean; limit?: number; cursor?: string } = {},
+  ) {
+    const pageLimit = Math.min(Math.max(1, options.limit ?? 20), 100);
     const now = new Date();
-    const where = options.upcomingOnly
-      ? {
-          OR: [
-            {
-              endTime: null,
-              startTime: {
-                gte: now,
-              },
-            },
-            {
-              endTime: {
-                gte: now,
-              },
-            },
-          ],
-        }
-      : undefined;
 
-    return this.prisma.event.findMany({
+    let where: Prisma.EventWhereInput;
+
+    if (options.cursor) {
+      const cursorDate = new Date(options.cursor);
+      where = Number.isNaN(cursorDate.getTime())
+        ? {}
+        : { startTime: { gt: cursorDate } };
+    } else if (options.upcomingOnly) {
+      where = {
+        OR: [
+          { endTime: null, startTime: { gte: now } },
+          { endTime: { gte: now } },
+        ],
+      };
+    } else {
+      where = {};
+    }
+
+    const rawItems = await this.prisma.event.findMany({
       where,
       include: {
         User: { select: { username: true, avatarUrl: true } },
@@ -1366,7 +1411,15 @@ export class EventsService {
         },
       },
       orderBy: { startTime: 'asc' },
+      take: pageLimit + 1,
     });
+
+    const hasMore = rawItems.length > pageLimit;
+    const items = hasMore ? rawItems.slice(0, pageLimit) : rawItems;
+    const nextCursor =
+      hasMore ? (items[items.length - 1]?.startTime?.toISOString() ?? null) : null;
+
+    return { items, nextCursor, hasMore };
   }
 
   async findMine(userId: string, role: string) {
@@ -1912,7 +1965,7 @@ export class EventsService {
         ? null
         : payload.cityId !== undefined
           ? payload.cityId
-          : event.cityId ?? null;
+          : (event.cityId ?? null);
 
     if (payload.cityId !== undefined && nextCityId !== null) {
       const city = await this.prisma.city.findUnique({
@@ -2089,7 +2142,9 @@ export class EventsService {
           ...(payload.refundPolicy !== undefined
             ? { refundPolicy: payload.refundPolicy }
             : {}),
-          ...(payload.address !== undefined ? { address: payload.address } : {}),
+          ...(payload.address !== undefined
+            ? { address: payload.address }
+            : {}),
           ...(payload.startTime !== undefined
             ? { startTime: new Date(payload.startTime) }
             : {}),
@@ -2403,7 +2458,7 @@ export class EventsService {
           data: {
             qrCode: randomUUID(),
           },
-            include: bookingInclude,
+          include: bookingInclude,
         });
 
         return this.formatBooking(upgraded);
@@ -2655,12 +2710,7 @@ export class EventsService {
 
   async findMyBookings(userId: string) {
     const bookings = await this.prisma.booking.findMany({
-      where: {
-        userId,
-        eventId: {
-          not: null,
-        },
-      },
+      where: { userId },
       include: {
         Event: {
           select: {
@@ -2741,8 +2791,16 @@ export class EventsService {
       );
     }
 
-    const scannedStatuses = ['USED', 'CHECKED_IN'];
-    const expectedStatuses = ['CONFIRMED', 'PAID', 'USED', 'CHECKED_IN'];
+    const scannedStatuses: BookingStatusValue[] = [
+      BOOKING_STATUS.USED,
+      BOOKING_STATUS.CHECKED_IN,
+    ];
+    const expectedStatuses: BookingStatusValue[] = [
+      BOOKING_STATUS.CONFIRMED,
+      BOOKING_STATUS.PAID,
+      BOOKING_STATUS.USED,
+      BOOKING_STATUS.CHECKED_IN,
+    ];
 
     const [scans, expectedCount, pendingCount] = await Promise.all([
       this.prisma.booking.findMany({

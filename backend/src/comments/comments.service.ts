@@ -3,7 +3,6 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -11,22 +10,46 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CommentsService {
   constructor(private prisma: PrismaService) {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  create(_createCommentDto: CreateCommentDto) {
-    return 'This action adds a new comment';
+  private readonly userSelect = {
+    id: true,
+    username: true,
+    displayName: true,
+    avatarUrl: true,
+  };
+
+  async findOne(id: string) {
+    const comment = await this.prisma.postComment.findUnique({
+      where: { id },
+      include: { User: { select: this.userSelect } },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Commentaire introuvable');
+    }
+
+    return comment;
   }
 
-  findAll() {
-    return `This action returns all comments`;
-  }
+  async update(id: string, userId: string, updateCommentDto: UpdateCommentDto) {
+    const comment = await this.prisma.postComment.findUnique({
+      where: { id },
+    });
 
-  findOne(id: number) {
-    return `This action returns a #${id} comment`;
-  }
+    if (!comment) {
+      throw new NotFoundException('Commentaire introuvable');
+    }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  update(id: number, _updateCommentDto: UpdateCommentDto) {
-    return `This action updates a #${id} comment`;
+    if (comment.userId !== userId) {
+      throw new ForbiddenException(
+        "Vous n'etes pas autorise a modifier ce commentaire",
+      );
+    }
+
+    return this.prisma.postComment.update({
+      where: { id },
+      data: { content: updateCommentDto.content },
+      include: { User: { select: this.userSelect } },
+    });
   }
 
   async remove(id: string, userId: string) {
@@ -35,17 +58,15 @@ export class CommentsService {
     });
 
     if (!comment) {
-      throw new NotFoundException(`Comment with ID ${id} not found`);
+      throw new NotFoundException('Commentaire introuvable');
     }
 
     if (comment.userId !== userId) {
       throw new ForbiddenException(
-        'You are not allowed to delete this comment',
+        "Vous n'etes pas autorise a supprimer ce commentaire",
       );
     }
 
-    return this.prisma.postComment.delete({
-      where: { id },
-    });
+    return this.prisma.postComment.delete({ where: { id } });
   }
 }

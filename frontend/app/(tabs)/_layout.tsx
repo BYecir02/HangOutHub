@@ -22,7 +22,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: activeTint,
         tabBarInactiveTintColor: inactiveTint,
         headerShown: false,
-        sceneContainerStyle: { backgroundColor: 'transparent' },
+        sceneStyle: { backgroundColor: 'transparent' },
         tabBarBackground: () => (
           <View style={StyleSheet.absoluteFill}>
 

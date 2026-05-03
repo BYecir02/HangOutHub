@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
-  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   RefreshControl,
   ScrollView,
   Text,
@@ -24,7 +26,7 @@ import SearchBar from '@/components/ui/SearchBar';
 import ScreenState from '@/components/ui/ScreenState';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/dataCache';
-import { formatEventCardPriceLabel, formatEventDate, formatPrice } from '@/services/formatters';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
@@ -58,6 +60,7 @@ interface EventItem {
 
 type EventFilter = 'all' | 'upcoming' | 'free' | 'week';
 type EventViewMode = 'list' | 'inspiration';
+type EventsPage = { items: EventItem[]; nextCursor: string | null; hasMore: boolean };
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
@@ -289,6 +292,9 @@ export default function EventsScreen() {
   const [loading, setLoading] = useState(!cachedEvents);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<EventFilter>('all');
   const [viewMode, setViewMode] = useState<EventViewMode>('inspiration');
@@ -311,9 +317,11 @@ export default function EventsScreen() {
       }
 
       try {
-        const response = await api.get<EventItem[]>('/events');
-        setEvents(response.data);
-        setCache('events', response.data);
+        const response = await api.get<EventsPage>('/events?limit=20');
+        setEvents(response.data.items);
+        setNextCursor(response.data.nextCursor);
+        setHasMore(response.data.hasMore);
+        setCache('events', response.data.items);
         setErrorMessage(null);
       } catch (error) {
         setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
@@ -327,6 +335,23 @@ export default function EventsScreen() {
     },
     [t],
   );
+
+  const loadMoreEvents = useCallback(async () => {
+    if (!hasMore || loadingMore || !nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const response = await api.get<EventsPage>(
+        `/events?limit=20&cursor=${encodeURIComponent(nextCursor)}`,
+      );
+      setEvents((prev) => [...prev, ...response.data.items]);
+      setNextCursor(response.data.nextCursor);
+      setHasMore(response.data.hasMore);
+    } catch {
+      // silent — user can scroll again to retry
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loadingMore, nextCursor]);
 
   useEffect(() => {
     void fetchEvents();
@@ -405,9 +430,25 @@ export default function EventsScreen() {
 
   const inspirationAutoplay = useVisibleItemAutoplay(filteredEvents, (event) => event.id);
 
+  const handleInspirationScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      inspirationAutoplay.onScroll(e);
+      const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+      if (
+        hasMore &&
+        !loadingMore &&
+        layoutMeasurement.height + contentOffset.y >= contentSize.height - 300
+      ) {
+        void loadMoreEvents();
+      }
+    },
+    [inspirationAutoplay, hasMore, loadingMore, loadMoreEvents],
+  );
+
   const renderListEventItem = useCallback(
     ({ item }: { item: EventItem }) => (
       <EntityCoverCard
+        variant="cover"
         imageUrl={getImageUrl(item.coverUrl) || EVENT_PLACEHOLDER}
         title={item.title}
         onPress={() =>
@@ -548,7 +589,7 @@ export default function EventsScreen() {
       ) : viewMode === 'inspiration' ? (
         <ScrollView
           onLayout={inspirationAutoplay.onLayout}
-          onScroll={inspirationAutoplay.onScroll}
+          onScroll={handleInspirationScroll}
           scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
@@ -596,6 +637,11 @@ export default function EventsScreen() {
               }
             />
           )}
+          {loadingMore ? (
+            <View className="items-center py-6">
+              <ActivityIndicator size="small" color="#4c669f" />
+            </View>
+          ) : null}
         </ScrollView>
       ) : (
         <FlatList
@@ -631,6 +677,17 @@ export default function EventsScreen() {
             />
           }
           renderItem={renderListEventItem}
+          onEndReached={() => {
+            void loadMoreEvents();
+          }}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={
+            loadingMore ? (
+              <View className="items-center py-6">
+                <ActivityIndicator size="small" color="#4c669f" />
+              </View>
+            ) : null
+          }
         />
       )}
     </CatalogScreenLayout>

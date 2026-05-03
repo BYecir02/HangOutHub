@@ -32,7 +32,7 @@ export class ReportsService {
   async findAllAdmin() {
     return this.prisma.report.findMany({
       include: {
-        User: {
+        Reporter: {
           select: {
             id: true,
             email: true,

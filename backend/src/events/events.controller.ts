@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { memoryStorage } from 'multer';
 
 import { MAX_MEDIA_FILE_SIZE_BYTES } from '../storage/media-limits';
@@ -70,7 +71,9 @@ export class EventsController {
             !file.mimetype.startsWith('video/')
           ) {
             return cb(
-              new BadRequestException('Seules les images et videos sont autorisees.'),
+              new BadRequestException(
+                'Seules les images et videos sont autorisees.',
+              ),
               false,
             );
           }
@@ -86,12 +89,30 @@ export class EventsController {
     files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
   ) {
     this.ensureOrganizerRole(req);
-    return this.eventsService.create(req.user.userId, createEventDto, files);
+    return this.eventsService.create(
+      req.user.userId,
+      req.user.role,
+      createEventDto,
+      files,
+    );
   }
 
+  @Throttle({ global: { ttl: 60_000, limit: 60 } })
   @Get()
-  findAll(@Query('upcoming') upcoming?: string) {
-    return this.eventsService.findAll({ upcomingOnly: upcoming === 'true' });
+  findAll(
+    @Query('upcoming') upcoming?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+    return this.eventsService.findAll({
+      upcomingOnly: upcoming === 'true',
+      limit:
+        parsedLimit !== undefined && !Number.isNaN(parsedLimit)
+          ? parsedLimit
+          : undefined,
+      cursor: cursor || undefined,
+    });
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -130,7 +151,9 @@ export class EventsController {
             !file.mimetype.startsWith('video/')
           ) {
             return cb(
-              new BadRequestException('Seules les images et videos sont autorisees.'),
+              new BadRequestException(
+                'Seules les images et videos sont autorisees.',
+              ),
               false,
             );
           }

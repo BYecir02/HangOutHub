@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import api, { clearAuthState, storage } from '@/services/api';
+import api, { clearAuthState, isUnauthorizedError, storage } from '@/services/api';
 import { getCache, getCategoryCache, setCache, setCategoryCache } from '@/services/dataCache';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
 import { getFriendshipOverview } from '@/services/friendships';
@@ -25,15 +25,6 @@ import type {
   HomeRecommendationItem,
   NotificationCountResponse,
 } from '@/components/home/home.types';
-
-function isUnauthorizedError(error: unknown) {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const response = (error as { response?: { status?: number } }).response;
-  return response?.status === 401;
-}
 
 type RecommendationPreferencesSnapshot = {
   tagIds: number[];
@@ -417,7 +408,7 @@ export function useHomeScreen() {
   const loadHomeData = useCallback(async () => {
     const results = await Promise.allSettled([
       api.get<Category[]>('/categories'),
-      api.get<HomeEvent[]>('/events?upcoming=true'),
+      api.get<{ items: HomeEvent[]; nextCursor: string | null; hasMore: boolean }>('/events?upcoming=true&limit=100'),
       api.get<HomePlace[]>('/places'),
     ]);
 
@@ -444,8 +435,8 @@ export function useHomeScreen() {
     }
 
     if (eventsResult.status === 'fulfilled') {
-      setEvents(eventsResult.value.data);
-      setCache('homeEvents', eventsResult.value.data);
+      setEvents(eventsResult.value.data.items);
+      setCache('homeEvents', eventsResult.value.data.items);
     } else {
       if (!isUnauthorizedError(eventsResult.reason)) {
         console.error('Erreur chargement evenements:', eventsResult.reason);

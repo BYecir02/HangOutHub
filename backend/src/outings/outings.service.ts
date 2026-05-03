@@ -152,7 +152,13 @@ export class OutingsService {
     }
   }
 
-  async findChats(userId: string) {
+  async findChats(
+    userId: string,
+    options: { limit?: number; cursor?: string } = {},
+  ) {
+    const limit = Math.min(Math.max(options.limit ?? 30, 1), 100);
+    const cursorDate = options.cursor ? new Date(options.cursor) : undefined;
+
     const outings = await this.prisma.outing.findMany({
       where: {
         OR: [
@@ -168,8 +174,10 @@ export class OutingsService {
             },
           },
         ],
+        ...(cursorDate ? { scheduledDate: { lt: cursorDate } } : {}),
       },
       orderBy: { scheduledDate: 'desc' },
+      take: limit + 1,
       include: {
         Place: {
           select: {
@@ -224,29 +232,34 @@ export class OutingsService {
       },
     });
 
-    const unreadCounts = new Map<string, number>();
+    const hasMore = outings.length > limit;
+    const page = hasMore ? outings.slice(0, limit) : outings;
 
-    await Promise.all(
-      outings.map(async (outing) => {
-        const lastReadAt = outing.OutingParticipant[0]?.chatLastReadAt;
-        const unreadCount = await this.prisma.chatMessage.count({
-          where: {
-            outingId: outing.id,
-            senderId: {
-              not: userId,
-            },
-            ...(lastReadAt
-              ? {
-                  OR: [{ sentAt: null }, { sentAt: { gt: lastReadAt } }],
-                }
-              : {}),
-          },
-        });
-        unreadCounts.set(outing.id, unreadCount);
-      }),
+    const ids = page.map((o) => o.id);
+
+    const unreadRows =
+      ids.length > 0
+        ? await this.prisma.$queryRaw<Array<{ outingId: string; unread: bigint }>>`
+            SELECT cm."outingId", COUNT(*)::bigint AS unread
+            FROM "ChatMessage" cm
+            LEFT JOIN "OutingParticipant" op
+              ON op."outingId" = cm."outingId" AND op."userId" = ${userId}::uuid
+            WHERE cm."outingId" = ANY(${ids}::uuid[])
+              AND cm."senderId" != ${userId}::uuid
+              AND (
+                op."chatLastReadAt" IS NULL
+                OR cm."sentAt" IS NULL
+                OR cm."sentAt" > op."chatLastReadAt"
+              )
+            GROUP BY cm."outingId"
+          `
+        : [];
+
+    const unreadCounts = new Map<string, number>(
+      unreadRows.map((row) => [row.outingId, Number(row.unread)]),
     );
 
-    const chats = outings.map((outing) => ({
+    const items = page.map((outing) => ({
       id: outing.id,
       title: outing.title,
       scheduledDate: outing.scheduledDate,
@@ -254,11 +267,11 @@ export class OutingsService {
       User: outing.User,
       participantsCount: outing._count.OutingParticipant,
       messagesCount: outing._count.ChatMessage,
-      unreadCount: unreadCounts.get(outing.id) || 0,
+      unreadCount: unreadCounts.get(outing.id) ?? 0,
       lastMessage: outing.ChatMessage[0] ?? null,
     }));
 
-    chats.sort((left, right) => {
+    items.sort((left, right) => {
       const leftActivity = new Date(
         left.lastMessage?.sentAt || left.scheduledDate,
       ).getTime();
@@ -269,7 +282,13 @@ export class OutingsService {
       return rightActivity - leftActivity;
     });
 
-    return chats;
+    const lastItem = page[page.length - 1];
+    const nextCursor =
+      hasMore && lastItem
+        ? new Date(lastItem.scheduledDate).toISOString()
+        : null;
+
+    return { items, nextCursor, hasMore };
   }
 
   async findMessages(userId: string, outingId: string) {
@@ -701,19 +720,8 @@ export class OutingsService {
     status: 'GOING' | 'MAYBE' | 'DECLINED',
   ) {
     const participant = await this.prisma.outingParticipant.findUnique({
-      where: {
-        outingId_userId: {
-          outingId,
-          userId,
-        },
-      },
-      include: {
-        Outing: {
-          select: {
-            id: true,
-          },
-        },
-      },
+      where: { outingId_userId: { outingId, userId } },
+      include: { Outing: { select: { id: true } } },
     });
 
     if (!participant || !participant.Outing) {
@@ -726,16 +734,24 @@ export class OutingsService {
       );
     }
 
+    const currentStatus = (participant.status || 'INVITED').toUpperCase();
+    const validTransitions: Record<string, string[]> = {
+      INVITED: ['GOING', 'MAYBE', 'DECLINED'],
+      GOING: ['MAYBE', 'DECLINED'],
+      MAYBE: ['GOING', 'DECLINED'],
+      DECLINED: [],
+    };
+
+    const allowed = validTransitions[currentStatus] ?? [];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        `Transition invalide : ${currentStatus} → ${status}.`,
+      );
+    }
+
     return this.prisma.outingParticipant.update({
-      where: {
-        outingId_userId: {
-          outingId,
-          userId,
-        },
-      },
-      data: {
-        status,
-      },
+      where: { outingId_userId: { outingId, userId } },
+      data: { status },
     });
   }
 }

@@ -21,7 +21,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import EventFormWizard from '@/components/ui/EventFormWizard';
-import api, { clearAuthState } from '../services/api';
+import api, { clearAuthState, isUnauthorizedError } from '@/services/api';
 import { getMySettings } from '@/services/settings';
 import {
   buildMediaUploadPayload,
@@ -80,9 +80,6 @@ interface EventDraftPayload {
   ticketTypes: DraftTicketType[];
   coverIndex: number;
 }
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 const EVENT_DRAFT_KEY = 'create-event-draft-v1';
 const AUTO_SAVE_INTERVAL_MS = 15000;
@@ -426,7 +423,7 @@ export default function CreateEventScreen() {
           }
         }
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -673,7 +670,7 @@ export default function CreateEventScreen() {
       );
       setCustomTagName('');
     } catch (error: any) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -901,7 +898,7 @@ export default function CreateEventScreen() {
         params: { id: response.data.id },
       });
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

@@ -12,7 +12,7 @@ import {
   type UserSettings,
   updateMySettings,
 } from '@/services/settings';
-import { clearAuthState } from '@/services/api';
+import { clearAuthState, isUnauthorizedError } from '@/services/api';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import SettingsSection from '@/components/settings/SettingsSection';
@@ -30,9 +30,6 @@ export default function NotificationSettingsScreen() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isUnauthorized = (error: unknown) =>
-    (error as { response?: { status?: number } }).response?.status === 401;
-
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();
     router.replace('/');
@@ -45,7 +42,7 @@ export default function NotificationSettingsScreen() {
       const nextSettings = await getMySettings();
       setSettings(nextSettings);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -85,7 +82,7 @@ export default function NotificationSettingsScreen() {
       });
       setSettings(savedSettings);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

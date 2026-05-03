@@ -14,7 +14,7 @@ import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import { clearAuthState, getApiErrorMessage } from '@/services/api';
+import { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   acceptFriendRequest,
   getFriendshipOverview,
@@ -41,9 +41,6 @@ export default function FriendRequestsScreen() {
   const [friendships, setFriendships] =
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
 
-  const isUnauthorized = (error: unknown) =>
-    (error as { response?: { status?: number } }).response?.status === 401;
-
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();
     router.replace('/');
@@ -57,7 +54,7 @@ export default function FriendRequestsScreen() {
       setFriendships(data);
       setErrorMessage(null);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -81,7 +78,7 @@ export default function FriendRequestsScreen() {
       await acceptFriendRequest(friendshipId);
       await loadRequests();
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -96,7 +93,7 @@ export default function FriendRequestsScreen() {
       await rejectFriendRequest(friendshipId);
       await loadRequests();
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

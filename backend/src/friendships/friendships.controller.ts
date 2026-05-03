@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 
 import { FriendshipsService } from './friendships.service';
 
@@ -29,6 +30,7 @@ export class FriendshipsController {
     return this.friendshipsService.findMine(req.user.userId);
   }
 
+  @Throttle({ global: { ttl: 60_000, limit: 30 } })
   @Get('discover')
   discover(
     @Request() req: AuthenticatedRequest,

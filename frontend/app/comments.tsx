@@ -19,11 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenState from '@/components/ui/ScreenState';
 import CommentItem from '../components/social/CommentItem';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { clearAuthState, getApiErrorMessage, getImageUrl } from '../services/api';
+import api, { clearAuthState, getApiErrorMessage, getImageUrl, isUnauthorizedError } from '../services/api';
 import { emitPostChanged } from '@/services/post-events';
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 interface CommentAuthor {
   displayName?: string | null;
@@ -128,7 +125,7 @@ export default function CommentsScreen() {
       }
       setErrorMessage(null);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -148,7 +145,7 @@ export default function CommentsScreen() {
         avatarUrl: res.data.avatarUrl,
       });
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -200,7 +197,7 @@ export default function CommentsScreen() {
       Keyboard.dismiss();
       scrollCommentsToEnd();
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -238,7 +235,7 @@ export default function CommentsScreen() {
       });
       Alert.alert(t('commentsDeleteSuccessTitle'), t('commentsDeleteSuccessMessage'));
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

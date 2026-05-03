@@ -216,9 +216,8 @@ export default function DiscoverScreen() {
               title={item.title}
               subtitle={item.subtitle}
               meta={item.meta}
-              image={item.image}
+              imageUrl={item.image}
               badge={item.badge}
-              actionColor={item.actionColor}
               onPress={() => handlePressItem(item)}
             />
           )}

@@ -12,11 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { clearAuthState, getImageUrl } from '../../services/api';
+import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '../../services/api';
 import PostItem from '../../components/social/PostItem';
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 interface PublicUserProfile {
   id: string;
@@ -97,7 +94,7 @@ export default function PublicProfileScreen() {
       setProfile(profileResponse.data);
       setPosts(postsResponse.data);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

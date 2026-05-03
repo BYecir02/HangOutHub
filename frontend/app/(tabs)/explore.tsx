@@ -78,9 +78,9 @@ export default function ExploreScreen() {
       const runner = mode === 'refresh' ? runRefresh : runInitial;
       const nextEvents = await runner(
         async () => {
-          const response = await api.get<EventItem[]>('/events?upcoming=true');
-          setCache('exploreEvents', response.data);
-          return response.data;
+          const response = await api.get<{ items: EventItem[]; nextCursor: string | null; hasMore: boolean }>('/events?upcoming=true&limit=100');
+          setCache('exploreEvents', response.data.items);
+          return response.data.items;
         },
         {
           mapError: (errorValue) =>

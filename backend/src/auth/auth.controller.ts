@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { AuthService } from './auth.service';
@@ -32,6 +33,7 @@ interface LogoutRequest {
 }
 
 @Controller('auth')
+@Throttle({ global: { ttl: 60_000, limit: 10 } })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -61,26 +63,31 @@ export class AuthController {
     return this.authService.verifyEmailToken(token);
   }
 
+  @Throttle({ global: { ttl: 900_000, limit: 10 } })
   @Post('verify-email/otp')
   verifyEmailOtp(@Body() dto: VerifyEmailOtpDto) {
     return this.authService.verifyEmailOtp(dto.email, dto.code);
   }
 
+  @Throttle({ global: { ttl: 900_000, limit: 5 } })
   @Post('verify-email/request')
   requestVerifyEmail(@Body() dto: RequestEmailVerificationDto) {
     return this.authService.requestEmailVerification(dto.email);
   }
 
+  @Throttle({ global: { ttl: 900_000, limit: 5 } })
   @Post('password-reset/request')
   requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
     return this.authService.requestPasswordReset(dto.email);
   }
 
+  @Throttle({ global: { ttl: 900_000, limit: 10 } })
   @Post('password-reset/verify')
   verifyPasswordReset(@Body() dto: VerifyPasswordResetDto) {
     return this.authService.verifyPasswordResetOtp(dto.email, dto.code);
   }
 
+  @Throttle({ global: { ttl: 900_000, limit: 10 } })
   @Post('password-reset/confirm')
   confirmPasswordReset(@Body() dto: ResetPasswordOtpDto) {
     return this.authService.resetPasswordOtp(dto.email, dto.code, dto.password);

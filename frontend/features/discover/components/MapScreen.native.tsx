@@ -484,8 +484,8 @@ export default function MapScreen() {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const response = await api.get<EventPin[]>('/events');
-      setEvents(response.data || []);
+      const response = await api.get<{ items: EventPin[]; nextCursor: string | null; hasMore: boolean }>('/events?limit=100');
+      setEvents(response.data.items || []);
     } catch {
       setEvents([]);
     }

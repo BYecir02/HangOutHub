@@ -24,7 +24,7 @@ import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChi
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import SearchBar from '@/components/ui/SearchBar';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { clearAuthState, getApiErrorMessage } from '@/services/api';
+import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   getOrCreateDirectChat,
   listDirectChats,
@@ -42,8 +42,14 @@ export default function MessagesScreen() {
   type OutingFilter = 'all' | 'upcoming' | 'withMessages' | 'unread';
   const [chats, setChats] = useState<OutingConversationSummary[]>([]);
   const chatsRef = useRef<OutingConversationSummary[]>([]);
+  const chatsCursorRef = useRef<string | null>(null);
+  const chatsHasMoreRef = useRef(false);
+  const [chatsLoadingMore, setChatsLoadingMore] = useState(false);
   const [directChats, setDirectChats] = useState<DirectChatSummary[]>([]);
   const directChatsRef = useRef<DirectChatSummary[]>([]);
+  const directCursorRef = useRef<string | null>(null);
+  const directHasMoreRef = useRef(false);
+  const [directLoadingMore, setDirectLoadingMore] = useState(false);
   const directSocketRef = useRef<Socket | null>(null);
   const directListRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -71,9 +77,6 @@ export default function MessagesScreen() {
   const [filter, setFilter] = useState<OutingFilter>('all');
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
 
-  const isUnauthorized = (error: unknown) =>
-    (error as { response?: { status?: number } }).response?.status === 401;
-
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();
     router.replace('/');
@@ -82,19 +85,26 @@ export default function MessagesScreen() {
   const loadChats = useCallback(
     async ({ isRefresh = false, silent = false } = {}) => {
       if (isRefresh) {
+        chatsCursorRef.current = null;
         setRefreshing(true);
       } else if (!silent) {
         setLoading(true);
       }
 
       try {
-        const response = await api.get<OutingConversationSummary[]>('/outings/chats');
-        setChats(response.data);
-        chatsRef.current = response.data;
+        const response = await api.get<{
+          items: OutingConversationSummary[];
+          nextCursor: string | null;
+          hasMore: boolean;
+        }>('/outings/chats', { params: { limit: 30 } });
+        chatsCursorRef.current = response.data.nextCursor;
+        chatsHasMoreRef.current = response.data.hasMore;
+        setChats(response.data.items);
+        chatsRef.current = response.data.items;
         setSyncWarning(false);
         setErrorMessage(null);
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -105,12 +115,7 @@ export default function MessagesScreen() {
           setSyncWarning(true);
         } else {
           setChats([]);
-          setErrorMessage(
-            getApiErrorMessage(
-              error,
-              t('messagesLoadFailedDefault'),
-            ),
-          );
+          setErrorMessage(getApiErrorMessage(error, t('messagesLoadFailedDefault')));
         }
       } finally {
         setLoading(false);
@@ -120,27 +125,55 @@ export default function MessagesScreen() {
     [handleInvalidSession, t],
   );
 
+  const loadMoreChats = useCallback(async () => {
+    if (!chatsHasMoreRef.current || !chatsCursorRef.current || chatsLoadingMore) {
+      return;
+    }
+
+    setChatsLoadingMore(true);
+    try {
+      const response = await api.get<{
+        items: OutingConversationSummary[];
+        nextCursor: string | null;
+        hasMore: boolean;
+      }>('/outings/chats', {
+        params: { limit: 30, cursor: chatsCursorRef.current },
+      });
+      chatsCursorRef.current = response.data.nextCursor;
+      chatsHasMoreRef.current = response.data.hasMore;
+      setChats((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const newItems = response.data.items.filter((c) => !existingIds.has(c.id));
+        const merged = [...prev, ...newItems];
+        chatsRef.current = merged;
+        return merged;
+      });
+    } catch {
+      // silently ignore load-more errors
+    } finally {
+      setChatsLoadingMore(false);
+    }
+  }, [chatsLoadingMore]);
+
   const loadDirectChats = useCallback(
     async ({ isRefresh = false, silent = false } = {}) => {
       if (isRefresh) {
+        directCursorRef.current = null;
         setDirectRefreshing(true);
       } else if (!silent) {
         setDirectLoading(true);
       }
 
       try {
-        const response = await listDirectChats();
-        const sorted = [...response].sort((left, right) => {
-          const leftTime = new Date(left.lastMessageAt || 0).getTime();
-          const rightTime = new Date(right.lastMessageAt || 0).getTime();
-          return rightTime - leftTime;
-        });
-        setDirectChats(sorted);
-        directChatsRef.current = sorted;
+        const page = await listDirectChats({ limit: 30 });
+        directCursorRef.current = page.nextCursor;
+        directHasMoreRef.current = page.hasMore;
+        setDirectChats(page.items);
+        directChatsRef.current = page.items;
         setDirectSyncWarning(false);
         setDirectErrorMessage(null);
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -152,10 +185,7 @@ export default function MessagesScreen() {
         } else {
           setDirectChats([]);
           setDirectErrorMessage(
-            getApiErrorMessage(
-              error,
-              t('directChatLoadFailed'),
-            ),
+            getApiErrorMessage(error, t('directChatLoadFailed')),
           );
         }
       } finally {
@@ -165,6 +195,33 @@ export default function MessagesScreen() {
     },
     [handleInvalidSession, t],
   );
+
+  const loadMoreDirectChats = useCallback(async () => {
+    if (!directHasMoreRef.current || !directCursorRef.current || directLoadingMore) {
+      return;
+    }
+
+    setDirectLoadingMore(true);
+    try {
+      const page = await listDirectChats({
+        limit: 30,
+        cursor: directCursorRef.current,
+      });
+      directCursorRef.current = page.nextCursor;
+      directHasMoreRef.current = page.hasMore;
+      setDirectChats((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const newItems = page.items.filter((c) => !existingIds.has(c.id));
+        const merged = [...prev, ...newItems];
+        directChatsRef.current = merged;
+        return merged;
+      });
+    } catch {
+      // silently ignore load-more errors
+    } finally {
+      setDirectLoadingMore(false);
+    }
+  }, [directLoadingMore]);
 
   const loadConnections = useCallback(
     async ({ force = false } = {}) => {
@@ -182,7 +239,7 @@ export default function MessagesScreen() {
         setConnections(nextConnections);
         setConnectionsLoaded(true);
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -218,7 +275,7 @@ export default function MessagesScreen() {
           params: { id: chat.id },
         });
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }
@@ -262,13 +319,14 @@ export default function MessagesScreen() {
         scheduleDirectRefresh();
       };
 
-      const interval = setInterval(() => {
-        if (tab === 'outings') {
-          void loadChats({ silent: true });
-        } else {
-          void loadDirectChats({ silent: true });
-        }
-      }, tab === 'direct' ? 30000 : 10000);
+      // Outings has no socket — poll every 60s as fallback.
+      // Direct is covered by the socket (chat:list-updated), no polling needed.
+      const interval =
+        tab === 'outings'
+          ? setInterval(() => {
+              void loadChats({ silent: true });
+            }, 60_000)
+          : null;
 
       void (async () => {
         const socket = await getDirectChatSocket();
@@ -283,7 +341,9 @@ export default function MessagesScreen() {
 
       return () => {
         isActive = false;
-        clearInterval(interval);
+        if (interval) {
+          clearInterval(interval);
+        }
         if (directListRefreshTimeoutRef.current) {
           clearTimeout(directListRefreshTimeoutRef.current);
           directListRefreshTimeoutRef.current = null;
@@ -532,6 +592,15 @@ export default function MessagesScreen() {
               />
             }
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+            onEndReached={() => void loadMoreChats()}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              chatsLoadingMore ? (
+                <View className="py-4 items-center">
+                  <ActivityIndicator size="small" color="#4c669f" />
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View className="mt-16 items-center px-6">
                 <Text className="text-base text-gray-500 dark:text-gray-400">
@@ -568,6 +637,15 @@ export default function MessagesScreen() {
               />
             }
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+            onEndReached={() => void loadMoreDirectChats()}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              directLoadingMore ? (
+                <View className="py-4 items-center">
+                  <ActivityIndicator size="small" color="#4c669f" />
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View className="mt-16 items-center px-6">
                 <Text className="text-base text-gray-500 dark:text-gray-400">

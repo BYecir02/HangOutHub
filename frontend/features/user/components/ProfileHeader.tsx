@@ -12,7 +12,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import type { UserProfile } from '@/hooks/useUserProfile';
 
-import { getImageUrl } from '../../services/api';
+import { getImageUrl } from '../../../services/api';
 
 interface ProfileHeaderProps {
   user: UserProfile | null;

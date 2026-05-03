@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { memoryStorage } from 'multer';
 
 import { MAX_MEDIA_FILE_SIZE_BYTES } from '../storage/media-limits';
@@ -56,7 +57,9 @@ export class PlacesController {
             !file.mimetype.startsWith('video/')
           ) {
             return cb(
-              new BadRequestException('Seules les images et videos sont autorisees.'),
+              new BadRequestException(
+                'Seules les images et videos sont autorisees.',
+              ),
               false,
             );
           }
@@ -93,7 +96,9 @@ export class PlacesController {
             !file.mimetype.startsWith('video/')
           ) {
             return cb(
-              new BadRequestException('Seules les images et videos sont autorisees.'),
+              new BadRequestException(
+                'Seules les images et videos sont autorisees.',
+              ),
               false,
             );
           }
@@ -131,6 +136,7 @@ export class PlacesController {
     );
   }
 
+  @Throttle({ global: { ttl: 60_000, limit: 60 } })
   @Get()
   findAll() {
     return this.placesService.findAll();
@@ -151,30 +157,27 @@ export class PlacesController {
   @UseGuards(AuthGuard('jwt'))
   @Post(':id/claims')
   @UseInterceptors(
-    FileFieldsInterceptor(
-      [{ name: 'document', maxCount: 1 }],
-      {
-        storage: memoryStorage(),
-        limits: {
-          fileSize: MAX_MEDIA_FILE_SIZE_BYTES,
-        },
-        fileFilter: (_req, file, cb) => {
-          if (
-            !file.mimetype.startsWith('image/') &&
-            file.mimetype !== 'application/pdf'
-          ) {
-            return cb(
-              new BadRequestException(
-                'Seules les images ou les PDF sont autorises.',
-              ),
-              false,
-            );
-          }
-
-          cb(null, true);
-        },
+    FileFieldsInterceptor([{ name: 'document', maxCount: 1 }], {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: MAX_MEDIA_FILE_SIZE_BYTES,
       },
-    ),
+      fileFilter: (_req, file, cb) => {
+        if (
+          !file.mimetype.startsWith('image/') &&
+          file.mimetype !== 'application/pdf'
+        ) {
+          return cb(
+            new BadRequestException(
+              'Seules les images ou les PDF sont autorises.',
+            ),
+            false,
+          );
+        }
+
+        cb(null, true);
+      },
+    }),
   )
   submitClaim(
     @Param('id') id: string,

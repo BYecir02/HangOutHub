@@ -25,13 +25,13 @@ import SocialFeedEmptyState from './SocialFeedEmptyState';
 import SocialFeedFiltersSheet from './SocialFeedFiltersSheet';
 import SocialFeedHeader from './SocialFeedHeader';
 import { resolvePostOwnership } from './post-ownership';
-import { SkeletonBlock } from '../ui/Skeleton';
-import api, { getImageUrl } from '../../services/api';
-import { getFriendshipOverview } from '../../services/friendships';
-import { getOrCreateDirectChat, sendDirectMessage } from '../../services/direct-chats';
-import { getPostsSocket } from '../../services/post-realtime';
-import { subscribeToPostChanges, type PostChangedPayload } from '../../services/post-events';
-import { resolveStoredUserSession } from '../../services/user-session';
+import { SkeletonBlock } from '../../../shared/ui/Skeleton';
+import api, { getImageUrl } from '../../../services/api';
+import { getFriendshipOverview } from '../../../services/friendships';
+import { getOrCreateDirectChat, sendDirectMessage } from '../../../services/direct-chats';
+import { getPostsSocket } from '../../../services/post-realtime';
+import { subscribeToPostChanges, type PostChangedPayload } from '../../../services/post-events';
+import { resolveStoredUserSession } from '../../../services/user-session';
 import { isVideoUrl } from '@/services/media';
 import {
   collectPrefetchUrls,
@@ -41,8 +41,8 @@ import {
   splitFeedPostsBySeenAt,
   type MergeMode,
 } from './social-feed.utils';
-import { clearAuthState, storage } from '../../services/api';
-import type { SocialUser } from '../../types/social';
+import { clearAuthState, storage } from '../../../services/api';
+import type { SocialUser } from '../../../types/social';
 
 const FEED_CACHE_KEY = 'socialFeedCache_v2';
 const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt_v2';
@@ -357,6 +357,13 @@ export default function SocialFeed() {
     nextCursorRef.current = nextCursor;
   }, [nextCursor]);
 
+  const mergePosts = useCallback(
+    (incoming: FeedPost[], current: FeedPost[], mode: MergeMode = 'prepend') => {
+      return mergeFeedPosts(incoming, current, mode);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (feedSeenAt === null || pendingPosts.length === 0) {
       return;
@@ -391,13 +398,6 @@ export default function SocialFeed() {
       latestFetchedAtRef.current = maxCreatedAt;
     }
   }, [getMaxCreatedAt]);
-
-  const mergePosts = useCallback(
-    (incoming: FeedPost[], current: FeedPost[], mode: MergeMode = 'prepend') => {
-      return mergeFeedPosts(incoming, current, mode);
-    },
-    [],
-  );
 
   const mergeUpdatedPost = useCallback(
     (post: FeedPost, update: PostChangedPayload) => {
@@ -903,6 +903,16 @@ export default function SocialFeed() {
     router.push('/search');
   }, [router]);
 
+  const pendingPostsToShow = useMemo(() => {
+    if (feedSeenAt === null) {
+      return pendingPosts;
+    }
+
+    return pendingPosts.filter(
+      (post) => getLatestFeedPostCreatedAtTime([post]) > feedSeenAt,
+    );
+  }, [feedSeenAt, pendingPosts]);
+
   const applyPendingPosts = useCallback(async () => {
     if (pendingPostsToShow.length === 0) {
       return;
@@ -943,16 +953,6 @@ export default function SocialFeed() {
     return '';
   }, []);
 
-  const pendingPostsToShow = useMemo(() => {
-    if (feedSeenAt === null) {
-      return pendingPosts;
-    }
-
-    return pendingPosts.filter(
-      (post) => getLatestFeedPostCreatedAtTime([post]) > feedSeenAt,
-    );
-  }, [feedSeenAt, pendingPosts]);
-
   const pendingLabel = useMemo(() => {
     const label = t('socialFeedNewPosts', { count: pendingPostsToShow.length });
     if (!label || label === 'socialFeedNewPosts') {
@@ -962,23 +962,6 @@ export default function SocialFeed() {
   }, [pendingPostsToShow.length, t]);
 
   const timelinePosts = useMemo(() => posts, [posts]);
-
-  useEffect(() => {
-    const urlsToPrefetch = collectPrefetchUrls(timelinePosts, feedActiveId, {
-      resolveImageUrl: getImageUrl,
-      isVideoUrl,
-      beforeCount: 1,
-      afterCount: 6,
-    });
-
-    if (urlsToPrefetch.length === 0) {
-      return;
-    }
-
-    void Promise.all(urlsToPrefetch.map((url) => ExpoImage.prefetch(url))).catch(() => {
-      // Préchargement opportuniste: on ignore les erreurs réseau.
-    });
-  }, [feedActiveId, timelinePosts]);
 
   const buildShareMessage = useCallback(
     (post: FeedPost) => {
@@ -1165,6 +1148,23 @@ export default function SocialFeed() {
     onScroll: feedOnScroll = NOOP_AUTOPLAY.onScroll,
     registerLayout: feedRegisterLayout = NOOP_AUTOPLAY.registerLayout,
   } = feedAutoplay ?? NOOP_AUTOPLAY;
+
+  useEffect(() => {
+    const urlsToPrefetch = collectPrefetchUrls(timelinePosts, feedActiveId, {
+      resolveImageUrl: (uri) => getImageUrl(uri) ?? uri,
+      isVideoUrl,
+      beforeCount: 1,
+      afterCount: 6,
+    });
+
+    if (urlsToPrefetch.length === 0) {
+      return;
+    }
+
+    void Promise.all(urlsToPrefetch.map((url) => ExpoImage.prefetch(url))).catch(() => {
+      // Préchargement opportuniste: on ignore les erreurs réseau.
+    });
+  }, [feedActiveId, timelinePosts]);
 
   const headerComponent = useMemo(
     () => (

@@ -16,7 +16,7 @@ import ScreenState from '@/components/ui/ScreenState';
 import AdminAnalyticsPanel from '@/components/admin/AdminAnalyticsPanel';
 import { useI18n } from '@/hooks/use-i18n';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
+import { clearAuthState, getApiErrorMessage, getImageUrl, isUnauthorizedError } from '@/services/api';
 import { deleteAdminUser, listAdminUsers, type AdminUserSummary } from '@/services/admin-users';
 import {
   getAdminOrganizerProfile,
@@ -36,15 +36,6 @@ import {
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 type BackofficeSection = 'claims' | 'organizers' | 'analytics' | 'users';
-
-function isUnauthorizedError(error: unknown) {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    (error as { response?: { status?: number } }).response?.status === 401
-  );
-}
 
 function getStatusTone(status?: string | null) {
   const normalized = (status || 'PENDING').toUpperCase();

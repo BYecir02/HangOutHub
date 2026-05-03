@@ -22,7 +22,7 @@ import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLocationScope } from '@/hooks/useLocationScope';
-import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
+import api, { clearAuthState, getImageUrl, isUnauthorizedError, storage } from '@/services/api';
 import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
 import {
   formatEventCardPriceLabel,
@@ -78,6 +78,7 @@ interface CategoryResult {
     startTime: string;
     coverUrl: string | null;
     entryFee: number | string | null;
+    TicketType?: { price: number | string; quantity?: number }[];
     Place?: {
       id: string;
       name?: string | null;
@@ -85,6 +86,7 @@ interface CategoryResult {
       City?: {
         id: number;
         name: string;
+        country?: string | null;
       } | null;
     } | null;
     address?: string | null;
@@ -131,8 +133,6 @@ function EmptyBlock({
   );
 }
 
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 function estimateCategoryCardHeight(index: number) {
   const imageHeights = [182, 240, 208, 262, 194, 228];
@@ -577,7 +577,7 @@ export default function CategoryDiscoverScreen() {
         const response = await api.get<{ id: string }[]>('/places/saved/mine');
         setSavedPlaceIds(new Set(response.data.map((place) => place.id)));
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await clearAuthState();
           router.replace('/');
           return;
@@ -625,7 +625,7 @@ export default function CategoryDiscoverScreen() {
             return next;
           });
         } catch (error) {
-          if (isUnauthorized(error)) {
+          if (isUnauthorizedError(error)) {
             await clearAuthState();
             router.replace('/');
             return;

@@ -5,7 +5,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 
 import { useI18n } from '@/hooks/use-i18n';
 import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
-import api, { clearAuthState, getApiErrorMessage, getImageUrl, storage } from '@/services/api';
+import api, { clearAuthState, getApiErrorMessage, getImageUrl, isUnauthorizedError, storage } from '@/services/api';
 import { createReport } from '@/services/reports';
 import { getPlacePosts, type PostDetails } from '@/services/posts';
 import { resolveStoredUserSession } from '@/services/user-session';
@@ -62,15 +62,6 @@ interface PlaceReview {
     displayName?: string | null;
     avatarUrl?: string | null;
   } | null;
-}
-
-function isUnauthorizedError(error: unknown) {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    (error as { response?: { status?: number } }).response?.status === 401
-  );
 }
 
 export function usePlaceDetail(placeId?: string) {

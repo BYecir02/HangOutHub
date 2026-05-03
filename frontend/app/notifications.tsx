@@ -16,7 +16,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useScreenAsync } from '@/hooks/useScreenAsync';
 import { formatEventDate } from '@/services/formatters';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import api, { clearAuthState, getApiErrorMessage } from '../services/api';
+import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '../services/api';
 import { getFriendshipOverview } from '../services/friendships';
 import {
   FriendshipOverview,
@@ -124,9 +124,6 @@ export default function NotificationsScreen() {
   const showInvitesCard = activeView === 'all' || activeView === 'invites';
   const showActivity = activeView === 'all' || activeView === 'activity';
 
-  const isUnauthorized = (error: unknown) =>
-    (error as { response?: { status?: number } }).response?.status === 401;
-
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();
     router.replace('/');
@@ -149,7 +146,7 @@ export default function NotificationsScreen() {
         activityItems: activityResponse.data || [],
       };
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return null;
       }

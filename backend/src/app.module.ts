@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -23,9 +25,10 @@ import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ name: 'global', ttl: 60_000, limit: 120 }]),
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'), // Utilise process.cwd() pour être sûr de pointer sur la racine du projet
-      serveRoot: '/uploads', // Rend les fichiers accessibles via http://ip:3000/uploads/...
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
     }),
     UsersModule,
     PrismaModule,
@@ -46,6 +49,6 @@ import { AnalyticsModule } from './analytics/analytics.module';
     AnalyticsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

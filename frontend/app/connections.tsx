@@ -17,8 +17,7 @@ import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChi
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import { useI18n } from '@/hooks/use-i18n';
-import { getApiErrorMessage } from '@/services/api';
-import { clearAuthState } from '@/services/api';
+import { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   getFriendshipOverview,
   removeFriendship,
@@ -47,9 +46,6 @@ export default function ConnectionsScreen() {
     useState<FriendshipOverview>(EMPTY_FRIENDSHIPS);
   const [activeView, setActiveView] = useState<ConnectionsView>('connections');
 
-  const isUnauthorized = (error: unknown) =>
-    (error as { response?: { status?: number } }).response?.status === 401;
-
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();
     router.replace('/');
@@ -71,7 +67,7 @@ export default function ConnectionsScreen() {
       setFriendships(friendshipsData);
       setErrorMessage(null);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -95,7 +91,7 @@ export default function ConnectionsScreen() {
       await removeFriendship(friendshipId);
       await loadConnections();
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

@@ -2,9 +2,8 @@ export type MergeMode = 'prepend' | 'append';
 
 export type FeedLikePost = {
   id: string;
-  images?: string[] | null;
+  images?: string[];
   createdAt?: string | null;
-  [key: string]: unknown;
 };
 
 export type PrefetchUrlOptions = {

@@ -20,7 +20,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import EventFormWizard from '@/components/ui/EventFormWizard';
-import api, { clearAuthState, getApiErrorMessage } from '@/services/api';
+import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import { clearCache } from '@/services/dataCache';
 import { getMySettings } from '@/services/settings';
 
@@ -85,9 +85,6 @@ interface EventPayload {
     endDate?: string | null;
   }[];
 }
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 export default function EditEventScreen() {
   const router = useRouter();
@@ -306,7 +303,7 @@ export default function EditEventScreen() {
         setImages(mergedImages);
         setCoverIndex(0);
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }

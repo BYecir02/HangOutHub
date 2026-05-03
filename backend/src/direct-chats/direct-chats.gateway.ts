@@ -36,10 +36,14 @@ type ClientSocketData = {
   userId?: string;
 };
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : '*';
+
 @WebSocketGateway({
   namespace: '/direct-chats',
   cors: {
-    origin: '*',
+    origin: allowedOrigins,
     credentials: true,
   },
 })

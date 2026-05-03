@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 
 import MediaFrame from '@/components/ui/MediaFrame';
 import { isVideoUrl } from '@/services/media';
-import { getImageUrl, storage } from '../../services/api';
+import { getImageUrl, storage } from '../../../services/api';
 
 const FEED_VIDEO_SOUND_KEY = 'socialFeedVideoMuted';
 

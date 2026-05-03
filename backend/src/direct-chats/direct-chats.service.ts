@@ -204,10 +204,19 @@ export class DirectChatsService {
     });
   }
 
-  async listChats(userId: string) {
+  async listChats(
+    userId: string,
+    options: { limit?: number; cursor?: string } = {},
+  ) {
+    const limit = Math.min(Math.max(options.limit ?? 30, 1), 100);
+    const cursorDate = options.cursor ? new Date(options.cursor) : undefined;
+
     const conversations = await this.prisma.directConversation.findMany({
       where: {
         OR: [{ userOneId: userId }, { userTwoId: userId }],
+        ...(cursorDate
+          ? { updatedAt: { lt: cursorDate } }
+          : {}),
       },
       include: {
         UserOne: { select: userSummarySelect },
@@ -224,38 +233,47 @@ export class DirectChatsService {
         },
       },
       orderBy: { updatedAt: 'desc' },
+      take: limit + 1,
     });
 
-    const unreadCounts = new Map<string, number>();
+    const hasMore = conversations.length > limit;
+    const page = hasMore ? conversations.slice(0, limit) : conversations;
 
-    await Promise.all(
-      conversations.map(async (conversation) => {
-        const lastReadAt =
-          conversation.userOneId === userId
-            ? conversation.userOneLastReadAt
-            : conversation.userTwoLastReadAt;
+    const ids = page.map((c) => c.id);
 
-        const unreadCount = await this.prisma.directMessage.count({
-          where: {
-            conversationId: conversation.id,
-            senderId: { not: userId },
-            ...(lastReadAt
-              ? { OR: [{ sentAt: null }, { sentAt: { gt: lastReadAt } }] }
-              : {}),
-          },
-        });
+    const unreadRows =
+      ids.length > 0
+        ? await this.prisma.$queryRaw<Array<{ conversationId: string; unread: bigint }>>`
+            SELECT dm."conversationId", COUNT(*)::bigint AS unread
+            FROM "DirectMessage" dm
+            JOIN "DirectConversation" dc ON dc.id = dm."conversationId"
+            WHERE dm."conversationId" = ANY(${ids}::uuid[])
+              AND dm."senderId" != ${userId}::uuid
+              AND (
+                (
+                  dc."userOneId" = ${userId}::uuid
+                  AND (dc."userOneLastReadAt" IS NULL OR dm."sentAt" IS NULL OR dm."sentAt" > dc."userOneLastReadAt")
+                )
+                OR (
+                  dc."userTwoId" = ${userId}::uuid
+                  AND (dc."userTwoLastReadAt" IS NULL OR dm."sentAt" IS NULL OR dm."sentAt" > dc."userTwoLastReadAt")
+                )
+              )
+            GROUP BY dm."conversationId"
+          `
+        : [];
 
-        unreadCounts.set(conversation.id, unreadCount);
-      }),
+    const unreadCounts = new Map<string, number>(
+      unreadRows.map((row) => [row.conversationId, Number(row.unread)]),
     );
 
-    return conversations
+    const items = page
       .map((conversation) => ({
         id: conversation.id,
         partner: this.mapPartner(conversation, userId),
         lastMessage: conversation.DirectMessage[0] ?? null,
         messagesCount: conversation._count.DirectMessage,
-        unreadCount: unreadCounts.get(conversation.id) || 0,
+        unreadCount: unreadCounts.get(conversation.id) ?? 0,
         lastMessageAt: conversation.lastMessageAt || conversation.updatedAt,
       }))
       .sort((left, right) => {
@@ -263,6 +281,14 @@ export class DirectChatsService {
         const rightTime = new Date(right.lastMessageAt || 0).getTime();
         return rightTime - leftTime;
       });
+
+    const lastItem = page[page.length - 1];
+    const nextCursor =
+      hasMore && lastItem
+        ? (lastItem.lastMessageAt ?? lastItem.updatedAt ?? new Date()).toISOString()
+        : null;
+
+    return { items, nextCursor, hasMore };
   }
 
   async getConversation(userId: string, conversationId: string) {

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UploadedFiles,
   UseGuards,
@@ -51,8 +52,16 @@ export class OutingsController {
   }
 
   @Get('chats')
-  findChats(@Request() req: AuthenticatedRequest) {
-    return this.outingsService.findChats(req.user.userId);
+  findChats(
+    @Request() req: AuthenticatedRequest,
+    @Query('limit') limitRaw?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    return this.outingsService.findChats(req.user.userId, {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      cursor,
+    });
   }
 
   @Get(':id/messages')

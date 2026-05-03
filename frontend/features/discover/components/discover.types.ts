@@ -76,7 +76,7 @@ export type DiscoverItem =
       subtitle: string;
       meta: string;
       image: string;
-      badge: string;
+      badge: { label: string; color: string };
       actionColor: string;
       targetId: string;
     }
@@ -88,7 +88,7 @@ export type DiscoverItem =
       subtitle: string;
       meta: string;
       image: string;
-      badge: string;
+      badge: { label: string; color: string };
       actionColor: string;
       targetId: string;
     };

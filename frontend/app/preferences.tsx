@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type DimensionValue,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,10 +23,8 @@ import {
   type OnboardingBudgetPreference,
   type OnboardingRadiusPreference,
 } from '@/services/recommendation-onboarding';
-import {
-  syncStoredUserSessionFromApi,
-  type StoredUserSession,
-} from '@/services/user-session';
+import { syncStoredUserSessionFromApi } from '@/services/user-session';
+import type { TranslationKey } from '@/services/i18n';
 import { setStoredLocation, type StoredLocation } from '@/services/location-preferences';
 
 type PreferenceStep = 1 | 2 | 3 | 4 | 5;
@@ -107,7 +106,7 @@ function normalizeMode(value: string | string[] | undefined): PreferencesMode {
   return raw === 'onboarding' ? 'onboarding' : 'edit';
 }
 
-function formatCityLabel(city: PreferenceCity, t: (key: string, params?: Record<string, string | number>) => string) {
+function formatCityLabel(city: PreferenceCity, t: (key: TranslationKey, params?: Record<string, string | number>) => string) {
   return [city.name, city.region, city.country || t('homeLocationCountry')]
     .filter(Boolean)
     .join(' • ');
@@ -565,8 +564,8 @@ export default function PreferencesScreen() {
     router.back();
   }, [isOnboarding, router, step]);
 
-  const progressWidth = `${(step / TOTAL_STEPS) * 100}%`;
-  const primaryButtonColors = isDark
+  const progressWidth: DimensionValue = `${(step / TOTAL_STEPS) * 100}%`;
+  const primaryButtonColors: [string, string] = isDark
     ? (step === 5 ? ['#4c669f', '#ff7a45'] : ['#4c669f', '#2ecc71'])
     : (step === 5 ? ['#3b82f6', '#f97316'] : ['#2563eb', '#10b981']);
 

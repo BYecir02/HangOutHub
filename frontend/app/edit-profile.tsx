@@ -15,15 +15,12 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
-import api, { clearAuthState, getImageUrl } from '../services/api';
+import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '../services/api';
 import {
   buildMediaUploadPayload,
   isMediaFileTooLarge,
   isSupportedMediaAsset,
 } from '@/services/media-upload';
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -61,7 +58,7 @@ export default function EditProfileScreen() {
         coverUrl,
       });
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -144,7 +141,7 @@ export default function EditProfileScreen() {
     } catch (error) {
       console.error(error);
 
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

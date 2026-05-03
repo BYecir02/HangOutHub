@@ -74,13 +74,13 @@ export function useDiscoverScreen() {
       }
 
       const results = await Promise.allSettled([
-        api.get<DiscoverEvent[]>('/events?upcoming=true'),
+        api.get<{ items: DiscoverEvent[]; nextCursor: string | null; hasMore: boolean }>('/events?upcoming=true&limit=100'),
         api.get<DiscoverPlace[]>('/places'),
       ]);
 
       const [eventsResult, placesResult] = results;
       const nextEvents =
-        eventsResult.status === 'fulfilled' ? eventsResult.value.data : [];
+        eventsResult.status === 'fulfilled' ? eventsResult.value.data.items : [];
       const nextPlaces =
         placesResult.status === 'fulfilled' ? placesResult.value.data : [];
 
@@ -283,10 +283,13 @@ export function useDiscoverScreen() {
         subtitle: event.Place?.name || event.City?.name || event.address || '',
         meta: formatEventDate(event.startTime, locale),
         image: getImageUrl(event.coverUrl) || EVENT_PLACEHOLDER_IMAGE,
-        badge:
-          Number(event.entryFee || 0) > 0
-            ? t('discoverEventBadge')
-            : t('discoverEventBadgeFree'),
+        badge: {
+          label:
+            Number(event.entryFee || 0) > 0
+              ? t('discoverEventBadge')
+              : t('discoverEventBadgeFree'),
+          color: '#ff4757',
+        },
         actionColor: '#ff4757',
         targetId: event.id,
       }));
@@ -317,7 +320,7 @@ export function useDiscoverScreen() {
             ? t('discoverPlaceMetaRated', { rating: place.avgRating.toFixed(1) })
             : t('discoverPlaceMetaDiscover'),
         image: getImageUrl(place.coverUrl) || PLACE_PLACEHOLDER_IMAGE,
-        badge: t('discoverPlaceBadge'),
+        badge: { label: t('discoverPlaceBadge'), color: '#2ecc71' },
         actionColor: '#2ecc71',
         targetId: place.id,
       }));

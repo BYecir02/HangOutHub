@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Text,
   TouchableOpacity,
@@ -16,8 +17,8 @@ import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
 import PostMediaGallery from './PostMediaGallery';
 import PostMediaViewer from './PostMediaViewer';
 
-import api, { getApiErrorMessage, getImageUrl } from '../../services/api';
-import { createReport } from '../../services/reports';
+import api, { getApiErrorMessage, getImageUrl } from '../../../services/api';
+import { createReport } from '../../../services/reports';
 
 export interface PostAuthor {
   username?: string | null;
@@ -183,6 +184,7 @@ function PostItem({
     });
   })();
 
+  const isInstagramPresentation = presentation === 'instagram';
   const rawContent = (item.content || '').trim();
   const firstLine = rawContent.split('\n')[0] || '';
   const titleText = firstLine
@@ -224,7 +226,6 @@ function PostItem({
     ? item.Place?.name?.trim() || item.User?.displayName || item.User?.username || t('postItemUserFallback')
     : item.User?.displayName || item.User?.username || t('postItemUserFallback');
   const authorAvatarUri = displayAsPlace ? placeAvatarUri : avatarUri;
-  const isInstagramPresentation = presentation === 'instagram';
 
   useEffect(() => {
     setIsLiked(Boolean(item.isLiked));

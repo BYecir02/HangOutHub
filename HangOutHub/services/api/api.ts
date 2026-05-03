@@ -2,11 +2,11 @@ import axios, { InternalAxiosRequestConfig, isAxiosError } from 'axios';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
-import { safeReplace } from './navigation';
-import { notifyAuthBootstrapReset } from '@/context/auth-bootstrap';
 import { Platform } from 'react-native';
 
-import { getCurrentDataSaver } from './app-preferences';
+import { getCurrentDataSaver } from '../auth/app-preferences';
+import { safeReplace } from './navigation';
+import { notifyAuthBootstrapReset } from '@/context/auth-bootstrap';
 
 const runtimeApiUrl =
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ||
@@ -148,14 +148,16 @@ export const clearAuthState = async () => {
   await storage.removeItem(USER_INFO_KEY);
 
   try {
-    const { disconnectDirectChatSocket } = await import('./direct-chat-realtime');
+    const { disconnectDirectChatSocket } = await import(
+      '../messaging/direct-chat-realtime'
+    );
     disconnectDirectChatSocket();
   } catch {
     // Ignore socket cleanup failures during auth teardown.
   }
 
   try {
-    const { disconnectPostsSocket } = await import('./post-realtime');
+    const { disconnectPostsSocket } = await import('../social/post-realtime');
     disconnectPostsSocket();
   } catch {
     // Ignore socket cleanup failures during auth teardown.
@@ -222,6 +224,7 @@ api.interceptors.response.use(
 
     const shouldTryRefresh =
       status === 401 &&
+      !isSilent401 &&
       !!originalRequest &&
       !originalRequest._retry &&
       !isAuthRoute(originalRequest.url || '');
@@ -277,20 +280,20 @@ export const getApiErrorMessage = (
 
   const message =
     (error.response.data as { message?: string | string[] } | undefined)
-      ?.message || fallback;
+      ?.message;
 
   if (Array.isArray(message)) {
     return message[0] || fallback;
   }
 
-  if (typeof message === 'string') {
+  if (typeof message === 'string' && message.trim()) {
     return message;
   }
 
   return fallback;
 };
 
-export const isApiNetworkError = (error: unknown) => {
+export const isApiNetworkError = (error: unknown): boolean => {
   if (!isAxiosError(error)) {
     return false;
   }
@@ -303,38 +306,17 @@ export const getImageUrl = (url: string | null | undefined) => {
     return null;
   }
 
-  const applyDataSaverOnRemoteUrl = (value: string) => {
-    if (!getCurrentDataSaver()) {
-      return value;
-    }
-
-    try {
-      const parsed = new URL(value);
-
-      if (parsed.hostname.includes('images.unsplash.com')) {
-        const currentWidth = Number(parsed.searchParams.get('w') || 0);
-
-        if (!currentWidth || currentWidth > 720) {
-          parsed.searchParams.set('w', '720');
-        }
-
-        parsed.searchParams.set('q', '60');
-        parsed.searchParams.set('auto', 'format');
-        return parsed.toString();
-      }
-    } catch {
-      return value;
-    }
-
-    return value;
-  };
-
-  if (url.includes('/uploads/')) {
-    const path = url.substring(url.indexOf('/uploads/'));
-    return `${BASE_URL}${path}`;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return getCurrentDataSaver() ? url : url;
   }
 
-  return applyDataSaverOnRemoteUrl(url);
+  return `${BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+export const isUnauthorizedError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const response = (error as { response?: { status?: number } }).response;
+  return response?.status === 401;
 };
 
 export default api;

@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 
 import MediaFrame from '@/components/ui/MediaFrame';
 import { isVideoUrl } from '@/services/media';
-import { getImageUrl } from '../../services/api';
+import { getImageUrl } from '../../../services/api';
 
 interface PostMediaViewerProps {
   visible: boolean;

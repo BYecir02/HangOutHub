@@ -34,8 +34,16 @@ export class DirectChatsController {
   constructor(private readonly directChatsService: DirectChatsService) {}
 
   @Get()
-  list(@Request() req: AuthenticatedRequest) {
-    return this.directChatsService.listChats(req.user.userId);
+  list(
+    @Request() req: AuthenticatedRequest,
+    @Query('limit') limitRaw?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    return this.directChatsService.listChats(req.user.userId, {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      cursor,
+    });
   }
 
   @Post('with/:userId')

@@ -24,7 +24,7 @@ const BOOTSTRAP_LOGO = require('../assets/images/hangouthub-logo-mark-512.png');
 import '../global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { clearAuthState, storage } from '@/services/api';
+import { clearAuthState, isUnauthorizedError, storage } from '@/services/api';
 import {
   getCurrentThemePreference,
   loadAppPreferences,
@@ -49,9 +49,6 @@ import { subscribeAuthBootstrapReset } from '@/context/auth-bootstrap';
 export const unstable_settings = {
   anchor: '(tabs)',
 };
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 const HOME_ROUTE = '/(tabs)/home' as Href;
 const BOOTSTRAP_MIN_DISPLAY_MS = __DEV__ ? 350 : 0;
@@ -239,11 +236,14 @@ export default function RootLayout() {
           return;
         }
 
-        const nextTargetHref = isOrganizerUser(user)
-          ? (getOrganizerEntryPath(user) as Href)
-          : hasCompletedTasteOnboarding(user)
-            ? HOME_ROUTE
-            : ({ pathname: '/preferences', params: { mode: 'onboarding' } } as Href);
+        let fallbackHref: Href = HOME_ROUTE;
+        if (!hasCompletedTasteOnboarding(user)) {
+          fallbackHref = { pathname: '/preferences', params: { mode: 'onboarding' } } as Href;
+        }
+        let nextTargetHref: Href = fallbackHref;
+        if (isOrganizerUser(user)) {
+          nextTargetHref = getOrganizerEntryPath(user) as Href;
+        }
 
         if (isOrganizerUser(user) && !canAccessOrganizerPanel(user)) {
           await clearAuthState();
@@ -270,13 +270,13 @@ export default function RootLayout() {
               await syncAppPreferencesFromSettings(settings);
             }
           } catch (error) {
-            if (isUnauthorized(error)) {
+            if (isUnauthorizedError(error)) {
               await clearAuthState();
             }
           }
         })();
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await clearAuthState();
         }
 

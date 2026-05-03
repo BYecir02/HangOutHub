@@ -14,7 +14,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import api, { storage } from '@/services/api';
+import api, { isUnauthorizedError, storage } from '@/services/api';
 import { setLanguagePreference } from '@/services/app-preferences';
 import { clearOfflineScans, listOfflineScans } from '@/services/organizer-scanner';
 import { normalizeTeamWorkspaceRole } from '@/services/organizer-access';
@@ -33,9 +33,6 @@ import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
 import SettingsSection from '@/components/settings/SettingsSection';
 import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 const REMINDER_PRESETS = [1440, 180, 60] as const;
 const DEFAULT_SCANNER_PREFERENCES: ScannerPreferences = {
@@ -127,7 +124,7 @@ export default function OrganizerSettingsScreen() {
       setScannerPreferences(nextScannerPreferences);
       setOfflineQueueCount(queuedScans.length);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }

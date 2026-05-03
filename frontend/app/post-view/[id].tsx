@@ -14,7 +14,7 @@ import PostItem from '@/components/social/PostItem';
 import BottomSheetModal from '@/components/ui/BottomSheetModal';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import ScreenState from '@/components/ui/ScreenState';
-import { getApiErrorMessage } from '@/services/api';
+import { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   getPostById,
   trackPostShare,
@@ -25,10 +25,6 @@ import { getOrCreateDirectChat, sendDirectMessage } from '@/services/direct-chat
 import PersonRow from '@/components/social/PersonRow';
 import type { SocialUser } from '@/types/social';
 import * as Linking from 'expo-linking';
-import { clearAuthState } from '@/services/api';
-
-const isUnauthorized = (error: unknown) =>
-  (error as { response?: { status?: number } }).response?.status === 401;
 
 export default function PostViewScreen() {
   const router = useRouter();
@@ -67,7 +63,7 @@ export default function PostViewScreen() {
       setPost(response);
       setErrorMessage(null);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -121,7 +117,7 @@ export default function PostViewScreen() {
       setConnectionsLoaded(true);
       setConnectionsErrorMessage(null);
     } catch (error) {
-      if (isUnauthorized(error)) {
+      if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
@@ -189,7 +185,7 @@ export default function PostViewScreen() {
           params: { id: chat.id },
         });
       } catch (error) {
-        if (isUnauthorized(error)) {
+        if (isUnauthorizedError(error)) {
           await handleInvalidSession();
           return;
         }

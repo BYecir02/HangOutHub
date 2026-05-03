@@ -422,7 +422,7 @@ export class AnalyticsService {
         reason: true,
         status: true,
         createdAt: true,
-        User: {
+        Reporter: {
           select: {
             id: true,
             username: true,
@@ -439,7 +439,7 @@ export class AnalyticsService {
       reason: row.reason,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
-      reporter: row.User,
+      reporter: row.Reporter,
     }));
   }
 
