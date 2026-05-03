@@ -18,7 +18,7 @@ import PostMediaGallery from './PostMediaGallery';
 import PostMediaViewer from './PostMediaViewer';
 
 import api, { getApiErrorMessage, getImageUrl } from '../../../services/api';
-import { createReport } from '../../../services/reports';
+import { createReport } from '@/services/social/reports';
 
 export interface PostAuthor {
   username?: string | null;

@@ -27,11 +27,11 @@ import SocialFeedHeader from './SocialFeedHeader';
 import { resolvePostOwnership } from './post-ownership';
 import { SkeletonBlock } from '../../../shared/ui/Skeleton';
 import api, { getImageUrl } from '../../../services/api';
-import { getFriendshipOverview } from '../../../services/friendships';
-import { getOrCreateDirectChat, sendDirectMessage } from '../../../services/direct-chats';
-import { getPostsSocket } from '../../../services/post-realtime';
-import { subscribeToPostChanges, type PostChangedPayload } from '../../../services/post-events';
-import { resolveStoredUserSession } from '../../../services/user-session';
+import { getFriendshipOverview } from '@/services/user/friendships';
+import { getOrCreateDirectChat, sendDirectMessage } from '@/services/messaging/direct-chats';
+import { getPostsSocket } from '@/services/social/post-realtime';
+import { subscribeToPostChanges, type PostChangedPayload } from '@/services/social/post-events';
+import { resolveStoredUserSession } from '@/services/auth/user-session';
 import { isVideoUrl } from '@/services/shared/media';
 import {
   collectPrefetchUrls,

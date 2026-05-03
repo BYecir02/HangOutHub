@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { PlatformPressable } from '@react-navigation/elements';
 
-import { HapticTab } from '@/components/haptic-tab';
+import { HapticTab } from '@/shared/ui/haptic-tab';
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
