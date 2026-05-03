@@ -1,7 +1,7 @@
 import React from 'react';
 
 import HomeContent from '@/features/user/components/HomeContent';
-import { useHomeScreen } from '@/features/user/hooks/useHomeScreen';
+import { useHomeScreen } from '../hooks/useHomeScreen';
 
 export default function HomeScreen() {
   const {
@@ -9,6 +9,7 @@ export default function HomeScreen() {
     featuredInspiration,
     handleCategoryPress,
     handleTogglePlaceSave,
+    hasPersonalization,
     loading,
     locationLabel,
     notificationCount,
@@ -30,6 +31,7 @@ export default function HomeScreen() {
       recommendedInspiration={recommendedInspiration}
       savedPlaceIds={savedPlaceIds}
       savingPlaceIds={savingPlaceIds}
+      hasPersonalization={hasPersonalization}
       onRefresh={onRefresh}
       onPressCategory={handleCategoryPress}
       onTogglePlaceSave={handleTogglePlaceSave}

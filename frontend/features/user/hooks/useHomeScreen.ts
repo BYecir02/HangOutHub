@@ -747,11 +747,16 @@ export function useHomeScreen() {
     [router],
   );
 
+  const hasPersonalization =
+    recommendationPreferences.tagIds.length > 0 ||
+    recommendationPreferences.cityIds.length > 0;
+
   return {
     categories,
     featuredInspiration,
     handleCategoryPress,
     handleTogglePlaceSave,
+    hasPersonalization,
     loading,
     locationLabel: locationValueLabel,
     notificationCount,

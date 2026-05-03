@@ -15,14 +15,14 @@ import ScreenState from '@/shared/ui/ScreenState';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useScreenAsync } from '@/shared/hooks/useScreenAsync';
 import { formatEventDate } from '@/services/shared/formatters';
-import SocialEmptyState from '../features/social/components/SocialEmptyState';
-import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '../services/api';
+import SocialEmptyState from '@/features/social/components/SocialEmptyState';
+import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import { getFriendshipOverview } from '@/services/user/friendships';
 import {
   FriendshipOverview,
   NotificationActivityItem,
   OutingInvitation,
-} from '../types/social';
+} from '@/types/social';
 
 const EMPTY_FRIENDSHIPS: FriendshipOverview = {
   counts: {

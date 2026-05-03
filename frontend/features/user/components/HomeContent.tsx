@@ -26,6 +26,7 @@ interface HomeContentProps {
   recommendedInspiration: HomeRecommendationItem[];
   savedPlaceIds: Set<string>;
   savingPlaceIds: Set<string>;
+  hasPersonalization: boolean;
   onRefresh: () => void;
   onPressCategory: (categoryId: number) => void;
   onTogglePlaceSave: (placeId: string) => void;
@@ -41,6 +42,7 @@ export default function HomeContent({
   recommendedInspiration,
   savedPlaceIds,
   savingPlaceIds,
+  hasPersonalization,
   onRefresh,
   onPressCategory,
   onTogglePlaceSave,
@@ -66,6 +68,7 @@ export default function HomeContent({
           locationLabel={t('homeLocationLabel')}
           onLocationPress={() => router.push('/location')}
           onNotificationPress={() => router.push('/notifications')}
+          transparent
         />
       </View>
 
@@ -112,7 +115,7 @@ export default function HomeContent({
         />
 
         <HomeRecommendedSection
-          title={t('homeRecommended')}
+          title={hasPersonalization ? t('homeRecommended') : t('homeTopPicks')}
           seeAllLabel={t('homeSeeAll')}
           emptyMessage={t('homeNoSuggestions')}
           items={recommendedInspiration}

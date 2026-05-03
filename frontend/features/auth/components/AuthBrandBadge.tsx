@@ -6,7 +6,7 @@ type AuthBrandBadgeProps = {
   showName?: boolean;
 };
 
-const BRAND_MARK = require('../../assets/images/hangouthub-logo-mark-512.png');
+const BRAND_MARK = require('../../../assets/images/hangouthub-logo-mark-512.png');
 
 export default function AuthBrandBadge({
   isDark,

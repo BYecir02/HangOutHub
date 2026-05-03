@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const BRAND_MARK = require('../../assets/images/hangouthub-logo-dark.png');
+const BRAND_MARK = require('../../../assets/images/hangouthub-logo-dark.png');
 
 type PlaceCoverFallbackProps = {
   className?: string;

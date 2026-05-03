@@ -3,8 +3,6 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
-  FlatList,
-  RefreshControl,
   Text,
   TouchableOpacity,
   View,
@@ -13,14 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { Socket } from 'socket.io-client';
 
-import DirectConversationCard from '@/features/messaging/components/DirectConversationCard';
-import OutingConversationCard, {
-  type OutingConversationSummary,
-} from '@/features/messaging/components/OutingConversationCard';
+import MessagesDirectChatsList from '@/features/messaging/components/MessagesDirectChatsList';
+import MessagesOutingsList from '@/features/messaging/components/MessagesOutingsList';
+import MessagesTabBar from '@/features/messaging/components/MessagesTabBar';
+import type { OutingConversationSummary } from '@/features/messaging/components/OutingConversationCard';
 import PersonRow from '@/features/social/components/PersonRow';
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import BottomSheetListModal from '@/shared/ui/BottomSheetListModal';
-import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import SearchBar from '@/shared/ui/SearchBar';
 import { useI18n } from '@/shared/hooks/use-i18n';
@@ -527,38 +525,7 @@ export default function MessagesScreen() {
         }
       />
 
-      <View className="px-5 pb-2">
-        <View className="flex-row rounded-full bg-gray-200 p-1 dark:bg-gray-900">
-          <TouchableOpacity
-            onPress={() => setTab('outings')}
-            className={`flex-1 items-center rounded-full px-4 py-2 ${
-              tab === 'outings' ? 'bg-[#4c669f]' : 'bg-transparent'
-            }`}
-          >
-            <Text
-              className={`text-xs font-semibold ${
-                tab === 'outings' ? 'text-white' : 'text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              {t('messagesTabOutings')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTab('direct')}
-            className={`flex-1 items-center rounded-full px-4 py-2 ${
-              tab === 'direct' ? 'bg-[#4c669f]' : 'bg-transparent'
-            }`}
-          >
-            <Text
-              className={`text-xs font-semibold ${
-                tab === 'direct' ? 'text-white' : 'text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              {t('messagesTabDirect')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <MessagesTabBar activeTab={tab} onTabChange={setTab} />
 
       {showSyncWarning ? (
         <View className="mx-5 mb-3 rounded-2xl bg-orange-100 px-4 py-3 dark:bg-orange-900/30">
@@ -568,116 +535,32 @@ export default function MessagesScreen() {
         </View>
       ) : null}
 
-      <View className="pb-4">
-        {tab === 'outings' ? (
-          <FilterChipsBar
-            options={outingFilterOptions}
-            activeKey={filter}
-            onChange={setFilter}
-            paddingTop={10}
-            paddingBottom={0}
-          />
-        ) : null}
-      </View>
-
       {tab === 'outings' ? (
-        <FlatList
-            data={filteredChats}
-            keyExtractor={(item) => item.id}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => void loadChats({ isRefresh: true })}
-                tintColor="#4c669f"
-              />
-            }
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
-            onEndReached={() => void loadMoreChats()}
-            onEndReachedThreshold={0.3}
-            ListFooterComponent={
-              chatsLoadingMore ? (
-                <View className="py-4 items-center">
-                  <ActivityIndicator size="small" color="#4c669f" />
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              <View className="mt-16 items-center px-6">
-                <Text className="text-base text-gray-500 dark:text-gray-400">
-                  {t('messagesEmptyTitle')}
-                </Text>
-                <Text className="mt-2 text-center text-sm text-gray-400 dark:text-gray-500">
-                  {t('messagesEmptyDescription')}
-                </Text>
-              </View>
-            }
-            renderItem={({ item }) => {
-              return (
-                <OutingConversationCard
-                  item={item}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/outing-chat/[id]',
-                      params: { id: item.id },
-                    })
-                  }
-                />
-              );
-            }}
-          />
+        <MessagesOutingsList
+          data={filteredChats}
+          refreshing={refreshing}
+          onRefresh={() => void loadChats({ isRefresh: true })}
+          onEndReached={() => void loadMoreChats()}
+          loadingMore={chatsLoadingMore}
+          onPressItem={(id) =>
+            router.push({ pathname: '/outing-chat/[id]', params: { id } })
+          }
+          filterOptions={outingFilterOptions}
+          activeFilter={filter}
+          onFilterChange={setFilter}
+        />
       ) : (
-        <FlatList
-            data={filteredDirectChats}
-            keyExtractor={(item) => item.id}
-            refreshControl={
-              <RefreshControl
-                refreshing={directRefreshing}
-                onRefresh={() => void loadDirectChats({ isRefresh: true })}
-                tintColor="#4c669f"
-              />
-            }
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
-            onEndReached={() => void loadMoreDirectChats()}
-            onEndReachedThreshold={0.3}
-            ListFooterComponent={
-              directLoadingMore ? (
-                <View className="py-4 items-center">
-                  <ActivityIndicator size="small" color="#4c669f" />
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              <View className="mt-16 items-center px-6">
-                <Text className="text-base text-gray-500 dark:text-gray-400">
-                  {t('directChatListEmptyTitle')}
-                </Text>
-                <Text className="mt-2 text-center text-sm text-gray-400 dark:text-gray-500">
-                  {t('directChatListEmptyDescription')}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => void openConnectionPicker()}
-                  className="mt-5 rounded-2xl bg-[#4c669f] px-4 py-2.5"
-                >
-                  <Text className="text-sm font-semibold text-white">
-                    {t('messagesDirectPickerOpenAction')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            }
-            renderItem={({ item }) => {
-              return (
-                <DirectConversationCard
-                  item={item}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/direct-chat/[id]',
-                      params: { id: item.id },
-                    })
-                  }
-                />
-              );
-            }}
-          />
+        <MessagesDirectChatsList
+          data={filteredDirectChats}
+          refreshing={directRefreshing}
+          onRefresh={() => void loadDirectChats({ isRefresh: true })}
+          onEndReached={() => void loadMoreDirectChats()}
+          loadingMore={directLoadingMore}
+          onPressItem={(id) =>
+            router.push({ pathname: '/direct-chat/[id]', params: { id } })
+          }
+          onOpenConnectionPicker={() => void openConnectionPicker()}
+        />
       )}
 
       <BottomSheetModal

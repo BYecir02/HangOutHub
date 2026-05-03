@@ -18,8 +18,8 @@ import {
   formatStatusLabel,
   normalizeStatus,
 } from '@/services/shared/formatters';
-import api, { getImageUrl } from '../../services/api';
-import { FriendshipOverview } from '../../types/social';
+import api, { getImageUrl } from '@/services/api';
+import { FriendshipOverview } from '@/types/social';
 
 interface OutingParticipant {
   userId: string;

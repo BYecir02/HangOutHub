@@ -8,15 +8,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import PersonActionButton from '../features/social/components/PersonActionButton';
-import SocialCountChip from '../features/social/components/SocialCountChip';
-import SocialEmptyState from '../features/social/components/SocialEmptyState';
+import PersonActionButton from '@/features/social/components/PersonActionButton';
+import SocialCountChip from '@/features/social/components/SocialCountChip';
+import SocialEmptyState from '@/features/social/components/SocialEmptyState';
 import { EntityRowCard } from '@/shared/ui/EntityCard';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import api, { getApiErrorMessage, getImageUrl } from '../services/api';
-import { OutingInvitation } from '../types/social';
+import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
+import { OutingInvitation } from '@/types/social';
 
 const OUTING_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

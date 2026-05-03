@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   Text,
   TouchableOpacity,
   View,
@@ -9,6 +8,7 @@ import {
 import EventInspirationCard from '@/features/events/components/EventInspirationCard';
 import MasonryGrid from '@/shared/ui/MasonryGrid';
 import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
 import { estimateRecommendationCardHeight } from './home.utils';
@@ -29,6 +29,8 @@ interface HomeRecommendedSectionProps {
   onTogglePlaceSave: (placeId: string) => void;
   registerLayout: (itemId: string, layout: HomeVisibleLayout) => void;
 }
+
+const SKELETON_HEIGHTS = [182, 240, 208, 262, 194, 228];
 
 export default function HomeRecommendedSection({
   title,
@@ -57,7 +59,18 @@ export default function HomeRecommendedSection({
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#f39c12" className="mt-4" />
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1, gap: 12 }}>
+            {SKELETON_HEIGHTS.filter((_, i) => i % 2 === 0).map((h, i) => (
+              <SkeletonBlock key={i} style={{ height: h, borderRadius: 14 }} />
+            ))}
+          </View>
+          <View style={{ flex: 1, gap: 12 }}>
+            {SKELETON_HEIGHTS.filter((_, i) => i % 2 === 1).map((h, i) => (
+              <SkeletonBlock key={i} style={{ height: h, borderRadius: 14 }} />
+            ))}
+          </View>
+        </View>
       ) : items.length > 0 ? (
         <MasonryGrid
           items={items}

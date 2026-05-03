@@ -12,8 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '../../services/api';
-import PostItem from '../../features/social/components/PostItem';
+import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '@/services/api';
+import PostItem from '@/features/social/components/PostItem';
 
 interface PublicUserProfile {
   id: string;

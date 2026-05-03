@@ -1,7 +1,7 @@
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import SocialFeed from '../../features/social/components/SocialFeed';
+import SocialFeed from '@/features/social/components/SocialFeed';
 
 export default function SocialScreen() {
   return (

@@ -9,10 +9,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import PersonActionButton from '../features/social/components/PersonActionButton';
-import PersonRow from '../features/social/components/PersonRow';
-import SocialCountChip from '../features/social/components/SocialCountChip';
-import SocialEmptyState from '../features/social/components/SocialEmptyState';
+import PersonActionButton from '@/features/social/components/PersonActionButton';
+import PersonRow from '@/features/social/components/PersonRow';
+import SocialCountChip from '@/features/social/components/SocialCountChip';
+import SocialEmptyState from '@/features/social/components/SocialEmptyState';
 import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
@@ -22,7 +22,7 @@ import {
   getFriendshipOverview,
   removeFriendship,
 } from '@/services/user/friendships';
-import { FriendshipOverview } from '../types/social';
+import { FriendshipOverview } from '@/types/social';
 
 const EMPTY_FRIENDSHIPS: FriendshipOverview = {
   counts: {

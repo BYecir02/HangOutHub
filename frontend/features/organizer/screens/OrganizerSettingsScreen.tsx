@@ -3,14 +3,10 @@ import {
   Alert,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/features/user/hooks/useUserProfile';
@@ -31,44 +27,20 @@ import {
 } from '@/services/user/settings';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
-import SettingsSection from '@/features/user/components/SettingsSection';
-import SettingsToggleRow from '@/features/user/components/SettingsToggleRow';
-
-const REMINDER_PRESETS = [1440, 180, 60] as const;
-const DEFAULT_SCANNER_PREFERENCES: ScannerPreferences = {
-  continuousScan: false,
-  defaultTorchEnabled: false,
-  defaultCameraFacing: 'back',
-  ticketInfoMode: 'detailed',
-};
-
-function formatReminderOffset(offsetMin: number) {
-  if (offsetMin % 1440 === 0) {
-    const days = offsetMin / 1440;
-    return days === 1 ? '1 jour' : `${days} jours`;
-  }
-
-  if (offsetMin % 60 === 0) {
-    const hours = offsetMin / 60;
-    return hours === 1 ? '1 heure' : `${hours} heures`;
-  }
-
-  return `${offsetMin} min`;
-}
-
-function normalizeReminderOffsets(offsets: number[]) {
-  return Array.from(
-    new Set(offsets.filter((offset) => Number.isInteger(offset))),
-  )
-    .filter((offset) => offset >= 15 && offset <= 10080)
-    .sort((a, b) => b - a)
-    .slice(0, 3);
-}
+import {
+  DEFAULT_SCANNER_PREFERENCES,
+  REMINDER_PRESETS,
+  normalizeReminderOffsets,
+} from '@/features/organizer/utils/settings-helpers';
+import OrganizerNotificationsSection from '@/features/organizer/components/settings/OrganizerNotificationsSection';
+import OrganizerScannerSection from '@/features/organizer/components/settings/OrganizerScannerSection';
+import OrganizerDefaultsSection from '@/features/organizer/components/settings/OrganizerDefaultsSection';
+import OrganizerTeamSection from '@/features/organizer/components/settings/OrganizerTeamSection';
+import OrganizerAccountSection from '@/features/organizer/components/settings/OrganizerAccountSection';
 
 export default function OrganizerSettingsScreen() {
   const router = useRouter();
   const { t } = useI18n();
-  const isDark = useColorScheme() === 'dark';
   const {
     user,
     loading: profileLoading,
@@ -403,479 +375,40 @@ export default function OrganizerSettingsScreen() {
       />
 
       {!isScannerWorkspace ? (
-        <SettingsSection title={t('organizerSettingsSectionNotifications')} containerClassName="mb-5">
-        <SettingsToggleRow
-          label={t('organizerSettingsNotifyBookings')}
-          value={settings.organizerNotifyBookings}
-          onValueChange={(next) => patch('organizerNotifyBookings', next)}
+        <OrganizerNotificationsSection
+          settings={settings}
+          customReminderInput={customReminderInput}
+          onCustomReminderInputChange={setCustomReminderInput}
+          onPatch={patch}
+          onSetSettings={setSettings}
+          onAddReminderOffset={addReminderOffset}
+          onRemoveReminderOffset={removeReminderOffset}
+          onAddCustomReminderFromInput={addCustomReminderFromInput}
         />
-        <SettingsToggleRow
-          label={t('organizerSettingsNotifyTeam')}
-          value={settings.organizerNotifyTeamUpdates}
-          onValueChange={(next) => patch('organizerNotifyTeamUpdates', next)}
-        />
-        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('organizerSettingsReminderMode')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['preset', 'custom'] as const).map((mode) => {
-              const active = settings.organizerReminderMode === mode;
-              return (
-                <TouchableOpacity
-                  key={mode}
-                  onPress={() => {
-                    setSettings((current) => {
-                      if (!current) {
-                        return current;
-                      }
-
-                      if (mode === 'preset') {
-                        return {
-                          ...current,
-                          organizerReminderMode: 'preset',
-                          organizerReminderOffsetsMin: [...REMINDER_PRESETS],
-                        };
-                      }
-
-                      return {
-                        ...current,
-                        organizerReminderMode: 'custom',
-                        organizerReminderOffsetsMin: normalizeReminderOffsets(
-                          current.organizerReminderOffsetsMin || [...REMINDER_PRESETS],
-                        ),
-                      };
-                    });
-                  }}
-                  className={`rounded-full px-3 py-2 ${
-                    active
-                      ? 'bg-[#4c669f]'
-                      : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {mode === 'preset'
-                      ? t('organizerSettingsReminderModePreset')
-                      : t('organizerSettingsReminderModeCustom')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {settings.organizerReminderMode === 'preset' ? (
-            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {t('organizerSettingsReminderPresetHelp')}
-            </Text>
-          ) : null}
-        </View>
-
-        {settings.organizerReminderMode === 'custom' ? (
-          <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-            <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-              {t('organizerSettingsReminderCustomTitle')}
-            </Text>
-
-            <View className="flex-row flex-wrap gap-2">
-              {REMINDER_PRESETS.map((offset) => {
-                const isSelected = (settings.organizerReminderOffsetsMin || []).includes(
-                  offset,
-                );
-                return (
-                  <TouchableOpacity
-                    key={offset}
-                    onPress={() => addReminderOffset(offset)}
-                    disabled={isSelected}
-                    className={`rounded-full px-3 py-2 ${
-                      isSelected
-                        ? 'bg-[#92A5C7]'
-                        : 'bg-gray-200 dark:bg-gray-800'
-                    }`}
-                  >
-                    <Text className="text-xs font-semibold text-gray-800 dark:text-gray-100">
-                      {formatReminderOffset(offset)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View className="mt-3 flex-row items-center gap-2">
-              <TextInput
-                value={customReminderInput}
-                onChangeText={setCustomReminderInput}
-                keyboardType="numeric"
-                placeholder={t('organizerSettingsReminderCustomPlaceholder')}
-                placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
-                className="flex-1 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
-              />
-              <TouchableOpacity
-                onPress={addCustomReminderFromInput}
-                className="rounded-xl bg-[#4c669f] px-4 py-3"
-              >
-                <Text className="text-xs font-semibold text-white">
-                  {t('organizerSettingsReminderAdd')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {t('organizerSettingsReminderCustomHint')}
-            </Text>
-
-            <View className="mt-3 flex-row flex-wrap gap-2">
-              {(settings.organizerReminderOffsetsMin || []).map((offset) => (
-                <TouchableOpacity
-                  key={`reminder-${offset}`}
-                  onPress={() => removeReminderOffset(offset)}
-                  className="rounded-full bg-[#4c669f]/10 px-3 py-2"
-                >
-                  <Text className="text-xs font-semibold text-[#4c669f]">
-                    {formatReminderOffset(offset)} x
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ) : null}
-        <View className="px-4 py-3">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('organizerSettingsPriorityMin')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['IMPORTANT', 'URGENT'] as const).map((level) => {
-              const active = settings.organizerNotificationPriorityMin === level;
-              return (
-                <TouchableOpacity
-                  key={level}
-                  onPress={() => patch('organizerNotificationPriorityMin', level)}
-                  className={`rounded-full px-3 py-2 ${
-                    active
-                      ? 'bg-[#4c669f]'
-                      : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {level}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-        </SettingsSection>
       ) : null}
 
-      <SettingsSection
-        title={
-          isScannerWorkspace
-            ? t('organizerSettingsSectionScannerWorkspace')
-            : t('organizerSettingsSectionScanner')
-        }
-        containerClassName="mb-5"
-      >
-        {isScannerWorkspace ? (
-          <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-            <Text className="text-xs text-gray-500 dark:text-gray-400">
-              {t('organizerSettingsScannerWorkspaceHint')}
-            </Text>
-          </View>
-        ) : null}
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerOfflineAuto')}
-          value={settings.organizerScannerOfflineAuto}
-          onValueChange={(next) => patch('organizerScannerOfflineAuto', next)}
-        />
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerAutoSync')}
-          value={settings.organizerScannerAutoSync}
-          onValueChange={(next) => patch('organizerScannerAutoSync', next)}
-        />
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerHaptics')}
-          value={settings.organizerScannerHaptics}
-          onValueChange={(next) => patch('organizerScannerHaptics', next)}
-        />
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerSound')}
-          value={settings.organizerScannerSound}
-          onValueChange={(next) => patch('organizerScannerSound', next)}
-        />
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerStrictWindow')}
-          value={settings.organizerScannerStrictWindow}
-          onValueChange={(next) => patch('organizerScannerStrictWindow', next)}
-        />
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerContinuousScan')}
-          value={scannerPreferences.continuousScan}
-          onValueChange={(next) => patchScanner('continuousScan', next)}
-        />
-        <SettingsToggleRow
-          label={t('organizerSettingsScannerTorchDefault')}
-          value={scannerPreferences.defaultTorchEnabled}
-          onValueChange={(next) => patchScanner('defaultTorchEnabled', next)}
-        />
-
-        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('organizerSettingsScannerCameraFacing')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['back', 'front'] as const).map((cameraFacing) => {
-              const active = scannerPreferences.defaultCameraFacing === cameraFacing;
-              return (
-                <TouchableOpacity
-                  key={cameraFacing}
-                  onPress={() => patchScanner('defaultCameraFacing', cameraFacing)}
-                  className={`rounded-full px-3 py-2 ${
-                    active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {cameraFacing === 'back'
-                      ? t('organizerSettingsScannerCameraBack')
-                      : t('organizerSettingsScannerCameraFront')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('organizerSettingsScannerTicketInfoMode')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['detailed', 'compact'] as const).map((ticketInfoMode) => {
-              const active = scannerPreferences.ticketInfoMode === ticketInfoMode;
-              return (
-                <TouchableOpacity
-                  key={ticketInfoMode}
-                  onPress={() => patchScanner('ticketInfoMode', ticketInfoMode)}
-                  className={`rounded-full px-3 py-2 ${
-                    active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {ticketInfoMode === 'detailed'
-                      ? t('organizerSettingsScannerTicketInfoDetailed')
-                      : t('organizerSettingsScannerTicketInfoCompact')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('settingsLanguage')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['fr', 'en'] as const).map((languageCode) => {
-              const active = settings.language === languageCode;
-              return (
-                <TouchableOpacity
-                  key={languageCode}
-                  onPress={() => patch('language', languageCode)}
-                  className={`rounded-full px-3 py-2 ${
-                    active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {languageCode === 'fr'
-                      ? t('settingsLanguageFrench')
-                      : t('settingsLanguageEnglish')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View className="px-4 py-3">
-          <Text className="text-xs text-gray-500 dark:text-gray-400">
-            {t('organizerSettingsScannerOfflinePendingCount', {
-              count: offlineQueueCount,
-            })}
-          </Text>
-          <TouchableOpacity
-            onPress={clearOfflineQueue}
-            className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-500/50 dark:bg-red-500/10"
-          >
-            <Text className="text-center text-xs font-semibold text-red-600 dark:text-red-300">
-              {t('organizerSettingsScannerOfflineClearAction')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SettingsSection>
+      <OrganizerScannerSection
+        settings={settings}
+        scannerPreferences={scannerPreferences}
+        offlineQueueCount={offlineQueueCount}
+        isScannerWorkspace={isScannerWorkspace}
+        onPatch={patch}
+        onPatchScanner={patchScanner}
+        onClearOfflineQueue={clearOfflineQueue}
+      />
 
       {!isScannerWorkspace ? (
-        <SettingsSection title={t('organizerSettingsSectionDefaults')} containerClassName="mb-5">
-        <View className="p-4">
-        <Text className="text-xs text-gray-500 dark:text-gray-400">
-          {t('organizerSettingsDefaultCheckInOpen')}
-        </Text>
-        <TextInput
-          value={String(settings.organizerDefaultCheckInOpenOffsetMin)}
-          onChangeText={(value) => {
-            const parsed = Number(value);
-            if (Number.isFinite(parsed)) {
-              patch('organizerDefaultCheckInOpenOffsetMin', Math.trunc(parsed));
-            }
-          }}
-          keyboardType="numbers-and-punctuation"
-          className="mt-1 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
+        <OrganizerDefaultsSection
+          settings={settings}
+          onPatch={patch}
         />
-
-        <Text className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          {t('organizerSettingsDefaultCheckInClose')}
-        </Text>
-        <TextInput
-          value={String(settings.organizerDefaultCheckInCloseOffsetMin)}
-          onChangeText={(value) => {
-            const parsed = Number(value);
-            if (Number.isFinite(parsed)) {
-              patch('organizerDefaultCheckInCloseOffsetMin', Math.trunc(parsed));
-            }
-          }}
-          keyboardType="numbers-and-punctuation"
-          className="mt-1 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
-        />
-
-        <Text className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          {t('organizerSettingsDefaultMaxTickets')}
-        </Text>
-        <TextInput
-          value={String(settings.organizerDefaultMaxTicketsPerUser)}
-          onChangeText={(value) => {
-            const parsed = Number(value);
-            if (Number.isFinite(parsed)) {
-              patch('organizerDefaultMaxTicketsPerUser', Math.trunc(parsed));
-            }
-          }}
-          keyboardType="numeric"
-          className="mt-1 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
-        />
-
-        <Text className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          {t('organizerSettingsDefaultCancellationPolicy')}
-        </Text>
-        <TextInput
-          value={settings.organizerDefaultCancellationPolicy || ''}
-          onChangeText={(value) => patch('organizerDefaultCancellationPolicy', value)}
-          multiline
-          className="mt-1 h-20 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
-          textAlignVertical="top"
-        />
-
-        <Text className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          {t('organizerSettingsDefaultRefundPolicy')}
-        </Text>
-        <TextInput
-          value={settings.organizerDefaultRefundPolicy || ''}
-          onChangeText={(value) => patch('organizerDefaultRefundPolicy', value)}
-          multiline
-          className="mt-1 h-20 rounded-xl bg-gray-100 px-3 py-3 text-gray-900 dark:bg-gray-800 dark:text-white"
-          textAlignVertical="top"
-        />
-        </View>
-        </SettingsSection>
       ) : null}
 
       {!isScannerWorkspace ? (
-        <SettingsSection title={t('organizerSettingsSectionTeam')} containerClassName="mb-5">
-        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('organizerSettingsTeamInviteScope')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['OWNER_ONLY', 'OWNER_AND_EDITORS'] as const).map((scope) => {
-              const active = settings.organizerTeamInviteScope === scope;
-              return (
-                <TouchableOpacity
-                  key={scope}
-                  onPress={() => patch('organizerTeamInviteScope', scope)}
-                  className={`rounded-full px-3 py-2 ${
-                    active
-                      ? 'bg-[#4c669f]'
-                      : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {scope === 'OWNER_ONLY'
-                      ? t('organizerSettingsTeamInviteOwnerOnly')
-                      : t('organizerSettingsTeamInviteOwnerEditors')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-          <Text className="mb-2 text-sm text-gray-700 dark:text-gray-200">
-            {t('organizerSettingsTeamDefaultPermission')}
-          </Text>
-          <View className="flex-row gap-2">
-            {(['EDIT', 'SCAN'] as const).map((permission) => {
-              const active = settings.organizerTeamDefaultPermission === permission;
-              return (
-                <TouchableOpacity
-                  key={permission}
-                  onPress={() => patch('organizerTeamDefaultPermission', permission)}
-                  className={`rounded-full px-3 py-2 ${
-                    active
-                      ? 'bg-[#4c669f]'
-                      : 'bg-gray-200 dark:bg-gray-800'
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      active ? 'text-white' : 'text-gray-700 dark:text-gray-200'
-                    }`}
-                  >
-                    {permission}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <SettingsToggleRow
-          label={t('organizerSettingsTeamRequireRemovalConfirm')}
-          value={settings.organizerTeamRequireRemovalConfirm}
-          withBorder={false}
-          onValueChange={(next) => patch('organizerTeamRequireRemovalConfirm', next)}
+        <OrganizerTeamSection
+          settings={settings}
+          onPatch={patch}
         />
-        </SettingsSection>
       ) : null}
 
       <TouchableOpacity
@@ -892,45 +425,12 @@ export default function OrganizerSettingsScreen() {
         </Text>
       </TouchableOpacity>
 
-      <SettingsSection title={t('organizerSettingsSectionAccount')} containerClassName="mt-3 mb-16">
-        <TouchableOpacity
-          onPress={() => router.replace('/(tabs)/home')}
-          className="flex-row items-center justify-between border-b border-gray-100 px-4 py-4 dark:border-gray-800"
-        >
-          <View className="flex-row items-center">
-            <View className="mr-3 rounded-full bg-gray-100 p-2 dark:bg-gray-800">
-              <Ionicons name="swap-horizontal-outline" size={16} color="#4c669f" />
-            </View>
-            <Text className="text-sm font-medium text-gray-800 dark:text-gray-100">
-              {t('organizerExitPanel')}
-            </Text>
-          </View>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={isDark ? '#9ca3af' : '#6b7280'}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleLogout}
-          className="flex-row items-center justify-between px-4 py-4"
-        >
-          <View className="flex-row items-center">
-            <View className="mr-3 rounded-full bg-gray-100 p-2 dark:bg-gray-800">
-              <Ionicons name="log-out-outline" size={16} color="#ff4757" />
-            </View>
-            <Text className="text-sm font-medium text-gray-800 dark:text-gray-100">
-              {t('settingsLogout')}
-            </Text>
-          </View>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={isDark ? '#9ca3af' : '#6b7280'}
-          />
-        </TouchableOpacity>
-      </SettingsSection>
+      <OrganizerAccountSection
+        onExitPanel={() => router.replace('/(tabs)/home')}
+        onLogout={() => {
+          void handleLogout();
+        }}
+      />
     </ScrollView>
   );
 }

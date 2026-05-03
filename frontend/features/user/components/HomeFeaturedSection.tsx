@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Text,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 
 import EventInspirationCard from '@/features/events/components/EventInspirationCard';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
 import type { HomeFeaturedItem } from './home.types';
@@ -42,9 +42,10 @@ export default function HomeFeaturedSection({
       setFeaturedIndex(0);
       return;
     }
-
     setFeaturedIndex((current) => Math.min(current, items.length - 1));
   }, [items.length]);
+
+  const centerPadding = Math.round((width - featuredCardWidth) / 2);
 
   return (
     <View className="mt-2">
@@ -58,7 +59,12 @@ export default function HomeFeaturedSection({
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
+        <View style={{ paddingHorizontal: centerPadding }}>
+          <SkeletonBlock style={{ height: 190, borderRadius: 14 }} />
+          <SkeletonBlock style={{ height: 15, marginTop: 12, borderRadius: 6, width: '65%' }} />
+          <SkeletonBlock style={{ height: 12, marginTop: 8, borderRadius: 6, width: '45%' }} />
+          <SkeletonBlock style={{ height: 12, marginTop: 6, borderRadius: 6, width: '55%' }} />
+        </View>
       ) : items.length > 0 ? (
         <View>
           <FlatList
@@ -71,19 +77,15 @@ export default function HomeFeaturedSection({
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.event.id}
             onMomentumScrollEnd={({ nativeEvent }) => {
-              const pageWidth = featuredCardStep;
-
-              if (!pageWidth) {
-                return;
-              }
-
-              const nextIndex = Math.round(nativeEvent.contentOffset.x / pageWidth);
-              setFeaturedIndex(
-                Math.max(0, Math.min(nextIndex, items.length - 1)),
-              );
+              if (!featuredCardStep) return;
+              const nextIndex = Math.round(nativeEvent.contentOffset.x / featuredCardStep);
+              setFeaturedIndex(Math.max(0, Math.min(nextIndex, items.length - 1)));
             }}
             renderItem={({ item, index }) => (
-              <View style={{ width: featuredCardWidth, marginRight: 12 }}>
+              <View style={{
+                width: featuredCardWidth,
+                marginRight: items.length === 1 ? 0 : 12,
+              }}>
                 <EventInspirationCard
                   event={item.event}
                   imageHeight={190}
@@ -98,25 +100,28 @@ export default function HomeFeaturedSection({
                 />
               </View>
             )}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
+            contentContainerStyle={{
+              paddingHorizontal: items.length === 1 ? centerPadding : 20,
+            }}
           />
 
-          <View className="mt-3 flex-row justify-center gap-2">
-            {items.map((item, index) => {
-              const isActive = index === featuredIndex;
-
-              return (
-                <View
-                  key={item.event.id}
-                  className={`rounded-full ${
-                    isActive
-                      ? 'h-2.5 w-6 bg-[#4c669f]'
-                      : 'h-2.5 w-2.5 bg-gray-300 dark:bg-gray-700'
-                  }`}
-                />
-              );
-            })}
-          </View>
+          {items.length > 1 && (
+            <View className="mt-3 flex-row justify-center gap-2">
+              {items.map((item, index) => {
+                const isActive = index === featuredIndex;
+                return (
+                  <View
+                    key={item.event.id}
+                    className={`rounded-full ${
+                      isActive
+                        ? 'h-2.5 w-6 bg-[#4c669f]'
+                        : 'h-2.5 w-2.5 bg-gray-300 dark:bg-gray-700'
+                    }`}
+                  />
+                );
+              })}
+            </View>
+          )}
         </View>
       ) : (
         <HomeSectionPlaceholder message={emptyMessage} />

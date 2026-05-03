@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '../services/api';
+import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '@/services/api';
 import {
   buildMediaUploadPayload,
   isMediaFileTooLarge,

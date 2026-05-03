@@ -163,59 +163,95 @@ export default function CreatePostScreen() {
     }
   };
 
-  const [content, setContent] = useState(params.content ? String(params.content) : '');
-  const [mediaItems, setMediaItems] = useState<PostMediaItem[]>(() =>
-    parseImagesParam(params.images).map((uri) => ({ uri })),
-  );
-  const [visibility, setVisibility] = useState<PostVisibility>(
-    params.visibility ||
-      (params.postType === 'plan' ? 'friends' : 'public'),
-  );
-  const [publicationScope] = useState<PublicationScope>(
-    params.publicationScope === 'structure' ? 'structure' : 'personal',
-  );
-  const [placeId, setPlaceId] = useState(
-    params.placeId ? String(params.placeId) : '',
-  );
-  const [eventId, setEventId] = useState(
-    params.eventId ? String(params.eventId) : '',
-  );
-  const [eventTitle, setEventTitle] = useState(
-    params.eventTitle ? String(params.eventTitle) : '',
-  );
-  const [placeName, setPlaceName] = useState(
-    params.placeName ? String(params.placeName) : '',
-  );
-  const [cityName, setCityName] = useState(
-    params.cityName ? String(params.cityName) : '',
-  );
-  const [ambiance, setAmbiance] = useState(
-    params.ambiance ? String(params.ambiance) : '',
-  );
-  const [selectedVisibilityUserIds, setSelectedVisibilityUserIds] = useState<string[]>(
-    () => parseIdArrayParam(params.visibilityUserIds),
-  );
-  const [showCustomAudienceModal, setShowCustomAudienceModal] = useState(false);
-  const [audienceSearch, setAudienceSearch] = useState('');
-  const [audienceLoading, setAudienceLoading] = useState(false);
-  const [audienceConnections, setAudienceConnections] = useState<FriendshipItem[]>([]);
-  const [showVisibilityModal, setShowVisibilityModal] = useState(false);
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [places, setPlaces] = useState<PlaceOption[]>([]);
-  const [placesLoading, setPlacesLoading] = useState(false);
-  const [placeSearch, setPlaceSearch] = useState('');
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [events, setEvents] = useState<EventOption[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventSearch, setEventSearch] = useState('');
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [planTarget, setPlanTarget] = useState<'place' | 'event'>(
-    params.eventId ? 'event' : 'place',
-  );
+  // ── 1. Post content ──────────────────────────────────────────────────────────
+  const [form, setForm] = useState({
+    content: params.content ? String(params.content) : '',
+    mediaItems: parseImagesParam(params.images).map((uri): PostMediaItem => ({ uri })),
+    visibility: (params.visibility ?? (params.postType === 'plan' ? 'friends' : 'public')) as PostVisibility,
+    selectedVisibilityUserIds: parseIdArrayParam(params.visibilityUserIds),
+    ambiance: params.ambiance ? String(params.ambiance) : '',
+  });
+  const { content, mediaItems, visibility, selectedVisibilityUserIds, ambiance } = form;
+  const setContent = (v: string) => setForm(p => ({ ...p, content: v }));
+  const setMediaItems = (v: PostMediaItem[] | ((p: PostMediaItem[]) => PostMediaItem[])) =>
+    setForm(p => ({ ...p, mediaItems: typeof v === 'function' ? v(p.mediaItems) : v }));
+  const setVisibility = (v: PostVisibility) => setForm(p => ({ ...p, visibility: v }));
+  const setSelectedVisibilityUserIds = (v: string[] | ((p: string[]) => string[])) =>
+    setForm(p => ({ ...p, selectedVisibilityUserIds: typeof v === 'function' ? v(p.selectedVisibilityUserIds) : v }));
+  const setAmbiance = (v: string | ((p: string) => string)) =>
+    setForm(p => ({ ...p, ambiance: typeof v === 'function' ? v(p.ambiance) : v }));
+
+  // publicationScope is set once from params and never changes
+  const publicationScope: PublicationScope = params.publicationScope === 'structure' ? 'structure' : 'personal';
+
+  // ── 2. Linked entity (place / event) ─────────────────────────────────────────
+  const [linked, setLinked] = useState({
+    placeId: params.placeId ? String(params.placeId) : '',
+    eventId: params.eventId ? String(params.eventId) : '',
+    eventTitle: params.eventTitle ? String(params.eventTitle) : '',
+    placeName: params.placeName ? String(params.placeName) : '',
+    cityName: params.cityName ? String(params.cityName) : '',
+    selectedPlaceId: null as string | null,
+    selectedEventId: null as string | null,
+    planTarget: (params.eventId ? 'event' : 'place') as 'place' | 'event',
+  });
+  const { placeId, eventId, eventTitle, placeName, cityName, selectedPlaceId, selectedEventId, planTarget } = linked;
+  const setPlaceId = (v: string) => setLinked(p => ({ ...p, placeId: v }));
+  const setEventId = (v: string) => setLinked(p => ({ ...p, eventId: v }));
+  const setEventTitle = (v: string) => setLinked(p => ({ ...p, eventTitle: v }));
+  const setPlaceName = (v: string) => setLinked(p => ({ ...p, placeName: v }));
+  const setCityName = (v: string) => setLinked(p => ({ ...p, cityName: v }));
+  const setSelectedPlaceId = (v: string | null) => setLinked(p => ({ ...p, selectedPlaceId: v }));
+  const setSelectedEventId = (v: string | null) => setLinked(p => ({ ...p, selectedEventId: v }));
+  const setPlanTarget = (v: 'place' | 'event') => setLinked(p => ({ ...p, planTarget: v }));
+
+  // ── 3. UI / modal state ───────────────────────────────────────────────────────
+  const [ui, setUi] = useState({
+    showCustomAudienceModal: false,
+    showVisibilityModal: false,
+    showPlanModal: false,
+    loading: false,
+    currentStep: 1,
+  });
+  const { showCustomAudienceModal, showVisibilityModal, showPlanModal, loading, currentStep } = ui;
+  const setShowCustomAudienceModal = (v: boolean) => setUi(p => ({ ...p, showCustomAudienceModal: v }));
+  const setShowVisibilityModal = (v: boolean) => setUi(p => ({ ...p, showVisibilityModal: v }));
+  const setShowPlanModal = (v: boolean) => setUi(p => ({ ...p, showPlanModal: v }));
+  const setLoading = (v: boolean) => setUi(p => ({ ...p, loading: v }));
+  const setCurrentStep = (v: number | ((n: number) => number)) =>
+    setUi(p => ({ ...p, currentStep: typeof v === 'function' ? v(p.currentStep) : v }));
+
+  // ── 4. Audience picker ────────────────────────────────────────────────────────
+  const [audience, setAudience] = useState({
+    audienceSearch: '',
+    audienceLoading: false,
+    audienceConnections: [] as FriendshipItem[],
+  });
+  const { audienceSearch, audienceLoading, audienceConnections } = audience;
+  const setAudienceSearch = (v: string) => setAudience(p => ({ ...p, audienceSearch: v }));
+  const setAudienceLoading = (v: boolean) => setAudience(p => ({ ...p, audienceLoading: v }));
+  const setAudienceConnections = (v: FriendshipItem[]) => setAudience(p => ({ ...p, audienceConnections: v }));
+
+  // ── 5. Plan-modal search data ─────────────────────────────────────────────────
+  const [searchData, setSearchData] = useState({
+    categories: [] as CategoryOption[],
+    categoriesLoading: false,
+    places: [] as PlaceOption[],
+    placesLoading: false,
+    placeSearch: '',
+    events: [] as EventOption[],
+    eventsLoading: false,
+    eventSearch: '',
+  });
+  const { categories, categoriesLoading, places, placesLoading, placeSearch, events, eventsLoading, eventSearch } = searchData;
+  const setCategories = (v: CategoryOption[]) => setSearchData(p => ({ ...p, categories: v }));
+  const setCategoriesLoading = (v: boolean) => setSearchData(p => ({ ...p, categoriesLoading: v }));
+  const setPlaces = (v: PlaceOption[]) => setSearchData(p => ({ ...p, places: v }));
+  const setPlacesLoading = (v: boolean) => setSearchData(p => ({ ...p, placesLoading: v }));
+  const setPlaceSearch = (v: string) => setSearchData(p => ({ ...p, placeSearch: v }));
+  const setEvents = (v: EventOption[]) => setSearchData(p => ({ ...p, events: v }));
+  const setEventsLoading = (v: boolean) => setSearchData(p => ({ ...p, eventsLoading: v }));
+  const setEventSearch = (v: string) => setSearchData(p => ({ ...p, eventSearch: v }));
 
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();

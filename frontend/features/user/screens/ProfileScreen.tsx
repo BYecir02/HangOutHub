@@ -12,14 +12,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import ProfileHeader from '../../features/user/components/ProfileHeader';
-import ProfileStats from '../../features/user/components/ProfileStats';
-import PostItem from '../../features/social/components/PostItem';
-import type { PostItemData } from '../../features/social/components/PostItem';
-import PlaceInspirationCard from '../../features/places/components/PlaceInspirationCard';
-import { SkeletonBlock } from '../../shared/ui/Skeleton';
-import Tabs from '../../shared/ui/Tabs';
-import api, { clearAuthState, getImageUrl, storage } from '../../services/api';
+import ProfileHeader from '@/features/user/components/ProfileHeader';
+import ProfileStats from '@/features/user/components/ProfileStats';
+import PostItem from '@/features/social/components/PostItem';
+import type { PostItemData } from '@/features/social/components/PostItem';
+import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
+import Tabs from '@/shared/ui/Tabs';
+import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import {
   canAccessOrganizerPanel, 
   getOrganizerEntryPath,

@@ -13,11 +13,11 @@ import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import SearchBar from '../shared/ui/SearchBar';
-import PersonActionButton from '../features/social/components/PersonActionButton';
-import PersonRow from '../features/social/components/PersonRow';
-import SocialEmptyState from '../features/social/components/SocialEmptyState';
-import { DiscoverUser } from '../types/social';
+import SearchBar from '@/shared/ui/SearchBar';
+import PersonActionButton from '@/features/social/components/PersonActionButton';
+import PersonRow from '@/features/social/components/PersonRow';
+import SocialEmptyState from '@/features/social/components/SocialEmptyState';
+import { DiscoverUser } from '@/types/social';
 import {
   acceptFriendRequest,
   discoverUsers,

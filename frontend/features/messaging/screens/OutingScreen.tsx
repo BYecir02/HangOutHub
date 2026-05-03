@@ -19,7 +19,7 @@ import * as SecureStore from 'expo-secure-store';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import api, { getImageUrl } from '../services/api';
+import api, { getImageUrl } from '@/services/api';
 import { formatEventDate } from '@/services/shared/formatters';
 
 interface PlaceOption {

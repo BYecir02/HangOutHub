@@ -10,17 +10,17 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import PersonActionButton from '../features/social/components/PersonActionButton';
-import PersonRow from '../features/social/components/PersonRow';
-import SocialCountChip from '../features/social/components/SocialCountChip';
-import SocialEmptyState from '../features/social/components/SocialEmptyState';
+import PersonActionButton from '@/features/social/components/PersonActionButton';
+import PersonRow from '@/features/social/components/PersonRow';
+import SocialCountChip from '@/features/social/components/SocialCountChip';
+import SocialEmptyState from '@/features/social/components/SocialEmptyState';
 import { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   acceptFriendRequest,
   getFriendshipOverview,
   rejectFriendRequest,
 } from '@/services/user/friendships';
-import { FriendshipOverview } from '../types/social';
+import { FriendshipOverview } from '@/types/social';
 
 const EMPTY_FRIENDSHIPS: FriendshipOverview = {
   counts: {
