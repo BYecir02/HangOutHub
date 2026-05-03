@@ -7,9 +7,9 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';
 import SocialCountChip from '../components/social/SocialCountChip';

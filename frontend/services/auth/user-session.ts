@@ -1,5 +1,5 @@
 import api, { clearAuthState, storage } from '@/services/api';
-import { disconnectDirectChatSocket } from '@/services/direct-chat-realtime';
+import { disconnectDirectChatSocket } from '@/services/messaging/direct-chat-realtime';
 
 const USER_INFO_KEY = 'userInfo';
 

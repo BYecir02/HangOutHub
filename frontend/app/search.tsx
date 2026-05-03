@@ -9,10 +9,10 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import { useI18n } from '@/hooks/use-i18n';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import SearchBar from '../components/ui/SearchBar';
 import PersonActionButton from '../components/social/PersonActionButton';
 import PersonRow from '../components/social/PersonRow';

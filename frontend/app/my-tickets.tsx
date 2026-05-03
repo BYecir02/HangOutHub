@@ -11,15 +11,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import Tabs from '@/components/ui/Tabs';
-import TicketStatusBadge from '@/components/ui/TicketStatusBadge';
-import { useI18n } from '@/hooks/use-i18n';
+import Tabs from '@/shared/ui/Tabs';
+import TicketStatusBadge from '@/shared/ui/TicketStatusBadge';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import { getApiErrorMessage, getImageUrl } from '@/services/api';
-import { formatEventDate } from '@/services/formatters';
+import { formatEventDate } from '@/services/shared/formatters';
 import {
   EventBookingTicket,
   getMyEventBookings,
-} from '@/services/event-bookings';
+} from '@/services/events/event-bookings';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';

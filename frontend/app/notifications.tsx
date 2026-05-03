@@ -8,13 +8,13 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { EntityRowCard } from '@/components/ui/EntityCard';
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import { useScreenAsync } from '@/hooks/useScreenAsync';
-import { formatEventDate } from '@/services/formatters';
+import { EntityRowCard } from '@/shared/ui/EntityCard';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useScreenAsync } from '@/shared/hooks/useScreenAsync';
+import { formatEventDate } from '@/services/shared/formatters';
 import SocialEmptyState from '../components/social/SocialEmptyState';
 import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '../services/api';
 import { getFriendshipOverview } from '../services/friendships';

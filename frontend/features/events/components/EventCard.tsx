@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import MediaFrame from '@/components/ui/MediaFrame';
-import PriceDisplay from '@/components/ui/primitives/PriceDisplay';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import PriceDisplay from '@/shared/ui/primitives/PriceDisplay';
 
 interface EventCardProps {
   title: string;

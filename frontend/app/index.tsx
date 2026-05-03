@@ -11,25 +11,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter, type Href } from 'expo-router';
 
-import AuthBrandBadge from '@/components/auth/AuthBrandBadge';
-import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
-import AuthTextField from '@/components/auth/AuthTextField';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import AuthBrandBadge from '@/features/auth/components/AuthBrandBadge';
+import AuthHeroLayout from '@/features/auth/components/AuthHeroLayout';
+import AuthTextField from '@/features/auth/components/AuthTextField';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage, storage } from '@/services/api';
 import {
   canAccessOrganizerPanel,
   getOrganizerAccessDenialReason,
   getOrganizerEntryPath,
   isOrganizerUser,
-} from '@/services/organizer-access';
+} from '@/services/organizer/organizer-access';
 import {
   clearStoredUserSession,
   hasCompletedTasteOnboarding,
   setStoredUserSession,
   syncStoredUserSessionFromApi,
   type StoredUserSession,
-} from '@/services/user-session';
+} from '@/services/auth/user-session';
 import { useAuthBootstrap } from '@/context/auth-bootstrap';
 
 const LOGIN_HIGHLIGHTS = [

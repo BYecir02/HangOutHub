@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 
-import PlacePublicationCard from '@/components/place/PlacePublicationCard';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import type { PostDetails } from '@/services/posts';
+import PlacePublicationCard from '@/features/places/components/PlacePublicationCard';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import type { PostDetails } from '@/services/social/posts';
 
 function estimatePublicationCardHeight(post: PostDetails, index: number) {
   const imageHeights = [184, 240, 208, 262, 194, 228];

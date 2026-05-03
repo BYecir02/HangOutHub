@@ -2,7 +2,7 @@ import api from '@/services/api';
 import {
   buildMediaUploadPayload,
   type MediaUploadAsset,
-} from '@/services/media-upload';
+} from '@/services/shared/media-upload';
 
 export interface OutingMessageUser {
   id: string;

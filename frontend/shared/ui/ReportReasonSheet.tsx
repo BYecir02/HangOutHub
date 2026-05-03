@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import type { TranslationKey } from '@/services/i18n';
-import { useI18n } from '@/hooks/use-i18n';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import type { TranslationKey } from '@/services/shared/i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 type ReportReasonSheetProps = {
   visible: boolean;

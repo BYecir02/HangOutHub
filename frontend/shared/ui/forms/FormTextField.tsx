@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, TextInput, type TextInputProps, View } from 'react-native';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 
 type FormTextFieldProps = TextInputProps & {
   label: string;

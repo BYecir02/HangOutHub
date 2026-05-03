@@ -10,10 +10,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
 import PostMediaGallery from './PostMediaGallery';
 import PostMediaViewer from './PostMediaViewer';
 

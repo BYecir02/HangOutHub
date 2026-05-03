@@ -3,12 +3,12 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { canAccessOrganizerCapability } from '@/services/organizer-access';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
+import { canAccessOrganizerCapability } from '@/services/organizer/organizer-access';
 
 interface ActionItem {
   id: string;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import MediaFrame from '@/components/ui/MediaFrame';
+import MediaFrame from '@/shared/ui/MediaFrame';
 
 type PlaceGalleryModalProps = {
   visible: boolean;

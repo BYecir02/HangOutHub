@@ -1,4 +1,4 @@
-import type { TranslationKey } from '@/services/i18n';
+import type { TranslationKey } from '@/services/shared/i18n';
 
 export type TicketStatusBadgeContext = 'myTickets' | 'eventScans';
 

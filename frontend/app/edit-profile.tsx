@@ -13,14 +13,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '../services/api';
 import {
   buildMediaUploadPayload,
   isMediaFileTooLarge,
   isSupportedMediaAsset,
-} from '@/services/media-upload';
+} from '@/services/shared/media-upload';
 
 export default function EditProfileScreen() {
   const router = useRouter();

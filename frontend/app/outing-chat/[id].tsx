@@ -14,13 +14,13 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
-import { ChatComposer } from '@/components/direct-chat/ChatComposer';
-import ChatScreenShell from '@/components/ui/ChatScreenShell';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+import { ChatComposer } from '@/features/messaging/components/ChatComposer';
+import ChatScreenShell from '@/features/messaging/components/ChatScreenShell';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
-import { sendOutingMessage, type OutingMessage } from '@/services/outings';
+import { sendOutingMessage, type OutingMessage } from '@/services/messaging/outings';
 
 interface OutingDetail {
   id: string;

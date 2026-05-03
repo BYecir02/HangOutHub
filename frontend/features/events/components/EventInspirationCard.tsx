@@ -10,9 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
 import { getImageUrl } from '@/services/api';
-import MediaFrame from '@/components/ui/MediaFrame';
-import PriceDisplay from '@/components/ui/primitives/PriceDisplay';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import PriceDisplay from '@/shared/ui/primitives/PriceDisplay';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 
 export interface EventInspirationCardEvent {
   id: string;

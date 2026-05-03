@@ -17,8 +17,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import MediaFrame from '@/components/ui/MediaFrame';
-import { isVideoUrl } from '@/services/media';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import { isVideoUrl } from '@/services/shared/media';
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));

@@ -2,9 +2,9 @@ import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { formatPrice } from '@/services/formatters';
-import type { EventDetail } from '@/hooks/useEventDetail';
-import type { TranslationKey } from '@/services/i18n';
+import { formatPrice } from '@/services/shared/formatters';
+import type { EventDetail } from '@/features/events/hooks/useEventDetail';
+import type { TranslationKey } from '@/services/shared/i18n';
 
 type TranslateFn = (key: TranslationKey, params?: Record<string, string | number>) => string;
 

@@ -12,17 +12,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
-import AuthTextField from '@/components/auth/AuthTextField';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import AuthHeroLayout from '@/features/auth/components/AuthHeroLayout';
+import AuthTextField from '@/features/auth/components/AuthTextField';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
-import { resolveStoredUserSession } from '@/services/user-session';
+import { resolveStoredUserSession } from '@/services/auth/user-session';
 import {
   canAccessOrganizerPanel,
   getOrganizerEntryPath,
   isOrganizerUser,
-} from '@/services/organizer-access';
+} from '@/services/organizer/organizer-access';
 
 export default function VerifyEmailScreen() {
   const params = useLocalSearchParams<{ email?: string }>();

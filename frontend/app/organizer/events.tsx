@@ -11,20 +11,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import {
   formatOrganizerDateTime,
   getOrganizerEventPhase,
   getOrganizerEventPhaseWeight,
   type OrganizerEventPhase,
-} from '@/services/organizer-ui';
+} from '@/services/organizer/organizer-ui';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';

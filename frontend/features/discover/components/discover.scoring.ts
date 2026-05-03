@@ -2,7 +2,7 @@ import type {
   DiscoverEvent,
   DiscoverPlace,
   RecommendationPreferencesSnapshot,
-} from '@/components/discover/discover.types';
+} from '@/features/discover/components/discover.types';
 
 type StoredLocationLike = {
   cityId?: number | null;

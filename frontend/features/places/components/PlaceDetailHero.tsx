@@ -3,8 +3,8 @@ import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
-import MediaFrame from '@/components/ui/MediaFrame';
+import RatingDisplay from '@/shared/ui/primitives/RatingDisplay';
+import MediaFrame from '@/shared/ui/MediaFrame';
 
 type PlaceDetailHeroProps = {
   heroImage: string;

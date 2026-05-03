@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, View } from 'react-native';
 
-import MediaFrame from '@/components/ui/MediaFrame';
+import MediaFrame from '@/shared/ui/MediaFrame';
 
 type EventDetailGalleryTabProps = {
   eventId: string;

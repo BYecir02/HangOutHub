@@ -2,10 +2,10 @@ import React from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import MediaFrame from '@/components/ui/MediaFrame';
-import PlaceCoverFallback from '@/components/ui/PlaceCoverFallback';
-import Badge from '@/components/ui/primitives/Badge';
-import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import PlaceCoverFallback from '@/features/places/components/PlaceCoverFallback';
+import Badge from '@/shared/ui/primitives/Badge';
+import RatingDisplay from '@/shared/ui/primitives/RatingDisplay';
 
 interface PlaceCardProps {
   name: string;

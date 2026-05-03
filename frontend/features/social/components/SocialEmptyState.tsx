@@ -1,6 +1,6 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import ScreenState from '@/components/ui/ScreenState';
+import ScreenState from '@/shared/ui/ScreenState';
 
 interface SocialEmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;

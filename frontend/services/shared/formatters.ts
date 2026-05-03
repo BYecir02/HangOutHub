@@ -1,8 +1,8 @@
-import type { TranslationKey } from '@/services/i18n';
+import type { TranslationKey } from '@/services/shared/i18n';
 import {
   getTicketStatusTranslationKey,
   type TicketStatusBadgeContext,
-} from '@/services/ticket-status';
+} from '@/services/shared/ticket-status';
 
 export type TranslationFn = (key: TranslationKey, params?: Record<string, unknown>) => string;
 

@@ -1,12 +1,12 @@
 import React from 'react';
 
-import { useI18n } from '@/hooks/use-i18n';
-import Badge from '@/components/ui/primitives/Badge';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import Badge from '@/shared/ui/primitives/Badge';
 import {
   getTicketStatusToneClass,
   getTicketStatusTranslationKey,
   type TicketStatusBadgeContext,
-} from '@/services/ticket-status';
+} from '@/services/shared/ticket-status';
 
 type TicketStatusBadgeProps = {
   status: string | null | undefined;

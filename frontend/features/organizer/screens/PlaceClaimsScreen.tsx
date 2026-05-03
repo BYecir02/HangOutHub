@@ -11,13 +11,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import AdminAnalyticsPanel from '@/components/admin/AdminAnalyticsPanel';
-import { useI18n } from '@/hooks/use-i18n';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import AdminAnalyticsPanel from '@/features/organizer/components/AdminAnalyticsPanel';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import { clearAuthState, getApiErrorMessage, getImageUrl, isUnauthorizedError } from '@/services/api';
-import { deleteAdminUser, listAdminUsers, type AdminUserSummary } from '@/services/admin-users';
+import { deleteAdminUser, listAdminUsers, type AdminUserSummary } from '@/services/organizer/admin-users';
 import {
   getAdminOrganizerProfile,
   listAdminOrganizerProfiles,
@@ -25,13 +25,13 @@ import {
   type AdminOrganizerDetail,
   type AdminOrganizerStatus,
   type AdminOrganizerSummary,
-} from '@/services/admin-organizers';
-import { formatOrganizerDateTime, getOrganizerStatusTone } from '@/services/organizer-ui';
+} from '@/services/organizer/admin-organizers';
+import { formatOrganizerDateTime, getOrganizerStatusTone } from '@/services/organizer/organizer-ui';
 import {
   listPlaceClaims,
   updatePlaceClaimStatus,
   type PlaceClaimItem,
-} from '@/services/place-claims';
+} from '@/services/places/place-claims';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

@@ -1,10 +1,10 @@
 import React from 'react';
 
-import EventInspirationCard from '@/components/ui/EventInspirationCard';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
-import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
-import type { DiscoverItem } from '@/components/discover/discover.types';
+import EventInspirationCard from '@/features/events/components/EventInspirationCard';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
+import type { DiscoverItem } from '@/features/discover/components/discover.types';
 
 function estimateDiscoverCardHeight(index: number) {
   const imageHeights = [182, 240, 208, 262, 194, 228];

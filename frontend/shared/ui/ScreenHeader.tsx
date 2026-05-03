@@ -2,7 +2,7 @@ import React, { type ReactNode } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { uiTokens } from '@/theme/tokens';
 
 type ScreenHeaderProps = {

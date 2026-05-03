@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Text, TouchableOpacity } from 'react-native';
 
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 export default function OrganizerExitPanelButton() {
   const router = useRouter();

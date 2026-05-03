@@ -10,14 +10,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api from '@/services/api';
-import { getCache, setCache } from '@/services/dataCache';
+import { getCache, setCache } from '@/services/api/dataCache';
 import {
   getStoredLocation,
   setStoredLocation,
   type StoredLocation,
-} from '@/services/location-preferences';
+} from '@/services/shared/location-preferences';
 
 interface CityOption {
   id: number;

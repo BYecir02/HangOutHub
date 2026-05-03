@@ -2,7 +2,7 @@ import React from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 
 type HeroBackgroundVariant = 'home' | 'catalog';
 

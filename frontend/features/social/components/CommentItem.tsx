@@ -2,9 +2,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 
-import Avatar from '@/components/ui/primitives/Avatar';
-import Divider from '@/components/ui/primitives/Divider';
-import { useI18n } from '@/hooks/use-i18n';
+import Avatar from '@/shared/ui/primitives/Avatar';
+import Divider from '@/shared/ui/primitives/Divider';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 interface CommentItemProps {
   item: {

@@ -3,7 +3,7 @@ import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import MediaFrame from '@/components/ui/MediaFrame';
+import MediaFrame from '@/shared/ui/MediaFrame';
 
 type EventDetailHeroProps = {
   heroImage: string;

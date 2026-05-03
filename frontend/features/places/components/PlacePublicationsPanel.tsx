@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import PlacePublicationsMasonry from '@/components/place/PlacePublicationsMasonry';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import type { VisibleRect } from '@/hooks/useVisibleItemAutoplay.logic';
-import type { PostDetails } from '@/services/posts';
+import PlacePublicationsMasonry from '@/features/places/components/PlacePublicationsMasonry';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import type { VisibleRect } from '@/shared/hooks/useVisibleItemAutoplay.logic';
+import type { PostDetails } from '@/services/social/posts';
 
 type PublicationsVisibility = {
   activeId: string | null;

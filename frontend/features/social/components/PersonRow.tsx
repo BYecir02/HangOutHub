@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-import Avatar from '@/components/ui/primitives/Avatar';
+import Avatar from '@/shared/ui/primitives/Avatar';
 import { getImageUrl } from '../../../services/api';
 import { SocialUser } from '../../../types/social';
 

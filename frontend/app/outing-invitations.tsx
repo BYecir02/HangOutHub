@@ -11,10 +11,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import PersonActionButton from '../components/social/PersonActionButton';
 import SocialCountChip from '../components/social/SocialCountChip';
 import SocialEmptyState from '../components/social/SocialEmptyState';
-import { EntityRowCard } from '@/components/ui/EntityCard';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+import { EntityRowCard } from '@/shared/ui/EntityCard';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '../services/api';
 import { OutingInvitation } from '../types/social';
 

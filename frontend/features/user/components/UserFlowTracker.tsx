@@ -4,7 +4,7 @@ import { usePathname } from 'expo-router';
 import {
   buildUserFlowContext,
   trackUserFlowEvent,
-} from '@/services/user-flow-analytics';
+} from '@/services/shared/user-flow-analytics';
 
 export default function UserFlowTracker() {
   const pathname = usePathname();

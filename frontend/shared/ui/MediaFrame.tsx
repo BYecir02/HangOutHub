@@ -4,7 +4,7 @@ import { useEventListener } from 'expo';
 import { Image as ExpoImage } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
 
-import { isVideoUrl } from '@/services/media';
+import { isVideoUrl } from '@/services/shared/media';
 
 interface MediaFrameProps {
   source: string;

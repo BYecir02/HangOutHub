@@ -8,9 +8,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import { useI18n } from '@/hooks/use-i18n';
-import type { StoredLocation } from '@/services/location-preferences';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import type { StoredLocation } from '@/services/shared/location-preferences';
 
 export type LocationCityOption = {
   id: number;

@@ -6,9 +6,9 @@ import {
   View,
 } from 'react-native';
 
-import EventInspirationCard from '@/components/ui/EventInspirationCard';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
+import EventInspirationCard from '@/features/events/components/EventInspirationCard';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
 import { estimateRecommendationCardHeight } from './home.utils';

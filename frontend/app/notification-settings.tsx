@@ -6,17 +6,17 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import {
   getMySettings,
   type UserSettings,
   updateMySettings,
-} from '@/services/settings';
+} from '@/services/user/settings';
 import { clearAuthState, isUnauthorizedError } from '@/services/api';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import SettingsSection from '@/components/settings/SettingsSection';
-import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import SettingsSection from '@/features/user/components/SettingsSection';
+import SettingsToggleRow from '@/features/user/components/SettingsToggleRow';
 
 type NotificationSettingKey =
   | 'notificationMessages'

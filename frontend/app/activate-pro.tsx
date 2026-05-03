@@ -9,14 +9,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import RoleOptionCard from '@/components/auth/RoleOptionCard';
-import FormTextField from '@/components/forms/FormTextField';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import RoleOptionCard from '@/features/auth/components/RoleOptionCard';
+import FormTextField from '@/shared/ui/forms/FormTextField';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
-import { setStoredUserSession } from '@/services/user-session';
-import { trackUserFlowEvent } from '@/services/user-flow-analytics';
+import { setStoredUserSession } from '@/services/auth/user-session';
+import { trackUserFlowEvent } from '@/services/shared/user-flow-analytics';
 
 type ProAccountType = 'PLACE' | 'NOMAD';
 

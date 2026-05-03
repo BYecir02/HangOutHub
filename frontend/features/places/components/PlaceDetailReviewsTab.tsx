@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 type PlaceDetailReview = {
   id: string;

@@ -11,22 +11,22 @@ import {
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import { getApiErrorMessage } from '@/services/api';
-import { discoverUsers } from '@/services/friendships';
+import { discoverUsers } from '@/services/user/friendships';
 import {
   type PlaceTeamMemberItem,
   type PlaceTeamRole,
   listPlaceTeam,
   removePlaceTeamMember,
   upsertPlaceTeamMember,
-} from '@/services/place-team';
+} from '@/services/places/place-team';
 import type { DiscoverUser } from '@/types/social';
 
 export default function OrganizerPlaceTeamScreen() {

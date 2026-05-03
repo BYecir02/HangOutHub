@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
-import CategoryCard from '@/components/ui/CategoryCard';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+import CatalogScreenLayout from '@/shared/ui/CatalogScreenLayout';
+import CategoryCard from '@/shared/ui/CategoryCard';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
-import { getCache, setCache } from '@/services/dataCache';
-import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getCache, setCache } from '@/services/api/dataCache';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import { Category } from '@/types';
 
 export default function CategoriesScreen() {

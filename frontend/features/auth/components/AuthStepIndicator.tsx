@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 type AuthStepIndicatorProps = {
   currentStep: number;

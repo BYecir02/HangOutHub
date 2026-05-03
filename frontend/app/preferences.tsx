@@ -14,18 +14,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api from '@/services/api';
 import {
   getRecommendationOnboardingPreferences,
   setRecommendationOnboardingPreferences,
   type OnboardingBudgetPreference,
   type OnboardingRadiusPreference,
-} from '@/services/recommendation-onboarding';
-import { syncStoredUserSessionFromApi } from '@/services/user-session';
-import type { TranslationKey } from '@/services/i18n';
-import { setStoredLocation, type StoredLocation } from '@/services/location-preferences';
+} from '@/services/shared/recommendation-onboarding';
+import { syncStoredUserSessionFromApi } from '@/services/auth/user-session';
+import type { TranslationKey } from '@/services/shared/i18n';
+import { setStoredLocation, type StoredLocation } from '@/services/shared/location-preferences';
 
 type PreferenceStep = 1 | 2 | 3 | 4 | 5;
 type PreferencesMode = 'onboarding' | 'edit';

@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 
-import CategoryCard from '@/components/ui/CategoryCard';
+import CategoryCard from '@/shared/ui/CategoryCard';
 import { type Category } from '@/types';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';

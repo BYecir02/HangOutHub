@@ -2,8 +2,8 @@ import React from 'react';
 import { Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import ListItem from '@/components/ui/primitives/ListItem';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import ListItem from '@/shared/ui/primitives/ListItem';
 import { uiTokens } from '@/theme/tokens';
 
 type SettingsToggleRowProps = {

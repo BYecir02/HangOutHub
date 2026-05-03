@@ -30,7 +30,7 @@ import {
 } from '../../services/organizer-access';
 import { useVisibleItemAutoplay } from '../../hooks/useVisibleItemAutoplay';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

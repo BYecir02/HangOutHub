@@ -16,11 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getImageUrl } from '../services/api';
-import { formatEventDate } from '@/services/formatters';
+import { formatEventDate } from '@/services/shared/formatters';
 
 interface PlaceOption {
   id: string;

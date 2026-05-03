@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import EventInspirationCard from '@/components/ui/EventInspirationCard';
+import EventInspirationCard from '@/features/events/components/EventInspirationCard';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
 import type { HomeFeaturedItem } from './home.types';

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import SearchBar from '@/components/ui/SearchBar';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import SearchBar from '@/shared/ui/SearchBar';
 import type {
   DiscoverFilter,
   DiscoverViewMode,
-} from '@/components/discover/discover.types';
+} from '@/features/discover/components/discover.types';
 
 type DiscoverFiltersModalProps = {
   visible: boolean;

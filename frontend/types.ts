@@ -1,7 +1,1 @@
-export interface Category {
-  id: number;
-  name: string;
-  icon: string;
-  color: string;
-  animationUrl?: string;
-}
+export * from './shared/types/index';

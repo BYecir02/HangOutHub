@@ -2,7 +2,7 @@ import React, { type ReactNode } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import MediaFrame from '@/components/ui/MediaFrame';
+import MediaFrame from '@/shared/ui/MediaFrame';
 
 type EntityCardBadge = {
   label: string;

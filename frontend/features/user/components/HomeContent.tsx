@@ -2,10 +2,10 @@ import React from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 
-import Header from '@/components/ui/Header';
-import HeroBackground from '@/components/ui/HeroBackground';
-import { useI18n } from '@/hooks/use-i18n';
-import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import Header from '@/shared/ui/Header';
+import HeroBackground from '@/shared/ui/HeroBackground';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 
 import HomeCategoriesSection from './HomeCategoriesSection';
 import HomeFeaturedSection from './HomeFeaturedSection';

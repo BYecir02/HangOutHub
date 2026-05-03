@@ -11,13 +11,13 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import {
   formatEventDate,
   formatStatusLabel,
   normalizeStatus,
-} from '@/services/formatters';
+} from '@/services/shared/formatters';
 import api, { getImageUrl } from '../../services/api';
 import { FriendshipOverview } from '../../types/social';
 

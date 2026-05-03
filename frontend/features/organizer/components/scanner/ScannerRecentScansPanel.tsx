@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-import type { ScannerVerificationStatus } from '@/services/organizer-scanner';
+import type { ScannerVerificationStatus } from '@/services/organizer/organizer-scanner';
 
 export interface RecentScanItemViewModel {
   id: string;

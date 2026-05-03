@@ -15,7 +15,7 @@ import BottomSheet, {
 } from '@gorhom/bottom-sheet';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { uiTokens } from '@/theme/tokens';
 
 type BottomSheetModalProps = {

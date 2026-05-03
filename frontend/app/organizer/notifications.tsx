@@ -13,20 +13,20 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { usePaginatedList } from '@/hooks/usePaginatedList';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { formatEventDate } from '@/services/formatters';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { usePaginatedList } from '@/shared/hooks/usePaginatedList';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
+import { formatEventDate } from '@/services/shared/formatters';
 import {
   fetchOrganizerNotifications,
   markOrganizerNotificationRead,
   markOrganizerNotificationsBatchRead,
   type OrganizerNotificationItem,
-} from '@/services/organizer-notifications';
+} from '@/services/organizer/organizer-notifications';
 
 function getPlaceClaimDecision(item: OrganizerNotificationItem) {
   const payload = item.payload;

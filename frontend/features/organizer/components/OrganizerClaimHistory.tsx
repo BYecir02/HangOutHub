@@ -9,10 +9,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
-import { listMyPlaceClaims, type PlaceClaimItem } from '@/services/place-claims';
+import { listMyPlaceClaims, type PlaceClaimItem } from '@/services/places/place-claims';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

@@ -1,14 +1,14 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-import Badge from '@/components/ui/primitives/Badge';
-import Divider from '@/components/ui/primitives/Divider';
-import { useI18n } from '@/hooks/use-i18n';
-import Avatar from '@/components/ui/primitives/Avatar';
+import Badge from '@/shared/ui/primitives/Badge';
+import Divider from '@/shared/ui/primitives/Divider';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import Avatar from '@/shared/ui/primitives/Avatar';
 import { getImageUrl } from '@/services/api';
-import { stripSystemMarkers } from '@/services/direct-chat-meta';
-import { isVideoUrl } from '@/services/media';
-import type { DirectChatSummary } from '@/services/direct-chats';
+import { stripSystemMarkers } from '@/services/messaging/direct-chat-meta';
+import { isVideoUrl } from '@/services/shared/media';
+import type { DirectChatSummary } from '@/services/messaging/direct-chats';
 
 function formatDate(value: string, locale: string) {
   return new Date(value).toLocaleString(locale, {

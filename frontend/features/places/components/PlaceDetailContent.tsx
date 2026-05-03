@@ -2,12 +2,12 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import PlaceDetailEventsTab from '@/components/place/PlaceDetailEventsTab';
-import PlaceDetailInfoTab from '@/components/place/PlaceDetailInfoTab';
-import PlaceDetailReviewsTab from '@/components/place/PlaceDetailReviewsTab';
-import PlaceSaveButton from '@/components/place/PlaceSaveButton';
-import Tabs, { type TabItem } from '@/components/ui/Tabs';
-import { useI18n } from '@/hooks/use-i18n';
+import PlaceDetailEventsTab from '@/features/places/components/PlaceDetailEventsTab';
+import PlaceDetailInfoTab from '@/features/places/components/PlaceDetailInfoTab';
+import PlaceDetailReviewsTab from '@/features/places/components/PlaceDetailReviewsTab';
+import PlaceSaveButton from '@/features/places/components/PlaceSaveButton';
+import Tabs, { type TabItem } from '@/shared/ui/Tabs';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 type PlaceDetailTab = 'info' | 'events' | 'reviews';
 

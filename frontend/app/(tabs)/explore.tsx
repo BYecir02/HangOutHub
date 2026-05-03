@@ -9,18 +9,18 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import EventCard from '@/components/ui/EventCard';
-import HeroBackground from '@/components/ui/HeroBackground';
-import LocationScopeBar from '@/components/ui/LocationScopeBar';
-import SearchBar from '@/components/ui/SearchBar';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import { useLocationScope } from '@/hooks/useLocationScope';
-import { useScreenAsync } from '@/hooks/useScreenAsync';
+import EventCard from '@/features/events/components/EventCard';
+import HeroBackground from '@/shared/ui/HeroBackground';
+import LocationScopeBar from '@/shared/ui/LocationScopeBar';
+import SearchBar from '@/shared/ui/SearchBar';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useLocationScope } from '@/shared/hooks/useLocationScope';
+import { useScreenAsync } from '@/shared/hooks/useScreenAsync';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
-import { getCache, setCache } from '@/services/dataCache';
-import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
-import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getCache, setCache } from '@/services/api/dataCache';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 
 interface EventItem {
   id: string;

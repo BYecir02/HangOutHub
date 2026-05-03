@@ -10,12 +10,12 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import { getApiErrorMessage } from '@/services/api';
 import {
   addEventCollaborator,
@@ -27,8 +27,8 @@ import {
   type PlaceTeamMemberItem,
   removeEventCollaborator,
   removeEventPlaceTeamMember,
-} from '@/services/event-collaborators';
-import { discoverUsers } from '@/services/friendships';
+} from '@/services/events/event-collaborators';
+import { discoverUsers } from '@/services/user/friendships';
 import type { DiscoverUser } from '@/types/social';
 
 export default function OrganizerEventTeamScreen() {

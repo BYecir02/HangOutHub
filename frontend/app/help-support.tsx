@@ -3,8 +3,8 @@ import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import { useI18n } from '@/hooks/use-i18n';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 export default function HelpSupportScreen() {
   const router = useRouter();

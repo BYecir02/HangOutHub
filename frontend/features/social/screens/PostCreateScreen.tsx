@@ -14,27 +14,27 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import PostCustomAudienceModal from '@/components/post/PostCustomAudienceModal';
-import PostVisibilityModal from '@/components/post/PostVisibilityModal';
-import PostItem, { type PostItemData } from '@/components/social/PostItem';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import MediaFrame from '@/components/ui/MediaFrame';
-import ScreenHeader from '@/components/ui/ScreenHeader';
+import PostCustomAudienceModal from '@/features/social/components/PostCustomAudienceModal';
+import PostVisibilityModal from '@/features/social/components/PostVisibilityModal';
+import PostItem, { type PostItemData } from '@/features/social/components/PostItem';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
 import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '@/services/api';
 import {
   buildMediaUploadPayload,
   inferMediaKind,
   isMediaFileTooLarge,
   isSupportedMediaAsset,
-} from '@/services/media-upload';
-import { emitPostChanged } from '@/services/post-events';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import type { TranslationKey } from '@/services/i18n';
-import { getFriendshipOverview } from '@/services/friendships';
-import { formatEventDate } from '@/services/formatters';
+} from '@/services/shared/media-upload';
+import { emitPostChanged } from '@/services/social/post-events';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import type { TranslationKey } from '@/services/shared/i18n';
+import { getFriendshipOverview } from '@/services/user/friendships';
+import { formatEventDate } from '@/services/shared/formatters';
 import type { FriendshipItem } from '@/types/social';
-import { getMySettings } from '@/services/settings';
+import { getMySettings } from '@/services/user/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 type PostType = 'post' | 'plan';

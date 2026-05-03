@@ -9,10 +9,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import MediaFrame from '@/components/ui/MediaFrame';
-import PlaceCoverFallback from '@/components/ui/PlaceCoverFallback';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import PlaceCoverFallback from '@/features/places/components/PlaceCoverFallback';
 import { getImageUrl } from '@/services/api';
-import RatingDisplay from '@/components/ui/primitives/RatingDisplay';
+import RatingDisplay from '@/shared/ui/primitives/RatingDisplay';
 
 export interface PlaceInspirationCardPlace {
   id: string;

@@ -16,11 +16,11 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import ScreenState from '@/components/ui/ScreenState';
+import ScreenState from '@/shared/ui/ScreenState';
 import CommentItem from '../components/social/CommentItem';
-import { useI18n } from '@/hooks/use-i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { clearAuthState, getApiErrorMessage, getImageUrl, isUnauthorizedError } from '../services/api';
-import { emitPostChanged } from '@/services/post-events';
+import { emitPostChanged } from '@/services/social/post-events';
 
 interface CommentAuthor {
   displayName?: string | null;

@@ -10,17 +10,17 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import {
   fetchOrganizerAnalytics,
   OrganizerAnalyticsResponse,
-} from '@/services/organizer-analytics';
+} from '@/services/organizer/organizer-analytics';
 import {
   formatOrganizerDateTime,
   getOrganizerStatusTone,
-} from '@/services/organizer-ui';
+} from '@/services/organizer/organizer-ui';
 
 function DashboardCard({
   title,

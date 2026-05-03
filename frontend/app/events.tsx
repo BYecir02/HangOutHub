@@ -13,23 +13,23 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useLocationScope } from '@/hooks/useLocationScope';
-import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import { EntityCoverCard } from '@/components/ui/EntityCard';
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import EventInspirationCard from '@/components/ui/EventInspirationCard';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import LocationScopeBar from '@/components/ui/LocationScopeBar';
-import SearchBar from '@/components/ui/SearchBar';
-import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useLocationScope } from '@/shared/hooks/useLocationScope';
+import CatalogScreenLayout from '@/shared/ui/CatalogScreenLayout';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import { EntityCoverCard } from '@/shared/ui/EntityCard';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import EventInspirationCard from '@/features/events/components/EventInspirationCard';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import LocationScopeBar from '@/shared/ui/LocationScopeBar';
+import SearchBar from '@/shared/ui/SearchBar';
+import ScreenState from '@/shared/ui/ScreenState';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
-import { getCache, setCache } from '@/services/dataCache';
-import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
-import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getCache, setCache } from '@/services/api/dataCache';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
-import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 
 interface EventItem {
   id: string;

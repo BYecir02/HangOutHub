@@ -7,8 +7,8 @@ import {
   Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { clearAuthState, storage } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -19,14 +19,14 @@ import {
   type PostVisibility,
   type UserSettings,
   updateMySettings,
-} from '@/services/settings';
-import { syncAppPreferencesFromSettings } from '@/services/app-preferences';
-import { clearStoredUserSession } from '@/services/user-session';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import ListItem from '@/components/ui/primitives/ListItem';
-import SettingsSection from '@/components/settings/SettingsSection';
-import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
+} from '@/services/user/settings';
+import { syncAppPreferencesFromSettings } from '@/services/auth/app-preferences';
+import { clearStoredUserSession } from '@/services/auth/user-session';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import ListItem from '@/shared/ui/primitives/ListItem';
+import SettingsSection from '@/features/user/components/SettingsSection';
+import SettingsToggleRow from '@/features/user/components/SettingsToggleRow';
 
 export default function SettingsScreen() {
   const router = useRouter();

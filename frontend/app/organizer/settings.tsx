@@ -10,29 +10,29 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import api, { isUnauthorizedError, storage } from '@/services/api';
-import { setLanguagePreference } from '@/services/app-preferences';
-import { clearOfflineScans, listOfflineScans } from '@/services/organizer-scanner';
-import { normalizeTeamWorkspaceRole } from '@/services/organizer-access';
+import { setLanguagePreference } from '@/services/auth/app-preferences';
+import { clearOfflineScans, listOfflineScans } from '@/services/organizer/organizer-scanner';
+import { normalizeTeamWorkspaceRole } from '@/services/organizer/organizer-access';
 import {
   getScannerPreferences,
   patchScannerPreferences,
   type ScannerPreferences,
-} from '@/services/scanner-preferences';
-import { clearStoredUserSession } from '@/services/user-session';
+} from '@/services/organizer/scanner-preferences';
+import { clearStoredUserSession } from '@/services/auth/user-session';
 import {
   getMySettings,
   type UserSettings,
   updateMySettings,
-} from '@/services/settings';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import SettingsSection from '@/components/settings/SettingsSection';
-import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
+} from '@/services/user/settings';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import SettingsSection from '@/features/user/components/SettingsSection';
+import SettingsToggleRow from '@/features/user/components/SettingsToggleRow';
 
 const REMINDER_PRESETS = [1440, 180, 60] as const;
 const DEFAULT_SCANNER_PREFERENCES: ScannerPreferences = {

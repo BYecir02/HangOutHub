@@ -3,8 +3,8 @@ import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import ScreenState from '@/components/ui/ScreenState';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import ScreenState from '@/shared/ui/ScreenState';
 
 type BottomSheetListModalProps<T> = {
   visible: boolean;

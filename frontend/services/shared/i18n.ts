@@ -1,4 +1,4 @@
-﻿import type { StoredLanguagePreference } from '@/services/app-preferences';
+﻿import type { StoredLanguagePreference } from '@/services/auth/app-preferences';
 
 type TranslationParams = Record<string, string | number>;
 

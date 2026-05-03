@@ -5,25 +5,25 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { PlatformPressable } from '@react-navigation/elements';
 
 import { HapticTab } from '@/components/haptic-tab';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import {
   canAccessOrganizerCapability,
   type OrganizerAccessUser,
   type OrganizerCapability,
   getHighestTeamWorkspaceRole,
   normalizeTeamWorkspaceRole,
-} from '@/services/organizer-access';
-import { fetchOrganizerNotificationsUnreadCount } from '@/services/organizer-notifications';
-import { listMyPlaceTeams } from '@/services/place-team';
+} from '@/services/organizer/organizer-access';
+import { fetchOrganizerNotificationsUnreadCount } from '@/services/organizer/organizer-notifications';
+import { listMyPlaceTeams } from '@/services/places/place-team';
 import {
   clearStoredUserSession,
   patchStoredUserSession,
   resolveStoredUserSession,
-} from '@/services/user-session';
+} from '@/services/auth/user-session';
 import { clearAuthState } from '@/services/api';
-import { safeReplace } from '@/services/navigation';
+import { safeReplace } from '@/services/api/navigation';
 
 interface ActionItem {
   id: string;

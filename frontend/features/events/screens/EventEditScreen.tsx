@@ -17,12 +17,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import EventFormWizard from '@/components/ui/EventFormWizard';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import EventFormWizard from '@/features/events/components/EventFormWizard';
 import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
-import { clearCache } from '@/services/dataCache';
-import { getMySettings } from '@/services/settings';
+import { clearCache } from '@/services/api/dataCache';
+import { getMySettings } from '@/services/user/settings';
 
 interface OwnedPlaceOption {
   id: string;

@@ -11,16 +11,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
-import FormImagePicker from '@/components/forms/FormImagePicker';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import SearchBar from '@/components/ui/SearchBar';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import FormImagePicker from '@/shared/ui/forms/FormImagePicker';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import SearchBar from '@/shared/ui/SearchBar';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import api, { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
-import { submitPlaceClaim, type PlaceClaimPlace } from '@/services/place-claims';
-import { trackUserFlowEvent } from '@/services/user-flow-analytics';
+import { submitPlaceClaim, type PlaceClaimPlace } from '@/services/places/place-claims';
+import { trackUserFlowEvent } from '@/services/shared/user-flow-analytics';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

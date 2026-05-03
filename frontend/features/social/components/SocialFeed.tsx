@@ -17,8 +17,8 @@ import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 import PersonRow from './PersonRow';
 import PostItem from './PostItem';
 import SocialFeedEmptyState from './SocialFeedEmptyState';
@@ -32,7 +32,7 @@ import { getOrCreateDirectChat, sendDirectMessage } from '../../../services/dire
 import { getPostsSocket } from '../../../services/post-realtime';
 import { subscribeToPostChanges, type PostChangedPayload } from '../../../services/post-events';
 import { resolveStoredUserSession } from '../../../services/user-session';
-import { isVideoUrl } from '@/services/media';
+import { isVideoUrl } from '@/services/shared/media';
 import {
   collectPrefetchUrls,
   getFeedPostCreatedAtTime,

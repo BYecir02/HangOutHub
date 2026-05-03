@@ -13,30 +13,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 
-import EventInspirationCard from '@/components/ui/EventInspirationCard';
+import EventInspirationCard from '@/features/events/components/EventInspirationCard';
 import LocationFilterSheet, {
   type LocationCityOption,
-} from '@/components/ui/LocationFilterSheet';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import { useLocationScope } from '@/hooks/useLocationScope';
+} from '@/shared/ui/LocationFilterSheet';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useLocationScope } from '@/shared/hooks/useLocationScope';
 import api, { clearAuthState, getImageUrl, isUnauthorizedError, storage } from '@/services/api';
-import { getCategoryCache, setCategoryCache } from '@/services/dataCache';
+import { getCategoryCache, setCategoryCache } from '@/services/api/dataCache';
 import {
   formatEventCardPriceLabel,
   formatEventDate,
-} from '@/services/formatters';
-import { getRecommendationOnboardingPreferences } from '@/services/recommendation-onboarding';
-import { resolveStoredUserSession } from '@/services/user-session';
-import { SkeletonBlock } from '@/components/ui/Skeleton';
+} from '@/services/shared/formatters';
+import { getRecommendationOnboardingPreferences } from '@/services/shared/recommendation-onboarding';
+import { resolveStoredUserSession } from '@/services/auth/user-session';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import {
   AnimationMeta,
   getCategoryAnimation,
 } from '@/utils/category-animations';
-import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
-import { setStoredLocation, type StoredLocation } from '@/services/location-preferences';
+import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
+import { setStoredLocation, type StoredLocation } from '@/services/shared/location-preferences';
 
 interface CategoryTag {
   id: number;

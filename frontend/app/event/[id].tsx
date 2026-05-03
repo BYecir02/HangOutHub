@@ -10,11 +10,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 
-import EventDetailContent from '@/components/event/EventDetailContent';
-import EventDetailHero from '@/components/event/EventDetailHero';
-import EventPublicationsPanel from '@/components/event/EventPublicationsPanel';
-import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
-import { useEventDetail } from '@/hooks/useEventDetail';
+import EventDetailContent from '@/features/events/components/EventDetailContent';
+import EventDetailHero from '@/features/events/components/EventDetailHero';
+import EventPublicationsPanel from '@/features/events/components/EventPublicationsPanel';
+import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
+import { useEventDetail } from '@/features/events/hooks/useEventDetail';
 
 export default function EventDetailScreen() {
   const router = useRouter();

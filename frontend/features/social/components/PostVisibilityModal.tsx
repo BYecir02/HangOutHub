@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 
 export type PostVisibility = 'public' | 'friends' | 'private' | 'custom';
 

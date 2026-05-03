@@ -3,8 +3,8 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import MediaFrame from '@/components/ui/MediaFrame';
-import { useI18n } from '@/hooks/use-i18n';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import { getImageUrl } from '@/services/api';
 
 const PLACE_PLACEHOLDER =

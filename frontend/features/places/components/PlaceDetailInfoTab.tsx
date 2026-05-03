@@ -3,9 +3,9 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import ContactAction from '@/components/ui/ContactAction';
-import MediaFrame from '@/components/ui/MediaFrame';
-import { useI18n } from '@/hooks/use-i18n';
+import ContactAction from '@/shared/ui/ContactAction';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import { useI18n } from '@/shared/hooks/use-i18n';
 
 type PlaceDetailInfoTabPlace = {
   id: string;

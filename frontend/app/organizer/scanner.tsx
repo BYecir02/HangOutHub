@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { BarcodeType, CameraView } from 'expo-camera';
 
-import ScannerEventPickerModal from '@/components/organizer/scanner/ScannerEventPickerModal';
-import ScannerRecentScansPanel from '@/components/organizer/scanner/ScannerRecentScansPanel';
-import ScannerScanResultCard from '@/components/organizer/scanner/ScannerScanResultCard';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import { useScannerFlow } from '@/hooks/useScannerFlow';
-import { scannerStatusTitleKey } from '@/services/scanner-status';
+import ScannerEventPickerModal from '@/features/organizer/components/scanner/ScannerEventPickerModal';
+import ScannerRecentScansPanel from '@/features/organizer/components/scanner/ScannerRecentScansPanel';
+import ScannerScanResultCard from '@/features/organizer/components/scanner/ScannerScanResultCard';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useScannerFlow } from '@/features/organizer/hooks/useScannerFlow';
+import { scannerStatusTitleKey } from '@/services/organizer/scanner-status';
 
 const SCANNER_BARCODE_TYPES: BarcodeType[] = ['qr' as BarcodeType];
 

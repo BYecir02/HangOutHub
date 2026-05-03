@@ -23,7 +23,7 @@ const BOOTSTRAP_LOGO = require('../assets/images/hangouthub-logo-mark-512.png');
 
 import '../global.css';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { clearAuthState, isUnauthorizedError, storage } from '@/services/api';
 import {
   getCurrentThemePreference,
@@ -31,19 +31,19 @@ import {
   subscribeThemePreference,
   syncAppPreferencesFromSettings,
   type StoredThemePreference,
-} from '@/services/app-preferences';
-import { getMySettings } from '@/services/settings';
+} from '@/services/auth/app-preferences';
+import { getMySettings } from '@/services/user/settings';
 import { AuthBootstrapProvider } from '@/context/auth-bootstrap';
 import {
   hasCompletedTasteOnboarding,
   resolveStoredUserSession,
-} from '@/services/user-session';
+} from '@/services/auth/user-session';
 import {
   canAccessOrganizerPanel,
   getOrganizerEntryPath,
   isOrganizerUser,
-} from '@/services/organizer-access';
-import UserFlowTracker from '@/components/analytics/UserFlowTracker';
+} from '@/services/organizer/organizer-access';
+import UserFlowTracker from '@/features/user/components/UserFlowTracker';
 import { subscribeAuthBootstrapReset } from '@/context/auth-bootstrap';
 
 export const unstable_settings = {

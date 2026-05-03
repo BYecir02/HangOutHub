@@ -1,7 +1,7 @@
 import React from 'react';
 
-import HomeContent from '@/components/home/HomeContent';
-import { useHomeScreen } from '@/hooks/useHomeScreen';
+import HomeContent from '@/features/user/components/HomeContent';
+import { useHomeScreen } from '@/features/user/hooks/useHomeScreen';
 
 export default function HomeScreen() {
   const {

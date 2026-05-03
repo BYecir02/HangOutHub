@@ -6,17 +6,17 @@ import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, type MapStyleElement, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useLocationScope } from '@/hooks/useLocationScope';
-import EventInspirationCard from '@/components/ui/EventInspirationCard';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import MediaFrame from '@/components/ui/MediaFrame';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useLocationScope } from '@/shared/hooks/useLocationScope';
+import EventInspirationCard from '@/features/events/components/EventInspirationCard';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
-import { formatEventCardPriceLabel, formatEventDate } from '@/services/formatters';
-import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
+import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 
 const DARK_MAP_STYLE: MapStyleElement[] = [
   { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },

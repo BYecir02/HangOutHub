@@ -1,8 +1,8 @@
 import React, { type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import HeroBackground from '@/components/ui/HeroBackground';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import HeroBackground from '@/shared/ui/HeroBackground';
 
 type CatalogScreenLayoutProps = {
   title: string;

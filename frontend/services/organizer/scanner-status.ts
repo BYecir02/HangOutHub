@@ -1,5 +1,5 @@
-import type { ScannerVerificationStatus } from '@/services/organizer-scanner';
-import type { TranslationKey } from '@/services/i18n';
+import type { ScannerVerificationStatus } from '@/services/organizer/organizer-scanner';
+import type { TranslationKey } from '@/services/shared/i18n';
 
 export const scannerStatusToneClass: Record<ScannerVerificationStatus, string> = {
   VALID_CHECKED_IN_NOW:

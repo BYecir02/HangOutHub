@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 
 type FilterType = 'all' | 'plan' | 'post';
 

@@ -8,9 +8,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import type { UserProfile } from '@/hooks/useUserProfile';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import type { UserProfile } from '@/features/user/hooks/useUserProfile';
 
 import { getImageUrl } from '../../../services/api';
 

@@ -10,9 +10,9 @@ import { useRouter } from 'expo-router';
 
 import AdminAnalyticsTree, {
   type AdminAnalyticsTreeNode,
-} from '@/components/admin/AdminAnalyticsTree';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+} from '@/features/organizer/components/AdminAnalyticsTree';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import { clearAuthState, getApiErrorMessage } from '@/services/api';
 import {
   fetchAdminAnalyticsDashboard,
@@ -22,7 +22,7 @@ import {
   type DashboardBucket,
   type DashboardTrendRange,
   type DashboardTopSharedItem,
-} from '@/services/admin-analytics';
+} from '@/services/organizer/admin-analytics';
 
 type SummaryCardTone = 'blue' | 'emerald' | 'amber' | 'rose' | 'violet';
 

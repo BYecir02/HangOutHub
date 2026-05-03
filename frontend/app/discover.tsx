@@ -9,15 +9,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import DiscoverEmptyState from '@/components/discover/DiscoverEmptyState';
-import DiscoverFiltersModal from '@/components/discover/DiscoverFiltersModal';
-import DiscoverInspirationMasonry from '@/components/discover/DiscoverInspirationMasonry';
-import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
-import { EntityRowCard } from '@/components/ui/EntityCard';
-import LocationScopeBar from '@/components/ui/LocationScopeBar';
-import ScreenState from '@/components/ui/ScreenState';
-import { SkeletonBlock } from '@/components/ui/Skeleton';
-import { useDiscoverScreen } from '@/hooks/useDiscoverScreen';
+import DiscoverEmptyState from '@/features/discover/components/DiscoverEmptyState';
+import DiscoverFiltersModal from '@/features/discover/components/DiscoverFiltersModal';
+import DiscoverInspirationMasonry from '@/features/discover/components/DiscoverInspirationMasonry';
+import CatalogScreenLayout from '@/shared/ui/CatalogScreenLayout';
+import { EntityRowCard } from '@/shared/ui/EntityCard';
+import LocationScopeBar from '@/shared/ui/LocationScopeBar';
+import ScreenState from '@/shared/ui/ScreenState';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
+import { useDiscoverScreen } from '@/features/discover/hooks/useDiscoverScreen';
 import { uiTokens } from '@/theme/tokens';
 
 export default function DiscoverScreen() {

@@ -2,12 +2,12 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import Tabs, { type TabItem } from '@/components/ui/Tabs';
-import EventDetailInfoTab from '@/components/event/EventDetailInfoTab';
-import EventDetailTicketsTab from '@/components/event/EventDetailTicketsTab';
-import EventDetailGalleryTab from '@/components/event/EventDetailGalleryTab';
-import type { EventDetail, EventDetailTab } from '@/hooks/useEventDetail';
-import type { TranslationKey } from '@/services/i18n';
+import Tabs, { type TabItem } from '@/shared/ui/Tabs';
+import EventDetailInfoTab from '@/features/events/components/EventDetailInfoTab';
+import EventDetailTicketsTab from '@/features/events/components/EventDetailTicketsTab';
+import EventDetailGalleryTab from '@/features/events/components/EventDetailGalleryTab';
+import type { EventDetail, EventDetailTab } from '@/features/events/hooks/useEventDetail';
+import type { TranslationKey } from '@/services/shared/i18n';
 
 type TranslateFn = (key: TranslationKey, params?: Record<string, string | number>) => string;
 

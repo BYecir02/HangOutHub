@@ -2,13 +2,13 @@ import React, { memo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 
-import Avatar from '@/components/ui/primitives/Avatar';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import MediaFrame from '@/components/ui/MediaFrame';
-import { useI18n } from '@/hooks/use-i18n';
+import Avatar from '@/shared/ui/primitives/Avatar';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import { getImageUrl } from '@/services/api';
-import { isVideoUrl } from '@/services/media';
-import type { PostDetails } from '@/services/posts';
+import { isVideoUrl } from '@/services/shared/media';
+import type { PostDetails } from '@/services/social/posts';
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150';
 

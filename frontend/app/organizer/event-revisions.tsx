@@ -6,14 +6,14 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import type { TranslationKey } from '@/services/i18n';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import type { TranslationKey } from '@/services/shared/i18n';
 import { getApiErrorMessage } from '@/services/api';
-import { EventRevisionItem, listEventRevisions } from '@/services/event-revisions';
+import { EventRevisionItem, listEventRevisions } from '@/services/events/event-revisions';
 
 function getRevisionActionLabel(
   action: string,

@@ -3,13 +3,13 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import { useI18n } from '@/hooks/use-i18n';
-import type { TranslationKey } from '@/services/i18n';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import type { TranslationKey } from '@/services/shared/i18n';
 import {
   resolveStoredUserSession,
   type StoredUserSession,
-} from '@/services/user-session';
+} from '@/services/auth/user-session';
 
 type ActionItem = {
   label: string;

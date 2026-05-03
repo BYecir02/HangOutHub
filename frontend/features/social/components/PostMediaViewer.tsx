@@ -3,8 +3,8 @@ import { Dimensions, FlatList, Modal, Pressable, Text, View } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 
-import MediaFrame from '@/components/ui/MediaFrame';
-import { isVideoUrl } from '@/services/media';
+import MediaFrame from '@/shared/ui/MediaFrame';
+import { isVideoUrl } from '@/services/shared/media';
 import { getImageUrl } from '../../../services/api';
 
 interface PostMediaViewerProps {

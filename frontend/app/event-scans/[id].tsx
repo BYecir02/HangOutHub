@@ -2,15 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import TicketStatusBadge from '@/components/ui/TicketStatusBadge';
-import { useI18n } from '@/hooks/use-i18n';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import TicketStatusBadge from '@/shared/ui/TicketStatusBadge';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import { getApiErrorMessage, getImageUrl } from '@/services/api';
 import {
   getEventScans,
   type EventScansResponse,
-} from '@/services/event-bookings';
+} from '@/services/events/event-bookings';
 
 const AVATAR_PLACEHOLDER = 'https://i.pravatar.cc/150?img=12';
 

@@ -9,20 +9,20 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
-import PostItem from '@/components/social/PostItem';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import PostItem from '@/features/social/components/PostItem';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
 import { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   getPostById,
   trackPostShare,
   type PostDetails,
-} from '@/services/posts';
-import { getFriendshipOverview } from '@/services/friendships';
-import { getOrCreateDirectChat, sendDirectMessage } from '@/services/direct-chats';
-import PersonRow from '@/components/social/PersonRow';
+} from '@/services/social/posts';
+import { getFriendshipOverview } from '@/services/user/friendships';
+import { getOrCreateDirectChat, sendDirectMessage } from '@/services/messaging/direct-chats';
+import PersonRow from '@/features/social/components/PersonRow';
 import type { SocialUser } from '@/types/social';
 import * as Linking from 'expo-linking';
 

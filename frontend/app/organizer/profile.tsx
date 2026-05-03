@@ -10,19 +10,19 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import OrganizerClaimHistory from '@/components/organizer/OrganizerClaimHistory';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import OrganizerClaimHistory from '@/features/organizer/components/OrganizerClaimHistory';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import api, { getImageUrl } from '@/services/api';
 import {
   normalizeTeamWorkspaceRole,
-} from '@/services/organizer-access';
-import { getOrganizerStatusTone } from '@/services/organizer-ui';
-import { clearStoredUserSession } from '@/services/user-session';
+} from '@/services/organizer/organizer-access';
+import { getOrganizerStatusTone } from '@/services/organizer/organizer-ui';
+import { clearStoredUserSession } from '@/services/auth/user-session';
 import { clearAuthState } from '@/services/api';
 
 const PLACE_PLACEHOLDER =

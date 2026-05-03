@@ -13,27 +13,27 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { useI18n } from '@/hooks/use-i18n';
-import { useLocationScope } from '@/hooks/useLocationScope';
-import CatalogScreenLayout from '@/components/ui/CatalogScreenLayout';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import LocationScopeBar from '@/components/ui/LocationScopeBar';
-import MasonryGrid from '@/components/ui/MasonryGrid';
-import SearchBar from '@/components/ui/SearchBar';
-import PlaceCard from '@/components/ui/PlaceCard';
-import PlaceInspirationCard from '@/components/ui/PlaceInspirationCard';
-import ScreenState from '@/components/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useLocationScope } from '@/shared/hooks/useLocationScope';
+import CatalogScreenLayout from '@/shared/ui/CatalogScreenLayout';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import LocationScopeBar from '@/shared/ui/LocationScopeBar';
+import MasonryGrid from '@/shared/ui/MasonryGrid';
+import SearchBar from '@/shared/ui/SearchBar';
+import PlaceCard from '@/features/places/components/PlaceCard';
+import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import ScreenState from '@/shared/ui/ScreenState';
 import api, {
   clearAuthState,
   getApiErrorMessage,
   getImageUrl,
   storage,
 } from '@/services/api';
-import { getCache, setCache } from '@/services/dataCache';
-import { SkeletonBlock } from '@/components/ui/Skeleton';
+import { getCache, setCache } from '@/services/api/dataCache';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
-import { useVisibleItemAutoplay } from '@/hooks/useVisibleItemAutoplay';
+import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 
 interface PlaceItem {
   id: string;

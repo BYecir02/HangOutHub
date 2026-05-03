@@ -13,26 +13,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { Socket } from 'socket.io-client';
 
-import DirectConversationCard from '@/components/messages/DirectConversationCard';
+import DirectConversationCard from '@/features/messaging/components/DirectConversationCard';
 import OutingConversationCard, {
   type OutingConversationSummary,
-} from '@/components/messages/OutingConversationCard';
-import PersonRow from '@/components/social/PersonRow';
-import BottomSheetModal from '@/components/ui/BottomSheetModal';
-import BottomSheetListModal from '@/components/ui/BottomSheetListModal';
-import FilterChipsBar, { type FilterChipOption } from '@/components/ui/FilterChipsBar';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import SearchBar from '@/components/ui/SearchBar';
-import { useI18n } from '@/hooks/use-i18n';
+} from '@/features/messaging/components/OutingConversationCard';
+import PersonRow from '@/features/social/components/PersonRow';
+import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import BottomSheetListModal from '@/shared/ui/BottomSheetListModal';
+import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import SearchBar from '@/shared/ui/SearchBar';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
   getOrCreateDirectChat,
   listDirectChats,
   type DirectChatSummary,
-} from '@/services/direct-chats';
-import { stripSystemMarkers } from '@/services/direct-chat-meta';
-import { getDirectChatSocket } from '@/services/direct-chat-realtime';
-import { getFriendshipOverview } from '@/services/friendships';
+} from '@/services/messaging/direct-chats';
+import { stripSystemMarkers } from '@/services/messaging/direct-chat-meta';
+import { getDirectChatSocket } from '@/services/messaging/direct-chat-realtime';
+import { getFriendshipOverview } from '@/services/user/friendships';
 import type { SocialUser } from '@/types/social';
 
 export default function MessagesScreen() {

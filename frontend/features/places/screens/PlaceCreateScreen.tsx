@@ -13,16 +13,16 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
-import FormImagePicker from '@/components/forms/FormImagePicker';
-import FormTextArea from '@/components/forms/FormTextArea';
-import FormTextField from '@/components/forms/FormTextField';
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import { useI18n } from '@/hooks/use-i18n';
+import FormImagePicker from '@/shared/ui/forms/FormImagePicker';
+import FormTextArea from '@/shared/ui/forms/FormTextArea';
+import FormTextField from '@/shared/ui/forms/FormTextField';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
-import { getCache, setCache } from '@/services/dataCache';
-import { getStoredLocation } from '@/services/location-preferences';
-import { patchStoredUserSession } from '@/services/user-session';
+import { getCache, setCache } from '@/services/api/dataCache';
+import { getStoredLocation } from '@/services/shared/location-preferences';
+import { patchStoredUserSession } from '@/services/auth/user-session';
 
 const PRICE_LEVELS = [1, 2, 3, 4] as const;
 const PHONE_REGEX = /^\+?[0-9\s().-]{8,20}$/;

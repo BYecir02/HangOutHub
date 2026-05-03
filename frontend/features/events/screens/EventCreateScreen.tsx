@@ -18,16 +18,16 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
-import EventFormWizard from '@/components/ui/EventFormWizard';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import EventFormWizard from '@/features/events/components/EventFormWizard';
 import api, { clearAuthState, isUnauthorizedError } from '@/services/api';
-import { getMySettings } from '@/services/settings';
+import { getMySettings } from '@/services/user/settings';
 import {
   buildMediaUploadPayload,
   isMediaFileTooLarge,
   isSupportedMediaAsset,
-} from '@/services/media-upload';
+} from '@/services/shared/media-upload';
 
 interface OwnedPlaceOption {
   id: string;

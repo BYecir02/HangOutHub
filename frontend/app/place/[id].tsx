@@ -10,13 +10,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 
-import PlaceDetailContent from '@/components/place/PlaceDetailContent';
-import PlaceDetailHero from '@/components/place/PlaceDetailHero';
-import PlaceGalleryModal from '@/components/place/PlaceGalleryModal';
-import PlacePublicationsPanel from '@/components/place/PlacePublicationsPanel';
-import PlaceReviewModal from '@/components/place/PlaceReviewModal';
-import ReportReasonSheet from '@/components/ui/ReportReasonSheet';
-import { usePlaceDetail, type PlaceDetailTab } from '@/hooks/usePlaceDetail';
+import PlaceDetailContent from '@/features/places/components/PlaceDetailContent';
+import PlaceDetailHero from '@/features/places/components/PlaceDetailHero';
+import PlaceGalleryModal from '@/features/places/components/PlaceGalleryModal';
+import PlacePublicationsPanel from '@/features/places/components/PlacePublicationsPanel';
+import PlaceReviewModal from '@/features/places/components/PlaceReviewModal';
+import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
+import { usePlaceDetail, type PlaceDetailTab } from '@/features/places/hooks/usePlaceDetail';
 
 export default function PlaceDetailScreen() {
   const router = useRouter();

@@ -11,13 +11,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
-import AuthBrandBadge from '@/components/auth/AuthBrandBadge';
-import AuthHeroLayout from '@/components/auth/AuthHeroLayout';
-import AuthStepIndicator from '@/components/auth/AuthStepIndicator';
-import AuthTextField from '@/components/auth/AuthTextField';
-import RoleOptionCard from '@/components/auth/RoleOptionCard';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/hooks/use-i18n';
+import AuthBrandBadge from '@/features/auth/components/AuthBrandBadge';
+import AuthHeroLayout from '@/features/auth/components/AuthHeroLayout';
+import AuthStepIndicator from '@/features/auth/components/AuthStepIndicator';
+import AuthTextField from '@/features/auth/components/AuthTextField';
+import RoleOptionCard from '@/features/auth/components/RoleOptionCard';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
 
 type AccountType = 'USER' | 'PLACE' | 'NOMAD';

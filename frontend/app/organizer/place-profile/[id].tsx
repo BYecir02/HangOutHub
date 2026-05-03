@@ -10,15 +10,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import ScreenHeader from '@/components/ui/ScreenHeader';
-import ScreenState from '@/components/ui/ScreenState';
-import Tabs, { type TabItem } from '@/components/ui/Tabs';
-import PostItem, { type PostItemData } from '@/components/social/PostItem';
-import { useI18n } from '@/hooks/use-i18n';
-import { useOrganizerGuard } from '@/hooks/useOrganizerGuard';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import ScreenHeader from '@/shared/ui/ScreenHeader';
+import ScreenState from '@/shared/ui/ScreenState';
+import Tabs, { type TabItem } from '@/shared/ui/Tabs';
+import PostItem, { type PostItemData } from '@/features/social/components/PostItem';
+import { useI18n } from '@/shared/hooks/use-i18n';
+import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
+import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import api, { getImageUrl } from '@/services/api';
-import { getPlacePosts } from '@/services/posts';
+import { getPlacePosts } from '@/services/social/posts';
 
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

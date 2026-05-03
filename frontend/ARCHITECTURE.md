@@ -19,7 +19,7 @@
 | 2 | 🟠 Moyen | Cache en mémoire pour analytics `events/overview` | `backend/src/events/events.service.ts` | Query lourde appelée sans cache |
 | 3 | 🟡 Faible | Debounce recherche `placeSearch` et `eventSearch` | `app/post.tsx` (300ms) | `setTimeout` + `clearTimeout` dans handler |
 | 4 | 🟡 Faible | Unifier cache + état local dans `useHomeScreen` | `hooks/useHomeScreen.ts` | `getCache('homeEvents')` et `setEvents` sont deux sources différentes |
-| 5 | 🔵 Archi | **Phase 3 migration** — extraire les 6 gros écrans vers `features/*/screens/` | Voir §5 Phase 3 | Commencer par `admin/place-claims.tsx` (plus simple, isolé) |
+| 5 | 🟡 Faible | **Nettoyage stubs** — supprimer les re-exports stubs et mettre à jour les imports directs | `components/**`, `hooks/**`, `services/**` | Optionnel — l'app fonctionne sans cette étape |
 
 ### Ce qui a DÉJÀ été fait (ne pas refaire)
 
@@ -35,6 +35,8 @@
 - ✅ `place.tsx` — AbortController dans `loadCategories`, `availableTags` wrappé dans `useMemo`
 - ✅ **Phase 1 migration** — `services/` restructuré en 9 sous-dossiers avec stubs rétro-compatibles (TypeScript 0 erreur)
 - ✅ **Phase 2 migration** — `components/` → `features/` + `shared/ui/` avec stubs rétro-compatibles (TypeScript 0 erreur)
+- ✅ **Phase 3 migration** — 6 grands écrans extraits vers `features/*/screens/`, thin wrappers à `app/` (TypeScript 0 erreur)
+- ✅ **Phase 4 migration** — `hooks/` → `shared/hooks/` + `features/*/hooks/`, types + constants déplacés (TypeScript 0 erreur)
 
 ---
 
@@ -427,7 +429,7 @@ services/
 **Risque** : Élevé (refactoring de logique). Faire **un écran à la fois**.  
 **Durée estimée** : 4–6 sessions.
 
-> **Statut : 🔲 Non commencé**
+> **Statut : ✅ TERMINÉ (6/6 écrans) — 2026-05-03**
 
 **Ordre recommandé** (du plus simple au plus complexe) :
 
@@ -459,14 +461,19 @@ export function PostCreateScreen() {
 ```
 
 **Checklist Phase 3** :
-- [ ] `place-claims.tsx` → `features/organizer/screens/PlaceClaimsScreen.tsx`
-- [ ] `post.tsx` → `features/social/screens/PostCreateScreen.tsx`
-- [ ] `place.tsx` → `features/places/screens/PlaceCreateScreen.tsx`
-- [ ] `event-edit/[id].tsx` → `features/events/screens/EventEditScreen.tsx`
-- [ ] `event.tsx` → `features/events/screens/EventCreateScreen.tsx`
-- [ ] `direct-chat/[id].tsx` → `features/messaging/screens/DirectChatScreen.tsx`
-- [ ] Vérifier `npx tsc --noEmit` = 0 erreur après chaque migration
-- [ ] Mettre à jour ce document
+- [x] `place-claims.tsx` → `features/organizer/screens/PlaceClaimsScreen.tsx`
+- [x] `post.tsx` → `features/social/screens/PostCreateScreen.tsx`
+- [x] `place.tsx` → `features/places/screens/PlaceCreateScreen.tsx`
+- [x] `event-edit/[id].tsx` → `features/events/screens/EventEditScreen.tsx`
+- [x] `event.tsx` → `features/events/screens/EventCreateScreen.tsx`
+- [x] `direct-chat/[id].tsx` → `features/messaging/screens/DirectChatScreen.tsx`
+- [x] Vérifier `npx tsc --noEmit` = 0 erreur après chaque migration ✅
+- [x] Mettre à jour ce document
+
+**Notes Phase 3** :
+- Thin wrappers créés aux anciens chemins `app/` (ex: `app/post.tsx` → `export { default } from '@/features/social/screens/PostCreateScreen'`)
+- 3 imports relatifs `../services/...` corrigés en `@/services/...` dans `PostCreateScreen.tsx` et `EventCreateScreen.tsx`
+- Dossiers `app/event-edit/` et `app/direct-chat/` recréés pour accueillir les wrappers `[id].tsx`
 
 ---
 
@@ -476,30 +483,35 @@ export function PostCreateScreen() {
 **Risque** : Faible.  
 **Durée estimée** : 1 session.
 
-> **Statut : 🔲 Non commencé**
+> **Statut : ✅ TERMINÉ (4/4 groupes) — 2026-05-03**
 
 **Checklist Phase 4** :
-- [ ] `hooks/useColorScheme.ts` + `use-color-scheme.web.ts` → `shared/hooks/`
-- [ ] `hooks/use-i18n.ts` → `shared/hooks/`
-- [ ] `hooks/use-app-language.ts` → `shared/hooks/`
-- [ ] `hooks/use-theme-color.ts` → `shared/hooks/`
-- [ ] `hooks/useLocationScope.ts` → `shared/hooks/`
-- [ ] `hooks/useScreenAsync.ts` → `shared/hooks/`
-- [ ] `hooks/usePaginatedList.ts` → `shared/hooks/`
-- [ ] `hooks/useVisibleItemAutoplay.ts` + `.logic.ts` → `shared/hooks/`
-- [ ] `hooks/useHomeScreen.ts` → `features/user/hooks/`
-- [ ] `hooks/useEventDetail.ts` → `features/events/hooks/`
-- [ ] `hooks/usePlaceDetail.ts` → `features/places/hooks/`
-- [ ] `hooks/useDiscoverScreen.ts` → `features/discover/hooks/`
-- [ ] `hooks/useOrganizerGuard.ts` → `features/organizer/hooks/`
-- [ ] `hooks/useScannerFlow.ts` → `features/organizer/hooks/`
-- [ ] `hooks/useUserProfile.ts` → `features/user/hooks/`
-- [ ] `types/social.ts` → `features/social/types.ts`
-- [ ] `types.ts` (racine) → `shared/types/` ou intégrer dans les features
-- [ ] `constants/theme.ts` → merger avec `theme/tokens.ts`
-- [ ] Supprimer dossiers vides après migration
-- [ ] Vérifier `npx tsc --noEmit` = 0 erreur
-- [ ] Mettre à jour ce document
+- [x] `hooks/use-color-scheme.ts` + `.web.ts` → `shared/hooks/`
+- [x] `hooks/use-i18n.ts` → `shared/hooks/`
+- [x] `hooks/use-app-language.ts` → `shared/hooks/`
+- [x] `hooks/use-theme-color.ts` → `shared/hooks/`
+- [x] `hooks/useLocationScope.ts` → `shared/hooks/`
+- [x] `hooks/useScreenAsync.ts` → `shared/hooks/`
+- [x] `hooks/usePaginatedList.ts` → `shared/hooks/`
+- [x] `hooks/useVisibleItemAutoplay.ts` + `.logic.ts` + `.logic.test.ts` → `shared/hooks/`
+- [x] `hooks/useHomeScreen.ts` → `features/user/hooks/`
+- [x] `hooks/useEventDetail.ts` → `features/events/hooks/`
+- [x] `hooks/usePlaceDetail.ts` → `features/places/hooks/`
+- [x] `hooks/useDiscoverScreen.ts` → `features/discover/hooks/`
+- [x] `hooks/useOrganizerGuard.ts` → `features/organizer/hooks/`
+- [x] `hooks/useScannerFlow.ts` → `features/organizer/hooks/`
+- [x] `hooks/useUserProfile.ts` → `features/user/hooks/`
+- [x] `types/social.ts` → `features/social/types.ts`
+- [x] `types.ts` (racine) → `shared/types/index.ts`
+- [x] `constants/theme.ts` → `shared/theme/colors.ts`
+- [x] Vérifier `npx tsc --noEmit` = 0 erreur ✅
+- [x] Mettre à jour ce document
+
+**Notes Phase 4** :
+- Stubs créés dans `hooks/` pour rétro-compatibilité (18 fichiers)
+- Barrels `index.ts` créés dans chaque `features/*/hooks/` et `shared/hooks/`
+- Correction `features/user/hooks/useUserProfile.ts` : `'../services/api'` → `'@/services/api'`
+- `constants/theme.ts` (couleurs) → `shared/theme/colors.ts` (distinct de `theme/tokens.ts` qui contient les spacing/dimensions)
 
 ---
 
