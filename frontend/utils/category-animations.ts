@@ -1,4 +1,4 @@
-import { Category } from '@/types';
+import { Category } from '@/shared/types';
 import type { AnimationObject } from 'lottie-react-native';
 import cultureAnimationJson from '@/assets/lottie/wired-lineal-1953-african-culture-hover-pinch.json';
 import natureAnimationJson from '@/assets/lottie/wired-lineal-1827-growing-plant-hover-pinch.json';

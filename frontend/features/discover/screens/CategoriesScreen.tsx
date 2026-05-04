@@ -9,7 +9,7 @@ import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
 import { getCache, setCache } from '@/services/api/dataCache';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
-import { Category } from '@/types';
+import { Category } from '@/shared/types';
 
 export default function CategoriesScreen() {
   const router = useRouter();

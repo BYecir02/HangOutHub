@@ -23,7 +23,7 @@ import {
 import { getFriendshipOverview } from '@/services/user/friendships';
 import { getOrCreateDirectChat, sendDirectMessage } from '@/services/messaging/direct-chats';
 import PersonRow from '@/features/social/components/PersonRow';
-import type { SocialUser } from '@/types/social';
+import type { SocialUser } from '@/features/social/types';
 import * as Linking from 'expo-linking';
 
 export default function PostViewScreen() {

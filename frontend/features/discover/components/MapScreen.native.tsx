@@ -144,6 +144,8 @@ const COUNTRY_CENTER_ZOOM = 5.2;
 const CITY_CENTER_ZOOM = 12;
 const PLACE_PLACEHOLDER =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200';
+const MARKER_STYLE_PLACE = { backgroundColor: '#2ecc71' };
+const MARKER_STYLE_EVENT = { backgroundColor: '#f39c12' };
 
 function zoomToRegionDelta(zoom: number) {
   const longitudeDelta = Math.max(0.005, 360 / Math.pow(2, zoom));
@@ -221,6 +223,7 @@ function collectMapSheetPrefetchUrls(
 function MapSuggestionsMasonry({
   tiles,
   activeItemId,
+  isPanelOpen,
   onPressPlace,
   onPressEvent,
   isPlaceSaved,
@@ -234,6 +237,7 @@ function MapSuggestionsMasonry({
 }: {
   tiles: MapSuggestionTile[];
   activeItemId: string | null;
+  isPanelOpen: boolean;
   onPressPlace: (place: PlacePin) => void;
   onPressEvent: (event: EventPin) => void;
   isPlaceSaved: (placeId: string) => boolean;
@@ -272,7 +276,7 @@ function MapSuggestionsMasonry({
               isSaved={isPlaceSaved(place.id)}
               onToggleSave={() => onToggleSavePlace(place.id)}
               saving={isSavingPlace(place.id)}
-              shouldPlay={activeItemId === tile.id}
+              shouldPlay={activeItemId === tile.id && !isPanelOpen}
               adaptiveHeight={false}
             />
           );
@@ -1030,7 +1034,7 @@ export default function MapScreen() {
                   className={`rounded-full border-2 border-white shadow-lg ${
                     isSelected ? 'h-5 w-5' : 'h-4 w-4'
                   }`}
-                  style={{ backgroundColor: marker.kind === 'place' ? '#2ecc71' : '#f39c12' }}
+                  style={marker.kind === 'place' ? MARKER_STYLE_PLACE : MARKER_STYLE_EVENT}
                 />
                 {marker.groupSize > 1 ? (
                   <View className="mt-1 rounded-full bg-black/70 px-1.5 py-0.5">
@@ -1383,6 +1387,7 @@ export default function MapScreen() {
           <MapSuggestionsMasonry
             tiles={mapSuggestionTiles}
             activeItemId={mapSuggestionAutoplay.activeId}
+            isPanelOpen={selectedPlace !== null || selectedEvent !== null}
             locale={locale}
             fallbackNewLabel={t('placesNewBadge')}
             freeLabel={t('homePriceFree')}

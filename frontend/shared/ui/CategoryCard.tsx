@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
-import { Category } from '@/types';
+import { Category } from '@/shared/types';
 import { getCategoryAnimation } from '@/utils/category-animations';
 
 interface CategoryCardProps {

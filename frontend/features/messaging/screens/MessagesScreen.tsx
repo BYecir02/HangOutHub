@@ -31,7 +31,7 @@ import {
 import { stripSystemMarkers } from '@/services/messaging/direct-chat-meta';
 import { getDirectChatSocket } from '@/services/messaging/direct-chat-realtime';
 import { getFriendshipOverview } from '@/services/user/friendships';
-import type { SocialUser } from '@/types/social';
+import type { SocialUser } from '@/features/social/types';
 
 export default function MessagesScreen() {
   const router = useRouter();

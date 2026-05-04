@@ -126,12 +126,14 @@ export function ZoomableImage({
   height,
   onClose,
   onLongPress,
+  shouldPlay = true,
 }: {
   uri: string;
   width: number;
   height: number;
   onClose: () => void;
   onLongPress: () => void;
+  shouldPlay?: boolean;
 }) {
   const isVideo = isVideoUrl(uri);
 
@@ -180,7 +182,7 @@ export function ZoomableImage({
         <MediaFrame
           source={uri}
           mediaType="video"
-          shouldPlay
+          shouldPlay={shouldPlay}
           showControls
           contentFit="contain"
           style={StyleSheet.absoluteFill}

@@ -20,6 +20,8 @@ import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import { useDiscoverScreen } from '@/features/discover/hooks/useDiscoverScreen';
 import { uiTokens } from '@/theme/tokens';
 
+const ListSeparator = () => <View style={{ height: 14 }} />;
+
 export default function DiscoverScreen() {
   const {
     locale,
@@ -115,7 +117,7 @@ export default function DiscoverScreen() {
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
               {t('discoverLoading')}

@@ -345,6 +345,11 @@ export default function CategoryDiscoverScreen() {
     [locationFilteredPlaces, preferenceSnapshot, selectedLocation],
   );
 
+  const categoryHeaderStyle = useMemo(
+    () => ({ backgroundColor: `${data?.category.color}18` }),
+    [data?.category.color],
+  );
+
   const handleSelectCity = useCallback(
     (city: CityOption) => {
       const nextLocation: StoredLocation = {
@@ -507,7 +512,7 @@ export default function CategoryDiscoverScreen() {
           <>
             <View
               className="px-5 pb-8 pt-16"
-              style={{ backgroundColor: `${data.category.color}18` }}
+              style={categoryHeaderStyle}
             >
               <View className="mb-6 flex-row items-center justify-between">
                 <TouchableOpacity

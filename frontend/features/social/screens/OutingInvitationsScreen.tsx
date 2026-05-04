@@ -16,7 +16,7 @@ import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
-import { OutingInvitation } from '@/types/social';
+import { OutingInvitation } from '@/features/social/types';
 
 const OUTING_PLACEHOLDER =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';

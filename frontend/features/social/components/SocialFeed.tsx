@@ -42,7 +42,7 @@ import {
   type MergeMode,
 } from './social-feed.utils';
 import { clearAuthState, storage } from '../../../services/api';
-import type { SocialUser } from '../../../types/social';
+import type { SocialUser } from '@/features/social/types';
 
 const FEED_CACHE_KEY = 'socialFeedCache_v2';
 const FEED_CACHE_TIME_KEY = 'socialFeedCacheAt_v2';

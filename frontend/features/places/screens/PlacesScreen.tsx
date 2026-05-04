@@ -51,6 +51,8 @@ interface PlaceItem {
 type PlaceFilter = 'all' | 'top' | 'budget';
 type PlaceViewMode = 'list' | 'inspiration';
 
+const ListSeparator = () => <View style={{ height: 16 }} />;
+
 function estimatePlaceCardHeight(index: number) {
   const imageHeights = [184, 248, 210, 276, 196, 232];
   return imageHeights[index % imageHeights.length] + 144;
@@ -593,7 +595,7 @@ export default function PlacesScreen() {
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
               {t('placesLoading')}
@@ -676,7 +678,7 @@ export default function PlacesScreen() {
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
               {t('placesResultsCount', { count: filteredPlaces.length })}

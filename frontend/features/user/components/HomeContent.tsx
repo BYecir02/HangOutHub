@@ -14,7 +14,7 @@ import type {
   HomeFeaturedItem,
   HomeRecommendationItem,
 } from './home.types';
-import type { Category } from '@/types';
+import type { Category } from '@/shared/types';
 
 interface HomeContentProps {
   notificationCount: number;

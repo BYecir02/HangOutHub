@@ -65,6 +65,8 @@ type EventsPage = { items: EventItem[]; nextCursor: string | null; hasMore: bool
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
 
+const ListSeparator = () => <View style={{ height: 16 }} />;
+
 function isWithinNextWeek(value: string) {
   const eventDate = new Date(value);
   if (Number.isNaN(eventDate.getTime())) {
@@ -559,7 +561,7 @@ export default function EventsScreen() {
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
               {t('eventsLoading')}
@@ -651,7 +653,7 @@ export default function EventsScreen() {
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListHeaderComponent={
             <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
               {t('eventsResultsCount', { count: filteredEvents.length })}

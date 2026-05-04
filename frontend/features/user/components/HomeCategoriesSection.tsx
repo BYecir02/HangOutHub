@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Text,
   TouchableOpacity,
@@ -8,9 +7,12 @@ import {
 } from 'react-native';
 
 import CategoryCard from '@/shared/ui/CategoryCard';
-import { type Category } from '@/types';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
+import { type Category } from '@/shared/types';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
+
+const SKELETON_WIDTHS = [90, 110, 80, 120, 95];
 
 interface HomeCategoriesSectionProps {
   title: string;
@@ -43,7 +45,11 @@ export default function HomeCategoriesSection({
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#4c669f" className="mt-4" />
+        <View style={{ flexDirection: 'row', paddingHorizontal: 20, gap: 10 }}>
+          {SKELETON_WIDTHS.map((w, i) => (
+            <SkeletonBlock key={i} style={{ width: w, height: 48, borderRadius: 100 }} />
+          ))}
+        </View>
       ) : categories.length > 0 ? (
         <FlatList
           data={categories}

@@ -11,8 +11,8 @@ import { setStoredLocation, type StoredLocation } from '@/services/shared/locati
 import { resolveStoredUserSession } from '@/services/auth/user-session';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useLocationScope } from '@/shared/hooks/useLocationScope';
-import type { Category } from '@/types';
-import type { OutingInvitation } from '@/types/social';
+import type { Category } from '@/shared/types';
+import type { OutingInvitation } from '@/features/social/types';
 import type {
   OnboardingBudgetPreference,
   OnboardingRadiusPreference,

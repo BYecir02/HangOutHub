@@ -17,7 +17,7 @@ import SearchBar from '@/shared/ui/SearchBar';
 import PersonActionButton from '@/features/social/components/PersonActionButton';
 import PersonRow from '@/features/social/components/PersonRow';
 import SocialEmptyState from '@/features/social/components/SocialEmptyState';
-import { DiscoverUser } from '@/types/social';
+import { DiscoverUser } from '@/features/social/types';
 import {
   acceptFriendRequest,
   discoverUsers,

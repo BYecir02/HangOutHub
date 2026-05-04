@@ -2107,7 +2107,7 @@ export default function DirectChatScreen() {
               );
               setPreviewIndex(index);
             }}
-            renderItem={({ item }) => (
+            renderItem={({ item, index }) => (
               <View
                 style={{
                   width: screenWidth,
@@ -2120,6 +2120,7 @@ export default function DirectChatScreen() {
                   uri={item}
                   width={screenWidth}
                   height={screenHeight}
+                  shouldPlay={index === previewIndex}
                   onClose={closePreview}
                   onLongPress={() => handleImageActions(item)}
                 />

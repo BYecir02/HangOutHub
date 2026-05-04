@@ -29,7 +29,7 @@ import {
   removeEventPlaceTeamMember,
 } from '@/services/events/event-collaborators';
 import { discoverUsers } from '@/services/user/friendships';
-import type { DiscoverUser } from '@/types/social';
+import type { DiscoverUser } from '@/features/social/types';
 
 export default function OrganizerEventTeamScreen() {
   const params = useLocalSearchParams<{ id?: string }>();

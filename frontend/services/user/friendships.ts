@@ -1,5 +1,5 @@
 import api from '../api';
-import { DiscoverUser, FriendshipOverview } from '../../types/social';
+import { DiscoverUser, FriendshipOverview } from '@/features/social/types';
 
 export async function getFriendshipOverview() {
   const response = await api.get<FriendshipOverview>('/friendships/mine');

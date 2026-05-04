@@ -33,7 +33,7 @@ import { useI18n } from '@/shared/hooks/use-i18n';
 import type { TranslationKey } from '@/services/shared/i18n';
 import { getFriendshipOverview } from '@/services/user/friendships';
 import { formatEventDate } from '@/services/shared/formatters';
-import type { FriendshipItem } from '@/types/social';
+import type { FriendshipItem } from '@/features/social/types';
 import { getMySettings } from '@/services/user/settings';
 
 type PostVisibility = 'public' | 'friends' | 'private' | 'custom';

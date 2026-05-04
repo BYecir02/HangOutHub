@@ -22,7 +22,7 @@ import {
   FriendshipOverview,
   NotificationActivityItem,
   OutingInvitation,
-} from '@/types/social';
+} from '@/features/social/types';
 
 const EMPTY_FRIENDSHIPS: FriendshipOverview = {
   counts: {

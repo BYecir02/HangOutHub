@@ -27,7 +27,7 @@ import {
   removePlaceTeamMember,
   upsertPlaceTeamMember,
 } from '@/services/places/place-team';
-import type { DiscoverUser } from '@/types/social';
+import type { DiscoverUser } from '@/features/social/types';
 
 export default function OrganizerPlaceTeamScreen() {
   const router = useRouter();

@@ -20,7 +20,7 @@ import {
   getFriendshipOverview,
   rejectFriendRequest,
 } from '@/services/user/friendships';
-import { FriendshipOverview } from '@/types/social';
+import { FriendshipOverview } from '@/features/social/types';
 
 const EMPTY_FRIENDSHIPS: FriendshipOverview = {
   counts: {

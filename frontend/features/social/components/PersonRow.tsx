@@ -3,7 +3,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 
 import Avatar from '@/shared/ui/primitives/Avatar';
 import { getImageUrl } from '../../../services/api';
-import { SocialUser } from '../../../types/social';
+import { SocialUser } from '@/features/social/types';
 
 interface PersonRowProps {
   user: SocialUser;

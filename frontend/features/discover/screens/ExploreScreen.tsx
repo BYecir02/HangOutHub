@@ -51,6 +51,8 @@ interface EventItem {
   } | null;
 }
 
+const ListSeparator = () => <View style={{ height: 16 }} />;
+
 export default function ExploreScreen() {
   const router = useRouter();
   const { locale, t } = useI18n();
@@ -176,7 +178,7 @@ export default function ExploreScreen() {
           data={[0, 1, 2]}
           keyExtractor={(item) => `skeleton-${item}`}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListEmptyComponent={null}
           renderItem={() => (
             <View className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -194,7 +196,7 @@ export default function ExploreScreen() {
           data={filteredEvents}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={ListSeparator}
           ListEmptyComponent={
             <View className="items-center py-16">
               <Text className="text-lg font-semibold text-gray-800 dark:text-white">

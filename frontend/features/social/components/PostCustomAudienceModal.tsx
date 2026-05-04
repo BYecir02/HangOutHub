@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { getImageUrl } from '@/services/api';
-import type { FriendshipItem } from '@/types/social';
+import type { FriendshipItem } from '@/features/social/types';
 
 type PostCustomAudienceModalProps = {
   visible: boolean;
