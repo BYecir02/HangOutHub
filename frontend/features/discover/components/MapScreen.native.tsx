@@ -15,6 +15,7 @@ import MediaFrame from '@/shared/ui/MediaFrame';
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
+import { getMapFriendsActivity } from '@/services/social/activity';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
 import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 
@@ -347,6 +348,7 @@ export default function MapScreen() {
   const [mapSheetVisible, setMapSheetVisible] = useState(false);
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceSheetDetail | null>(null);
   const [selectedPlaceDetailsLoading, setSelectedPlaceDetailsLoading] = useState(false);
+  const [friendsActivityMap, setFriendsActivityMap] = useState<Map<string, number>>(new Map());
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const headerSurfaceStyle = useMemo(
     () => ({
@@ -507,6 +509,14 @@ export default function MapScreen() {
   useEffect(() => {
     void fetchPlaces();
   }, [fetchPlaces]);
+
+  useEffect(() => {
+    void getMapFriendsActivity().then((items) => {
+      const map = new Map<string, number>();
+      items.forEach((item) => map.set(item.entityId, item.friendsCount));
+      setFriendsActivityMap(map);
+    });
+  }, []);
 
   useEffect(() => {
     void loadSavedPlaces();
@@ -1030,12 +1040,23 @@ export default function MapScreen() {
             >
               <View className="items-center justify-center">
                 {isSelected ? <View className="absolute h-10 w-10 rounded-full bg-white/20" /> : null}
-                <View
-                  className={`rounded-full border-2 border-white shadow-lg ${
-                    isSelected ? 'h-5 w-5' : 'h-4 w-4'
-                  }`}
-                  style={marker.kind === 'place' ? MARKER_STYLE_PLACE : MARKER_STYLE_EVENT}
-                />
+                <View className="relative">
+                  <View
+                    className={`rounded-full border-2 border-white shadow-lg ${
+                      isSelected ? 'h-5 w-5' : 'h-4 w-4'
+                    }`}
+                    style={marker.kind === 'place' ? MARKER_STYLE_PLACE : MARKER_STYLE_EVENT}
+                  />
+                  {(() => {
+                    const entityId = marker.kind === 'place' ? marker.place.id : marker.event.id;
+                    const count = friendsActivityMap.get(entityId) ?? 0;
+                    return count > 0 ? (
+                      <View className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 items-center justify-center rounded-full bg-[#4c669f] border border-white">
+                        <Text className="text-[7px] font-bold text-white">{count > 9 ? '9+' : count}</Text>
+                      </View>
+                    ) : null;
+                  })()}
+                </View>
                 {marker.groupSize > 1 ? (
                   <View className="mt-1 rounded-full bg-black/70 px-1.5 py-0.5">
                     <Text className="text-[10px] font-bold text-white">+{marker.groupSize - 1}</Text>

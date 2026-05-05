@@ -18,7 +18,7 @@ export default function EventCard({ title, date, location, imageUrl, price, onPr
   return (
     <TouchableOpacity 
       onPress={onPress}
-      className="mr-5 w-64 overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      className="mr-5 w-64 overflow-hidden rounded-[18px] border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
       activeOpacity={0.85}
     >
       <View className="relative">

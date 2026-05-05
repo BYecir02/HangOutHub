@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -17,6 +17,7 @@ import PlacePublicationsPanel from '@/features/places/components/PlacePublicatio
 import PlaceReviewModal from '@/features/places/components/PlaceReviewModal';
 import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
 import { usePlaceDetail, type PlaceDetailTab } from '@/features/places/hooks/usePlaceDetail';
+import { getPlaceFriendsAttending, type FriendAttendee } from '@/services/social/activity';
 
 export default function PlaceDetailScreen() {
   const router = useRouter();
@@ -70,6 +71,12 @@ export default function PlaceDetailScreen() {
   const [reviewComment, setReviewComment] = useState('');
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<PlaceDetailTab>('info');
+  const [friendsAttending, setFriendsAttending] = useState<FriendAttendee[]>([]);
+
+  useEffect(() => {
+    if (!params.id) return;
+    void getPlaceFriendsAttending(params.id).then(setFriendsAttending);
+  }, [params.id]);
 
   const handleOpenReviewModal = useCallback(() => {
     if (myReview) {
@@ -142,6 +149,7 @@ export default function PlaceDetailScreen() {
             onOpenPublications={handleOpenPublications}
             mediaMuteLabel={t('mediaMute')}
             mediaUnmuteLabel={t('mediaUnmute')}
+            friendsAttending={friendsAttending}
           />
 
           <View className="relative overflow-hidden" style={{ minHeight: screenHeight }}>

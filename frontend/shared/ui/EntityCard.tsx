@@ -48,7 +48,7 @@ export function EntityCoverCard({
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="overflow-hidden rounded-[28px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+      className="overflow-hidden rounded-[20px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
     >
       <MediaFrame
         source={imageUrl}
@@ -98,7 +98,7 @@ export function EntityRowCard({
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="flex-row overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
+      className="flex-row overflow-hidden rounded-[20px] border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
     >
       <MediaFrame
         source={imageUrl}

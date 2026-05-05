@@ -22,6 +22,7 @@ import { CitiesModule } from './cities/cities.module';
 import { DirectChatsModule } from './direct-chats/direct-chats.module';
 import { ReportsModule } from './reports/reports.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     OrganizerScannerModule,
     ReportsModule,
     AnalyticsModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

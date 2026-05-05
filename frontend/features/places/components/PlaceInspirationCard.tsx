@@ -74,7 +74,7 @@ export default function PlaceInspirationCard({
             }
           : undefined,
       ]}
-      className="mb-3 overflow-hidden rounded-[30px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+      className="mb-3 overflow-hidden rounded-[22px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
       activeOpacity={0.92}
     >
       <View className="relative">

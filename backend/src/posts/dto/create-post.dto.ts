@@ -26,6 +26,10 @@ export class CreatePostDto {
   eventId?: string;
 
   @IsOptional()
+  @IsUUID()
+  outingId?: string;
+
+  @IsOptional()
   @IsString()
   placeName?: string;
 

@@ -60,6 +60,7 @@ export interface PostItemData {
       name?: string | null;
     } | null;
   } | null;
+  outingId?: string | null;
   isLiked?: boolean;
   isOwner?: boolean;
   visibility?: 'public' | 'friends' | 'private' | 'custom';
@@ -81,7 +82,7 @@ interface PostItemProps {
   showDateColumn?: boolean;
   authorDisplayMode?: 'place' | 'user' | 'auto';
   shouldPlayMedia?: boolean;
-  presentation?: 'thread' | 'instagram';
+  presentation?: 'thread' | 'instagram' | 'sortie';
   readOnly?: boolean;
 }
 
@@ -331,6 +332,22 @@ function PostItem({
     });
   };
 
+  const [joiningOuting, setJoiningOuting] = useState(false);
+  const [joinedOuting, setJoinedOuting] = useState(false);
+
+  const handleJoinOuting = async () => {
+    if (!item.outingId || joiningOuting || joinedOuting) return;
+    setJoiningOuting(true);
+    try {
+      await api.patch(`/outings/${item.outingId}/respond`, { status: 'accepted' });
+      setJoinedOuting(true);
+    } catch {
+      // silently fail — backend endpoint may not be ready yet
+    } finally {
+      setJoiningOuting(false);
+    }
+  };
+
   const mediaUrls = item.images || [];
 
   const handleOpenMediaViewer = (index: number) => {
@@ -341,6 +358,233 @@ function PostItem({
     setMediaViewerIndex(index);
     setMediaViewerVisible(true);
   };
+
+  // ── Sortie Card presentation ─────────────────────────────────────────────────
+  if (presentation === 'sortie') {
+    const entityName =
+      item.Event?.title?.trim() ||
+      item.Place?.name?.trim() ||
+      item.placeName?.trim() ||
+      titleText;
+    const isLinkedToEvent = !!item.Event?.id;
+    const isLinkedToPlace = !!item.placeId || !!item.Place?.id;
+    const hasEntity = isLinkedToEvent || isLinkedToPlace;
+
+    const handleNavigateToEntity = () => {
+      if (isLinkedToEvent && item.Event?.id) {
+        router.push({ pathname: '/event/[id]', params: { id: item.Event.id } });
+      } else if (item.placeId || item.Place?.id) {
+        router.push({ pathname: '/place/[id]', params: { id: (item.placeId || item.Place?.id)! } });
+      }
+    };
+
+    const entityColor = isLinkedToEvent ? '#ff4757' : '#2ecc71';
+    const entityIcon = isLinkedToEvent ? 'calendar-outline' : 'location-outline';
+    const entityTypeLabel = isLinkedToEvent ? 'Événement' : 'Lieu';
+
+    return (
+      <View className="mx-4 mb-3 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100/80 dark:bg-gray-950 dark:ring-white/8">
+
+        {/* Header: Entité en héros */}
+        <TouchableOpacity
+          onPress={hasEntity ? handleNavigateToEntity : undefined}
+          activeOpacity={hasEntity ? 0.75 : 1}
+          className="px-4 pt-4 pb-3"
+        >
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1 pr-2">
+              {hasEntity ? (
+                <View className="mb-1.5 flex-row items-center gap-1">
+                  <Ionicons name={entityIcon} size={12} color={entityColor} />
+                  <Text style={{ color: entityColor }} className="text-[10px] font-bold uppercase tracking-[0.22em]">
+                    {entityTypeLabel}
+                  </Text>
+                </View>
+              ) : null}
+              <Text className="text-[18px] font-bold leading-[22px] text-gray-900 dark:text-white" numberOfLines={2}>
+                {entityName}
+              </Text>
+              {locationLabel ? (
+                <Text className="mt-1 text-[13px] text-gray-400 dark:text-gray-500">
+                  {locationLabel}
+                </Text>
+              ) : null}
+            </View>
+            {!readOnly && (onDelete || onEdit) ? (
+              <TouchableOpacity onPress={handleOpenOptionsMenu} className="p-1 -mt-0.5 -mr-1">
+                <Ionicons name="ellipsis-horizontal" size={18} color={isDark ? '#555' : '#bbb'} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+
+        {/* Strip photos compact */}
+        {mediaUrls.length > 0 ? (
+          <View className="flex-row gap-1 px-4">
+            {mediaUrls.slice(0, 3).map((url, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => handleOpenMediaViewer(i)}
+                activeOpacity={0.85}
+                className="flex-1 overflow-hidden rounded-2xl"
+                style={{ height: mediaUrls.length === 1 ? 200 : 120 }}
+              >
+                <Image
+                  source={{ uri: getImageUrl(url) || url }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+                {i === 2 && mediaUrls.length > 3 ? (
+                  <View className="absolute inset-0 items-center justify-center bg-black/50">
+                    <Text className="text-xl font-bold text-white">+{mediaUrls.length - 3}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Texte du post */}
+        {rawContent ? (
+          <View className="px-4 pt-3">
+            <Text
+              className="text-[14px] leading-[20px] text-gray-600 dark:text-gray-300"
+              numberOfLines={isContentExpanded ? undefined : 3}
+            >
+              {rawContent}
+            </Text>
+            {rawContent.length > 120 ? (
+              <TouchableOpacity
+                onPress={() => setIsContentExpanded((v) => !v)}
+                className="mt-1"
+              >
+                <Text className="text-[12px] font-semibold text-[#4c669f] dark:text-[#b9c8f2]">
+                  {isContentExpanded ? t('postItemShowLess') : t('postItemShowMore')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Footer: auteur + date + engagement */}
+        <View className="flex-row items-center justify-between px-4 pb-4 pt-3">
+          <TouchableOpacity
+            className="flex-row items-center gap-2"
+            onPress={() => router.push({ pathname: '/profile/[username]', params: { username: item.User?.username || '' } })}
+            activeOpacity={0.7}
+          >
+            <Image source={{ uri: avatarUri }} className="h-7 w-7 rounded-full" resizeMode="cover" />
+            <View>
+              <Text className="text-[12px] font-semibold text-gray-800 dark:text-gray-100" numberOfLines={1}>
+                {authorLabel}
+              </Text>
+              <Text className="text-[11px] text-gray-400 dark:text-gray-500">
+                {relativeDateLabel}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <View className="flex-row items-center gap-3">
+            <TouchableOpacity className="flex-row items-center gap-1" onPress={readOnly ? undefined : handleLike}>
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={18}
+                color={isLiked ? '#ff4757' : isDark ? '#666' : '#bbb'}
+              />
+              {likesCount > 0 ? (
+                <Text className={`text-[12px] font-semibold ${isLiked ? 'text-[#ff4757]' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {likesCount}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+
+            <TouchableOpacity className="flex-row items-center gap-1" onPress={() => onComment?.(item)}>
+              <Ionicons name="chatbubble-ellipses-outline" size={17} color={isDark ? '#666' : '#bbb'} />
+              {commentsCount > 0 ? (
+                <Text className="text-[12px] font-semibold text-gray-400 dark:text-gray-500">{commentsCount}</Text>
+              ) : null}
+            </TouchableOpacity>
+
+            {!readOnly && isPlanPost && item.outingId && !item.isOwner ? (
+              <TouchableOpacity
+                onPress={() => void handleJoinOuting()}
+                disabled={joiningOuting || joinedOuting}
+                className={`rounded-full px-3 py-1.5 ${joinedOuting ? 'bg-[#2ecc71]' : 'bg-[#ff4757]'}`}
+              >
+                {joiningOuting ? (
+                  <ActivityIndicator size={10} color="#fff" />
+                ) : (
+                  <Text className="text-[11px] font-bold text-white">
+                    {joinedOuting ? "J'y vais ✓" : 'Rejoindre'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ) : !readOnly && hasEntity ? (
+              <TouchableOpacity
+                onPress={hasEntity ? handleNavigateToEntity : handleCreateOuting}
+                className="rounded-full px-3 py-1.5"
+                style={{ backgroundColor: entityColor + '18' }}
+              >
+                <Text style={{ color: entityColor }} className="text-[11px] font-bold">
+                  Voir
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        <PostMediaViewer
+          visible={mediaViewerVisible}
+          mediaUrls={mediaUrls}
+          initialIndex={mediaViewerIndex}
+          onClose={() => setMediaViewerVisible(false)}
+        />
+        <ReportReasonSheet
+          visible={reportSheetVisible}
+          onClose={() => setReportSheetVisible(false)}
+          onSubmitReason={handleSubmitReportReason}
+        />
+        <BottomSheetModal
+          visible={optionsSheetVisible}
+          onClose={() => setOptionsSheetVisible(false)}
+          title={t('postItemOptionsTitle')}
+          subtitle={t('postItemOptionsSubtitle')}
+          contentMode="auto"
+          maxHeight={360}
+        >
+          <View className="gap-3">
+            {onEdit ? (
+              <TouchableOpacity
+                onPress={() => { setOptionsSheetVisible(false); onEdit(item); }}
+                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('postItemEdit')}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {onDelete ? (
+              <TouchableOpacity
+                onPress={handleDeletePress}
+                disabled={isDeleting}
+                className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-900/20"
+              >
+                <Text className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+                  {isDeleting ? 'Suppression...' : t('postItemDelete')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {!item.isOwner ? (
+              <TouchableOpacity
+                onPress={handleOpenReport}
+                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
+              >
+                <Text className="text-sm font-semibold text-gray-500 dark:text-gray-400">{t('postItemReport')}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </BottomSheetModal>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -546,7 +790,21 @@ function PostItem({
               </TouchableOpacity>
             </View>
 
-            {!readOnly && isPlanPost && (item.placeId || item.eventId || item.Event) ? (
+            {!readOnly && isPlanPost && item.outingId && !item.isOwner ? (
+              <TouchableOpacity
+                onPress={() => void handleJoinOuting()}
+                disabled={joiningOuting || joinedOuting}
+                className={`rounded-full px-3 py-2 ${joinedOuting ? 'bg-[#2ecc71]' : 'bg-[#ff4757]'}`}
+              >
+                {joiningOuting ? (
+                  <ActivityIndicator size={12} color="#fff" />
+                ) : (
+                  <Text className="text-xs font-semibold text-white">
+                    {joinedOuting ? "J'y vais ✓" : "Rejoindre"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ) : !readOnly && isPlanPost && (item.placeId || item.eventId || item.Event) ? (
               <TouchableOpacity
                 onPress={handleCreateOuting}
                 className="rounded-full bg-[#4c669f] px-3 py-2"

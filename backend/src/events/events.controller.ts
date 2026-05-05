@@ -324,4 +324,40 @@ export class EventsController {
   findOne(@Param('id') id: string) {
     return this.eventsService.findOne(id);
   }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/friends-attending')
+  getFriendsAttending(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.getFriendsAttendingEvent(req.user.userId, id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/attend')
+  getAttendance(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.getAttendance(req.user.userId, id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/attend')
+  attend(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.attend(req.user.userId, id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/attend')
+  unattend(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.eventsService.unattend(req.user.userId, id);
+  }
 }

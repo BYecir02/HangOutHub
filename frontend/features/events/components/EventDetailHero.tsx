@@ -1,9 +1,11 @@
 import React from 'react';
-import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import MediaFrame from '@/shared/ui/MediaFrame';
+import FriendsAttendingRow from '@/shared/ui/FriendsAttendingRow';
+import type { FriendAttendee } from '@/services/social/activity';
 
 type EventDetailHeroProps = {
   heroImage: string;
@@ -18,6 +20,10 @@ type EventDetailHeroProps = {
   onOpenPublications: () => void;
   mediaMuteLabel: string;
   mediaUnmuteLabel: string;
+  friendsAttending?: FriendAttendee[];
+  isAttending?: boolean;
+  attendingLoading?: boolean;
+  onToggleAttend?: () => void;
 };
 
 export default function EventDetailHero({
@@ -33,9 +39,14 @@ export default function EventDetailHero({
   onOpenPublications,
   mediaMuteLabel,
   mediaUnmuteLabel,
+  friendsAttending = [],
+  isAttending = false,
+  attendingLoading = false,
+  onToggleAttend,
 }: EventDetailHeroProps) {
   const { height: screenHeight } = useWindowDimensions();
   const heroBadgeBottom = Math.max(24, Math.min(48, Math.round(screenHeight * 0.035)));
+  const hasFriends = friendsAttending.length > 0;
 
   return (
     <View className="relative mt-10 mx-4 overflow-hidden rounded-[34px] bg-gray-100 shadow-lg dark:bg-black">
@@ -53,9 +64,10 @@ export default function EventDetailHero({
       />
 
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.82)']}
-        locations={[0, 0.62, 1]}
-        className="absolute inset-x-0 bottom-0 h-44"
+        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.88)']}
+        locations={[0, 0.55, 1]}
+        className="absolute inset-x-0 bottom-0"
+        style={{ height: hasFriends || onToggleAttend ? 160 : 140 }}
       />
 
       <View className="absolute inset-x-0 top-0 flex-row items-start justify-end px-5 pt-6">
@@ -76,14 +88,47 @@ export default function EventDetailHero({
       </View>
 
       <View className="absolute inset-x-0 px-5" style={{ bottom: heroBadgeBottom }}>
+        {/* Amis qui y vont */}
+        {hasFriends ? (
+          <View className="mb-3">
+            <FriendsAttendingRow friends={friendsAttending} label="y vont" />
+          </View>
+        ) : null}
+
         <View className="flex-row items-center justify-between gap-3">
-          <View className="max-w-[72%] flex-row flex-wrap items-center gap-2">
+          <View className="flex-row flex-wrap items-center gap-2">
             <View className="rounded-full bg-black/55 px-3 py-2">
               <Text className="text-xs font-semibold text-white">{cityLabel}</Text>
             </View>
             <View className="rounded-full bg-black/55 px-3 py-2">
               <Text className="text-xs font-semibold text-white">{priceLabel}</Text>
             </View>
+
+            {/* Bouton J'y vais */}
+            {onToggleAttend ? (
+              <TouchableOpacity
+                onPress={attendingLoading ? undefined : onToggleAttend}
+                className={`flex-row items-center rounded-full px-3 py-2 ${
+                  isAttending ? 'bg-[#2ecc71]' : 'bg-white/20'
+                }`}
+                activeOpacity={0.8}
+              >
+                {attendingLoading ? (
+                  <ActivityIndicator size={12} color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={isAttending ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={14}
+                      color="#fff"
+                    />
+                    <Text className="ml-1 text-xs font-semibold text-white">
+                      {isAttending ? "J'y vais ✓" : "J'y vais"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <TouchableOpacity

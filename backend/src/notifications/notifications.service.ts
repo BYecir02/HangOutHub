@@ -132,6 +132,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             `Reminder sweep skipped after startup: ${error instanceof Error ? error.message : String(error)}`,
           );
         });
+        void this.emitPostOutingReminders().catch((error: unknown) => {
+          this.logger.warn(
+            `Post-outing reminder sweep skipped: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       },
       15 * 60 * 1000,
     );
@@ -140,6 +145,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     void this.emitUpcomingEventReminders().catch((error: unknown) => {
       this.logger.warn(
         `Reminder sweep skipped at startup: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+    void this.emitPostOutingReminders().catch((error: unknown) => {
+      this.logger.warn(
+        `Post-outing reminder sweep skipped at startup: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }
@@ -472,6 +482,81 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       eventsChecked: upcomingEvents.length,
       notificationsCreated,
     };
+  }
+
+  async emitPostOutingReminders(): Promise<{ outingsChecked: number; notificationsCreated: number }> {
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - 28 * 60 * 60 * 1000);
+    const windowEnd = new Date(now.getTime() - 20 * 60 * 60 * 1000);
+    let notificationsCreated = 0;
+
+    const pastOutings = await this.prisma.outing.findMany({
+      where: {
+        scheduledDate: { gte: windowStart, lte: windowEnd },
+        status: { not: 'CANCELLED' },
+      },
+      select: {
+        id: true,
+        title: true,
+        placeId: true,
+        creatorId: true,
+        Place: { select: { name: true } },
+        OutingParticipant: {
+          where: { status: 'ACCEPTED' },
+          select: { userId: true },
+        },
+      },
+    });
+
+    for (const outing of pastOutings) {
+      const userIds = Array.from(
+        new Set([
+          outing.creatorId,
+          ...outing.OutingParticipant.map((p) => p.userId),
+        ]),
+      );
+
+      const targetPath = outing.placeId
+        ? `/post?placeId=${outing.placeId}&postType=plan`
+        : `/post?postType=plan`;
+
+      for (const userId of userIds) {
+        const existing = await this.prisma.notification.findFirst({
+          where: { userId, type: 'OUTING_POST_REMINDER', targetPath },
+          select: { id: true },
+        });
+
+        if (existing) continue;
+
+        const placeName = outing.Place?.name ?? outing.title;
+        await this.prisma.notification.create({
+          data: {
+            userId,
+            type: 'OUTING_POST_REMINDER',
+            title: 'Et ta sortie ?',
+            message: `Tu es allé à ${placeName} hier — partage ton souvenir !`,
+            severity: 'INFO',
+            targetPath,
+            payload: {
+              outingId: outing.id,
+              placeId: outing.placeId,
+              placeName,
+            },
+            isRead: false,
+          },
+        });
+
+        notificationsCreated += 1;
+      }
+    }
+
+    if (pastOutings.length > 0 || notificationsCreated > 0) {
+      this.logger.debug(
+        `Post-outing reminder sweep: ${pastOutings.length} sortie(s) verifiée(s), ${notificationsCreated} notification(s) créée(s).`,
+      );
+    }
+
+    return { outingsChecked: pastOutings.length, notificationsCreated };
   }
 
   async getActivity(userId: string) {

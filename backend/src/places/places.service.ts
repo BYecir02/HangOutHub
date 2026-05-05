@@ -1550,4 +1550,41 @@ export class PlacesService {
 
     return review;
   }
+
+  private async getFriendIds(userId: string): Promise<string[]> {
+    const friendships = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ requesterId: userId }, { receiverId: userId }],
+      },
+      select: { requesterId: true, receiverId: true },
+    });
+    return friendships.map((f) =>
+      f.requesterId === userId ? f.receiverId : f.requesterId,
+    );
+  }
+
+  async getFriendsAttendingPlace(userId: string, placeId: string) {
+    const friendIds = await this.getFriendIds(userId);
+    if (friendIds.length === 0) return { friends: [] };
+
+    const savedPlaces = await this.prisma.savedPlace.findMany({
+      where: {
+        placeId,
+        userId: { in: friendIds },
+      },
+      select: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    return { friends: savedPlaces.map((sp) => sp.User) };
+  }
 }

@@ -303,4 +303,13 @@ export class PlacesController {
   findOne(@Param('id') id: string) {
     return this.placesService.findOne(id);
   }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/friends-attending')
+  getFriendsAttending(
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.placesService.getFriendsAttendingPlace(req.user.userId, id);
+  }
 }

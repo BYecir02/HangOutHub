@@ -39,7 +39,7 @@ export default function PlaceCard({
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="mr-3 w-full overflow-hidden rounded-[28px] border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+      className="mr-3 w-full overflow-hidden rounded-[20px] border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
       activeOpacity={0.85}
     >
       <View className="flex-row">

@@ -256,6 +256,7 @@ model Outing {
   Place             Place?              @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   OutingMedia       OutingMedia[]
   OutingParticipant OutingParticipant[]
+  Post              Post[]
 }
 
 model OutingMedia {
@@ -426,6 +427,7 @@ model Post {
   visibilityUserIds String[] @default([])
   placeId    String?   @db.Uuid
   eventId    String?   @db.Uuid
+  outingId   String?   @db.Uuid
   placeName  String?   @db.VarChar(120)
   cityName   String?   @db.VarChar(120)
   ambiance   String?   @db.VarChar(50)
@@ -435,6 +437,7 @@ model Post {
   User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   Place      Place?    @relation(fields: [placeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   Event      Event?    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Outing     Outing?   @relation(fields: [outingId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   comments   PostComment[]
   likes      PostLike[]
   SharedDirectMessage DirectMessage[] @relation("DirectMessageSharedPost")

@@ -263,6 +263,7 @@ export class PostsService {
           effectiveVisibility === 'custom' ? filteredVisibilityUsers : [],
         placeId: normalizedPlaceId || undefined,
         eventId: normalizeId(createPostDto.eventId) || undefined,
+        outingId: normalizeId(createPostDto.outingId) || undefined,
         placeName: normalizeText(createPostDto.placeName) || undefined,
         cityName: normalizeText(createPostDto.cityName) || undefined,
         ambiance: normalizeText(createPostDto.ambiance) || undefined,

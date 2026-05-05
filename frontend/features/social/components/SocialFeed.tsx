@@ -24,9 +24,11 @@ import PostItem from './PostItem';
 import SocialFeedEmptyState from './SocialFeedEmptyState';
 import SocialFeedFiltersSheet from './SocialFeedFiltersSheet';
 import SocialFeedHeader from './SocialFeedHeader';
+import FeedActivityCard from './FeedActivityCard';
 import { resolvePostOwnership } from './post-ownership';
 import { SkeletonBlock } from '../../../shared/ui/Skeleton';
 import api, { getImageUrl } from '../../../services/api';
+import { getFriendActivity, type FriendActivityItem } from '@/services/social/activity';
 import { getFriendshipOverview } from '@/services/user/friendships';
 import { getOrCreateDirectChat, sendDirectMessage } from '@/services/messaging/direct-chats';
 import { getPostsSocket } from '@/services/social/post-realtime';
@@ -95,6 +97,7 @@ interface FeedPost {
   } | null;
   visibility?: 'public' | 'friends' | 'private' | 'custom';
   createdAt?: string;
+  outingId?: string | null;
   isLiked?: boolean;
   isOwner?: boolean;
   User?: FeedAuthor;
@@ -110,6 +113,9 @@ type FeedCacheSnapshot = {
   nextCursor: string | null;
   cachedAt: number;
 };
+
+type ActivitySlot = { _type: 'activity'; id: string; data: FriendActivityItem };
+type FeedItem = (FeedPost & { _type?: never }) | ActivitySlot;
 
 const NOOP_AUTOPLAY = {
   activeId: null as string | null,
@@ -216,7 +222,7 @@ function SkeletonPost() {
 export default function SocialFeed() {
   const router = useRouter();
   const { t } = useI18n();
-  const feedListRef = useRef<FlatList<FeedPost>>(null);
+  const feedListRef = useRef<FlatList<FeedItem>>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -250,6 +256,7 @@ export default function SocialFeed() {
   const [selectedType, setSelectedType] = useState<FilterType>('all');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activityItems, setActivityItems] = useState<FriendActivityItem[]>([]);
 
   const getFeedSeenAtKey = useCallback(
     (userId: string | null) => `${FEED_SEEN_AT_KEY_PREFIX}_${userId || 'anonymous'}`,
@@ -344,6 +351,10 @@ export default function SocialFeed() {
 
     return true;
   }, [cacheHydrated, getMaxCreatedAt, updateFeedSeenAt]);
+
+  useEffect(() => {
+    void getFriendActivity().then(setActivityItems);
+  }, []);
 
   useEffect(() => {
     postsRef.current = posts;
@@ -1131,6 +1142,20 @@ export default function SocialFeed() {
     [currentUserId, filteredPosts],
   );
 
+  const mergedFeedItems = useMemo((): FeedItem[] => {
+    if (activityItems.length === 0) return displayPosts;
+    const result: FeedItem[] = [];
+    let activityIndex = 0;
+    displayPosts.forEach((post, i) => {
+      result.push(post);
+      if ((i + 1) % 5 === 0 && activityIndex < activityItems.length) {
+        const activity = activityItems[activityIndex++]!;
+        result.push({ _type: 'activity', id: `activity-${activity.id}`, data: activity });
+      }
+    });
+    return result;
+  }, [displayPosts, activityItems]);
+
   const feedMediaCount = useMemo(
     () => displayPosts.filter((post) => (post.images || []).length > 0).length,
     [displayPosts],
@@ -1270,37 +1295,42 @@ export default function SocialFeed() {
           </View>
         </View>
       ) : null}
-      <FlatList<FeedPost>
+      <FlatList<FeedItem>
         ref={feedListRef}
         key="social-feed-main"
-        data={displayPosts}
+        data={mergedFeedItems}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={15}
         updateCellsBatchingPeriod={16}
         removeClippedSubviews={false}
-        renderItem={({ item }) => (
-          <View
-            onLayout={(event) => {
-              feedRegisterLayout(item.id, {
-                y: event.nativeEvent.layout.y,
-                height: event.nativeEvent.layout.height,
-              });
-            }}
-          >
-            <PostItem
-              item={item}
-              showDateColumn={false}
-              shouldPlayMedia={feedActiveId === item.id}
-              presentation="instagram"
-              onDelete={item.isOwner ? handleDeletePost : undefined}
-              onEdit={item.isOwner ? handleEditPost : undefined}
-              onComment={handleCommentPost}
-              onShare={handleSharePost}
-            />
-          </View>
-        )}
+        renderItem={({ item }) => {
+          if ('_type' in item && item._type === 'activity') {
+            return <FeedActivityCard item={item.data} />;
+          }
+          return (
+            <View
+              onLayout={(event) => {
+                feedRegisterLayout(item.id, {
+                  y: event.nativeEvent.layout.y,
+                  height: event.nativeEvent.layout.height,
+                });
+              }}
+            >
+              <PostItem
+                item={item}
+                showDateColumn={false}
+                shouldPlayMedia={feedActiveId === item.id}
+                presentation="instagram"
+                onDelete={item.isOwner ? handleDeletePost : undefined}
+                onEdit={item.isOwner ? handleEditPost : undefined}
+                onComment={handleCommentPost}
+                onShare={handleSharePost}
+              />
+            </View>
+          );
+        }}
         ListHeaderComponent={headerComponent}
         ListEmptyComponent={
           <SocialFeedEmptyState

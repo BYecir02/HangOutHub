@@ -15,6 +15,7 @@ import EventDetailHero from '@/features/events/components/EventDetailHero';
 import EventPublicationsPanel from '@/features/events/components/EventPublicationsPanel';
 import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
 import { useEventDetail } from '@/features/events/hooks/useEventDetail';
+import { useEventAttendance } from '@/features/events/hooks/useEventAttendance';
 
 export default function EventDetailScreen() {
   const router = useRouter();
@@ -81,6 +82,9 @@ export default function EventDetailScreen() {
     handleSubmitReportReason,
   } = useEventDetail(params.id, params.tab);
 
+  const { isAttending, attendingLoading, friendsAttending, handleToggleAttend } =
+    useEventAttendance(params.id);
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
@@ -125,6 +129,10 @@ export default function EventDetailScreen() {
           onOpenPublications={handleOpenPublications}
           mediaMuteLabel={t('mediaMute')}
           mediaUnmuteLabel={t('mediaUnmute')}
+          friendsAttending={friendsAttending}
+          isAttending={isAttending}
+          attendingLoading={attendingLoading}
+          onToggleAttend={handleToggleAttend}
         />
 
         <View className="relative overflow-hidden" style={{ minHeight: screenHeight }}>

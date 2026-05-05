@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import RatingDisplay from '@/shared/ui/primitives/RatingDisplay';
 import MediaFrame from '@/shared/ui/MediaFrame';
+import FriendsAttendingRow from '@/shared/ui/FriendsAttendingRow';
+import type { FriendAttendee } from '@/services/social/activity';
 
 type PlaceDetailHeroProps = {
   heroImage: string;
@@ -18,6 +20,7 @@ type PlaceDetailHeroProps = {
   onOpenPublications: () => void;
   mediaMuteLabel: string;
   mediaUnmuteLabel: string;
+  friendsAttending?: FriendAttendee[];
 };
 
 export default function PlaceDetailHero({
@@ -32,9 +35,11 @@ export default function PlaceDetailHero({
   onOpenPublications,
   mediaMuteLabel,
   mediaUnmuteLabel,
+  friendsAttending = [],
 }: PlaceDetailHeroProps) {
   const { height: screenHeight } = useWindowDimensions();
   const heroBadgeBottom = Math.max(24, Math.min(48, Math.round(screenHeight * 0.035)));
+  const hasFriends = friendsAttending.length > 0;
 
   return (
     <View className="relative mt-10 mx-4 overflow-hidden rounded-[34px] bg-gray-100 shadow-lg dark:bg-black">
@@ -52,9 +57,10 @@ export default function PlaceDetailHero({
       />
 
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.82)']}
-        locations={[0, 0.62, 1]}
-        className="absolute inset-x-0 bottom-0 h-44"
+        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.88)']}
+        locations={[0, 0.55, 1]}
+        className="absolute inset-x-0 bottom-0"
+        style={{ height: hasFriends ? 160 : 140 }}
       />
 
       <View className="absolute inset-x-0 top-0 flex-row items-start justify-end px-5 pt-6">
@@ -75,6 +81,12 @@ export default function PlaceDetailHero({
       </View>
 
       <View className="absolute inset-x-0 px-5" style={{ bottom: heroBadgeBottom }}>
+        {hasFriends ? (
+          <View className="mb-3">
+            <FriendsAttendingRow friends={friendsAttending} label="fréquentent ce lieu" />
+          </View>
+        ) : null}
+
         <View className="flex-row items-center justify-between gap-3">
           <View
             className="max-w-[72%] flex-row flex-wrap items-center gap-2"

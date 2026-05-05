@@ -2962,4 +2962,86 @@ export class EventsService {
 
     return event;
   }
+
+  private async getFriendIds(userId: string): Promise<string[]> {
+    const friendships = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ requesterId: userId }, { receiverId: userId }],
+      },
+      select: { requesterId: true, receiverId: true },
+    });
+    return friendships.map((f) =>
+      f.requesterId === userId ? f.receiverId : f.requesterId,
+    );
+  }
+
+  async getFriendsAttendingEvent(userId: string, eventId: string) {
+    const friendIds = await this.getFriendIds(userId);
+    if (friendIds.length === 0) return { friends: [] };
+
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        eventId,
+        userId: { in: friendIds },
+        status: { not: 'CANCELLED' },
+      },
+      select: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    const seen = new Set<string>();
+    const friends: { id: string; username: string | null; displayName: string | null; avatarUrl: string | null }[] = [];
+    for (const b of bookings) {
+      if (!seen.has(b.User.id)) {
+        seen.add(b.User.id);
+        friends.push(b.User);
+      }
+    }
+
+    return { friends };
+  }
+
+  async getAttendance(userId: string, eventId: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { userId, eventId, clientRequestId: 'QUICK_ATTEND' },
+      select: { id: true },
+    });
+    return { isAttending: !!booking };
+  }
+
+  async attend(userId: string, eventId: string) {
+    await this.prisma.booking.upsert({
+      where: {
+        userId_eventId_clientRequestId: {
+          userId,
+          eventId,
+          clientRequestId: 'QUICK_ATTEND',
+        },
+      },
+      create: {
+        userId,
+        eventId,
+        clientRequestId: 'QUICK_ATTEND',
+        status: 'CONFIRMED',
+      },
+      update: { status: 'CONFIRMED' },
+    });
+    return { success: true };
+  }
+
+  async unattend(userId: string, eventId: string) {
+    await this.prisma.booking.deleteMany({
+      where: { userId, eventId, clientRequestId: 'QUICK_ATTEND' },
+    });
+    return { success: true };
+  }
 }
