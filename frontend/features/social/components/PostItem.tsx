@@ -1,8 +1,10 @@
 import React, { memo, useEffect, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -12,7 +14,6 @@ import { useRouter } from 'expo-router';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
-import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
 import PostMediaGallery from './PostMediaGallery';
 import PostMediaViewer from './PostMediaViewer';
@@ -111,7 +112,6 @@ function PostItem({
   const [commentsCount, setCommentsCount] = useState(item._count?.comments || 0);
   const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
   const [mediaViewerIndex, setMediaViewerIndex] = useState(0);
-  const [optionsSheetVisible, setOptionsSheetVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const [isContentExpanded, setIsContentExpanded] = useState(false);
@@ -261,21 +261,48 @@ function PostItem({
   };
 
   const handleOpenReport = () => {
-    setOptionsSheetVisible(false);
     setReportSheetVisible(true);
   };
 
   const handleOpenOptionsMenu = () => {
-    if (isDeleting) {
-      return;
+    if (isDeleting) return;
+
+    const actions: Array<{ label: string; handler: () => void; destructive?: boolean }> = [];
+    if (onEdit) {
+      actions.push({ label: t('postItemEdit'), handler: () => onEdit(item) });
+    }
+    if (onDelete) {
+      actions.push({ label: t('postItemDelete'), handler: () => void handleConfirmDelete(), destructive: true });
+    }
+    if (!item.isOwner) {
+      actions.push({ label: t('reportAction'), handler: handleOpenReport });
     }
 
-    setOptionsSheetVisible(true);
-  };
-
-  const handleDeletePress = () => {
-    setOptionsSheetVisible(false);
-    void handleConfirmDelete();
+    if (Platform.OS === 'ios') {
+      const options = [...actions.map((a) => a.label), t('postItemCancel')];
+      const destructiveIndex = actions.findIndex((a) => a.destructive);
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: options.length - 1,
+          destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
+        },
+        (idx) => { if (idx < actions.length) actions[idx]?.handler(); },
+      );
+    } else {
+      Alert.alert(
+        t('postItemOptionsTitle'),
+        undefined,
+        [
+          ...actions.map((a) => ({
+            text: a.label,
+            onPress: a.handler,
+            style: (a.destructive ? 'destructive' : 'default') as 'destructive' | 'default',
+          })),
+          { text: t('postItemCancel'), style: 'cancel' as const },
+        ],
+      );
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -361,14 +388,21 @@ function PostItem({
 
   // ── Sortie Card presentation ─────────────────────────────────────────────────
   if (presentation === 'sortie') {
-    const entityName =
-      item.Event?.title?.trim() ||
-      item.Place?.name?.trim() ||
-      item.placeName?.trim() ||
-      titleText;
     const isLinkedToEvent = !!item.Event?.id;
-    const isLinkedToPlace = !!item.placeId || !!item.Place?.id;
+    const isLinkedToPlace = !!(item.placeId || item.Place?.id);
     const hasEntity = isLinkedToEvent || isLinkedToPlace;
+
+    // Entity name only from real linked entities — never from content
+    const entityName = isLinkedToEvent
+      ? item.Event!.title.trim()
+      : isLinkedToPlace
+      ? (item.Place?.name?.trim() || item.placeName?.trim() || '')
+      : '';
+
+    // Location: for events show place+city, for places show only city (avoid repeating entityName)
+    const sortieLocation = isLinkedToEvent
+      ? locationLabel
+      : (item.cityName?.trim() || item.Event?.Place?.City?.name?.trim() || '');
 
     const handleNavigateToEntity = () => {
       if (isLinkedToEvent && item.Event?.id) {
@@ -385,14 +419,14 @@ function PostItem({
     return (
       <View className="mx-4 mb-3 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100/80 dark:bg-gray-950 dark:ring-white/8">
 
-        {/* Header: Entité en héros */}
-        <TouchableOpacity
-          onPress={hasEntity ? handleNavigateToEntity : undefined}
-          activeOpacity={hasEntity ? 0.75 : 1}
-          className="px-4 pt-4 pb-3"
-        >
+        {/* Header: Entité en héros — seulement si entité réelle */}
+        <View className="px-4 pt-4 pb-3">
           <View className="flex-row items-start justify-between">
-            <View className="flex-1 pr-2">
+            <TouchableOpacity
+              onPress={hasEntity ? handleNavigateToEntity : undefined}
+              activeOpacity={hasEntity ? 0.75 : 1}
+              className="flex-1 pr-2"
+            >
               {hasEntity ? (
                 <View className="mb-1.5 flex-row items-center gap-1">
                   <Ionicons name={entityIcon} size={12} color={entityColor} />
@@ -401,22 +435,24 @@ function PostItem({
                   </Text>
                 </View>
               ) : null}
-              <Text className="text-[18px] font-bold leading-[22px] text-gray-900 dark:text-white" numberOfLines={2}>
-                {entityName}
-              </Text>
-              {locationLabel ? (
-                <Text className="mt-1 text-[13px] text-gray-400 dark:text-gray-500">
-                  {locationLabel}
+              {hasEntity ? (
+                <Text className="text-[18px] font-bold leading-[22px] text-gray-900 dark:text-white" numberOfLines={2}>
+                  {entityName}
                 </Text>
               ) : null}
-            </View>
+              {sortieLocation ? (
+                <Text className="mt-1 text-[13px] text-gray-400 dark:text-gray-500">
+                  {sortieLocation}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
             {!readOnly && (onDelete || onEdit) ? (
               <TouchableOpacity onPress={handleOpenOptionsMenu} className="p-1 -mt-0.5 -mr-1">
                 <Ionicons name="ellipsis-horizontal" size={18} color={isDark ? '#555' : '#bbb'} />
               </TouchableOpacity>
             ) : null}
           </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Strip photos compact */}
         {mediaUrls.length > 0 ? (
@@ -446,14 +482,14 @@ function PostItem({
 
         {/* Texte du post */}
         {rawContent ? (
-          <View className="px-4 pt-3">
+          <View className={`px-4 ${hasEntity || mediaUrls.length > 0 ? 'pt-3' : 'pt-0'}`}>
             <Text
               className="text-[14px] leading-[20px] text-gray-600 dark:text-gray-300"
-              numberOfLines={isContentExpanded ? undefined : 3}
+              numberOfLines={isContentExpanded ? undefined : (hasEntity ? 3 : 5)}
             >
               {rawContent}
             </Text>
-            {rawContent.length > 120 ? (
+            {rawContent.length > (hasEntity ? 120 : 180) ? (
               <TouchableOpacity
                 onPress={() => setIsContentExpanded((v) => !v)}
                 className="mt-1"
@@ -470,7 +506,7 @@ function PostItem({
         <View className="flex-row items-center justify-between px-4 pb-4 pt-3">
           <TouchableOpacity
             className="flex-row items-center gap-2"
-            onPress={() => router.push({ pathname: '/profile/[username]', params: { username: item.User?.username || '' } })}
+            onPress={() => item.userId ? router.push({ pathname: '/user/[id]', params: { id: item.userId } }) : undefined}
             activeOpacity={0.7}
           >
             <Image source={{ uri: avatarUri }} className="h-7 w-7 rounded-full" resizeMode="cover" />
@@ -544,44 +580,6 @@ function PostItem({
           onClose={() => setReportSheetVisible(false)}
           onSubmitReason={handleSubmitReportReason}
         />
-        <BottomSheetModal
-          visible={optionsSheetVisible}
-          onClose={() => setOptionsSheetVisible(false)}
-          title={t('postItemOptionsTitle')}
-          subtitle={t('postItemOptionsSubtitle')}
-          contentMode="auto"
-          maxHeight={360}
-        >
-          <View className="gap-3">
-            {onEdit ? (
-              <TouchableOpacity
-                onPress={() => { setOptionsSheetVisible(false); onEdit(item); }}
-                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
-              >
-                <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('postItemEdit')}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {onDelete ? (
-              <TouchableOpacity
-                onPress={handleDeletePress}
-                disabled={isDeleting}
-                className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-900/20"
-              >
-                <Text className="text-sm font-semibold text-rose-600 dark:text-rose-400">
-                  {isDeleting ? 'Suppression...' : t('postItemDelete')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-            {!item.isOwner ? (
-              <TouchableOpacity
-                onPress={handleOpenReport}
-                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
-              >
-                <Text className="text-sm font-semibold text-gray-500 dark:text-gray-400">{t('postItemReport')}</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </BottomSheetModal>
       </View>
     );
   }
@@ -823,73 +821,6 @@ function PostItem({
         onClose={() => setReportSheetVisible(false)}
         onSubmitReason={handleSubmitReportReason}
       />
-
-      <BottomSheetModal
-        visible={optionsSheetVisible}
-        onClose={() => setOptionsSheetVisible(false)}
-        title={t('postItemOptionsTitle')}
-        subtitle={t('postItemOptionsSubtitle')}
-        contentMode="auto"
-        maxHeight={360}
-      >
-        <View className="gap-3">
-          {onEdit ? (
-            <TouchableOpacity
-              onPress={() => {
-                setOptionsSheetVisible(false);
-                onEdit(item);
-              }}
-              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
-            >
-              <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {t('postItemEdit')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-
-          {onDelete ? (
-            <TouchableOpacity
-              testID="post-delete-button"
-              onPress={handleDeletePress}
-              disabled={isDeleting}
-              className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-900/20"
-            >
-              {isDeleting ? (
-                <View className="flex-row items-center gap-2">
-                  <ActivityIndicator color="#e11d48" size="small" />
-                  <Text className="text-sm font-semibold text-rose-600 dark:text-rose-300">
-                    Suppression...
-                  </Text>
-                </View>
-              ) : (
-                <Text className="text-sm font-semibold text-rose-600 dark:text-rose-300">
-                  {t('postItemDelete')}
-                </Text>
-              )}
-            </TouchableOpacity>
-          ) : null}
-
-          {!item.isOwner ? (
-            <TouchableOpacity
-              onPress={handleOpenReport}
-              className="rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800"
-            >
-              <Text className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {t('reportAction')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-
-          <TouchableOpacity
-            onPress={() => setOptionsSheetVisible(false)}
-            className="items-center rounded-2xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-600 dark:bg-gray-900"
-          >
-            <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-              {t('postItemCancel')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheetModal>
 
       <PostMediaViewer
         visible={mediaViewerVisible}

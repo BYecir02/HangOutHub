@@ -2,15 +2,17 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
+  Pressable,
   Text,
   TextInput,
   TouchableOpacity,
-  Pressable,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -52,12 +54,42 @@ interface CurrentUserState {
   avatarUrl?: string | null;
 }
 
+const SWIPE_CLOSE_THRESHOLD_Y = 120;
+const SWIPE_CLOSE_THRESHOLD_VY = 0.6;
+const SWIPE_ANIMATE_OUT = 900;
+
 export default function CommentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ postId?: string }>();
   const postId = params.postId;
   const { locale, t } = useI18n();
   const commentsListRef = useRef<FlatList<CommentListItem>>(null);
+
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dy, dx }) =>
+        dy > 8 && Math.abs(dy) > Math.abs(dx),
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) translateY.setValue(dy);
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > SWIPE_CLOSE_THRESHOLD_Y || vy > SWIPE_CLOSE_THRESHOLD_VY) {
+          Animated.timing(translateY, {
+            toValue: SWIPE_ANIMATE_OUT,
+            duration: 220,
+            useNativeDriver: true,
+          }).start(() => router.back());
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<CommentListItem[]>([]);
@@ -96,14 +128,8 @@ export default function CommentsScreen() {
 
   const syncPostCommentsCount = useCallback(
     (nextCount: number) => {
-      if (!postId) {
-        return;
-      }
-
-      emitPostChanged({
-        id: postId,
-        _count: { comments: nextCount },
-      });
+      if (!postId) return;
+      emitPostChanged({ id: postId, _count: { comments: nextCount } });
     },
     [postId],
   );
@@ -120,16 +146,13 @@ export default function CommentsScreen() {
       const res = await api.get<ApiComment[]>(`/posts/${postId}/comments`);
       const nextComments = res.data.map(mapComment);
       setComments(nextComments);
-      if (nextComments.length > 0) {
-        scrollCommentsToEnd();
-      }
+      if (nextComments.length > 0) scrollCommentsToEnd();
       setErrorMessage(null);
     } catch (error) {
       if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
-
       console.error('Erreur chargement commentaires:', error);
       setErrorMessage(getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
@@ -140,16 +163,12 @@ export default function CommentsScreen() {
   const fetchCurrentUser = useCallback(async () => {
     try {
       const res = await api.get('/users/me');
-      setCurrentUser({
-        id: res.data.id,
-        avatarUrl: res.data.avatarUrl,
-      });
+      setCurrentUser({ id: res.data.id, avatarUrl: res.data.avatarUrl });
     } catch (error) {
       if (isUnauthorizedError(error)) {
         await handleInvalidSession();
         return;
       }
-
       setCurrentUser(null);
     }
   }, [handleInvalidSession]);
@@ -174,9 +193,7 @@ export default function CommentsScreen() {
   }, [fetchComments, fetchCurrentUser]);
 
   const handleSend = async () => {
-    if (!comment.trim() || isSending || !postId) {
-      return;
-    }
+    if (!comment.trim() || isSending || !postId) return;
 
     setIsSending(true);
     try {
@@ -184,7 +201,6 @@ export default function CommentsScreen() {
         content: comment,
         parentId: replyingTo ? replyingTo.id : undefined,
       });
-
       const nextComment = mapComment(res.data);
       setComments((prev) => {
         const next = [...prev, nextComment];
@@ -201,7 +217,6 @@ export default function CommentsScreen() {
         await handleInvalidSession();
         return;
       }
-
       console.error('Erreur envoi commentaire:', error);
       Alert.alert(t('commonErrorTitle'), getApiErrorMessage(error, t('commonErrorTitle')));
     } finally {
@@ -215,10 +230,8 @@ export default function CommentsScreen() {
       setComments((prev) => {
         const idsToRemove = new Set<string>([commentId]);
         let shouldScanAgain = true;
-
         while (shouldScanAgain) {
           shouldScanAgain = false;
-
           prev.forEach((current) => {
             if (current.parentId && idsToRemove.has(current.parentId)) {
               if (!idsToRemove.has(current.id)) {
@@ -228,7 +241,6 @@ export default function CommentsScreen() {
             }
           });
         }
-
         const next = prev.filter((current) => !idsToRemove.has(current.id));
         syncPostCommentsCount(next.length);
         return next;
@@ -239,13 +251,20 @@ export default function CommentsScreen() {
         await handleInvalidSession();
         return;
       }
-
       Alert.alert(t('commonErrorTitle'), t('commentsDeleteErrorMessage'));
     }
   };
 
   const handleReportComment = () => {
     Alert.alert(t('commentsReportTitle'), t('commentsReportMessage'));
+  };
+
+  const handleClose = () => {
+    Animated.timing(translateY, {
+      toValue: SWIPE_ANIMATE_OUT,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => router.back());
   };
 
   const composer = (
@@ -267,9 +286,7 @@ export default function CommentsScreen() {
         } ${replyingTo ? 'border-t-0' : ''}`}
       >
         <Image
-          source={{
-            uri: getImageUrl(currentUser?.avatarUrl) || 'https://i.pravatar.cc/150?u=me',
-          }}
+          source={{ uri: getImageUrl(currentUser?.avatarUrl) || 'https://i.pravatar.cc/150?u=me' }}
           className="mb-2 mr-3 h-8 w-8 rounded-full"
         />
         <View className="flex-1 flex-row items-center rounded-3xl bg-gray-100 px-4 py-2 dark:bg-gray-800">
@@ -293,11 +310,7 @@ export default function CommentsScreen() {
             {isSending ? (
               <ActivityIndicator size="small" color="#4c669f" />
             ) : (
-              <Text
-                className={`font-bold ${
-                  comment.trim() ? 'text-[#4c669f]' : 'text-gray-400'
-                }`}
-              >
+              <Text className={`font-bold ${comment.trim() ? 'text-[#4c669f]' : 'text-gray-400'}`}>
                 {t('commentsPublish')}
               </Text>
             )}
@@ -314,22 +327,33 @@ export default function CommentsScreen() {
       className="flex-1"
     >
       <View className="flex-1 justify-end">
-        <Pressable
-          className="absolute inset-0"
-          onPress={() => router.back()}
-        >
-          <View className="absolute inset-0 bg-black/40" />
+        <Pressable className="absolute inset-0" onPress={handleClose}>
+          <View className="absolute inset-0 bg-black/[0.45]" />
         </Pressable>
 
-        <View
-          className="w-full flex-1 overflow-hidden rounded-t-3xl border-t border-gray-200 bg-white px-5 pb-8 pt-4 dark:border-gray-800 dark:bg-gray-900"
-          style={{ height: '85%', maxHeight: 680 }}
+        <Animated.View
+          className="w-full flex-1 overflow-hidden bg-white dark:bg-gray-900"
+          style={{
+            height: '85%',
+            maxHeight: 680,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            transform: [{ translateY }],
+          }}
         >
-          <View className="mb-4 items-center">
+          {/* Drag handle — pan handler attached here */}
+          <View
+            {...panResponder.panHandlers}
+            className="items-center pt-4 pb-2"
+          >
             <View className="h-1.5 w-12 rounded-full bg-gray-300 dark:bg-gray-700" />
           </View>
 
-          <View className="mb-4 flex-row items-start justify-between">
+          {/* Header — pan handler continues here */}
+          <View
+            {...panResponder.panHandlers}
+            className="flex-row items-start justify-between px-5 pb-4"
+          >
             <View className="flex-1 pr-3">
               <Text className="text-lg font-bold text-gray-900 dark:text-white">
                 {t('commentsTitle')}
@@ -337,7 +361,7 @@ export default function CommentsScreen() {
             </View>
 
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={handleClose}
               className="bg-gray-100 p-2 dark:bg-gray-800"
               style={{ borderRadius: 999 }}
             >
@@ -354,9 +378,7 @@ export default function CommentsScreen() {
                 title={t('commonErrorTitle')}
                 description={errorMessage}
                 actionLabel={t('commonRetry')}
-                onAction={() => {
-                  void fetchComments();
-                }}
+                onAction={() => { void fetchComments(); }}
               />
             ) : comments.length === 0 ? (
               <ScreenState mode="empty" title={t('commentsFirstComment')} />
@@ -382,7 +404,7 @@ export default function CommentsScreen() {
           </View>
 
           <View className="mt-4">{composer}</View>
-        </View>
+        </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );

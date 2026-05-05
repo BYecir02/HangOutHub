@@ -1322,7 +1322,7 @@ export default function SocialFeed() {
                 item={item}
                 showDateColumn={false}
                 shouldPlayMedia={feedActiveId === item.id}
-                presentation="instagram"
+                presentation="sortie"
                 onDelete={item.isOwner ? handleDeletePost : undefined}
                 onEdit={item.isOwner ? handleEditPost : undefined}
                 onComment={handleCommentPost}

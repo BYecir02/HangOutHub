@@ -1,5 +1,5 @@
-import React from 'react';
-import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image as RNImage, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -23,6 +23,12 @@ type PlaceDetailHeroProps = {
   friendsAttending?: FriendAttendee[];
 };
 
+// Fallback ratio (4:3) used while the real image dimensions load
+const FALLBACK_RATIO = 4 / 3;
+// Safety cap: portrait images won't exceed this ratio (width/height)
+// e.g. 0.56 ≈ 9:16 — very tall but still reasonable for a hero
+const MIN_RATIO = 9 / 16;
+
 export default function PlaceDetailHero({
   heroImage,
   heroIsVideo,
@@ -41,19 +47,40 @@ export default function PlaceDetailHero({
   const heroBadgeBottom = Math.max(24, Math.min(48, Math.round(screenHeight * 0.035)));
   const hasFriends = friendsAttending.length > 0;
 
+  // Natural aspect ratio of the cover image (width / height)
+  const [aspectRatio, setAspectRatio] = useState<number>(FALLBACK_RATIO);
+
+  useEffect(() => {
+    if (!heroImage || heroIsVideo) return;
+
+    let cancelled = false;
+    RNImage.getSize(
+      heroImage,
+      (w, h) => {
+        if (!cancelled && w > 0 && h > 0) {
+          // Clamp at MIN_RATIO so extremely tall images don't overwhelm the screen
+          setAspectRatio(Math.max(MIN_RATIO, w / h));
+        }
+      },
+      () => { /* keep fallback on error */ },
+    );
+    return () => { cancelled = true; };
+  }, [heroImage, heroIsVideo]);
+
   return (
-    <View className="relative mt-10 mx-4 overflow-hidden rounded-[34px] bg-gray-100 shadow-lg dark:bg-black">
+    <View
+      className="relative w-full overflow-hidden bg-gray-100 dark:bg-gray-900 mt-10"
+      style={{ aspectRatio }}
+    >
       <MediaFrame
         source={heroImage}
-        className="w-full"
-        style={{ borderRadius: 34, overflow: 'hidden' }}
+        className="w-full h-full"
+        style={{ overflow: 'hidden' }}
         shouldPlay
         muted={heroMuted}
         loop
         showControls
-        adaptiveHeight
-        minHeight={280}
-        maxHeight={480}
+        contentFit="cover"
       />
 
       <LinearGradient

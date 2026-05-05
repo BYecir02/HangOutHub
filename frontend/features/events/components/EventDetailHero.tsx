@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image as RNImage, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -48,19 +48,37 @@ export default function EventDetailHero({
   const heroBadgeBottom = Math.max(24, Math.min(48, Math.round(screenHeight * 0.035)));
   const hasFriends = friendsAttending.length > 0;
 
+  const [aspectRatio, setAspectRatio] = useState<number>(4 / 3);
+
+  useEffect(() => {
+    if (!heroImage || heroIsVideo) return;
+    let cancelled = false;
+    RNImage.getSize(
+      heroImage,
+      (w, h) => {
+        if (!cancelled && w > 0 && h > 0) {
+          setAspectRatio(Math.max(9 / 16, w / h));
+        }
+      },
+      () => {},
+    );
+    return () => { cancelled = true; };
+  }, [heroImage, heroIsVideo]);
+
   return (
-    <View className="relative mt-10 mx-4 overflow-hidden rounded-[34px] bg-gray-100 shadow-lg dark:bg-black">
+    <View
+      className="relative w-full overflow-hidden bg-gray-100 dark:bg-black mt-10"
+      style={{ aspectRatio }}
+    >
       <MediaFrame
         source={heroImage}
-        className="w-full"
-        style={{ borderRadius: 34, overflow: 'hidden' }}
+        className="w-full h-full"
+        style={{ overflow: 'hidden' }}
         shouldPlay
         muted={heroMuted}
         loop
         showControls
-        adaptiveHeight
-        minHeight={280}
-        maxHeight={480}
+        contentFit="cover"
       />
 
       <LinearGradient
