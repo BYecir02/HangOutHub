@@ -387,6 +387,8 @@ export class PostsService {
       });
     }
 
+    filters.push({ User: { isActive: true, isSuspended: false } });
+
     const where =
       filters.length > 1
         ? {
