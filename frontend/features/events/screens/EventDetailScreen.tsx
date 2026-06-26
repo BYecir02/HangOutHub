@@ -1,6 +1,7 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -85,6 +86,24 @@ export default function EventDetailScreen() {
   const { isAttending, attendingLoading, friendsAttending, handleToggleAttend } =
     useEventAttendance(params.id);
 
+  const handleToggleAttendWrapper = () => {
+    if (hasActiveBooking) {
+      Alert.alert(
+        locale === 'fr-FR' ? 'Participation liée' : 'Attending status linked',
+        locale === 'fr-FR'
+          ? "Vous possédez un billet pour cet événement. Pour annuler votre participation, veuillez annuler votre réservation à l'aide du bouton en bas de l'écran."
+          : 'You already have a ticket for this event. To cancel your attendance, please cancel your booking at the bottom of the screen.'
+      );
+      return;
+    }
+
+    if (ticketTypes && ticketTypes.length > 0 && !isAttending) {
+      setActiveTab('tickets');
+    } else {
+      void handleToggleAttend();
+    }
+  };
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
@@ -130,9 +149,9 @@ export default function EventDetailScreen() {
           mediaMuteLabel={t('mediaMute')}
           mediaUnmuteLabel={t('mediaUnmute')}
           friendsAttending={friendsAttending}
-          isAttending={isAttending}
+          isAttending={isAttending || hasActiveBooking}
           attendingLoading={attendingLoading}
-          onToggleAttend={handleToggleAttend}
+          onToggleAttend={handleToggleAttendWrapper}
         />
 
         <View className="relative overflow-hidden" style={{ minHeight: screenHeight }}>
@@ -186,32 +205,37 @@ export default function EventDetailScreen() {
             </ScrollView>
           </Animated.View>
 
-          <EventPublicationsPanel
-            eventTitle={event.title}
-            publications={eventPublications}
-            scrollRef={publicationsScrollRef}
-            visibility={eventPublicationsVisibility}
-            containerOffsetY={publicationsGridOffsetY}
-            onGridLayout={(offsetY) => {
-              setPublicationsGridOffsetY(offsetY);
-            }}
-            loading={eventPublicationsLoading}
-            error={eventPublicationsError}
-            authRequired={eventPublicationsAuthRequired}
-            onRetry={() => {
-              void loadEventPublications();
-            }}
-            onClose={handleClosePublications}
-            onPressPost={(post) => {
-              handleClosePublications();
-              router.push({
-                pathname: '/post-view/[id]',
-                params: { id: post.id },
-              });
-            }}
-            style={publicationsPanelBStyle}
-            pointerEvents={publicationsOpen ? 'auto' : 'none'}
-          />
+          {/* Panneau "Publications" de l'evenement masque (reseau social en veille).
+              Son declencheur (bouton cover) est deja desactive ; on gate aussi
+              le rendu ici. Pour le reactiver : retirer le `false &&`. */}
+          {false && (
+            <EventPublicationsPanel
+              eventTitle={event?.title ?? ''}
+              publications={eventPublications}
+              scrollRef={publicationsScrollRef}
+              visibility={eventPublicationsVisibility}
+              containerOffsetY={publicationsGridOffsetY}
+              onGridLayout={(offsetY) => {
+                setPublicationsGridOffsetY(offsetY);
+              }}
+              loading={eventPublicationsLoading}
+              error={eventPublicationsError}
+              authRequired={eventPublicationsAuthRequired}
+              onRetry={() => {
+                void loadEventPublications();
+              }}
+              onClose={handleClosePublications}
+              onPressPost={(post) => {
+                handleClosePublications();
+                router.push({
+                  pathname: '/post-view/[id]',
+                  params: { id: post.id },
+                });
+              }}
+              style={publicationsPanelBStyle}
+              pointerEvents={publicationsOpen ? 'auto' : 'none'}
+            />
+          )}
         </View>
       </ScrollView>
 

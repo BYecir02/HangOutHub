@@ -21,6 +21,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:seed": "ts-node prisma/seed.ts --force-demo",
+    "seed:events": "ts-node prisma/seed-upcoming-events.ts",
+    "seed:clear-place-images": "ts-node prisma/clear-stock-place-images.ts",
+    "seed:verify-demo": "ts-node prisma/verify-demo-accounts.ts",
     "backfill:place-tags": "ts-node scripts/backfill-place-tags.ts",
     "backfill:place-tags:dry-run": "ts-node scripts/backfill-place-tags.ts --dry-run"
   },

@@ -1283,6 +1283,23 @@ export class EventsService {
       }
     }
 
+    // Un ADMIN peut créer l'évènement AU NOM d'un organisateur qu'il choisit ;
+    // sinon le créateur reste l'organisateur.
+    let organizerId = userId;
+    if ((role || '').toUpperCase() === 'ADMIN' && createEventDto.organizerId) {
+      const organizer = await this.prisma.user.findFirst({
+        where: {
+          id: createEventDto.organizerId,
+          OrganizerProfile: { isNot: null },
+        },
+        select: { id: true },
+      });
+      if (!organizer) {
+        throw new BadRequestException('Organisateur invalide.');
+      }
+      organizerId = createEventDto.organizerId;
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const created = await tx.event.create({
         data: {
@@ -1301,7 +1318,7 @@ export class EventsService {
           entryFee: minTicketPrice,
           coverUrl,
           images: galleryUrls,
-          organizerId: userId,
+          organizerId,
           placeId: createEventDto.placeId || null,
           cityId: nextCityId,
           ...(ticketTypes.length > 0

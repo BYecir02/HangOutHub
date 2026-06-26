@@ -17,6 +17,11 @@ export class CreateEventDto {
   @IsString()
   title: string;
 
+  // Permet à un ADMIN de créer l'évènement au nom d'un organisateur qu'il choisit.
+  @IsOptional()
+  @IsUUID()
+  organizerId?: string;
+
   @IsOptional()
   @IsString()
   description?: string;

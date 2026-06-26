@@ -274,45 +274,6 @@ export default function OrganizerLayout() {
           }}
         />
         <Tabs.Screen
-          name="action-center"
-          options={{
-            title: '',
-            tabBarLabel: '',
-            tabBarItemStyle: showActionCenter
-              ? undefined
-              : { display: 'none' },
-            tabBarButton: (props) =>
-              showActionCenter ? (
-                <PlatformPressable
-                  {...props}
-                  onPress={() => setActionCenterOpen(true)}
-                  style={[
-                    props.style,
-                    {
-                      alignItems: 'center',
-                      alignSelf: 'center',
-                      justifyContent: 'center',
-                    },
-                  ]}
-                >
-                  <View
-                    className="h-14 w-14 items-center justify-center rounded-full bg-[#4c669f]"
-                    style={{
-                      marginBottom: 20,
-                      shadowColor: '#4c669f',
-                      shadowOpacity: 0.32,
-                      shadowOffset: { width: 0, height: 8 },
-                      shadowRadius: 12,
-                      elevation: 8,
-                    }}
-                  >
-                    <Ionicons name="add" size={35} color="#FFFFFF" />
-                  </View>
-                </PlatformPressable>
-              ) : null,
-          }}
-        />
-        <Tabs.Screen
           name="profile"
           options={{
             title: t('organizerNavProfile'),
@@ -374,6 +335,45 @@ export default function OrganizerLayout() {
                 color={color}
               />
             ),
+          }}
+        />
+        <Tabs.Screen
+          name="action-center"
+          options={{
+            title: '',
+            tabBarLabel: '',
+            tabBarItemStyle: showActionCenter
+              ? undefined
+              : { display: 'none' },
+            tabBarButton: (props) =>
+              showActionCenter ? (
+                <PlatformPressable
+                  {...props}
+                  onPress={() => setActionCenterOpen(true)}
+                  style={[
+                    props.style,
+                    {
+                      alignItems: 'center',
+                      alignSelf: 'center',
+                      justifyContent: 'center',
+                    },
+                  ]}
+                >
+                  <View
+                    className="h-14 w-14 items-center justify-center rounded-full bg-[#4c669f]"
+                    style={{
+                      marginBottom: 20,
+                      shadowColor: '#4c669f',
+                      shadowOpacity: 0.32,
+                      shadowOffset: { width: 0, height: 8 },
+                      shadowRadius: 12,
+                      elevation: 8,
+                    }}
+                  >
+                    <Ionicons name="add" size={35} color="#FFFFFF" />
+                  </View>
+                </PlatformPressable>
+              ) : null,
           }}
         />
         <Tabs.Screen name="places" options={{ href: null }} />

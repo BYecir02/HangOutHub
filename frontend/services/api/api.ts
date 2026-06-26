@@ -220,9 +220,12 @@ api.interceptors.response.use(
       console.error(`[API ${status}] ${method} ${requestUrl}`, data);
     }
 
+    // On tente le refresh MEME pour les endpoints "silencieux" (badges /
+    // compteurs en arriere-plan). Sinon, des que l'access token expire (~15 min),
+    // un de ces appels renvoie 401 sans jamais utiliser le refresh token, et
+    // l'utilisateur est deconnecte alors que sa session est encore valide 30 jours.
     const shouldTryRefresh =
       status === 401 &&
-      !isSilent401 &&
       !!originalRequest &&
       !originalRequest._retry &&
       !isAuthRoute(originalRequest.url || '');
@@ -248,9 +251,15 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch (refreshError) {
-        await storage.setItem(AUTH_REDIRECT_REASON_KEY, 'session_expired');
-        await clearAuthState();
-        safeReplace('/');
+        // Le refresh a vraiment echoue (refresh token absent/expire/invalide).
+        // On ne redirige vers le login que pour une requete explicite de
+        // l'utilisateur. Pour un endpoint silencieux, on laisse l'appelant
+        // gerer le 401 sans deconnexion brutale.
+        if (!isSilent401) {
+          await storage.setItem(AUTH_REDIRECT_REASON_KEY, 'session_expired');
+          await clearAuthState();
+          safeReplace('/');
+        }
         return Promise.reject(refreshError);
       }
     }

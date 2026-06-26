@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -232,7 +232,10 @@ export default function CreateModalScreen() {
         outingTitle: typeof params.outingTitle === 'string' ? params.outingTitle : undefined,
         eventId: typeof params.eventId === 'string' ? params.eventId : undefined,
         eventTitle: typeof params.eventTitle === 'string' ? params.eventTitle : undefined,
-      }),
+      })
+        // Bouton "Publication" masqué temporairement (réseau social en veille).
+        // Pour le réactiver : supprimer ce .filter().
+        .filter((action) => action.path !== '/post'),
     [
       currentUser,
       params.cityName,
@@ -275,12 +278,7 @@ export default function CreateModalScreen() {
       }
     >
       {actions.length > 0 ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 8 }}
-          style={{ maxHeight: 420 }}
-        >
-          <View>
+        <View>
             {actions.map((action) => (
               <TouchableOpacity
                 key={action.label}
@@ -309,8 +307,7 @@ export default function CreateModalScreen() {
                 <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
               </TouchableOpacity>
             ))}
-          </View>
-        </ScrollView>
+        </View>
       ) : (
         <View className="py-8">
           <Text className="text-center text-sm text-gray-500 dark:text-gray-400">

@@ -31,6 +31,7 @@ export default function PlaceDetailScreen() {
     heroMuted,
     toggleHeroMuted,
     heroImage,
+    hasCover,
     heroIsVideo,
     publicationsOpen,
     placePublications,
@@ -139,6 +140,7 @@ export default function PlaceDetailScreen() {
         <View className="bg-gray-50 dark:bg-black mt-2">
           <PlaceDetailHero
             heroImage={heroImage}
+            hasCover={hasCover}
             heroIsVideo={heroIsVideo}
             heroMuted={heroMuted}
             onToggleHeroMuted={toggleHeroMuted}
@@ -169,7 +171,6 @@ export default function PlaceDetailScreen() {
                   onOpenCreateModal={handleOpenCreateModal}
                   canClaimPlace={canClaimPlace}
                   onOpenClaimPlace={handleOpenClaimPlace}
-                  onReportPlace={handleReportPlace}
                   onContactPlace={handleContactPlace}
                   onOpenGallery={(index) => {
                     setGalleryIndex(index);
@@ -187,32 +188,37 @@ export default function PlaceDetailScreen() {
               </ScrollView>
             </Animated.View>
 
-            <PlacePublicationsPanel
-              placeName={place.name}
-              publications={placePublications}
-              scrollRef={publicationsScrollRef}
-              visibility={placePublicationsVisibility}
-              containerOffsetY={publicationsGridOffsetY}
-              onGridLayout={(offsetY) => {
-                setPublicationsGridOffsetY(offsetY);
-              }}
-              loading={placePublicationsLoading}
-              error={placePublicationsError}
-              authRequired={placePublicationsAuthRequired}
-              onRetry={() => {
-                void loadPlacePublications();
-              }}
-              onClose={handleClosePublications}
-              onPressPost={(post) => {
-                handleClosePublications();
-                router.push({
-                  pathname: '/post-view/[id]',
-                  params: { id: post.id },
-                });
-              }}
-              style={publicationsPanelBStyle}
-              pointerEvents={publicationsOpen ? 'auto' : 'none'}
-            />
+            {/* Panneau "Publications" du lieu masque temporairement (reseau social en veille).
+                Son unique declencheur (bouton cover) est deja desactive ; on gate aussi
+                le rendu ici. Pour le reactiver : retirer le `false &&`. */}
+            {false && (
+              <PlacePublicationsPanel
+                placeName={place?.name ?? ''}
+                publications={placePublications}
+                scrollRef={publicationsScrollRef}
+                visibility={placePublicationsVisibility}
+                containerOffsetY={publicationsGridOffsetY}
+                onGridLayout={(offsetY) => {
+                  setPublicationsGridOffsetY(offsetY);
+                }}
+                loading={placePublicationsLoading}
+                error={placePublicationsError}
+                authRequired={placePublicationsAuthRequired}
+                onRetry={() => {
+                  void loadPlacePublications();
+                }}
+                onClose={handleClosePublications}
+                onPressPost={(post) => {
+                  handleClosePublications();
+                  router.push({
+                    pathname: '/post-view/[id]',
+                    params: { id: post.id },
+                  });
+                }}
+                style={publicationsPanelBStyle}
+                pointerEvents={publicationsOpen ? 'auto' : 'none'}
+              />
+            )}
           </View>
         </View>
       </ScrollView>
@@ -224,6 +230,15 @@ export default function PlaceDetailScreen() {
         accessibilityLabel="Retour"
       >
         <Ionicons name="arrow-back" size={22} color="#fff" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={handleReportPlace}
+        className="absolute right-5 top-14 z-30 rounded-full bg-black/45 p-3 shadow-lg"
+        accessibilityRole="button"
+        accessibilityLabel="Signaler"
+      >
+        <Ionicons name="flag-outline" size={22} color="#fff" />
       </TouchableOpacity>
 
       <PlaceGalleryModal

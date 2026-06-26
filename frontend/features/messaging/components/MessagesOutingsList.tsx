@@ -2,8 +2,8 @@ import React from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  RefreshControl,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -11,6 +11,7 @@ import OutingConversationCard, {
   type OutingConversationSummary,
 } from '@/features/messaging/components/OutingConversationCard';
 import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 
 type OutingFilter = 'all' | 'upcoming' | 'withMessages' | 'unread';
@@ -25,6 +26,7 @@ interface MessagesOutingsListProps {
   filterOptions: FilterChipOption<OutingFilter>[];
   activeFilter: OutingFilter;
   onFilterChange: (filter: OutingFilter) => void;
+  onCreateOuting?: () => void;
 }
 
 export default function MessagesOutingsList({
@@ -37,11 +39,12 @@ export default function MessagesOutingsList({
   filterOptions,
   activeFilter,
   onFilterChange,
+  onCreateOuting,
 }: MessagesOutingsListProps) {
   const { t } = useI18n();
 
   return (
-    <>
+    <View className="flex-1">
       <View className="pb-4">
         <FilterChipsBar
           options={filterOptions}
@@ -55,13 +58,12 @@ export default function MessagesOutingsList({
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#4c669f"
-          />
-        }
+        alwaysBounceVertical
+        onScrollEndDrag={(event) => {
+          if (!refreshing && event.nativeEvent.contentOffset.y <= -80) {
+            onRefresh();
+          }
+        }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.3}
@@ -80,6 +82,16 @@ export default function MessagesOutingsList({
             <Text className="mt-2 text-center text-sm text-gray-400 dark:text-gray-500">
               {t('messagesEmptyDescription')}
             </Text>
+            {onCreateOuting ? (
+              <TouchableOpacity
+                onPress={onCreateOuting}
+                className="mt-5 rounded-2xl bg-[#4c669f] px-4 py-2.5"
+              >
+                <Text className="text-sm font-semibold text-white">
+                  {t('messagesEmptyCreateOutingAction')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -89,6 +101,18 @@ export default function MessagesOutingsList({
           />
         )}
       />
-    </>
+
+      {refreshing ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 z-10 items-center"
+          style={{ top: 56 }}
+        >
+          <View className="rounded-full bg-white/85 p-2.5 dark:bg-gray-900/85">
+            <LogoSpinner size={24} />
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 }

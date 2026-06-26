@@ -84,21 +84,13 @@ export default function EventDetailContent({
         {event.Place?.City?.name ? ` • ${event.Place.City.name}` : ''}
       </Text>
 
-      <View className="mt-4 flex-row gap-3">
-        <TouchableOpacity
-          onPress={onReportEvent}
-          className="flex-1 flex-row items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/30 dark:bg-rose-900/20"
-        >
-          <Ionicons name="flag-outline" size={14} color="#e11d48" />
-          <Text className="ml-2 text-xs font-semibold text-rose-600">{t('reportAction')}</Text>
-        </TouchableOpacity>
-
+      <View className="mt-4">
         <TouchableOpacity
           onPress={onCreateOuting}
-          className="flex-1 flex-row items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/30 dark:bg-blue-900/20"
+          className="flex-row items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3.5 dark:border-blue-900/30 dark:bg-blue-900/20"
         >
-          <Ionicons name="people-outline" size={14} color="#2563eb" />
-          <Text className="ml-2 text-xs font-semibold text-blue-700 dark:text-blue-200">
+          <Ionicons name="people-outline" size={15} color="#2563eb" />
+          <Text className="ml-2 text-sm font-semibold text-blue-700 dark:text-blue-200">
             {t('profileOrganizeOutingCta')}
           </Text>
         </TouchableOpacity>
@@ -148,6 +140,17 @@ export default function EventDetailContent({
           <EventDetailGalleryTab eventId={event.id} gallery={gallery} />
         ) : null}
       </View>
+
+      <TouchableOpacity
+        onPress={onReportEvent}
+        className="mt-6 flex-row items-center justify-center py-2"
+        activeOpacity={0.7}
+      >
+        <Ionicons name="flag-outline" size={14} color="#9ca3af" />
+        <Text className="ml-1.5 text-xs text-gray-400 dark:text-gray-500 underline">
+          {t('reportAction')}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }

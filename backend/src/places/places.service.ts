@@ -66,7 +66,7 @@ export class PlacesService {
       cover?: Express.Multer.File[];
       gallery?: Express.Multer.File[];
     } = {},
-    ownerId: string,
+    ownerId: string | null,
   ) {
     const coverFile = files?.cover?.[0] ?? null;
     const coverUrl = coverFile
@@ -77,7 +77,11 @@ export class PlacesService {
       ? await this.storageService.uploadFiles('places', files.gallery)
       : [];
 
-    const { tagIds: rawTagIds, ...placeData } = createPlaceDto as CreatePlaceDto & {
+    const {
+      tagIds: rawTagIds,
+      openingHoursStructured: rawHours,
+      ...placeData
+    } = createPlaceDto as CreatePlaceDto & {
       tagIds?: string;
     };
     const tagIds = this.parseTagIdsPayload(rawTagIds);
@@ -99,6 +103,7 @@ export class PlacesService {
       const created = await tx.place.create({
         data: {
           ...placeData,
+          openingHoursStructured: this.parseOpeningHours(rawHours),
           moderationStatus: this.normalizeModerationStatus(
             placeData.moderationStatus,
           ),
@@ -160,12 +165,18 @@ export class PlacesService {
     const {
       tagIds: rawTagIds,
       existingImages: rawExistingImages,
+      openingHoursStructured: rawHours,
       ...rest
     } = updatePlaceDto as UpdatePlaceDto & {
       tagIds?: string;
       existingImages?: string;
     };
     const data: Prisma.PlaceUpdateInput = { ...rest };
+
+    const parsedHours = this.parseOpeningHours(rawHours);
+    if (parsedHours !== undefined) {
+      data.openingHoursStructured = parsedHours;
+    }
 
     if (rest.moderationStatus !== undefined) {
       data.moderationStatus = this.normalizeModerationStatus(
@@ -437,6 +448,71 @@ export class PlacesService {
     }
 
     return Array.from(new Set(normalized));
+  }
+
+  // Parse + valide les horaires structurés (chaîne JSON -> objet par jour).
+  // undefined = champ non fourni (on n'y touche pas) ; vide/{} = on remet à null.
+  private parseOpeningHours(
+    raw?: string,
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined {
+    if (raw === undefined) {
+      return undefined;
+    }
+
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === 'null' || trimmed === '{}') {
+      return Prisma.JsonNull;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      throw new BadRequestException('Format des horaires invalide.');
+    }
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new BadRequestException(
+        'Les horaires doivent etre un objet par jour.',
+      );
+    }
+
+    const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const result: Record<string, { open: string; close: string }[]> = {};
+
+    for (const [day, value] of Object.entries(
+      parsed as Record<string, unknown>,
+    )) {
+      if (!DAYS.includes(day)) {
+        throw new BadRequestException(`Jour invalide : ${day}.`);
+      }
+      if (!Array.isArray(value)) {
+        throw new BadRequestException(
+          `Les creneaux de ${day} doivent etre une liste.`,
+        );
+      }
+
+      result[day] = value.map((range) => {
+        if (typeof range !== 'object' || range === null) {
+          throw new BadRequestException('Creneau horaire invalide.');
+        }
+        const { open, close } = range as { open?: unknown; close?: unknown };
+        if (
+          typeof open !== 'string' ||
+          typeof close !== 'string' ||
+          !TIME_REGEX.test(open) ||
+          !TIME_REGEX.test(close)
+        ) {
+          throw new BadRequestException(
+            'Heures invalides (format attendu HH:mm).',
+          );
+        }
+        return { open, close };
+      });
+    }
+
+    return result as Prisma.InputJsonValue;
   }
 
   private hasProviderMetadata(payload: {

@@ -44,6 +44,11 @@ export class CreatePlaceDto {
   @MaxLength(255)
   openingHours?: string;
 
+  // Horaires structurés, transmis en chaîne JSON (parsés/validés côté service).
+  @IsOptional()
+  @IsString()
+  openingHoursStructured?: string;
+
   @IsNotEmpty()
   @IsNumber()
   @Type(() => Number)

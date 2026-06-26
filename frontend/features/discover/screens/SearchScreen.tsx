@@ -3,15 +3,12 @@ import {
   Alert,
   ScrollView,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
-import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import SearchBar from '@/shared/ui/SearchBar';
 import PersonActionButton from '@/features/social/components/PersonActionButton';
@@ -33,7 +30,6 @@ export default function SearchScreen() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [results, setResults] = useState<DiscoverUser[]>([]);
-  const [searchSheetOpen, setSearchSheetOpen] = useState(true);
   const normalizedQuery = query.trim();
   const headerSubtitle =
     normalizedQuery.length >= 2
@@ -133,19 +129,22 @@ export default function SearchScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
-      <View className="px-5 pb-4">
+      <View className="px-5 pb-3">
         <ScreenHeader
           title={t('searchTitle')}
           subtitle={headerSubtitle}
           onBack={() => router.back()}
-          rightSlot={
-            <TouchableOpacity
-              onPress={() => setSearchSheetOpen(true)}
-              className="h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-            >
-              <Ionicons name="search-outline" size={20} color="#4c669f" />
-            </TouchableOpacity>
-          }
+        />
+      </View>
+
+      {/* Champ de recherche inline, focus direct a l'arrivee : pas de modal,
+          resultats live juste en dessous. */}
+      <View className="pb-3">
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          autoFocus
+          placeholder={t('searchPlaceholder')}
         />
       </View>
 
@@ -239,23 +238,6 @@ export default function SearchScreen() {
           />
         )}
       </ScrollView>
-
-      <BottomSheetModal
-        visible={searchSheetOpen}
-        onClose={() => setSearchSheetOpen(false)}
-        title={t('searchTitle')}
-        subtitle={t('searchHintDescription')}
-        maxHeight={300}
-        contentMode="auto"
-      >
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          autoFocus
-          placeholder={t('searchPlaceholder')}
-          useBottomSheetInput
-        />
-      </BottomSheetModal>
     </View>
   );
 }

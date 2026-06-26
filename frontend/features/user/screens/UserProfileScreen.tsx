@@ -120,7 +120,7 @@ export default function PublicProfileScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
+        <ActivityIndicator size="large" color="#ff4757" />
       </View>
     );
   }
@@ -133,7 +133,7 @@ export default function PublicProfileScreen() {
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mt-4 rounded-full bg-[#4c669f] px-5 py-3"
+          className="mt-4 rounded-full bg-[#ff4757] px-5 py-3"
         >
           <Text className="font-semibold text-white">{t('publicProfileBack')}</Text>
         </TouchableOpacity>
@@ -195,17 +195,12 @@ export default function PublicProfileScreen() {
           {profile.bio || t('profileNoBioYet')}
         </Text>
 
-        <View className="mt-5 flex-row rounded-2xl border border-gray-100 bg-gray-50 px-1 py-3 dark:border-gray-800 dark:bg-gray-900">
-          <View className="flex-1 items-center">
-            <Text className="text-base font-bold text-gray-900 dark:text-white">
-              {profile._count?.Post || posts.length}
-            </Text>
-            <Text className="mt-1 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              {t('profileStatsPosts')}
-            </Text>
-          </View>
-          {isOrganizer ? (
-            <View className="flex-1 items-center border-l border-gray-100 dark:border-gray-800">
+        {/* Compteur "Posts" masque (reseau social en veille). Pour un user
+            normal il ne reste aucune stat -> barre affichee seulement pour les
+            organisateurs (compteur Lieux). */}
+        {isOrganizer ? (
+          <View className="mt-5 flex-row rounded-2xl border border-gray-100 bg-gray-50 px-1 py-3 dark:border-gray-800 dark:bg-gray-900">
+            <View className="flex-1 items-center">
               <Text className="text-base font-bold text-gray-900 dark:text-white">
                 {profile.OwnedPlaces?.length || 0}
               </Text>
@@ -213,8 +208,8 @@ export default function PublicProfileScreen() {
                 {t('profileStatsPlaces')}
               </Text>
             </View>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
 
       {isOrganizer && profile.OwnedPlaces && profile.OwnedPlaces.length > 0 ? (
@@ -256,26 +251,30 @@ export default function PublicProfileScreen() {
         </View>
       ) : null}
 
-      <View className="mt-8">
-        {posts.length > 0 ? (
-          posts.map((post) => (
-            <PostItem
-              key={post.id}
-              item={post}
-              onComment={handleCommentPost}
-            />
-          ))
-        ) : (
-          <View className="mx-5 items-center rounded-[28px] bg-gray-50 px-6 py-10 dark:bg-gray-900">
-            <Text className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('publicProfileNoPostsTitle')}
-            </Text>
-            <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
-              {t('publicProfileNoPostsDescription')}
-            </Text>
-          </View>
-        )}
-      </View>
+      {/* Section publications (posts) masquee : reseau social en veille.
+          Pour reactiver : retirer le `false &&`. */}
+      {false && (
+        <View className="mt-8">
+          {posts.length > 0 ? (
+            posts.map((post) => (
+              <PostItem
+                key={post.id}
+                item={post}
+                onComment={handleCommentPost}
+              />
+            ))
+          ) : (
+            <View className="mx-5 items-center rounded-[28px] bg-gray-50 px-6 py-10 dark:bg-gray-900">
+              <Text className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('publicProfileNoPostsTitle')}
+              </Text>
+              <Text className="mt-2 text-center text-gray-500 dark:text-gray-400">
+                {t('publicProfileNoPostsDescription')}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }

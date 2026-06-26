@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import { EntityRowCard } from '@/shared/ui/EntityCard';
 import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useScreenAsync } from '@/shared/hooks/useScreenAsync';
 import { formatEventDate } from '@/services/shared/formatters';
@@ -208,22 +208,21 @@ export default function NotificationsScreen() {
       <View className="px-5 pb-4">
         <ScreenHeader
           title={t('notificationsTitle')}
-          onBack={() => router.back()}
         />
       </View>
 
       <ScrollView
         className="flex-1 px-5 pb-10 pt-2"
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              void onRefresh();
-            }}
-            tintColor="#4c669f"
-          />
-        }
+        // Pull-to-refresh "maison" : pas de RefreshControl natif (pas de rond
+        // systeme). Sur iOS le ScrollView rebondit -> on detecte le tirage au
+        // relachement. Retour visuel = notre LogoSpinner (overlay plus bas).
+        alwaysBounceVertical
+        onScrollEndDrag={(event) => {
+          if (!refreshing && event.nativeEvent.contentOffset.y <= -80) {
+            void onRefresh();
+          }
+        }}
       >
         {errorMessage ? (
           <ScreenState
@@ -308,7 +307,9 @@ export default function NotificationsScreen() {
             </Text>
 
             {loading ? (
-              <ScreenState mode="loading" containerClassName="px-0 py-4" />
+              <View className="items-center py-4">
+                <LogoSpinner size={32} />
+              </View>
             ) : activityItems.length > 0 ? (
               <View className="gap-4">
                 {activityItems.map((item) => (
@@ -352,6 +353,19 @@ export default function NotificationsScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* Spinner brande affiche pendant le rafraichissement (pull-to-refresh). */}
+      {refreshing ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 z-10 items-center"
+          style={{ top: 110 }}
+        >
+          <View className="rounded-full bg-white/85 p-2.5 dark:bg-gray-900/85">
+            <LogoSpinner size={26} />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -181,7 +181,7 @@ export default function HomeFeaturedSectionNetflix({
                       {title}
                     </Text>
                     <TouchableOpacity onPress={onSeeAll} hitSlop={8}>
-                      <Text className="text-xs font-medium text-[#4c669f]">
+                      <Text className="text-xs font-medium text-[#ff4757]">
                         {seeAllLabel}
                       </Text>
                     </TouchableOpacity>
@@ -201,7 +201,7 @@ export default function HomeFeaturedSectionNetflix({
                     key={item.event.id}
                     className={`rounded-full ${
                       isActive
-                        ? 'h-2 w-6 bg-[#4c669f]'
+                        ? 'h-2 w-6 bg-[#ff4757]'
                         : 'h-2 w-2 bg-gray-300 dark:bg-gray-700'
                     }`}
                   />

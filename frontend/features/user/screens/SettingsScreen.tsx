@@ -28,6 +28,10 @@ import ListItem from '@/shared/ui/primitives/ListItem';
 import SettingsSection from '@/features/user/components/SettingsSection';
 import SettingsToggleRow from '@/features/user/components/SettingsToggleRow';
 
+// Réseau social en veille : masque la "Visibilité par défaut des publications".
+// Repasser à true pour la réafficher.
+const SHOW_DEFAULT_POST_VISIBILITY: boolean = false;
+
 export default function SettingsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -213,7 +217,7 @@ export default function SettingsScreen() {
               key={choice.value}
               onPress={() => onSelect(choice.value)}
               className={`mr-2 mb-2 rounded-full px-3 py-2 ${
-                active ? 'bg-[#4c669f]' : 'bg-gray-200 dark:bg-gray-800'
+                active ? 'bg-[#ff4757]' : 'bg-gray-200 dark:bg-gray-800'
               }`}
             >
               <Text
@@ -306,7 +310,7 @@ export default function SettingsScreen() {
                 }}
               />
 
-              {renderChoiceRow(
+              {SHOW_DEFAULT_POST_VISIBILITY && renderChoiceRow(
                 'globe-outline',
                 t('settingsDefaultPostVisibility'),
                 settings.defaultPostVisibility,

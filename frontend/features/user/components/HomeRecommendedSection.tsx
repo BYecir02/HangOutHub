@@ -54,7 +54,7 @@ export default function HomeRecommendedSection({
           {title}
         </Text>
         <TouchableOpacity onPress={onSeeAll}>
-          <Text className="text-xs font-medium text-[#4c669f]">{seeAllLabel}</Text>
+          <Text className="text-xs font-medium text-[#ff4757]">{seeAllLabel}</Text>
         </TouchableOpacity>
       </View>
 
@@ -92,7 +92,7 @@ export default function HomeRecommendedSection({
                   priceLabel={item.priceLabel}
                   borderColor={item.accentColor}
                   imageHeight={imageHeights[index % imageHeights.length]}
-                  adaptiveHeight={false}
+                  adaptiveHeight={true}
                   shouldPlay={activeId === item.id}
                   onPress={() => onPressEvent(item.event.id)}
                 />
@@ -105,7 +105,7 @@ export default function HomeRecommendedSection({
                 imageHeight={imageHeights[index % imageHeights.length]}
                 fallbackNewLabel={item.fallbackNewLabel}
                 borderColor={item.accentColor}
-                adaptiveHeight={false}
+                adaptiveHeight={true}
                 shouldPlay={activeId === item.id}
                 isSaved={savedPlaceIds.has(item.place.id)}
                 onToggleSave={() => onTogglePlaceSave(item.place.id)}

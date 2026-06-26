@@ -108,11 +108,53 @@ export default function BottomSheetModal({
     return null;
   }
 
+  // En mode "auto", le header doit etre RENDU DANS le BottomSheetScrollView
+  // pour que le dynamic sizing compte sa hauteur (sinon le bas du contenu
+  // est rogne). `inside` retire alors les paddings deja fournis par le scroll.
+  const renderHeader = (inside: boolean) =>
+    title || subtitle ? (
+      <View
+        className="flex-row items-start justify-between"
+        style={{
+          backgroundColor: sheetBackgroundColor,
+          paddingHorizontal: inside ? 0 : uiTokens.spacing.screenX,
+          paddingTop: inside ? 0 : uiTokens.spacing.rowY,
+          paddingBottom: uiTokens.spacing.rowY,
+          borderTopLeftRadius: sheetRadius,
+          borderTopRightRadius: sheetRadius,
+        }}
+      >
+        <View className="flex-1 pr-3">
+          {title ? (
+            <Text className="text-lg font-bold text-gray-900 dark:text-white">
+              {title}
+            </Text>
+          ) : null}
+          {subtitle ? (
+            <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+
+        <TouchableOpacity
+          onPress={onClose}
+          className="bg-gray-100 p-2 dark:bg-gray-800"
+          style={{ borderRadius: uiTokens.radius.full }}
+        >
+          <Ionicons name="close" size={uiTokens.size.iconSm} color="#6b7280" />
+        </TouchableOpacity>
+      </View>
+    ) : null;
+
   return (
     <BottomSheet
       ref={sheetRef}
       index={0}
-      snapPoints={snapPoints}
+      // En mode "auto", on laisse le dynamic sizing seul gerer la hauteur
+      // (le sheet epouse exactement son contenu). Passer aussi un snapPoint
+      // fixe entre en conflit et fait ouvrir le sheet trop court.
+      snapPoints={isAutoSizing ? undefined : snapPoints}
       enableDynamicSizing={isAutoSizing}
       maxDynamicContentSize={isAutoSizing ? maxHeight : undefined}
       enablePanDownToClose
@@ -157,40 +199,7 @@ export default function BottomSheetModal({
         zIndex: 9999,
       }}
     >
-      {title || subtitle ? (
-        <View
-          className="flex-row items-start justify-between"
-          style={{
-            backgroundColor: sheetBackgroundColor,
-            paddingHorizontal: uiTokens.spacing.screenX,
-            paddingTop: uiTokens.spacing.rowY,
-            paddingBottom: uiTokens.spacing.rowY,
-            borderTopLeftRadius: sheetRadius,
-            borderTopRightRadius: sheetRadius,
-          }}
-        >
-          <View className="flex-1 pr-3">
-            {title ? (
-              <Text className="text-lg font-bold text-gray-900 dark:text-white">
-                {title}
-              </Text>
-            ) : null}
-            {subtitle ? (
-              <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {subtitle}
-              </Text>
-            ) : null}
-          </View>
-
-          <TouchableOpacity
-            onPress={onClose}
-            className="bg-gray-100 p-2 dark:bg-gray-800"
-            style={{ borderRadius: uiTokens.radius.full }}
-          >
-            <Ionicons name="close" size={uiTokens.size.iconSm} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
-      ) : null}
+      {isAutoSizing ? null : renderHeader(false)}
 
       <BottomSheetScrollView
         className="w-full"
@@ -204,7 +213,8 @@ export default function BottomSheetModal({
           ...(isAutoSizing ? {} : { flex: 1 }),
         }}
         contentContainerStyle={{
-          paddingBottom: uiTokens.spacing.cardPaddingLg + 12,
+          paddingBottom:
+            uiTokens.spacing.cardPaddingLg + 12 + (isAutoSizing ? insets.bottom : 0),
           ...(isAutoSizing ? {} : { flexGrow: 1 }),
         }}
         showsVerticalScrollIndicator={false}
@@ -217,6 +227,7 @@ export default function BottomSheetModal({
         scrollEventThrottle={16}
       >
         <View className={contentMode === 'fill' ? 'flex-1' : 'min-h-[1px]'}>
+          {isAutoSizing ? renderHeader(true) : null}
           {heroContent ? <View className="mb-4 items-center">{heroContent}</View> : null}
 
           {children}

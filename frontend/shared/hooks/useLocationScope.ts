@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import {
   getStoredLocation,
+  subscribeStoredLocation,
   type StoredLocation,
 } from '@/services/shared/location-preferences';
 
@@ -55,6 +56,17 @@ export function useLocationScope(options: UseLocationScopeOptions) {
       };
     }, []),
   );
+
+  // Synchronisation live : tout écran qui change la ville notifie celui-ci
+  // immédiatement (même en arrière-plan), sans attendre le focus.
+  useEffect(() => {
+    const unsubscribe = subscribeStoredLocation((value) => {
+      setSelectedLocation(value);
+      setHydrated(true);
+    });
+
+    return unsubscribe;
+  }, []);
 
   const defaultCountry = useMemo(
     () => normalizeValue(options.defaultCountry),

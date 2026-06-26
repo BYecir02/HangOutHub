@@ -363,6 +363,7 @@ const fr = {
   createPlaceWhatsappLabel: 'WhatsApp',
   createPlaceWhatsappPlaceholder: 'Ex : +229 01 90 00 00 00',
   createPlaceWhatsappInvalid: 'Le numéro WhatsApp est invalide.',
+  createPlaceWhatsappSameAsPhone: 'Le numéro WhatsApp est le même que le téléphone',
   createPlaceHoursLabel: 'Horaires',
   createPlaceHoursOpenLabel: 'Ouverture',
   createPlaceHoursCloseLabel: 'Fermeture',
@@ -448,6 +449,8 @@ const fr = {
   messagesEmptyTitle: 'Aucune discussion disponible pour le moment.',
   messagesEmptyDescription:
     "Crée une sortie ou accepte une invitation pour commencer à chatter.",
+  messagesEmptyCreateOutingAction: 'Créer une sortie',
+  messagesFindFriendsAction: 'Trouver des amis',
   messagesLocationFallback: 'Lieu libre',
   messagesLastMessageEmpty: 'Aucun message pour le moment.',
   messagesSystemAuthor: 'Système',
@@ -2448,6 +2451,7 @@ const en: Record<keyof typeof fr, string> = {
   createPlaceWhatsappLabel: 'WhatsApp',
   createPlaceWhatsappPlaceholder: 'e.g. +229 01 90 00 00 00',
   createPlaceWhatsappInvalid: 'The WhatsApp number is invalid.',
+  createPlaceWhatsappSameAsPhone: 'The WhatsApp number is the same as the phone',
   createPlaceHoursLabel: 'Opening hours',
   createPlaceHoursOpenLabel: 'Opens',
   createPlaceHoursCloseLabel: 'Closes',
@@ -2533,6 +2537,8 @@ const en: Record<keyof typeof fr, string> = {
   messagesEmptyTitle: 'No conversations available right now.',
   messagesEmptyDescription:
     'Create an outing or accept an invitation to start chatting.',
+  messagesEmptyCreateOutingAction: 'Create an outing',
+  messagesFindFriendsAction: 'Find friends',
   messagesLocationFallback: 'Open location',
   messagesLastMessageEmpty: 'No message yet.',
   messagesSystemAuthor: 'System',

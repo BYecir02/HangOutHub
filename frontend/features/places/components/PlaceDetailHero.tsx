@@ -8,8 +8,11 @@ import MediaFrame from '@/shared/ui/MediaFrame';
 import FriendsAttendingRow from '@/shared/ui/FriendsAttendingRow';
 import type { FriendAttendee } from '@/services/social/activity';
 
+import PlaceCoverFallback from './PlaceCoverFallback';
+
 type PlaceDetailHeroProps = {
   heroImage: string;
+  hasCover: boolean;
   heroIsVideo: boolean;
   heroMuted: boolean;
   onToggleHeroMuted: () => void;
@@ -31,6 +34,7 @@ const MIN_RATIO = 9 / 16;
 
 export default function PlaceDetailHero({
   heroImage,
+  hasCover,
   heroIsVideo,
   heroMuted,
   onToggleHeroMuted,
@@ -72,16 +76,20 @@ export default function PlaceDetailHero({
       className="relative w-full overflow-hidden bg-gray-100 dark:bg-gray-900 mt-10"
       style={{ aspectRatio }}
     >
-      <MediaFrame
-        source={heroImage}
-        className="w-full h-full"
-        style={{ overflow: 'hidden' }}
-        shouldPlay
-        muted={heroMuted}
-        loop
-        showControls
-        contentFit="cover"
-      />
+      {hasCover ? (
+        <MediaFrame
+          source={heroImage}
+          className="w-full h-full"
+          style={{ overflow: 'hidden' }}
+          shouldPlay
+          muted={heroMuted}
+          loop
+          showControls
+          contentFit="cover"
+        />
+      ) : (
+        <PlaceCoverFallback className="h-full w-full" logoSize={72} />
+      )}
 
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.88)']}
@@ -131,22 +139,26 @@ export default function PlaceDetailHero({
             ) : null}
           </View>
 
-          <TouchableOpacity
-            onPress={onOpenPublications}
-            className="relative rounded-full bg-black/45 p-3 shadow-lg"
-            style={{ transform: [{ translateY: 8 }] }}
-            accessibilityRole="button"
-            accessibilityLabel={publicationsCtaLabel}
-          >
-            <Ionicons name="apps-outline" size={22} color="#fff" />
-            {publicationsLoaded && publicationsCount > 0 ? (
-              <View className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 py-0.5">
-                <Text className="text-center text-[10px] font-bold text-white">
-                  {publicationsCount > 99 ? '99+' : String(publicationsCount)}
-                </Text>
-              </View>
-            ) : null}
-          </TouchableOpacity>
+          {/* Bouton "Publications" du lieu masque temporairement (reseau social en veille).
+              Pour le reactiver : retirer le `false &&`. */}
+          {false && (
+            <TouchableOpacity
+              onPress={onOpenPublications}
+              className="relative rounded-full bg-black/45 p-3 shadow-lg"
+              style={{ transform: [{ translateY: 8 }] }}
+              accessibilityRole="button"
+              accessibilityLabel={publicationsCtaLabel}
+            >
+              <Ionicons name="apps-outline" size={22} color="#fff" />
+              {publicationsLoaded && publicationsCount > 0 ? (
+                <View className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 py-0.5">
+                  <Text className="text-center text-[10px] font-bold text-white">
+                    {publicationsCount > 99 ? '99+' : String(publicationsCount)}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>

@@ -52,6 +52,10 @@ export default function MessagesScreen() {
   const directListRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  // Suivi du premier chargement par sous-onglet : evite de tout recharger
+  // (spinner plein ecran) a chaque bascule Sorties <-> Prive.
+  const outingsLoadedRef = useRef(false);
+  const directLoadedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [directLoading, setDirectLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -294,10 +298,23 @@ export default function MessagesScreen() {
       let isActive = true;
       let attachedSocket: Socket | null = null;
 
+      // Premier passage sur l'onglet : chargement complet (avec spinner).
+      // Passages suivants : rafraichissement silencieux, sans vider la liste
+      // ni spinner plein ecran -> bascule instantanee.
       if (tab === 'outings') {
-        void loadChats();
+        if (outingsLoadedRef.current) {
+          void loadChats({ silent: true });
+        } else {
+          outingsLoadedRef.current = true;
+          void loadChats();
+        }
       } else {
-        void loadDirectChats();
+        if (directLoadedRef.current) {
+          void loadDirectChats({ silent: true });
+        } else {
+          directLoadedRef.current = true;
+          void loadDirectChats();
+        }
       }
 
       const scheduleDirectRefresh = () => {
@@ -470,7 +487,6 @@ export default function MessagesScreen() {
       <View className="flex-1 bg-gray-50 pt-16 dark:bg-black">
         <ScreenHeader
           title={t('messagesTitle')}
-          onBack={() => router.back()}
           containerClassName="px-5 pb-4"
         />
 
@@ -503,7 +519,6 @@ export default function MessagesScreen() {
       <ScreenHeader
         title={t('messagesTitle')}
         subtitle={headerSubtitle}
-        onBack={() => router.back()}
         containerClassName="px-5 pb-4"
         rightSlot={
           <View className="flex-row items-center">
@@ -548,6 +563,7 @@ export default function MessagesScreen() {
           filterOptions={outingFilterOptions}
           activeFilter={filter}
           onFilterChange={setFilter}
+          onCreateOuting={() => router.push('/outing')}
         />
       ) : (
         <MessagesDirectChatsList
@@ -560,6 +576,7 @@ export default function MessagesScreen() {
             router.push({ pathname: '/direct-chat/[id]', params: { id } })
           }
           onOpenConnectionPicker={() => void openConnectionPicker()}
+          onFindFriends={() => router.push('/search')}
         />
       )}
 

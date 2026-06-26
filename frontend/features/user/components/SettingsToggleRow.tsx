@@ -38,7 +38,7 @@ export default function SettingsToggleRow({
           value={value}
           onValueChange={onValueChange}
           disabled={disabled}
-          trackColor={{ false: '#d1d5db', true: '#4c669f' }}
+          trackColor={{ false: '#d1d5db', true: '#ff4757' }}
           thumbColor="#ffffff"
         />
       }

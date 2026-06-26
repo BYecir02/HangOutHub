@@ -59,7 +59,6 @@ type PlaceDetailContentProps = {
   onOpenCreateModal: () => void;
   canClaimPlace: boolean;
   onOpenClaimPlace: () => void;
-  onReportPlace: () => void;
   onContactPlace: () => void;
   onOpenGallery: (index: number) => void;
   onOpenReviewModal: () => void;
@@ -80,7 +79,6 @@ export default function PlaceDetailContent({
   onOpenCreateModal,
   canClaimPlace,
   onOpenClaimPlace,
-  onReportPlace,
   onContactPlace,
   onOpenGallery,
   onOpenReviewModal,
@@ -122,26 +120,15 @@ export default function PlaceDetailContent({
           />
         </View>
 
-      <View className="mt-4 flex-row flex-wrap gap-2">
-        <TouchableOpacity
-          onPress={onOpenCreateModal}
-          className="flex-1 min-w-[140px] flex-row items-center justify-center rounded-full bg-[#4c669f] px-3 py-3"
-        >
-            <Ionicons name="add" size={13} color="#fff" />
-            <Text className="ml-1.5 text-xs font-semibold text-white">
-              {t('placeDetailCreateCta')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onReportPlace}
-            className="flex-1 min-w-[120px] flex-row items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900/30 dark:bg-rose-900/20"
-          >
-            <Ionicons name="flag-outline" size={13} color="#e11d48" />
-          <Text className="ml-1.5 text-xs font-semibold text-rose-600">
-            {t('reportAction')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        onPress={onOpenCreateModal}
+        className="mt-4 flex-row items-center justify-center rounded-full bg-[#ff4757] py-3.5"
+      >
+        <Ionicons name="add" size={16} color="#fff" />
+        <Text className="ml-2 text-sm font-semibold text-white">
+          {t('placeDetailCreateCta')}
+        </Text>
+      </TouchableOpacity>
 
       {!place.Owner?.id && canClaimPlace ? (
         <View className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/20">

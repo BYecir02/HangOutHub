@@ -30,9 +30,11 @@ export default function Header({
   const isDark = colorScheme === 'dark';
   const safeCount = Number.isFinite(notificationCount) ? notificationCount : 0;
   const badgeLabel = safeCount > 99 ? '99+' : String(safeCount);
+  const hasNotificationAction = typeof onNotificationPress === 'function';
   const hasSearchAction = typeof onSearchPress === 'function';
   const hasFilterAction = typeof onFilterPress === 'function';
-  const actionCount = 1 + Number(hasSearchAction) + Number(hasFilterAction);
+  const actionCount =
+    Number(hasNotificationAction) + Number(hasSearchAction) + Number(hasFilterAction);
   const actionWidthClass =
     actionCount >= 3 ? 'w-28' : actionCount === 2 ? 'w-20' : 'w-10';
 
@@ -108,19 +110,21 @@ export default function Header({
           </TouchableOpacity>
         ) : null}
 
-        <TouchableOpacity
-          onPress={onNotificationPress}
-          className="h-10 w-10 justify-center items-center"
-        >
-          <Ionicons name="notifications-outline" size={24} color={iconColor} />
-          {safeCount > 0 ? (
-            <View className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 items-center justify-center border-2 border-white dark:border-black">
-              <Text className="text-[10px] font-bold text-white">
-                {badgeLabel}
-              </Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
+        {hasNotificationAction ? (
+          <TouchableOpacity
+            onPress={onNotificationPress}
+            className="h-10 w-10 justify-center items-center"
+          >
+            <Ionicons name="notifications-outline" size={24} color={iconColor} />
+            {safeCount > 0 ? (
+              <View className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 items-center justify-center border-2 border-white dark:border-black">
+                <Text className="text-[10px] font-bold text-white">
+                  {badgeLabel}
+                </Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );

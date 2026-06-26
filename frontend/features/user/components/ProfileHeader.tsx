@@ -105,7 +105,7 @@ export default function ProfileHeader({
             <TouchableOpacity activeOpacity={0.9} onPress={() => onImagePress(avatarUrl)}>
               <Image source={{ uri: avatarUrl }} className="h-24 w-24 rounded-full" resizeMode="cover" />
             </TouchableOpacity>
-            <TouchableOpacity className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-blue-500 p-1.5 dark:border-black">
+            <TouchableOpacity className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-[#ff4757] p-1.5 dark:border-black">
               <Ionicons name="camera" size={14} color="white" />
             </TouchableOpacity>
           </View>
@@ -186,7 +186,7 @@ export default function ProfileHeader({
 
         {!canAccessProPanel && canActivateProPanel ? (
           <TouchableOpacity
-            className="mt-3 items-center rounded-lg border border-[#4c669f]/35 bg-[#4c669f]/10 py-2.5 active:opacity-90 dark:border-[#4c669f]/50 dark:bg-[#4c669f]/20"
+            className="mt-3 items-center rounded-lg border border-[#ff4757]/35 bg-[#ff4757]/10 py-2.5 active:opacity-90 dark:border-[#ff4757]/50 dark:bg-[#ff4757]/20"
             onPress={() => {
               if (onActivateProPanel) {
                 onActivateProPanel();
@@ -195,7 +195,7 @@ export default function ProfileHeader({
               router.push('/activate-pro');
             }}
           >
-            <Text className="text-sm font-bold text-[#4c669f]">
+            <Text className="text-sm font-bold text-[#ff4757]">
               {t('profileActivateProPanel')}
             </Text>
           </TouchableOpacity>

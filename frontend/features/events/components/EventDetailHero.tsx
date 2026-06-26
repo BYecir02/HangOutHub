@@ -149,21 +149,25 @@ export default function EventDetailHero({
             ) : null}
           </View>
 
-          <TouchableOpacity
-            onPress={onOpenPublications}
-            className="relative rounded-full bg-black/45 p-3 shadow-lg"
-            accessibilityRole="button"
-            accessibilityLabel={publicationsCtaLabel}
-          >
-            <Ionicons name="apps-outline" size={22} color="#fff" />
-            {publicationsLoaded && publicationsCount > 0 ? (
-              <View className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 py-0.5">
-                <Text className="text-center text-[10px] font-bold text-white">
-                  {publicationsCount > 99 ? '99+' : String(publicationsCount)}
-                </Text>
-              </View>
-            ) : null}
-          </TouchableOpacity>
+          {/* Bouton "Publications" de l'evenement masque (reseau social en veille).
+              Pour le reactiver : retirer le `false &&`. */}
+          {false && (
+            <TouchableOpacity
+              onPress={onOpenPublications}
+              className="relative rounded-full bg-black/45 p-3 shadow-lg"
+              accessibilityRole="button"
+              accessibilityLabel={publicationsCtaLabel}
+            >
+              <Ionicons name="apps-outline" size={22} color="#fff" />
+              {publicationsLoaded && publicationsCount > 0 ? (
+                <View className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 py-0.5">
+                  <Text className="text-center text-[10px] font-bold text-white">
+                    {publicationsCount > 99 ? '99+' : String(publicationsCount)}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>

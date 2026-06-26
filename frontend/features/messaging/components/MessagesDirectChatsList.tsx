@@ -2,13 +2,13 @@ import React from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  RefreshControl,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 
 import DirectConversationCard from '@/features/messaging/components/DirectConversationCard';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import type { DirectChatSummary } from '@/services/messaging/direct-chats';
 
@@ -20,6 +20,7 @@ interface MessagesDirectChatsListProps {
   loadingMore: boolean;
   onPressItem: (id: string) => void;
   onOpenConnectionPicker: () => void;
+  onFindFriends?: () => void;
 }
 
 export default function MessagesDirectChatsList({
@@ -30,20 +31,21 @@ export default function MessagesDirectChatsList({
   loadingMore,
   onPressItem,
   onOpenConnectionPicker,
+  onFindFriends,
 }: MessagesDirectChatsListProps) {
   const { t } = useI18n();
 
   return (
-    <FlatList
+    <View className="flex-1">
+      <FlatList
       data={data}
       keyExtractor={(item) => item.id}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#4c669f"
-        />
-      }
+      alwaysBounceVertical
+      onScrollEndDrag={(event) => {
+        if (!refreshing && event.nativeEvent.contentOffset.y <= -80) {
+          onRefresh();
+        }
+      }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.3}
@@ -70,6 +72,13 @@ export default function MessagesDirectChatsList({
               {t('messagesDirectPickerOpenAction')}
             </Text>
           </TouchableOpacity>
+          {onFindFriends ? (
+            <TouchableOpacity onPress={onFindFriends} className="mt-3 px-4 py-2">
+              <Text className="text-sm font-semibold text-[#4c669f]">
+                {t('messagesFindFriendsAction')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       }
       renderItem={({ item }) => (
@@ -78,6 +87,18 @@ export default function MessagesDirectChatsList({
           onPress={() => onPressItem(item.id)}
         />
       )}
-    />
+      />
+
+      {refreshing ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 top-2 z-10 items-center"
+        >
+          <View className="rounded-full bg-white/85 p-2.5 dark:bg-gray-900/85">
+            <LogoSpinner size={24} />
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 }

@@ -74,7 +74,11 @@ export class PlacesController {
     @UploadedFiles()
     files: { cover?: Express.Multer.File[]; gallery?: Express.Multer.File[] },
   ) {
-    return this.placesService.create(createPlaceDto, files, req.user.userId);
+    // Un lieu créé par un ADMIN reste "non revendiqué" (ownerId = null) pour
+    // qu'un vrai gérant puisse le revendiquer ensuite.
+    const ownerId =
+      (req.user.role || '').toUpperCase() === 'ADMIN' ? null : req.user.userId;
+    return this.placesService.create(createPlaceDto, files, ownerId);
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -6,11 +6,13 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
+import { useNotificationsBadge } from '@/shared/hooks/use-notifications-badge';
 
 export default function TabLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { count: unreadNotifications } = useNotificationsBadge();
   const activeTint = isDark ? '#d6ddff' : '#4c669f';
   const inactiveTint = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)';
   const addButtonBg = isDark ? '#ff5c7a' : '#ff4757';
@@ -67,21 +69,6 @@ export default function TabLayout() {
               style={[StyleSheet.absoluteFill, { height: '55%' }]}
             />
 
-            {/* 4. Ligne "bord de verre" en haut */}
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 1,
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.25)'
-                  : 'rgba(255,255,255,0.90)',
-              }}
-            />
-
             {/* 5. Micro-bordure basse (effet "épaisseur") */}
             <View
               pointerEvents="none"
@@ -128,15 +115,26 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 2. CARTE */}
+      {/* 2. MESSAGES */}
       <Tabs.Screen
-        name="map"
+        name="messages"
         options={{
-          title: 'Carte',
+          title: 'Messages',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'map' : 'map-outline'} size={24} color={color} />
+            <Ionicons
+              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+              size={24}
+              color={color}
+            />
           ),
         }}
+      />
+
+      {/* 2. CARTE — masquée temporairement (on la réactivera plus tard).
+          La route reste accessible, seul l'onglet est retiré de la barre. */}
+      <Tabs.Screen
+        name="map"
+        options={{ href: null }}
       />
 
       {/* 3. BOUTON CENTRAL : AJOUTER */}
@@ -173,13 +171,32 @@ export default function TabLayout() {
         })}
       />
 
-      {/* 4. SOCIAL */}
+      {/* 4. SOCIAL — masqué temporairement (réseau social mis en veille,
+          on le réactivera quand les autres features seront finies).
+          La route reste accessible, seul l'onglet est retiré de la barre. */}
       <Tabs.Screen
         name="social"
+        options={{ href: null }}
+      />
+
+      {/* 4. NOTIFICATIONS */}
+      <Tabs.Screen
+        name="notifications"
         options={{
-          title: 'Social',
+          title: 'Notifs',
+          tabBarBadge:
+            unreadNotifications > 0
+              ? unreadNotifications > 99
+                ? '99+'
+                : unreadNotifications
+              : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#ff4757' },
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={24} color={color} />
+            <Ionicons
+              name={focused ? 'notifications' : 'notifications-outline'}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />

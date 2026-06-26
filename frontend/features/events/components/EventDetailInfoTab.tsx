@@ -37,7 +37,7 @@ export default function EventDetailInfoTab({
 
   return (
     <View className="pt-5">
-      <View className="mt-5 flex-row items-start">
+      <View className="mt-5 flex-row items-center">
         <Ionicons name="calendar-outline" size={20} color="#ff4757" />
         <View className="ml-3 flex-1">
           <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -52,7 +52,7 @@ export default function EventDetailInfoTab({
         </View>
       </View>
 
-      <View className="mt-5 flex-row items-start">
+      <View className="mt-5 flex-row items-center">
         <Ionicons name="location-outline" size={20} color="#ff4757" />
         <View className="ml-3 flex-1">
           <View className="flex-row items-start justify-between gap-3">
@@ -82,8 +82,8 @@ export default function EventDetailInfoTab({
         </View>
       </View>
 
-      <View className="mt-5 flex-row items-start">
-        <Ionicons name="person-outline" size={20} color="#f39c12" />
+      <View className="mt-5 flex-row items-center">
+        <Ionicons name="person-outline" size={20} color="#ff4757" />
         <View className="ml-3 flex-1">
           <View className="flex-row items-start justify-between gap-3">
             <View className="flex-1">
@@ -96,7 +96,7 @@ export default function EventDetailInfoTab({
                   t('eventDetailUnknownOrganizer')}
               </Text>
             </View>
-            {event.User?.id ? (
+            {/* event.User?.id ? (
               <TouchableOpacity
                 onPress={onContactOrganizer}
                 className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 dark:border-blue-900/40 dark:bg-blue-900/25"
@@ -105,7 +105,7 @@ export default function EventDetailInfoTab({
                   {t('directChatContactOrganizer')}
                 </Text>
               </TouchableOpacity>
-            ) : null}
+            ) : null */}
           </View>
         </View>
       </View>

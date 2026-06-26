@@ -329,6 +329,7 @@ model Place {
   phone        String?        @db.VarChar(30)
   whatsapp     String?        @db.VarChar(30)
   openingHours String?        @db.VarChar(255)
+  openingHoursStructured Json? // Horaires structurés par jour (mon..sun) : { mon: [{ open, close }], ... }. [] ou absent = fermé.
   latitude     Float
   longitude    Float
   priceLevel   Int?           @default(1)

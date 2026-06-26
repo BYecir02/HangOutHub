@@ -50,7 +50,7 @@ export default function HelpSupportScreen() {
           </Text>
           <TouchableOpacity
             onPress={() => void openSupportEmail()}
-            className="flex-row items-center rounded-xl bg-[#4c669f] px-4 py-3"
+            className="flex-row items-center rounded-xl bg-[#ff4757] px-4 py-3"
           >
             <Ionicons name="mail-outline" size={20} color="#fff" />
             <Text className="ml-2 font-semibold text-white">support@hangouthub.app</Text>

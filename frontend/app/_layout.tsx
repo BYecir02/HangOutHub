@@ -8,18 +8,18 @@ import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ActivityIndicator, Image, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import type { TextInputProps, TextProps } from 'react-native';
 
 import { useFonts } from 'expo-font';
+
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 
 const poppinsFonts = {
   Poppins_400Regular: require('../assets/fonts/Poppins_400Regular.ttf'),
   Poppins_500Medium: require('../assets/fonts/Poppins_500Medium.ttf'),
   Poppins_600SemiBold: require('../assets/fonts/Poppins_600SemiBold.ttf'),
 };
-
-const BOOTSTRAP_LOGO = require('../assets/images/hangouthub-logo-mark-512.png');
 
 import '../global.css';
 
@@ -73,11 +73,9 @@ function AppBootstrapScreen({ isDark }: { isDark: boolean }) {
               : 'border-slate-200 bg-white'
           }`}
         >
-          <Image
-            source={BOOTSTRAP_LOGO}
-            style={{ width: 112, height: 112 }}
-            resizeMode="contain"
-          />
+          {/* Le logo de l'app tourne lui-meme pendant la verification de session
+              (remplace l'ancien ActivityIndicator natif). */}
+          <LogoSpinner size={96} durationMs={1100} />
         </View>
 
         <Text
@@ -88,11 +86,6 @@ function AppBootstrapScreen({ isDark }: { isDark: boolean }) {
           HangOutHub
         </Text>
 
-        <ActivityIndicator
-          size="large"
-          color="#4c669f"
-          className="mt-6"
-        />
         <Text
           className={`mt-3 text-center text-sm ${
             isDark ? 'text-slate-400' : 'text-slate-500'
@@ -387,14 +380,12 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen name="search" options={{ headerShown: false }} />
-            <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="friend-requests" options={{ headerShown: false }} />
             <Stack.Screen
               name="outing-invitations"
               options={{ headerShown: false }}
             />
             <Stack.Screen name="connections" options={{ headerShown: false }} />
-            <Stack.Screen name="messages" options={{ headerShown: false }} />
             <Stack.Screen
               name="outing-chat/[id]"
               options={{ headerShown: false }}

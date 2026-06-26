@@ -95,9 +95,13 @@ export default function ProfileStats({
         <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
           <StatItem label={t('profileStatsOutings')} value={outingsCount} />
         </View>
-        <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
-          <StatItem label={t('profileStatsPosts')} value={postsCount} />
-        </View>
+        {/* Compteur "Posts" masque (reseau social en veille).
+            Pour le reactiver : retirer le `false &&`. */}
+        {false && (
+          <View className="flex-1 border-l border-gray-100 dark:border-gray-800">
+            <StatItem label={t('profileStatsPosts')} value={postsCount} />
+          </View>
+        )}
       </View>
     </View>
   );

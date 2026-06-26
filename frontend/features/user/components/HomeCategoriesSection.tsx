@@ -40,7 +40,7 @@ export default function HomeCategoriesSection({
           {title}
         </Text>
         <TouchableOpacity onPress={onSeeAll}>
-          <Text className="text-xs font-medium text-[#4c669f]">{seeAllLabel}</Text>
+          <Text className="text-xs font-medium text-[#ff4757]">{seeAllLabel}</Text>
         </TouchableOpacity>
       </View>
 

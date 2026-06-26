@@ -2,7 +2,6 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import Badge from '@/shared/ui/primitives/Badge';
-import Divider from '@/shared/ui/primitives/Divider';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import Avatar from '@/shared/ui/primitives/Avatar';
 import { getImageUrl } from '@/services/api';
@@ -94,10 +93,8 @@ export default function DirectConversationCard({
             </View>
           </View>
 
-          <Divider className="my-3" color="#e5e7eb" />
-
           <Text
-            className="mt-2 text-sm text-gray-600 dark:text-gray-300"
+            className="mt-1 text-sm text-gray-600 dark:text-gray-300"
             numberOfLines={2}
           >
             {cleanedLastMessageText}

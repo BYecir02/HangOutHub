@@ -23,6 +23,8 @@ export { default as LocationFilterSheet } from './LocationFilterSheet';
 export * from './LocationFilterSheet';
 export { default as LocationScopeBar } from './LocationScopeBar';
 export * from './LocationScopeBar';
+export { default as LogoSpinner } from './LogoSpinner';
+export * from './LogoSpinner';
 export { default as MasonryGrid } from './MasonryGrid';
 export * from './MasonryGrid';
 export { default as MediaFrame } from './MediaFrame';

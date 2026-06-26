@@ -155,7 +155,7 @@ export default function EditProfileScreen() {
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
+        <ActivityIndicator size="large" color="#ff4757" />
       </View>
     );
   }
@@ -185,9 +185,9 @@ export default function EditProfileScreen() {
         </Text>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
-            <ActivityIndicator size="small" color="#4c669f" />
+            <ActivityIndicator size="small" color="#ff4757" />
           ) : (
-            <Text className="text-[#4c669f] font-bold text-lg">
+            <Text className="text-[#ff4757] font-bold text-lg">
               {t('editProfileSave')}
             </Text>
           )}

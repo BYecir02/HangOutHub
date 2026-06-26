@@ -115,6 +115,7 @@ export default function CreatePlaceScreen() {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [sameWhatsapp, setSameWhatsapp] = useState(false);
   const [weeklySchedule, setWeeklySchedule] = useState<Record<DayKey, DaySchedule>>(
     createInitialWeeklySchedule,
   );
@@ -518,7 +519,8 @@ export default function CreatePlaceScreen() {
     try {
       const normalizedCategory = selectedCategory.trim();
       const normalizedPhone = phone.trim();
-      const normalizedWhatsapp = whatsapp.trim();
+      // Si "même numéro" est coché, le WhatsApp reprend le téléphone.
+      const normalizedWhatsapp = sameWhatsapp ? normalizedPhone : whatsapp.trim();
       const normalizedAddress = address.trim()
         || [selectedCity?.name, selectedCountry]
           .filter(Boolean)
@@ -910,17 +912,37 @@ export default function CreatePlaceScreen() {
             placeholder={t('createPlacePhonePlaceholder')}
           />
 
-          <FormTextField
-            containerClassName="mt-4"
-            label={t('createPlaceWhatsappLabel')}
-            value={whatsapp}
-            onChangeText={(value) => {
-              setWhatsapp(value);
+          <TouchableOpacity
+            onPress={() => {
+              setSameWhatsapp((prev) => !prev);
               setSubmitError(null);
             }}
-            keyboardType="phone-pad"
-            placeholder={t('createPlaceWhatsappPlaceholder')}
-          />
+            activeOpacity={0.7}
+            className="mt-4 flex-row items-center"
+          >
+            <Ionicons
+              name={sameWhatsapp ? 'checkbox' : 'square-outline'}
+              size={22}
+              color={sameWhatsapp ? '#4c669f' : '#9ca3af'}
+            />
+            <Text className="ml-2 flex-1 text-sm text-gray-600 dark:text-gray-300">
+              {t('createPlaceWhatsappSameAsPhone')}
+            </Text>
+          </TouchableOpacity>
+
+          {!sameWhatsapp ? (
+            <FormTextField
+              containerClassName="mt-4"
+              label={t('createPlaceWhatsappLabel')}
+              value={whatsapp}
+              onChangeText={(value) => {
+                setWhatsapp(value);
+                setSubmitError(null);
+              }}
+              keyboardType="phone-pad"
+              placeholder={t('createPlaceWhatsappPlaceholder')}
+            />
+          ) : null}
             </>
           ) : null}
 
@@ -1164,7 +1186,7 @@ export default function CreatePlaceScreen() {
                   ].join(' • ')}
                 </Text>
                 <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  {phone.trim() || '-'} | {whatsapp.trim() || '-'}
+                  {phone.trim() || '-'} | {(sameWhatsapp ? phone.trim() : whatsapp.trim()) || '-'}
                 </Text>
                 <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   {selectedTagIds.length > 0

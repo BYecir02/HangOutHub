@@ -120,7 +120,7 @@ export default function EventInspirationCard({
           </Text>
 
           <View className="mt-2 flex-row items-center">
-            <Ionicons name="location-outline" size={13} color={isDark ? '#93a8d0' : '#4c669f'} />
+            <Ionicons name="location-outline" size={13} color={isDark ? '#ff7a45' : '#ff4757'} />
             <Text
               className="ml-1.5 flex-1 text-sm text-gray-600 dark:text-gray-300"
               numberOfLines={1}

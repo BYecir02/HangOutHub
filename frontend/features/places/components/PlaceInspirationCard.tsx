@@ -8,7 +8,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import MediaFrame from '@/shared/ui/MediaFrame';
 import PlaceCoverFallback from '@/features/places/components/PlaceCoverFallback';
 import { getImageUrl } from '@/services/api';
@@ -55,6 +57,7 @@ export default function PlaceInspirationCard({
   shouldPlay = false,
   adaptiveHeight = true,
 }: PlaceInspirationCardProps) {
+  const isDark = useColorScheme() === 'dark';
   const cityLabel = place.City?.name || '';
   const ratingLabel =
     typeof place.avgRating === 'number' && place.avgRating > 0
@@ -89,7 +92,7 @@ export default function PlaceInspirationCard({
             adaptiveHeight={adaptiveHeight}
             minHeight={imageHeight}
             maxHeight={380}
-            style={{ height: imageHeight }}
+            style={adaptiveHeight ? undefined : { height: imageHeight }}
           />
         ) : (
           <PlaceCoverFallback
@@ -118,12 +121,12 @@ export default function PlaceInspirationCard({
             }`}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={isSaved ? '#2ecc71' : '#4c669f'} />
+              <ActivityIndicator size="small" color={isSaved ? '#2ecc71' : '#ff4757'} />
             ) : (
               <Ionicons
                 name={isSaved ? 'bookmark' : 'bookmark-outline'}
                 size={18}
-                color={isSaved ? '#2ecc71' : '#4c669f'}
+                color={isSaved ? '#2ecc71' : '#ff4757'}
               />
             )}
           </TouchableOpacity>
@@ -140,10 +143,32 @@ export default function PlaceInspirationCard({
         </View>
       </View>
 
-      <View className="p-4">
-        <Text className="text-base font-bold text-gray-900 dark:text-white" numberOfLines={2}>
-          {place.name}
-        </Text>
+      <View className="overflow-hidden rounded-b-[22px]">
+        <BlurView
+          intensity={isDark ? 28 : 36}
+          tint={isDark ? 'dark' : 'light'}
+          className="px-4 py-4"
+        >
+          <Text className="text-base font-bold text-gray-900 dark:text-white" numberOfLines={2}>
+            {place.name}
+          </Text>
+
+          {cityLabel ? (
+            <View className="mt-2 flex-row items-center">
+              <Ionicons name="location-outline" size={13} color={isDark ? '#ff7a45' : '#ff4757'} />
+              <Text
+                className="ml-1.5 flex-1 text-sm text-gray-600 dark:text-gray-300"
+                numberOfLines={1}
+              >
+                {place.address || cityLabel}
+              </Text>
+            </View>
+          ) : null}
+        </BlurView>
+        <View
+          pointerEvents="none"
+          className={isDark ? 'absolute inset-0 bg-black/30' : 'absolute inset-0 bg-white/30'}
+        />
       </View>
     </TouchableOpacity>
   );

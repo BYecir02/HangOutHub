@@ -12,8 +12,6 @@ import { resolveStoredUserSession } from '@/services/auth/user-session';
 import { getOrCreateDirectChat } from '@/services/messaging/direct-chats';
 import { isVideoUrl } from '@/services/shared/media';
 
-const PLACE_PLACEHOLDER =
-  'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1200';
 
 export type PlaceDetailTab = 'info' | 'events' | 'reviews';
 
@@ -90,8 +88,11 @@ export function usePlaceDetail(placeId?: string) {
   const placePublicationsLoadingRef = useRef(false);
   const publicationsPanelProgress = useSharedValue(0);
 
-  const heroImage = getImageUrl(place?.coverUrl) || PLACE_PLACEHOLDER;
-  const heroIsVideo = isVideoUrl(heroImage);
+  // Pas de cover officielle -> on n'invente pas une image stock : le hero
+  // affichera le placeholder brandé (logo). hasCover pilote ce choix.
+  const heroImage = getImageUrl(place?.coverUrl) || '';
+  const hasCover = Boolean(heroImage);
+  const heroIsVideo = hasCover && isVideoUrl(heroImage);
   const publicationsCount = placePublications.length;
   const myReview = currentUserId
     ? reviews.find((review) => review.User?.id === currentUserId)
@@ -102,8 +103,10 @@ export function usePlaceDetail(placeId?: string) {
     .filter(Boolean);
   const gallery =
     place?.images?.length && place.images.length > 0
-      ? place.images.map((image) => getImageUrl(image) || PLACE_PLACEHOLDER)
-      : [heroImage];
+      ? place.images
+          .map((image) => getImageUrl(image))
+          .filter((url): url is string => Boolean(url))
+      : [];
 
   const placePublicationsVisibility = useVisibleItemAutoplay(
     placePublications,
@@ -500,6 +503,7 @@ export function usePlaceDetail(placeId?: string) {
     heroMuted,
     toggleHeroMuted,
     heroImage,
+    hasCover,
     heroIsVideo,
     publicationsOpen,
     placePublications,

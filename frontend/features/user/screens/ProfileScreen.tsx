@@ -277,7 +277,9 @@ export default function ProfileScreen() {
     : [
         { id: 'outings', label: t('profileTabOutings') },
         { id: 'saved', label: t('profileTabSaved') },
-        { id: 'posts', label: t('profileTabPosts') },
+        // Onglet "Publications" masqué temporairement (réseau social en veille).
+        // Pour le réactiver : décommenter la ligne ci-dessous.
+        // { id: 'posts', label: t('profileTabPosts') },
       ];
 
   const handleDeletePost = async (postId: string) => {
@@ -426,6 +428,7 @@ export default function ProfileScreen() {
       onScroll={activeVisibleAutoplay ? activeVisibleAutoplay.onScroll : undefined}
       scrollEventThrottle={16}
       onLayout={activeVisibleAutoplay ? activeVisibleAutoplay.onLayout : undefined}
+      contentContainerStyle={{ paddingBottom: 120 }}
     >
       <ProfileHeader
         user={displayUser}
@@ -475,8 +478,8 @@ export default function ProfileScreen() {
         <View className="mt-4 px-5">
           <View className="rounded-3xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <View className="flex-row items-start">
-              <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-[#4c669f]/12">
-                <Ionicons name="shield-checkmark-outline" size={18} color="#4c669f" />
+              <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-[#ff4757]/12">
+                <Ionicons name="shield-checkmark-outline" size={18} color="#ff4757" />
               </View>
               <View className="flex-1">
                 <Text className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -487,7 +490,7 @@ export default function ProfileScreen() {
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push('/admin/place-claims')}
-                  className="mt-4 self-start rounded-full bg-[#4c669f] px-4 py-2.5"
+                  className="mt-4 self-start rounded-full bg-[#ff4757] px-4 py-2.5"
                 >
                   <Text className="text-xs font-semibold text-white">
                     {t('profileAdminClaimsAction')}
@@ -521,7 +524,7 @@ export default function ProfileScreen() {
                       key={option.key}
                       onPress={() => setOutingFilter(option.key as typeof outingFilter)}
                       className={`flex-1 items-center rounded-full px-3 py-2 ${
-                        active ? 'bg-[#4c669f]' : 'bg-transparent'
+                        active ? 'bg-[#ff4757]' : 'bg-transparent'
                       }`}
                     >
                       <Text
@@ -571,7 +574,7 @@ export default function ProfileScreen() {
 
                   <TouchableOpacity
                     onPress={() => router.push('/outing')}
-                    className="mt-4 items-center rounded-full bg-[#4c669f] px-5 py-3"
+                    className="mt-4 items-center rounded-full bg-[#ff4757] px-5 py-3"
                   >
                     <Text className="font-semibold text-white">
                       {t('profileCreateOutingCta')}
@@ -581,7 +584,7 @@ export default function ProfileScreen() {
               ) : (
                 <EmptyPanel
                   icon="calendar-outline"
-                  color="#4c669f"
+                  color="#ff4757"
                   title={t('profileEmptyOutingsTitle')}
                   description={t('profileEmptyOutingsDescription')}
                   actionLabel={t('profileOrganizeOutingCta')}
