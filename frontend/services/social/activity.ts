@@ -39,6 +39,24 @@ export async function getEventFriendsAttending(eventId: string): Promise<FriendA
   }
 }
 
+export interface EventAttendeesPreview {
+  count: number;
+  attendees: FriendAttendee[];
+}
+
+export async function getEventAttendeesPreview(
+  eventId: string,
+): Promise<EventAttendeesPreview> {
+  try {
+    const res = await api.get<EventAttendeesPreview>(
+      `/events/${eventId}/attendees-preview`,
+    );
+    return { count: res.data.count ?? 0, attendees: res.data.attendees ?? [] };
+  } catch {
+    return { count: 0, attendees: [] };
+  }
+}
+
 export async function getPlaceFriendsAttending(placeId: string): Promise<FriendAttendee[]> {
   try {
     const res = await api.get<{ friends: FriendAttendee[] }>(`/places/${placeId}/friends-attending`);

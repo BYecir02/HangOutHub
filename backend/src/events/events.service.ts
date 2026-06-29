@@ -1152,6 +1152,10 @@ export class EventsService {
         id: string;
         name: string;
       } | null;
+      City?: {
+        name: string;
+      } | null;
+      address?: string | null;
     } | null;
     TicketType: {
       id: string;
@@ -1174,6 +1178,8 @@ export class EventsService {
             coverUrl: booking.Event.coverUrl,
             organizerId: booking.Event.organizerId,
             place: booking.Event.Place,
+            city: booking.Event.City ?? null,
+            address: booking.Event.address ?? null,
           }
         : null,
       ticketType: booking.TicketType
@@ -2737,9 +2743,15 @@ export class EventsService {
             endTime: true,
             coverUrl: true,
             organizerId: true,
+            address: true,
             Place: {
               select: {
                 id: true,
+                name: true,
+              },
+            },
+            City: {
+              select: {
                 name: true,
               },
             },
@@ -3025,6 +3037,33 @@ export class EventsService {
     }
 
     return { friends };
+  }
+
+  /** Aperçu des participants : nombre total (users distincts, résa non annulée)
+   *  + un échantillon d'avatars pour la preuve sociale sous le titre. */
+  async getAttendeesPreview(eventId: string, limit = 5) {
+    const distinct = await this.prisma.booking.findMany({
+      where: {
+        eventId,
+        status: { not: 'CANCELLED' },
+      },
+      distinct: ['userId'],
+      select: {
+        User: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    return {
+      count: distinct.length,
+      attendees: distinct.slice(0, limit).map((b) => b.User),
+    };
   }
 
   async getAttendance(userId: string, eventId: string) {

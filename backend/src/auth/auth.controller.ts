@@ -22,6 +22,7 @@ import { RequestEmailVerificationDto } from './dto/request-email-verification.dt
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterOrganizerDto } from './dto/register-organizer.dto';
 import { ResetPasswordOtpDto } from './dto/reset-password-otp.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { VerifyPasswordResetDto } from './dto/verify-password-reset.dto';
 import { VerifyEmailOtpDto } from './dto/verify-email-otp.dto';
 
@@ -99,6 +100,21 @@ export class AuthController {
     @Request() req: LogoutRequest & { user: { userId: string } },
   ) {
     return this.authService.resendEmailVerification(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Throttle({ global: { ttl: 900_000, limit: 10 } })
+  @Post('change-password')
+  @HttpCode(200)
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @Request() req: LogoutRequest & { user: { userId: string } },
+  ) {
+    return this.authService.changePassword(
+      req.user.userId,
+      dto.currentPassword,
+      dto.password,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))

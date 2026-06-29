@@ -13,7 +13,7 @@ import type { TextInputProps, TextProps } from 'react-native';
 
 import { useFonts } from 'expo-font';
 
-import LogoSpinner from '@/shared/ui/LogoSpinner';
+import LogoLoader from '@/shared/ui/LogoLoader';
 
 const poppinsFonts = {
   Poppins_400Regular: require('../assets/fonts/Poppins_400Regular.ttf'),
@@ -73,9 +73,9 @@ function AppBootstrapScreen({ isDark }: { isDark: boolean }) {
               : 'border-slate-200 bg-white'
           }`}
         >
-          {/* Le logo de l'app tourne lui-meme pendant la verification de session
-              (remplace l'ancien ActivityIndicator natif). */}
-          <LogoSpinner size={96} durationMs={1100} />
+          {/* Loader de marque : le logo complet avec un reflet qui balaie,
+              pendant la verification de session. */}
+          <LogoLoader size={104} />
         </View>
 
         <Text
@@ -352,6 +352,10 @@ export default function RootLayout() {
             <Stack.Screen
               name="outing"
               options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
+            <Stack.Screen
+              name="new-conversation"
+              options={{ headerShown: false, presentation: 'transparentModal', animation: 'slide_from_bottom' }}
             />
             <Stack.Screen name="outing/[id]" options={{ headerShown: false }} />
             <Stack.Screen

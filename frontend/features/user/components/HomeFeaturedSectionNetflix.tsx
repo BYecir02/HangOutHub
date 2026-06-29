@@ -14,6 +14,7 @@ import MediaFrame from '@/shared/ui/MediaFrame';
 import { getImageUrl } from '@/services/api';
 import PriceDisplay from '@/shared/ui/primitives/PriceDisplay';
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
+import HomeSeeAllButton from './HomeSeeAllButton';
 import type { HomeFeaturedItem } from './home.types';
 
 const EVENT_PLACEHOLDER =
@@ -180,11 +181,11 @@ export default function HomeFeaturedSectionNetflix({
                     <Text className="text-sm font-bold text-white/80">
                       {title}
                     </Text>
-                    <TouchableOpacity onPress={onSeeAll} hitSlop={8}>
-                      <Text className="text-xs font-medium text-[#ff4757]">
-                        {seeAllLabel}
-                      </Text>
-                    </TouchableOpacity>
+                    <HomeSeeAllButton
+                      label={seeAllLabel}
+                      onPress={onSeeAll}
+                      variant="onImage"
+                    />
                   </View>
                 </View>
               </TouchableOpacity>

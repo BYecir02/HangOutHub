@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 
 export default function EventBookingRedirectScreen() {
   const router = useRouter();
@@ -23,7 +25,7 @@ export default function EventBookingRedirectScreen() {
 
   return (
     <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-      <ActivityIndicator size="large" color="#ff4757" />
+      <LogoSpinner size={44} />
     </View>
   );
 }

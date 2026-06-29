@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Alert,
   RefreshControl,
   ScrollView,
   Image,
@@ -31,6 +30,7 @@ import api, {
   storage,
 } from '@/services/api';
 import { getCache, setCache } from '@/services/api/dataCache';
+import { usePlaceSaveSet } from '@/features/places/hooks/usePlaceSaveSet';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import { uiTokens } from '@/theme/tokens';
 import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
@@ -253,8 +253,8 @@ export default function PlacesScreen() {
   const [activeFilter, setActiveFilter] = useState<PlaceFilter>('all');
   const [viewMode, setViewMode] = useState<PlaceViewMode>('inspiration');
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
-  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const { savedPlaceIds, setSavedPlaceIds, savingPlaceIds, toggleSave } =
+    usePlaceSaveSet();
   const { filterByLocation, locationLabel, locationValueLabel } = useLocationScope({
     defaultCountry: t('homeLocationCountry'),
     currentLabel: t('homeLocationCurrentLabel'),
@@ -416,62 +416,6 @@ export default function PlacesScreen() {
 
   const inspirationAutoplay = useVisibleItemAutoplay(filteredPlaces, (place) => place.id);
 
-  const handleTogglePlaceSave = useCallback(
-    async (placeId: string) => {
-      const token = await storage.getItem('userToken');
-
-      if (!token) {
-        Alert.alert(
-          t('placeDetailLoginRequiredTitle'),
-          t('placeDetailLoginRequiredMessage'),
-        );
-        return;
-      }
-
-      if (savingPlaceIds.has(placeId)) {
-        return;
-      }
-
-      setSavingPlaceIds((current) => {
-        const next = new Set(current);
-        next.add(placeId);
-        return next;
-      });
-
-      try {
-        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
-        setSavedPlaceIds((current) => {
-          const next = new Set(current);
-          if (response.data.saved) {
-            next.add(placeId);
-          } else {
-            next.delete(placeId);
-          }
-          return next;
-        });
-      } catch (error) {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'response' in error &&
-          (error as { response?: { status?: number } }).response?.status === 401
-        ) {
-          await clearAuthState();
-          router.replace('/');
-          return;
-        }
-
-        Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
-      } finally {
-        setSavingPlaceIds((current) => {
-          const next = new Set(current);
-          next.delete(placeId);
-          return next;
-        });
-      }
-    },
-    [savingPlaceIds, t],
-  );
 
   const renderListPlaceItem = useCallback(
     ({ item }: { item: PlaceItem }) => {
@@ -493,7 +437,7 @@ export default function PlacesScreen() {
           isSaved={savedPlaceIds.has(item.id)}
           saving={savingPlaceIds.has(item.id)}
           onToggleSave={() => {
-            void handleTogglePlaceSave(item.id);
+            void toggleSave(item.id);
           }}
           onPress={() =>
             router.push({
@@ -504,7 +448,7 @@ export default function PlacesScreen() {
         />
       );
     },
-    [handleTogglePlaceSave, router, t, savedPlaceIds],
+    [toggleSave, router, t, savedPlaceIds],
   );
 
   const inspirationColumns = useMemo(() => {
@@ -663,7 +607,7 @@ export default function PlacesScreen() {
               }
               isPlaceSaved={(placeId) => savedPlaceIds.has(placeId)}
               isSavingPlace={(placeId) => savingPlaceIds.has(placeId)}
-              onToggleSavePlace={handleTogglePlaceSave}
+              onToggleSavePlace={toggleSave}
               activeItemId={inspirationAutoplay.activeId}
               registerLayout={inspirationAutoplay.registerLayout}
             />

@@ -64,7 +64,6 @@ export default function DiscoverInspirationMasonry({
               borderColor={item.actionColor}
               onPress={() => onPressItem(item)}
               shouldPlay={activeItemId === item.id}
-              adaptiveHeight={false}
             />
           );
         }
@@ -81,7 +80,6 @@ export default function DiscoverInspirationMasonry({
               onToggleSave={() => void onTogglePlaceSave(item.place.id)}
               saving={savingPlaceIds.has(item.place.id)}
               shouldPlay={activeItemId === item.id}
-              adaptiveHeight={false}
             />
           );
         }

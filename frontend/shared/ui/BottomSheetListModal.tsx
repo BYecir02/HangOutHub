@@ -25,6 +25,8 @@ type BottomSheetListModalProps<T> = {
   emptyDescription?: string;
   maxHeight?: number;
   autoFocusSearchInput?: boolean;
+  /** Feuille à hauteur fixe (= maxHeight) qui ne se rétracte pas avec le clavier. */
+  fixedHeight?: boolean;
 };
 
 export default function BottomSheetListModal<T>({
@@ -46,6 +48,7 @@ export default function BottomSheetListModal<T>({
   emptyDescription,
   maxHeight,
   autoFocusSearchInput = false,
+  fixedHeight = false,
 }: BottomSheetListModalProps<T>) {
   return (
     <BottomSheetModal
@@ -54,7 +57,7 @@ export default function BottomSheetListModal<T>({
       title={title}
       subtitle={subtitle}
       maxHeight={maxHeight}
-      contentMode="auto"
+      contentMode={fixedHeight ? 'fill' : 'auto'}
     >
       <View className="mb-4 flex-row items-center rounded-2xl bg-gray-100 px-3 py-2 dark:bg-gray-800">
         <Ionicons name="search-outline" size={18} color="#9ca3af" />
@@ -83,6 +86,15 @@ export default function BottomSheetListModal<T>({
           title={emptyTitle}
           description={emptyDescription}
         />
+      ) : fixedHeight ? (
+        // Hauteur fixe : on rend la liste directement, le scroll de la feuille
+        // (BottomSheetScrollView en mode "fill") gère le défilement.
+        <View>
+          {items.map((item) => (
+            <View key={keyExtractor(item)}>{renderItem(item)}</View>
+          ))}
+          <View className="h-1" />
+        </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}

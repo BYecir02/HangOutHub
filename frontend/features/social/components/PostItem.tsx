@@ -20,6 +20,7 @@ import PostMediaViewer from './PostMediaViewer';
 
 import api, { getApiErrorMessage, getImageUrl } from '../../../services/api';
 import { createReport } from '@/services/social/reports';
+import { haptics } from '@/services/shared/haptics';
 
 export interface PostAuthor {
   username?: string | null;
@@ -242,12 +243,14 @@ function PostItem({
     const previousState = isLiked;
     setIsLiked(!isLiked);
     setLikesCount((prev) => (isLiked ? prev - 1 : prev + 1));
+    haptics.light();
 
     try {
       await api.post(`/posts/${item.id}/like`);
     } catch {
       setIsLiked(previousState);
       setLikesCount((prev) => (isLiked ? prev + 1 : prev - 1));
+      haptics.error();
     }
   };
 

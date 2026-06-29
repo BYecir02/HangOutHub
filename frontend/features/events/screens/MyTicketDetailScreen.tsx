@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -13,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 
 import TicketStatusBadge from '@/shared/ui/TicketStatusBadge';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { formatEventDate } from '@/services/shared/formatters';
@@ -20,6 +20,7 @@ import {
   EventBookingTicket,
   getMyEventBookings,
 } from '@/services/events/event-bookings';
+import PaymentSheet from '@/features/events/components/PaymentSheet';
 
 const EVENT_PLACEHOLDER =
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200';
@@ -32,6 +33,7 @@ export default function MyTicketDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [ticket, setTicket] = useState<EventBookingTicket | null>(null);
+  const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
 
   const bookingId = typeof params.id === 'string' ? params.id : null;
 
@@ -86,138 +88,167 @@ export default function MyTicketDetailScreen() {
   }, [status, t, ticket]);
 
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 px-5 pt-14 dark:bg-black"
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void loadTicket(true)}
-          tintColor="#ff4757"
-        />
-      }
-    >
-      <View className="mb-6 flex-row items-center">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-3 rounded-full bg-white p-3 dark:bg-gray-900"
-        >
-          <Ionicons name="arrow-back" size={20} color="#ff4757" />
-        </TouchableOpacity>
-        <View>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('myTicketDetailTitle')}
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400">
-            {t('myTicketDetailSubtitle')}
-          </Text>
-        </View>
-      </View>
-
-      {loading ? (
-        <View className="flex-1 items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#ff4757" />
-          <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-            {t('myTicketsLoading')}
-          </Text>
-        </View>
-      ) : null}
-
-      {!loading && errorMessage ? (
-        <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
-          <Text className="text-sm text-red-600 dark:text-red-300">{errorMessage}</Text>
+    <View className="flex-1 bg-gray-50 dark:bg-black">
+      <ScrollView
+        className="flex-1 px-5 pt-14"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void loadTicket(true)}
+            tintColor="#ff4757"
+          />
+        }
+      >
+        <View className="mb-6 flex-row items-center">
           <TouchableOpacity
-            onPress={() => void loadTicket(true)}
-            className="mt-3 self-start rounded-xl bg-[#ff4757] px-4 py-2"
+            onPress={() => router.back()}
+            className="mr-3 rounded-full bg-white p-3 dark:bg-gray-900"
           >
-            <Text className="font-semibold text-white">{t('commonRetry')}</Text>
+            <Ionicons name="arrow-back" size={20} color="#ff4757" />
           </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {!loading && !errorMessage && !ticket ? (
-        <View className="rounded-3xl bg-white px-5 py-8 dark:bg-gray-900">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            {t('myTicketDetailNotFound')}
-          </Text>
-          <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {t('myTicketDetailNotFoundDescription')}
-          </Text>
-        </View>
-      ) : null}
-
-      {!loading && !errorMessage && ticket ? (
-        <>
-          <View className="mb-4 overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-            <View className="flex-row items-center">
-              <Image
-                source={{ uri: getImageUrl(ticket.event?.coverUrl) || EVENT_PLACEHOLDER }}
-                className="h-14 w-14 rounded-xl bg-gray-200 dark:bg-gray-800"
-                resizeMode="cover"
-              />
-              <View className="ml-3 flex-1">
-                <Text className="text-base font-bold text-gray-900 dark:text-white">
-                  {ticket.event?.title || '-'}
-                </Text>
-                <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {t('myTicketsStart')}{' '}
-                  {formatEventDate(ticket.event?.startTime || null, locale, {
-                    includeWeekday: true,
-                    fallback: '-',
-                  })}
-                </Text>
-              </View>
-              <TicketStatusBadge status={status} context="myTickets" />
-            </View>
-
-            <View className="mt-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
-              <Text className="text-xs text-gray-500 dark:text-gray-400">
-                {t('myTicketsTicketType')}: {ticket.ticketType?.name || '-'}
-              </Text>
-              <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {t('eventDetailPlace')}: {ticket.event?.place?.name || '-'}
-              </Text>
-            </View>
-          </View>
-
-          <View className="mb-4 rounded-3xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-            <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-              {t('myTicketDetailQrTitle')}
+          <View>
+            <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+              {t('myTicketDetailTitle')}
             </Text>
-
-            {hasQr ? (
-              <View className="mt-4 items-center">
-                <QRCode value={ticket.qrCode || ''} size={200} backgroundColor="transparent" />
-                <Text className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
-                  {ticket.qrCode}
-                </Text>
-              </View>
-            ) : (
-              <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                {qrHint}
-              </Text>
-            )}
+            <Text className="text-sm text-gray-500 dark:text-gray-400">
+              {t('myTicketDetailSubtitle')}
+            </Text>
           </View>
+        </View>
 
-          <View className="pb-10">
+        {loading ? (
+          <View className="flex-1 items-center justify-center py-24">
+            <LogoSpinner size={44} />
+            <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              {t('myTicketsLoading')}
+            </Text>
+          </View>
+        ) : null}
+
+        {!loading && errorMessage ? (
+          <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+            <Text className="text-sm text-red-600 dark:text-red-300">{errorMessage}</Text>
             <TouchableOpacity
-              onPress={() => {
-                if (!ticket.event?.id) {
-                  return;
-                }
-                router.push({
-                  pathname: '/event/[id]',
-                  params: { id: ticket.event.id },
-                });
-              }}
-              className="items-center rounded-2xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-600 dark:bg-gray-900"
+              onPress={() => void loadTicket(true)}
+              className="mt-3 self-start rounded-xl bg-[#ff4757] px-4 py-2"
             >
-              <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                {t('myTicketsOpenEvent')}
-              </Text>
+              <Text className="font-semibold text-white">{t('commonRetry')}</Text>
             </TouchableOpacity>
           </View>
-        </>
-      ) : null}
-    </ScrollView>
+        ) : null}
+
+        {!loading && !errorMessage && !ticket ? (
+          <View className="rounded-3xl bg-white px-5 py-8 dark:bg-gray-900">
+            <Text className="text-lg font-bold text-gray-900 dark:text-white">
+              {t('myTicketDetailNotFound')}
+            </Text>
+            <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {t('myTicketDetailNotFoundDescription')}
+            </Text>
+          </View>
+        ) : null}
+
+        {!loading && !errorMessage && ticket ? (
+          <>
+            <View className="mb-4 overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+              <View className="flex-row items-center">
+                <Image
+                  source={{ uri: getImageUrl(ticket.event?.coverUrl) || EVENT_PLACEHOLDER }}
+                  className="h-14 w-14 rounded-xl bg-gray-200 dark:bg-gray-800"
+                  resizeMode="cover"
+                />
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-bold text-gray-900 dark:text-white">
+                    {ticket.event?.title || '-'}
+                  </Text>
+                  <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {t('myTicketsStart')}{' '}
+                    {formatEventDate(ticket.event?.startTime || null, locale, {
+                      includeWeekday: true,
+                      fallback: '-',
+                    })}
+                  </Text>
+                </View>
+                <TicketStatusBadge status={status} context="myTickets" />
+              </View>
+
+              <View className="mt-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
+                <Text className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('myTicketsTicketType')}: {ticket.ticketType?.name || '-'}
+                </Text>
+                <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {t('eventDetailPlace')}:{' '}
+                  {ticket.event?.place?.name ||
+                    ticket.event?.city?.name ||
+                    ticket.event?.address ||
+                    '-'}
+                </Text>
+              </View>
+            </View>
+
+            <View className="mb-4 rounded-3xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                {t('myTicketDetailQrTitle')}
+              </Text>
+
+              {hasQr ? (
+                <View className="mt-4 items-center">
+                  <QRCode value={ticket.qrCode || ''} size={200} backgroundColor="transparent" />
+                  <Text className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
+                    {ticket.qrCode}
+                  </Text>
+                </View>
+              ) : (
+                <View className="mt-3">
+                  <Text className="text-sm text-gray-500 dark:text-gray-400">
+                    {qrHint}
+                  </Text>
+                  {status === 'PENDING' ? (
+                    <TouchableOpacity
+                      onPress={() => setPaymentSheetVisible(true)}
+                      className="mt-4 flex-row items-center justify-center rounded-2xl bg-[#ff4757] py-3.5"
+                    >
+                      <Ionicons name="card-outline" size={16} color="#fff" />
+                      <Text className="ml-2 text-sm font-semibold text-white">
+                        {locale === 'fr-FR' ? 'Payer maintenant' : 'Pay now'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+            </View>
+
+            <View className="pb-10">
+              <TouchableOpacity
+                onPress={() => {
+                  if (!ticket.event?.id) {
+                    return;
+                  }
+                  router.push({
+                    pathname: '/event/[id]',
+                    params: { id: ticket.event.id },
+                  });
+                }}
+                className="items-center rounded-2xl border border-gray-300 bg-white px-4 py-3 dark:border-gray-600 dark:bg-gray-900"
+              >
+                <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  {t('myTicketsOpenEvent')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+
+      <PaymentSheet
+        visible={paymentSheetVisible}
+        bookingId={bookingId}
+        onClose={() => setPaymentSheetVisible(false)}
+        onPaid={() => {
+          setPaymentSheetVisible(false);
+          void loadTicket(true);
+        }}
+      />
+    </View>
   );
 }

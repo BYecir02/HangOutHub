@@ -105,9 +105,11 @@ export default function ProfileHeader({
             <TouchableOpacity activeOpacity={0.9} onPress={() => onImagePress(avatarUrl)}>
               <Image source={{ uri: avatarUrl }} className="h-24 w-24 rounded-full" resizeMode="cover" />
             </TouchableOpacity>
-            <TouchableOpacity className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-[#ff4757] p-1.5 dark:border-black">
-              <Ionicons name="camera" size={14} color="white" />
-            </TouchableOpacity>
+            {false && (
+              <TouchableOpacity className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-[#ff4757] p-1.5 dark:border-black">
+                <Ionicons name="camera" size={14} color="white" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

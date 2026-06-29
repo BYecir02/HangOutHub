@@ -16,6 +16,10 @@ export interface EventBookingTicket {
       id: string;
       name: string;
     } | null;
+    city: {
+      name: string;
+    } | null;
+    address: string | null;
   } | null;
   ticketType: {
     id: string;

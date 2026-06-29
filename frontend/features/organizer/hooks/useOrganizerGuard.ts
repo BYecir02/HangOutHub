@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { clearAuthState } from '@/services/api';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import type { TranslationKey } from '@/services/shared/i18n';
 import {
@@ -94,15 +95,17 @@ export function useOrganizerGuard({
         text: t('organizerGuardActionOk'),
         onPress: () => router.replace(target as never),
       },
+      {
+        text: t('settingsLogout', { defaultValue: 'Déconnexion' }),
+        style: 'destructive',
+        onPress: async () => {
+          await clearAuthState();
+          router.replace('/');
+        },
+      },
     ]);
 
-    const fallbackRedirect = setTimeout(() => {
-      router.replace(target as never);
-    }, 500);
-
-    return () => {
-      clearTimeout(fallbackRedirect);
-    };
+    return () => {};
   }, [hasPanelAccess, isAllowed, loading, router, suspend, t, user]);
 
   return isAllowed;

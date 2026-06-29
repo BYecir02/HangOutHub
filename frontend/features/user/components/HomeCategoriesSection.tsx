@@ -2,7 +2,6 @@ import React from 'react';
 import {
   FlatList,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -11,6 +10,7 @@ import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import { type Category } from '@/shared/types';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
+import HomeSeeAllButton from './HomeSeeAllButton';
 
 const SKELETON_WIDTHS = [90, 110, 80, 120, 95];
 
@@ -39,9 +39,7 @@ export default function HomeCategoriesSection({
         <Text className="text-lg font-bold text-gray-800 dark:text-white">
           {title}
         </Text>
-        <TouchableOpacity onPress={onSeeAll}>
-          <Text className="text-xs font-medium text-[#ff4757]">{seeAllLabel}</Text>
-        </TouchableOpacity>
+        <HomeSeeAllButton label={seeAllLabel} onPress={onSeeAll} />
       </View>
 
       {loading ? (

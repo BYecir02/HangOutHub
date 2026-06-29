@@ -19,6 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import EventFormWizard from '@/features/events/components/EventFormWizard';
 import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import { clearCache } from '@/services/api/dataCache';
@@ -718,7 +719,7 @@ export default function EditEventScreen() {
   if (initialLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }

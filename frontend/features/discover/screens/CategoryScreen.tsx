@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ import LocationFilterSheet, {
 } from '@/shared/ui/LocationFilterSheet';
 import MasonryGrid from '@/shared/ui/MasonryGrid';
 import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import { usePlaceSaveSet } from '@/features/places/hooks/usePlaceSaveSet';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useLocationScope } from '@/shared/hooks/useLocationScope';
@@ -32,6 +34,7 @@ import {
 import { getRecommendationOnboardingPreferences } from '@/services/shared/recommendation-onboarding';
 import { resolveStoredUserSession } from '@/services/auth/user-session';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import {
   AnimationMeta,
   getCategoryAnimation,
@@ -118,8 +121,8 @@ export default function CategoryDiscoverScreen() {
     null,
   );
   const [activeTab, setActiveTab] = useState<'events' | 'places'>('events');
-  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
-  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const { savedPlaceIds, setSavedPlaceIds, savingPlaceIds, toggleSave } =
+    usePlaceSaveSet();
   const [cities, setCities] = useState<CityOption[]>([]);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [preferenceSnapshot, setPreferenceSnapshot] = useState<PreferenceSnapshot>({
@@ -258,58 +261,6 @@ export default function CategoryDiscoverScreen() {
     void loadSavedPlaces();
   }, [router]);
 
-  const handleTogglePlaceSave = useMemo(
-    () =>
-      async (placeId: string) => {
-        const token = await storage.getItem('userToken');
-
-        if (!token) {
-          Alert.alert(
-            t('placeDetailLoginRequiredTitle'),
-            t('placeDetailLoginRequiredMessage'),
-          );
-          return;
-        }
-
-        if (savingPlaceIds.has(placeId)) {
-          return;
-        }
-
-        setSavingPlaceIds((current) => {
-          const next = new Set(current);
-          next.add(placeId);
-          return next;
-        });
-
-        try {
-          const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
-          setSavedPlaceIds((current) => {
-            const next = new Set(current);
-            if (response.data.saved) {
-              next.add(placeId);
-            } else {
-              next.delete(placeId);
-            }
-            return next;
-          });
-        } catch (error) {
-          if (isUnauthorizedError(error)) {
-            await clearAuthState();
-            router.replace('/');
-            return;
-          }
-
-          Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
-        } finally {
-          setSavingPlaceIds((current) => {
-            const next = new Set(current);
-            next.delete(placeId);
-            return next;
-          });
-        }
-      },
-    [router, savingPlaceIds, t],
-  );
 
   const locationFilteredEvents = useMemo(() => {
     if (!data) {
@@ -415,43 +366,55 @@ export default function CategoryDiscoverScreen() {
   const categoryAutoplay = activeTab === 'events' ? eventAutoplay : placeAutoplay;
   const hasVisibleAutoplayTargets = categoryAutoplay.visibleIdSet.size > 0;
 
+  const handleRefresh = useCallback(() => {
+    const categoryId = params.id;
+    if (!categoryId) return;
+    
+    void (async () => {
+      setRefreshing(true);
+      try {
+        const response = await api.get<CategoryResult>(`/categories/${categoryId}/discover`);
+        setData(response.data);
+        setCategoryCache(categoryId, response.data);
+        setBadgeAnimation(getCategoryAnimation(response.data.category));
+      } finally {
+        setRefreshing(false);
+      }
+    })();
+  }, [params.id]);
+
   return (
     <View className="flex-1 bg-gray-50 dark:bg-black">
       <ScrollView
         ref={scrollViewRef}
         className="flex-1"
         showsVerticalScrollIndicator={false}
+        alwaysBounceVertical
         onLayout={categoryAutoplay.onLayout}
         onScroll={categoryAutoplay.onScroll}
+        onScrollEndDrag={(event) => {
+          if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+            handleRefresh();
+          }
+        }}
         scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              const categoryId = params.id;
-
-              if (!categoryId) {
-                return;
-              }
-
-              void (async () => {
-                setRefreshing(true);
-                try {
-                  const response = await api.get<CategoryResult>(
-                    `/categories/${categoryId}/discover`,
-                  );
-                  setData(response.data);
-                  setCategoryCache(categoryId, response.data);
-                  setBadgeAnimation(getCategoryAnimation(response.data.category));
-                } finally {
-                  setRefreshing(false);
-                }
-              })();
-            }}
-            tintColor="#4c669f"
-          />
+          Platform.OS === 'android' ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              progressViewOffset={-500}
+            />
+          ) : undefined
         }
       >
+        {Platform.OS === 'ios' ? (
+          <View 
+            className="absolute inset-x-0" 
+            style={[{ top: -1000, height: 1000 }, categoryHeaderStyle]}
+            pointerEvents="none"
+          />
+        ) : null}
         {loading && !data ? (
           <View className="px-5 pb-24 pt-16">
             <SkeletonBlock className="h-11 w-11 rounded-full" />
@@ -514,13 +477,21 @@ export default function CategoryDiscoverScreen() {
               className="px-5 pb-8 pt-16"
               style={categoryHeaderStyle}
             >
-              <View className="mb-6 flex-row items-center justify-between">
+              <View className="mb-6 flex-row items-center justify-between relative">
                 <TouchableOpacity
                   onPress={() => router.back()}
                   className="h-11 w-11 items-center justify-center rounded-full bg-white/90 dark:bg-gray-900/80"
                 >
                   <Ionicons name="arrow-back" size={22} color={isDark ? '#fff' : '#111827'} />
                 </TouchableOpacity>
+
+                {refreshing ? (
+                  <View className="absolute inset-x-0 items-center justify-center" pointerEvents="none">
+                    <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                      <LogoSpinner size={26} />
+                    </View>
+                  </View>
+                ) : null}
 
                 <TouchableOpacity
                   onPress={() => setFiltersVisible(true)}
@@ -530,15 +501,15 @@ export default function CategoryDiscoverScreen() {
                 </TouchableOpacity>
               </View>
 
-          <View className="flex-row items-center">
-            <View className="mr-2 flex-shrink">
-              <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
-                {t('categoryHeaderLabel')}
-              </Text>
-              <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                {data.category.name}
-              </Text>
-            </View>
+              <View className="flex-row items-center">
+                <View className="mr-2 flex-shrink">
+                  <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-500 dark:text-gray-300">
+                    {t('categoryHeaderLabel')}
+                  </Text>
+                  <Text className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                    {data.category.name}
+                  </Text>
+                </View>
             {badgeAnimation ? (
               <View
                 className="overflow-hidden rounded-full bg-white/30 dark:bg-gray-900/40"
@@ -664,7 +635,6 @@ export default function CategoryDiscoverScreen() {
                               ? categoryAutoplay.visibleIdSet.has(`event-${item.id}`)
                               : categoryAutoplay.activeId === `event-${item.id}`
                           }
-                          adaptiveHeight={false}
                         />
                       );
                     }}
@@ -708,14 +678,13 @@ export default function CategoryDiscoverScreen() {
                           })
                         }
                         isSaved={savedPlaceIds.has(item.id)}
-                        onToggleSave={() => void handleTogglePlaceSave(item.id)}
+                        onToggleSave={() => void toggleSave(item.id)}
                         saving={savingPlaceIds.has(item.id)}
                         shouldPlay={
                           hasVisibleAutoplayTargets
                             ? categoryAutoplay.visibleIdSet.has(`place-${item.id}`)
                             : categoryAutoplay.activeId === `place-${item.id}`
                         }
-                        adaptiveHeight={false}
                       />
                     );
                   }}
@@ -731,6 +700,14 @@ export default function CategoryDiscoverScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      {refreshing && Platform.OS === 'android' ? (
+        <View pointerEvents="none" className="absolute inset-x-0 z-10 items-center" style={{ top: 90 }}>
+          <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+            <LogoSpinner size={26} />
+          </View>
+        </View>
+      ) : null}
 
       <LocationFilterSheet
         visible={filtersVisible}

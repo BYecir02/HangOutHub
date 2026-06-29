@@ -1,11 +1,12 @@
 import React from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, View, RefreshControl, Platform } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 
 import Header from '@/shared/ui/Header';
 import HeroBackground from '@/shared/ui/HeroBackground';
 import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
+import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
 
 import HomeCategoriesSection from './HomeCategoriesSection';
@@ -50,6 +51,7 @@ export default function HomeContent({
 }: HomeContentProps) {
   const router = useRouter();
   const { t } = useI18n();
+  const isDark = useColorScheme() === 'dark';
   const eventsRoute = '/events' as Href;
   const discoverRoute = '/discover' as Href;
   const categoriesRoute = '/categories' as Href;
@@ -80,13 +82,22 @@ export default function HomeContent({
         onScroll={recommendedAutoplay.onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: 96, paddingBottom: 24 }}
-        // Pull-to-refresh "maison" : pas de RefreshControl natif (donc pas de
-        // rond systeme). Sur iOS le ScrollView rebondit, donc on detecte le
+        // Pull-to-refresh "maison" sur iOS : on detecte le
         // tirage vers le bas au relachement et on declenche le refresh.
-        // Le retour visuel est notre logo anime (overlay plus bas).
+        // Sur Android, on utilise le RefreshControl natif.
         alwaysBounceVertical
+        contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
+        refreshControl={
+          Platform.OS === 'android' ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              progressViewOffset={-500} // Cache le spinner natif Android hors de l'écran
+            />
+          ) : undefined
+        }
         onScrollEndDrag={(event) => {
-          if (!refreshing && event.nativeEvent.contentOffset.y <= -80) {
+          if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
             void onRefresh();
           }
         }}
@@ -143,8 +154,7 @@ export default function HomeContent({
         />
       </ScrollView>
 
-      {/* Spinner brande : le logo de l'app qui tourne, affiche subtilement
-          en haut pendant le rafraichissement (remplace le spinner natif). */}
+      {/* Spinner brande : le logo de l'app qui tourne, affiché de façon unifiée sur iOS et Android. */}
       {refreshing ? (
         <View
           pointerEvents="none"

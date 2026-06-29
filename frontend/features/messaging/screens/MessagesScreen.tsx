@@ -1,8 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  ActivityIndicator,
-  Dimensions,
   Text,
   TouchableOpacity,
   View,
@@ -15,23 +13,19 @@ import MessagesDirectChatsList from '@/features/messaging/components/MessagesDir
 import MessagesOutingsList from '@/features/messaging/components/MessagesOutingsList';
 import MessagesTabBar from '@/features/messaging/components/MessagesTabBar';
 import type { OutingConversationSummary } from '@/features/messaging/components/OutingConversationCard';
-import PersonRow from '@/features/social/components/PersonRow';
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
-import BottomSheetListModal from '@/shared/ui/BottomSheetListModal';
 import { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import SearchBar from '@/shared/ui/SearchBar';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { clearAuthState, getApiErrorMessage, isUnauthorizedError } from '@/services/api';
 import {
-  getOrCreateDirectChat,
   listDirectChats,
   type DirectChatSummary,
 } from '@/services/messaging/direct-chats';
 import { stripSystemMarkers } from '@/services/messaging/direct-chat-meta';
 import { getDirectChatSocket } from '@/services/messaging/direct-chat-realtime';
-import { getFriendshipOverview } from '@/services/user/friendships';
-import type { SocialUser } from '@/features/social/types';
 
 export default function MessagesScreen() {
   const router = useRouter();
@@ -65,19 +59,8 @@ export default function MessagesScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [directErrorMessage, setDirectErrorMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [connectionPickerOpen, setConnectionPickerOpen] = useState(false);
-  const [connections, setConnections] = useState<SocialUser[]>([]);
-  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
-  const [connectionsLoading, setConnectionsLoading] = useState(false);
-  const [connectionsErrorMessage, setConnectionsErrorMessage] = useState<string | null>(
-    null,
-  );
-  const [connectionsQuery, setConnectionsQuery] = useState('');
-  const [creatingChatForUserId, setCreatingChatForUserId] = useState<string | null>(
-    null,
-  );
   const [filter, setFilter] = useState<OutingFilter>('all');
-  const [searchSheetOpen, setSearchSheetOpen] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   const handleInvalidSession = useCallback(async () => {
     await clearAuthState();
@@ -225,74 +208,6 @@ export default function MessagesScreen() {
     }
   }, [directLoadingMore]);
 
-  const loadConnections = useCallback(
-    async ({ force = false } = {}) => {
-      if (connectionsLoaded && !force) {
-        return;
-      }
-
-      setConnectionsLoading(true);
-      setConnectionsErrorMessage(null);
-      try {
-        const overview = await getFriendshipOverview();
-        const nextConnections = overview.connections
-          .map((item) => item.user)
-          .filter((user): user is SocialUser => Boolean(user?.id));
-        setConnections(nextConnections);
-        setConnectionsLoaded(true);
-      } catch (error) {
-        if (isUnauthorizedError(error)) {
-          await handleInvalidSession();
-          return;
-        }
-
-        console.error('Erreur chargement connexions messages prives:', error);
-        setConnections([]);
-        setConnectionsErrorMessage(
-          getApiErrorMessage(error, t('messagesDirectConnectionsLoadFailed')),
-        );
-      } finally {
-        setConnectionsLoading(false);
-      }
-    },
-    [connectionsLoaded, handleInvalidSession, t],
-  );
-
-  const openConnectionPicker = useCallback(async () => {
-    setConnectionPickerOpen(true);
-    setConnectionsQuery('');
-    await loadConnections();
-  }, [loadConnections]);
-
-  const startConversationWithConnection = useCallback(
-    async (user: SocialUser) => {
-      setCreatingChatForUserId(user.id);
-      try {
-        const chat = await getOrCreateDirectChat(user.id);
-        setConnectionPickerOpen(false);
-        setConnectionsQuery('');
-        void loadDirectChats({ silent: true });
-        router.push({
-          pathname: '/direct-chat/[id]',
-          params: { id: chat.id },
-        });
-      } catch (error) {
-        if (isUnauthorizedError(error)) {
-          await handleInvalidSession();
-          return;
-        }
-
-        Alert.alert(
-          t('commonErrorTitle'),
-          getApiErrorMessage(error, t('directChatStartFailed')),
-        );
-      } finally {
-        setCreatingChatForUserId(null);
-      }
-    },
-    [handleInvalidSession, loadDirectChats, router, t],
-  );
-
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
@@ -428,24 +343,6 @@ export default function MessagesScreen() {
     });
   }, [directChats, query]);
 
-  const filteredConnections = useMemo(() => {
-    const normalizedQuery = connectionsQuery.trim().toLowerCase();
-
-    return connections.filter((user) => {
-      if (!normalizedQuery) {
-        return true;
-      }
-      const displayName = (user.displayName || '').toLowerCase();
-      const username = (user.username || '').toLowerCase();
-      const bio = (user.bio || '').toLowerCase();
-      return (
-        displayName.includes(normalizedQuery) ||
-        username.includes(normalizedQuery) ||
-        bio.includes(normalizedQuery)
-      );
-    });
-  }, [connections, connectionsQuery]);
-
   const isLoading = tab === 'outings' ? loading : directLoading;
   const hasError = tab === 'outings' ? errorMessage : directErrorMessage;
   const showSyncWarning = tab === 'outings' ? syncWarning : directSyncWarning;
@@ -455,10 +352,6 @@ export default function MessagesScreen() {
     tab === 'outings'
       ? t('messagesSearchPlaceholder')
       : t('directChatSearchPlaceholder');
-  const pickerMaxHeight = Math.min(
-    720,
-    Math.round(Dimensions.get('window').height * 0.88),
-  );
   const normalizedQuery = query.trim();
   const headerSubtitle =
     normalizedQuery.length >= 2
@@ -477,7 +370,7 @@ export default function MessagesScreen() {
   if (shouldShowLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -505,7 +398,7 @@ export default function MessagesScreen() {
                 void loadDirectChats();
               }
             }}
-            className="mt-4 items-center rounded-2xl bg-[#4c669f] px-4 py-3"
+            className="mt-4 items-center rounded-2xl bg-[#ff4757] px-4 py-3"
           >
             <Text className="text-sm font-semibold text-white">{t('commonRetry')}</Text>
           </TouchableOpacity>
@@ -523,15 +416,18 @@ export default function MessagesScreen() {
         rightSlot={
           <View className="flex-row items-center">
             <TouchableOpacity
-              onPress={() => setSearchSheetOpen(true)}
+              onPress={() => {
+                setIsSearchVisible(!isSearchVisible);
+                if (isSearchVisible) setQuery('');
+              }}
               className="mr-2 h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
             >
-              <Ionicons name="search-outline" size={20} color="#4c669f" />
+              <Ionicons name={isSearchVisible ? "close-outline" : "search-outline"} size={20} color="#ff4757" />
             </TouchableOpacity>
             {tab === 'direct' ? (
               <TouchableOpacity
-                onPress={() => void openConnectionPicker()}
-                className="h-10 w-10 items-center justify-center rounded-full bg-[#4c669f]"
+                onPress={() => router.push('/new-conversation')}
+                className="h-10 w-10 items-center justify-center rounded-full bg-[#ff4757]"
               >
                 <Ionicons name="add" size={20} color="#ffffff" />
               </TouchableOpacity>
@@ -541,6 +437,17 @@ export default function MessagesScreen() {
       />
 
       <MessagesTabBar activeTab={tab} onTabChange={setTab} />
+
+      {isSearchVisible && (
+        <View className="mb-2">
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+            placeholder={searchPlaceholder}
+          />
+        </View>
+      )}
 
       {showSyncWarning ? (
         <View className="mx-5 mb-3 rounded-2xl bg-orange-100 px-4 py-3 dark:bg-orange-900/30">
@@ -575,70 +482,11 @@ export default function MessagesScreen() {
           onPressItem={(id) =>
             router.push({ pathname: '/direct-chat/[id]', params: { id } })
           }
-          onOpenConnectionPicker={() => void openConnectionPicker()}
+          onOpenConnectionPicker={() => router.push('/new-conversation')}
           onFindFriends={() => router.push('/search')}
         />
       )}
 
-      <BottomSheetModal
-        visible={searchSheetOpen}
-        onClose={() => setSearchSheetOpen(false)}
-        title={t('messagesTitle')}
-        subtitle={searchPlaceholder}
-        maxHeight={140}
-        contentMode="auto"
-      >
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          autoFocus
-          placeholder={searchPlaceholder}
-          useBottomSheetInput
-        />
-      </BottomSheetModal>
-
-      <BottomSheetListModal
-        visible={connectionPickerOpen}
-        onClose={() => setConnectionPickerOpen(false)}
-        title={t('messagesDirectPickerTitle')}
-        subtitle={t('messagesDirectPickerSubtitle')}
-        items={filteredConnections}
-        keyExtractor={(user) => user.id}
-        renderItem={(user) => (
-          <PersonRow
-            user={user}
-            subtitle={user.bio?.trim() || t('connectionsAcceptedSubtitle')}
-            onPress={() => void startConversationWithConnection(user)}
-            primaryAction={
-              creatingChatForUserId === user.id ? (
-                <ActivityIndicator color="#4c669f" />
-              ) : (
-                <View className="rounded-full bg-[#4c669f]/10 px-3 py-2">
-                  <Text className="text-xs font-semibold text-[#4c669f]">
-                    {t('messagesDirectPickerStartAction')}
-                  </Text>
-                </View>
-              )
-            }
-          />
-        )}
-        searchValue={connectionsQuery}
-        onSearchChange={setConnectionsQuery}
-        searchPlaceholder={t('messagesDirectPickerSearchPlaceholder')}
-        autoFocusSearchInput
-        loading={connectionsLoading}
-        errorMessage={connectionsErrorMessage}
-        onRetry={() => {
-          void loadConnections({ force: true });
-        }}
-        retryLabel={t('commonRetry')}
-        emptyTitle={
-          connectionsQuery.trim()
-            ? t('messagesDirectPickerNoResult')
-            : t('messagesDirectPickerEmpty')
-        }
-        maxHeight={pickerMaxHeight}
-      />
     </View>
   );
 }

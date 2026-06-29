@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import FilterChipsBar, { type FilterChipOption } from '@/shared/ui/FilterChipsBar';
 import ScreenHeader from '@/shared/ui/ScreenHeader';
 import ScreenState from '@/shared/ui/ScreenState';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
 import { usePaginatedList } from '@/shared/hooks/usePaginatedList';
@@ -625,7 +625,7 @@ export default function OrganizerNotificationsScreen() {
               </Animated.View>
             ))}
             <View className="items-center pt-1">
-              <ActivityIndicator size="small" color="#4c669f" />
+              <LogoSpinner size={22} />
               <Text className="mt-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                 {t('organizerNotificationsLoadingMore')}
               </Text>

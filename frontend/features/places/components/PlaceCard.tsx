@@ -47,7 +47,10 @@ export default function PlaceCard({
           {imageUrl ? (
             <MediaFrame
               source={imageUrl}
-              className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
+              className="w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
+              adaptiveHeight
+              minHeight={60}
+              maxHeight={200}
             />
           ) : (
             <PlaceCoverFallback className="h-28 w-28 rounded-2xl" logoSize={34} />

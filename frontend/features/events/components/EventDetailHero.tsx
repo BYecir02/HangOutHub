@@ -12,7 +12,6 @@ type EventDetailHeroProps = {
   heroIsVideo: boolean;
   heroMuted: boolean;
   onToggleHeroMuted: () => void;
-  cityLabel: string;
   priceLabel: string;
   publicationsLoaded: boolean;
   publicationsCount: number;
@@ -31,7 +30,6 @@ export default function EventDetailHero({
   heroIsVideo,
   heroMuted,
   onToggleHeroMuted,
-  cityLabel,
   priceLabel,
   publicationsLoaded,
   publicationsCount,
@@ -45,7 +43,7 @@ export default function EventDetailHero({
   onToggleAttend,
 }: EventDetailHeroProps) {
   const { height: screenHeight } = useWindowDimensions();
-  const heroBadgeBottom = Math.max(24, Math.min(48, Math.round(screenHeight * 0.035)));
+  const heroBadgeBottom = 16;
   const hasFriends = friendsAttending.length > 0;
 
   const [aspectRatio, setAspectRatio] = useState<number>(4 / 3);
@@ -115,9 +113,6 @@ export default function EventDetailHero({
 
         <View className="flex-row items-center justify-between gap-3">
           <View className="flex-row flex-wrap items-center gap-2">
-            <View className="rounded-full bg-black/55 px-3 py-2">
-              <Text className="text-xs font-semibold text-white">{cityLabel}</Text>
-            </View>
             <View className="rounded-full bg-black/55 px-3 py-2">
               <Text className="text-xs font-semibold text-white">{priceLabel}</Text>
             </View>

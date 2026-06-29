@@ -11,10 +11,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import EventDetailContent from '@/features/events/components/EventDetailContent';
 import EventDetailHero from '@/features/events/components/EventDetailHero';
 import EventPublicationsPanel from '@/features/events/components/EventPublicationsPanel';
 import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
+import EventBookingConfirmSheet from '@/features/events/components/EventBookingConfirmSheet';
 import { useEventDetail } from '@/features/events/hooks/useEventDetail';
 import { useEventAttendance } from '@/features/events/hooks/useEventAttendance';
 
@@ -29,6 +31,8 @@ export default function EventDetailScreen() {
     cancelling,
     reportSheetVisible,
     setReportSheetVisible,
+    bookingSheetVisible,
+    setBookingSheetVisible,
     heroMuted,
     setHeroMuted,
     joining,
@@ -68,7 +72,6 @@ export default function EventDetailScreen() {
     gallery,
     eventLocationLabel,
     eventAddressLabel,
-    eventCityLabel,
     eventStartTime,
     primaryActionLabel,
     tabItems,
@@ -78,13 +81,19 @@ export default function EventDetailScreen() {
     handleOpenPublications,
     handleClosePublications,
     handlePrimaryAction,
+    handleConfirmBooking,
     handlePromoChange,
     handleReportEvent,
     handleSubmitReportReason,
   } = useEventDetail(params.id, params.tab);
 
-  const { isAttending, attendingLoading, friendsAttending, handleToggleAttend } =
-    useEventAttendance(params.id);
+  const {
+    isAttending,
+    attendingLoading,
+    friendsAttending,
+    attendeesPreview,
+    handleToggleAttend,
+  } = useEventAttendance(params.id);
 
   const handleToggleAttendWrapper = () => {
     if (hasActiveBooking) {
@@ -107,7 +116,7 @@ export default function EventDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#ff4757" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -140,7 +149,6 @@ export default function EventDetailScreen() {
           heroIsVideo={heroIsVideo}
           heroMuted={heroMuted}
           onToggleHeroMuted={() => setHeroMuted((value) => !value)}
-          cityLabel={eventCityLabel}
           priceLabel={heroPriceLabel}
           publicationsLoaded={eventPublicationsLoaded}
           publicationsCount={publicationsCount}
@@ -163,6 +171,7 @@ export default function EventDetailScreen() {
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
               <EventDetailContent
                 event={event}
+                attendeesPreview={attendeesPreview}
                 t={t}
                 locale={locale}
                 tabItems={tabItems}
@@ -272,6 +281,23 @@ export default function EventDetailScreen() {
         onClose={() => setReportSheetVisible(false)}
         onSubmitReason={handleSubmitReportReason}
       />
+
+      {event ? (
+        <EventBookingConfirmSheet
+          visible={bookingSheetVisible}
+          onClose={() => setBookingSheetVisible(false)}
+          event={event}
+          t={t}
+          locale={locale}
+          selectedTicketType={selectedTicketType}
+          displayPrice={displayPrice}
+          promoCode={promoCode}
+          onChangePromoCode={handlePromoChange}
+          promoError={promoError}
+          joining={joining}
+          onConfirm={handleConfirmBooking}
+        />
+      ) : null}
     </View>
   );
 }

@@ -1,6 +1,5 @@
 ﻿import React, { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Text,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import ScreenState from '@/shared/ui/ScreenState';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { clearAuthState, getApiErrorMessage, getImageUrl } from '@/services/api';
 import { listMyPlaceClaims, type PlaceClaimItem } from '@/services/places/place-claims';
@@ -232,7 +232,7 @@ export default function OrganizerClaimHistory() {
           </View>
         </View>
         <View className="mt-6 items-center py-4">
-          <ActivityIndicator size="large" color="#4c669f" />
+          <LogoSpinner size={44} />
           <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
             {t('organizerProfileClaimsLoading')}
           </Text>

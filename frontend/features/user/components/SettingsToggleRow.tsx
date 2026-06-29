@@ -38,6 +38,9 @@ export default function SettingsToggleRow({
           value={value}
           onValueChange={onValueChange}
           disabled={disabled}
+          accessibilityLabel={label}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: value, disabled }}
           trackColor={{ false: '#d1d5db', true: '#ff4757' }}
           thumbColor="#ffffff"
         />

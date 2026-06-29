@@ -1,10 +1,11 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
+  Platform,
 } from 'react-native';
 
 import DirectConversationCard from '@/features/messaging/components/DirectConversationCard';
@@ -41,18 +42,37 @@ export default function MessagesDirectChatsList({
       data={data}
       keyExtractor={(item) => item.id}
       alwaysBounceVertical
+      contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
+      refreshControl={
+        Platform.OS === 'android' ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            progressViewOffset={-500}
+          />
+        ) : undefined
+      }
       onScrollEndDrag={(event) => {
-        if (!refreshing && event.nativeEvent.contentOffset.y <= -80) {
+        if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
           onRefresh();
         }
       }}
+      ListHeaderComponent={
+        Platform.OS === 'ios' ? (
+          <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+            <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+              <LogoSpinner size={26} />
+            </View>
+          </View>
+        ) : null
+      }
       contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.3}
       ListFooterComponent={
         loadingMore ? (
           <View className="py-4 items-center">
-            <ActivityIndicator size="small" color="#4c669f" />
+            <LogoSpinner size={22} />
           </View>
         ) : null
       }
@@ -89,7 +109,7 @@ export default function MessagesDirectChatsList({
       )}
       />
 
-      {refreshing ? (
+      {refreshing && Platform.OS === 'android' ? (
         <View
           pointerEvents="none"
           className="absolute inset-x-0 top-2 z-10 items-center"

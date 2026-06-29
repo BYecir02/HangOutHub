@@ -111,6 +111,7 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
   const [cancelling] = useState(false);
   const [booking, setBooking] = useState<EventBookingTicket | null>(null);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
+  const [bookingSheetVisible, setBookingSheetVisible] = useState(false);
   const [heroMuted, setHeroMuted] = useState(true);
   const [joining, setJoining] = useState(false);
   const [selectedTicketTypeId, setSelectedTicketTypeId] = useState('');
@@ -222,10 +223,12 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
 
   const primaryActionLabel = hasActiveBooking
     ? t('eventDetailViewTicket')
-    : activeTab === 'tickets' && !isSoldOut
-    ? t('eventDetailConfirmCta')
     : isSoldOut
     ? t('eventDetailTicketSoldOutCta')
+    : activeTab === 'tickets'
+    ? t('eventDetailConfirmCta')
+    : ticketTypes.length > 0
+    ? (locale === 'fr-FR' ? 'Choisir un billet' : 'Choose a ticket')
     : t('eventDetailBookCta');
 
   const tabItems = useMemo(
@@ -448,17 +451,76 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
       return;
     }
 
+    if (isSoldOut || selectedTicketSoldOut) {
+      Alert.alert(t('commonErrorTitle'), t('eventDetailTicketSoldOutCta'));
+      return;
+    }
+
+    if (ticketTypes.length > 0) {
+      if (activeTab !== 'tickets') {
+        setActiveTab('tickets');
+        return;
+      }
+      setBookingSheetVisible(true);
+      return;
+    }
+
     if (bookingSubmissionLockRef.current || joining) {
+      return;
+    }
+
+    const clientRequestId = bookingRequestIdRef.current || generateBookingRequestId();
+    bookingRequestIdRef.current = clientRequestId;
+    bookingSubmissionLockRef.current = true;
+    setJoining(true);
+
+    try {
+      const reserved = await createEventBooking(
+        event.id,
+        undefined,
+        undefined,
+        clientRequestId,
+      );
+      setBooking(reserved);
+      bookingRequestIdRef.current = null;
+
+      if ((reserved.status || '').toUpperCase() === 'CONFIRMED') {
+        Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
+      }
+
+      router.push({
+        pathname: '/my-ticket/[id]',
+        params: {
+          id: reserved.id,
+        },
+      });
+    } catch (error) {
+      const message = getApiErrorMessage(error, t('eventDetailJoinFailed'));
+      Alert.alert(t('commonErrorTitle'), message);
+    } finally {
+      setJoining(false);
+      bookingSubmissionLockRef.current = false;
+    }
+  }, [
+    booking,
+    event,
+    hasActiveBooking,
+    isSoldOut,
+    joining,
+    router,
+    selectedTicketSoldOut,
+    ticketTypes.length,
+    activeTab,
+    t,
+  ]);
+
+  const handleConfirmBooking = useCallback(async () => {
+    if (!event || bookingSubmissionLockRef.current || joining) {
       return;
     }
 
     if (ticketTypes.length > 0 && !selectedTicketTypeId) {
       Alert.alert(t('commonErrorTitle'), t('eventDetailTicketTypeRequired'));
-      return;
-    }
-
-    if (isSoldOut || selectedTicketSoldOut) {
-      Alert.alert(t('commonErrorTitle'), t('eventDetailTicketSoldOutCta'));
       return;
     }
 
@@ -477,8 +539,11 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
       );
       setBooking(reserved);
       bookingRequestIdRef.current = null;
+      setBookingSheetVisible(false);
 
-      Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
+      if ((reserved.status || '').toUpperCase() === 'CONFIRMED') {
+        Alert.alert(t('eventDetailJoinSuccessTitle'), t('eventDetailJoinSuccessMessage'));
+      }
 
       router.push({
         pathname: '/my-ticket/[id]',
@@ -495,14 +560,10 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
       bookingSubmissionLockRef.current = false;
     }
   }, [
-    booking,
     event,
-    hasActiveBooking,
-    isSoldOut,
     joining,
     promoCode,
     router,
-    selectedTicketSoldOut,
     selectedTicketTypeId,
     t,
     ticketTypes.length,
@@ -542,6 +603,8 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
     booking,
     reportSheetVisible,
     setReportSheetVisible,
+    bookingSheetVisible,
+    setBookingSheetVisible,
     heroMuted,
     setHeroMuted,
     joining,
@@ -591,6 +654,7 @@ export function useEventDetail(eventId?: string, initialTab?: string) {
     handleOpenPublications,
     handleClosePublications,
     handlePrimaryAction,
+    handleConfirmBooking,
     handlePromoChange,
     handleReportEvent,
     handleSubmitReportReason,

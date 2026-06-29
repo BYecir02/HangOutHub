@@ -1,4 +1,5 @@
 ﻿import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
@@ -749,6 +750,50 @@ export class AuthService {
         where: { userId: user.id },
       }),
     ]);
+
+    return { success: true };
+  }
+
+  // Changement de mot de passe pour un utilisateur connecte : on exige le mot
+  // de passe actuel (anti-detournement de session) et on refuse un mot de passe
+  // identique. La session courante reste valide (pas de deconnexion forcee).
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user || !user.passwordHash) {
+      throw new ForbiddenException('Utilisateur introuvable.');
+    }
+
+    const isCurrentValid = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash,
+    );
+
+    if (!isCurrentValid) {
+      throw new ForbiddenException('Mot de passe actuel incorrect.');
+    }
+
+    const isSameAsCurrent = await bcrypt.compare(newPassword, user.passwordHash);
+
+    if (isSameAsCurrent) {
+      throw new BadRequestException(
+        "Le nouveau mot de passe doit etre different de l'ancien.",
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
 
     return { success: true };
   }

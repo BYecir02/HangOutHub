@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useOrganizerGuard } from '@/features/organizer/hooks/useOrganizerGuard';
 import { useUserProfile } from '@/features/user/hooks/useUserProfile';
 import {
@@ -150,7 +151,7 @@ export default function DashboardScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -177,7 +178,7 @@ export default function DashboardScreen() {
   if (!user || !isAllowed) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }

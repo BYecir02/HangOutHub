@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   Text,
   TextInput,
@@ -11,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import api from '@/services/api';
 import { getCache, setCache } from '@/services/api/dataCache';
 import {
@@ -34,12 +34,25 @@ type CountryOption = {
   name: string;
 };
 
+// Comparaison de pays insensible a la casse ET aux accents : en base le pays
+// est stocke sans accent ("Benin") alors que l'i18n FR affiche "Benin" avec
+// accent. Sans ca, le filtre ville/pays rejette tout.
+function normalizeCountry(value?: string | null): string {
+  return (
+    value
+      ?.normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .trim()
+      .toLowerCase() || ''
+  );
+}
+
 export default function LocationScreen() {
   const router = useRouter();
   const { t } = useI18n();
-  const cachedCities = getCache<CityOption[]>('cities');
-  const [cities, setCities] = useState<CityOption[]>(cachedCities ?? []);
-  const [loading, setLoading] = useState(!cachedCities);
+  const initialCachedCities = getCache<CityOption[]>('cities');
+  const [cities, setCities] = useState<CityOption[]>(initialCachedCities ?? []);
+  const [loading, setLoading] = useState(!initialCachedCities);
   const [locationQuery, setLocationQuery] = useState('');
   const [selectedLocation, setSelectedLocation] =
     useState<StoredLocation | null>(null);
@@ -69,6 +82,7 @@ export default function LocationScreen() {
     let isMounted = true;
 
     const loadCities = async () => {
+      const cachedCities = getCache<CityOption[]>('cities');
       setLoading(!cachedCities);
       try {
         const response = await api.get<CityOption[]>('/cities');
@@ -93,17 +107,15 @@ export default function LocationScreen() {
     return () => {
       isMounted = false;
     };
-  }, [cachedCities]);
+  }, []);
 
   const defaultCountry = t('homeLocationCountry');
   const selectedCountry = selectedLocation?.country;
-  const normalizedDefaultCountry = defaultCountry.trim().toLowerCase();
+  const normalizedDefaultCountry = normalizeCountry(defaultCountry);
   const effectiveCountry =
     selectedCountry || (selectedLocation?.cityName ? defaultCountry : undefined);
 
-  const normalizedSelectedCountry = effectiveCountry
-    ? effectiveCountry.trim().toLowerCase()
-    : '';
+  const normalizedSelectedCountry = normalizeCountry(effectiveCountry);
 
   const countryOptions = useMemo<CountryOption[]>(() => {
     const unique = new Set<string>();
@@ -126,8 +138,7 @@ export default function LocationScreen() {
     const normalizedQuery = locationQuery.trim().toLowerCase();
 
     return cities.filter((city) => {
-      const cityCountry =
-        city.country?.trim().toLowerCase() || normalizedDefaultCountry;
+      const cityCountry = normalizeCountry(city.country) || normalizedDefaultCountry;
 
       if (normalizedSelectedCountry && cityCountry !== normalizedSelectedCountry) {
         return false;
@@ -161,7 +172,7 @@ export default function LocationScreen() {
       return false;
     }
 
-    return effectiveCountry.toLowerCase() === country.name.toLowerCase();
+    return normalizeCountry(effectiveCountry) === normalizeCountry(country.name);
   };
 
   const isCitySelected = (city: CityOption) => {
@@ -318,7 +329,7 @@ export default function LocationScreen() {
           <View className="mt-4">
             {loading && cities.length === 0 ? (
               <View className="items-center py-6">
-                <ActivityIndicator size="small" color="#4c669f" />
+                <LogoSpinner size={22} />
               </View>
             ) : (
               <>

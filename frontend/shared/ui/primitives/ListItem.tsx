@@ -43,6 +43,10 @@ export default function ListItem({
       onPress={onPress}
       activeOpacity={0.9}
       disabled={disabled || !onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? title : undefined}
+      accessibilityHint={onPress && subtitle ? subtitle : undefined}
+      accessibilityState={onPress ? { disabled } : undefined}
       className={`flex-row items-center ${compact ? 'px-4 py-3' : 'px-4 py-4'} ${withBorder ? 'border-b border-gray-100 dark:border-gray-800' : ''} ${disabled ? 'opacity-60' : ''} ${className}`.trim()}
       style={style}
     >

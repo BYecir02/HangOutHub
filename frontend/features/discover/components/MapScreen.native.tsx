@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,11 +9,13 @@ import * as Location from 'expo-location';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useLocationScope } from '@/shared/hooks/useLocationScope';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import EventInspirationCard from '@/features/events/components/EventInspirationCard';
 import MasonryGrid from '@/shared/ui/MasonryGrid';
 import MediaFrame from '@/shared/ui/MediaFrame';
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
 import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
+import { usePlaceSaveSet } from '@/features/places/hooks/usePlaceSaveSet';
 import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
 import { getMapFriendsActivity } from '@/services/social/activity';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
@@ -278,7 +280,6 @@ function MapSuggestionsMasonry({
               onToggleSave={() => onToggleSavePlace(place.id)}
               saving={isSavingPlace(place.id)}
               shouldPlay={activeItemId === tile.id && !isPanelOpen}
-              adaptiveHeight={false}
             />
           );
         }
@@ -303,7 +304,6 @@ function MapSuggestionsMasonry({
             })}
             onPress={() => onPressEvent(event)}
             shouldPlay={activeItemId === tile.id}
-            adaptiveHeight={false}
           />
         );
       }}
@@ -332,8 +332,8 @@ export default function MapScreen() {
   const [activeLayer, setActiveLayer] = useState<MapLayer>('all');
   const [useMyLocation, setUseMyLocation] = useState(false);
   const [radiusKm, setRadiusKm] = useState(5);
-  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
-  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const { savedPlaceIds, setSavedPlaceIds, savingPlaceIds, toggleSave } =
+    usePlaceSaveSet();
   const [userCoords, setUserCoords] = useState<{
     latitude: number;
     longitude: number;
@@ -431,62 +431,6 @@ export default function MapScreen() {
     }
   }, [router]);
 
-  const handleTogglePlaceSave = useCallback(
-    async (placeId: string) => {
-      const token = await storage.getItem('userToken');
-
-      if (!token) {
-        Alert.alert(
-          t('placeDetailLoginRequiredTitle'),
-          t('placeDetailLoginRequiredMessage'),
-        );
-        return;
-      }
-
-      if (savingPlaceIds.has(placeId)) {
-        return;
-      }
-
-      setSavingPlaceIds((current) => {
-        const next = new Set(current);
-        next.add(placeId);
-        return next;
-      });
-
-      try {
-        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
-        setSavedPlaceIds((current) => {
-          const next = new Set(current);
-          if (response.data.saved) {
-            next.add(placeId);
-          } else {
-            next.delete(placeId);
-          }
-          return next;
-        });
-      } catch (error) {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'response' in error &&
-          (error as { response?: { status?: number } }).response?.status === 401
-        ) {
-          await clearAuthState();
-          router.replace('/');
-          return;
-        }
-
-        Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
-      } finally {
-        setSavingPlaceIds((current) => {
-          const next = new Set(current);
-          next.delete(placeId);
-          return next;
-        });
-      }
-    },
-    [router, savingPlaceIds, t],
-  );
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -1310,7 +1254,7 @@ export default function MapScreen() {
               >
                 {selectedPlaceDetailsLoading ? (
                   <View className="h-32 items-center justify-center">
-                    <ActivityIndicator size="large" color="#2ecc71" />
+                    <LogoSpinner size={44} />
                   </View>
                 ) : (
                   <MediaFrame
@@ -1417,7 +1361,7 @@ export default function MapScreen() {
             onPressEvent={focusOnEvent}
             isPlaceSaved={(placeId) => savedPlaceIds.has(placeId)}
             isSavingPlace={(placeId) => savingPlaceIds.has(placeId)}
-            onToggleSavePlace={(placeId) => void handleTogglePlaceSave(placeId)}
+            onToggleSavePlace={(placeId) => void toggleSave(placeId)}
             registerLayout={mapSuggestionAutoplay.registerLayout}
           />
         ) : activeLayer === 'events' ? (

@@ -303,12 +303,21 @@ model OutingParticipant {
 }
 
 model Payment {
-  id        String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  bookingId String  @db.Uuid
-  amount    Decimal @db.Decimal(10, 2)
-  provider  String  @db.VarChar(50)
-  status    String? @default("PENDING") @db.VarChar(20)
-  Booking   Booking @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bookingId     String   @db.Uuid
+  amount        Decimal  @db.Decimal(10, 2)
+  provider      String   @db.VarChar(50)
+  status        String?  @default("PENDING") @db.VarChar(20)
+  // Intégration prestataire (FedaPay) : id de transaction + page de paiement.
+  transactionId String?  @db.VarChar(100)
+  reference     String?  @db.VarChar(100)
+  paymentUrl    String?  @db.VarChar(512)
+  currency      String?  @default("XOF") @db.VarChar(8)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  Booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([transactionId])
 }
 
 model Permission {

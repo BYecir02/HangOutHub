@@ -335,6 +335,12 @@ export class EventsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Get(':id/attendees-preview')
+  getAttendeesPreview(@Param('id', ParseUUIDPipe) id: string) {
+    return this.eventsService.getAttendeesPreview(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id/attend')
   getAttendance(
     @Req() req: AuthenticatedRequest,

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import {
   formatEventDate,
   formatStatusLabel,
@@ -212,7 +213,7 @@ export default function OutingDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <ActivityIndicator size="large" color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }

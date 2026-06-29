@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { formatPrice } from '@/services/shared/formatters';
@@ -16,14 +16,6 @@ type EventDetailTicketsTabProps = {
   selectedTicketTypeId: string;
   setSelectedTicketTypeId: (id: string) => void;
   availableTicketTypes: NonNullable<EventDetail['TicketType']>;
-  promoCode: string;
-  onChangePromoCode: (value: string) => void;
-  promoError: string;
-  joining: boolean;
-  hasActiveBooking: boolean;
-  isSoldOut: boolean;
-  selectedTicketType: NonNullable<EventDetail['TicketType']>[number] | undefined;
-  displayPrice: number | string | null | undefined;
   showCancellationDetails: boolean;
   setShowCancellationDetails: (value: boolean | ((prev: boolean) => boolean)) => void;
   showRefundDetails: boolean;
@@ -38,14 +30,6 @@ export default function EventDetailTicketsTab({
   selectedTicketTypeId,
   setSelectedTicketTypeId,
   availableTicketTypes,
-  promoCode,
-  onChangePromoCode,
-  promoError,
-  joining,
-  hasActiveBooking,
-  isSoldOut,
-  selectedTicketType,
-  displayPrice,
   showCancellationDetails,
   setShowCancellationDetails,
   showRefundDetails,
@@ -141,71 +125,18 @@ export default function EventDetailTicketsTab({
         )}
       </View>
 
-      <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
-        <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-          {t('eventDetailPromoCodeTitle')}
-        </Text>
-        <TextInput
-          value={promoCode}
-          onChangeText={onChangePromoCode}
-          placeholder={t('eventDetailPromoCodePlaceholder')}
-          className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-base text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={20}
-          editable={!joining && !hasActiveBooking && !isSoldOut}
-        />
-        <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          {t('eventDetailPromoCodeHint')}
-        </Text>
-        {promoError ? (
-          <Text className="mt-2 text-xs text-red-500 dark:text-red-400">
-            {promoError}
-          </Text>
-        ) : null}
-      </View>
+      <View className="h-px bg-gray-100 dark:bg-gray-800 mt-6" />
 
-      <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
-        <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
-          {t('eventDetailBookingSummaryTitle')}
-        </Text>
-        <View className="mt-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
-          <View className="flex-row items-center justify-between gap-3">
-            <Text className="flex-1 text-sm font-semibold text-gray-800 dark:text-gray-100">
-              {selectedTicketType?.name || t('eventDetailBookingSummaryTicketLabel')}
-            </Text>
-            <Text className="text-sm font-bold text-[#ff4757]">
-              {formatPrice(selectedTicketType?.price || displayPrice, locale, {
-                freeLabel: t('homePriceFree'),
-              })}
-            </Text>
-          </View>
-          {selectedTicketType ? (
-            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {selectedTicketType.quantity <= 0
-                ? t('eventDetailTicketSoldOut')
-                : t('eventDetailTicketRemaining', {
-                    count: selectedTicketType.quantity,
-                  })}
-            </Text>
-          ) : (
-            <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {t('eventDetailBookingSummaryFixedPrice')}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      <View className="mt-6 rounded-3xl bg-white p-5 dark:bg-gray-900">
+      <View className="mt-6 px-1">
         <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
           {t('eventDetailPoliciesTitle')}
         </Text>
-        <View className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <View className="mt-3 overflow-hidden rounded-2xl bg-gray-50 dark:bg-gray-800">
           <TouchableOpacity
             onPress={() => setShowCancellationDetails((prev) => !prev)}
             className="flex-row items-center p-4"
           >
-            <Ionicons name="information-circle-outline" size={22} color="#4c669f" />
+            <Ionicons name="information-circle-outline" size={22} color="#ff4757" />
             <Text className="ml-3 flex-1 text-base font-semibold text-gray-800 dark:text-gray-100">
               {t('eventDetailCancellationPolicyTitle')}
             </Text>
@@ -224,9 +155,9 @@ export default function EventDetailTicketsTab({
           ) : null}
           <TouchableOpacity
             onPress={() => setShowRefundDetails((prev) => !prev)}
-            className="flex-row items-center border-t border-gray-100 p-4 dark:border-gray-800"
+            className="flex-row items-center border-t border-gray-200 p-4 dark:border-gray-700"
           >
-            <Ionicons name="information-circle-outline" size={22} color="#4c669f" />
+            <Ionicons name="information-circle-outline" size={22} color="#ff4757" />
             <Text className="ml-3 flex-1 text-base font-semibold text-gray-800 dark:text-gray-100">
               {t('eventDetailRefundPolicyTitle')}
             </Text>
@@ -247,23 +178,26 @@ export default function EventDetailTicketsTab({
       </View>
 
       {event.Promotion?.length ? (
-        <View className="mt-6 rounded-3xl bg-gray-50 p-5 dark:bg-gray-800">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white">
-            Promotions
-          </Text>
-          <View className="mt-3 gap-2">
-            {event.Promotion.map((promotion) => (
-              <View
-                key={promotion.id}
-                className="rounded-2xl bg-white px-4 py-3 dark:bg-gray-900"
-              >
-                <Text className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {promotion.code || promotion.id}
-                </Text>
-              </View>
-            ))}
+        <>
+          <View className="h-px bg-gray-100 dark:bg-gray-800 mt-6" />
+          <View className="mt-6 px-1">
+            <Text className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              Promotions
+            </Text>
+            <View className="mt-3 gap-2">
+              {event.Promotion.map((promotion) => (
+                <View
+                  key={promotion.id}
+                  className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800"
+                >
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {promotion.code || promotion.id}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        </>
       ) : null}
     </View>
   );

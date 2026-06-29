@@ -1,6 +1,7 @@
 import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { uiTokens } from '@/theme/tokens';
 
 type ScreenStateMode = 'loading' | 'error' | 'empty' | 'warning';
@@ -50,7 +51,7 @@ export default function ScreenState({
   if (mode === 'loading') {
     return (
       <View className={`${wrapperClassName} ${containerClassName}`.trim()}>
-        <ActivityIndicator size="large" color="#4c669f" />
+        <LogoSpinner size={44} />
         {title ? (
           <Text className="mt-3 text-sm font-medium text-gray-600 dark:text-gray-300">
             {title}

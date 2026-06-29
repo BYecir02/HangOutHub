@@ -12,6 +12,7 @@ import {
   LoadingState,
   PageHeader,
   Pagination,
+  Select,
   StatusBadge,
   Table,
   TBody,
@@ -44,6 +45,7 @@ export function PlacesPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const { data, isLoading, isError, refetch } = usePlaces();
   const { data: categories } = useCategories();
   const deleteMutation = useDeletePlace();
@@ -76,6 +78,9 @@ export function PlacesPage() {
         (p) => (p.moderationStatus ?? 'PENDING').toUpperCase() === status,
       );
     }
+    if (categoryFilter !== 'ALL') {
+      list = list.filter((p) => getPlaceCategories(p).includes(categoryFilter));
+    }
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((p) =>
@@ -85,7 +90,7 @@ export function PlacesPage() {
       );
     }
     return list;
-  }, [data, status, query]);
+  }, [data, status, categoryFilter, query, categoryNameById]);
 
   const { page, setPage, pageSize, setPageSize, total, totalPages, pageItems } =
     usePagination(places);
@@ -131,14 +136,28 @@ export function PlacesPage() {
             </button>
           ))}
         </div>
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un lieu, une ville…"
-            className="pl-9"
-          />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center w-full sm:w-auto">
+          <Select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full sm:w-48"
+          >
+            <option value="ALL">Toutes les catégories</option>
+            {categories?.map((cat) => (
+              <option key={cat.id} value={cat.name}>
+                {cat.name}
+              </option>
+            ))}
+          </Select>
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Rechercher un lieu, une ville…"
+              className="pl-9"
+            />
+          </div>
         </div>
       </div>
 

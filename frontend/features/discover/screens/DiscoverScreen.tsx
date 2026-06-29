@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -17,6 +18,7 @@ import { EntityRowCard } from '@/shared/ui/EntityCard';
 import LocationScopeBar from '@/shared/ui/LocationScopeBar';
 import ScreenState from '@/shared/ui/ScreenState';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { useDiscoverScreen } from '@/features/discover/hooks/useDiscoverScreen';
 import { uiTokens } from '@/theme/tokens';
 
@@ -145,19 +147,35 @@ export default function DiscoverScreen() {
           onLayout={discoverAutoplay.onLayout}
           onScroll={discoverAutoplay.onScroll}
           scrollEventThrottle={16}
+          alwaysBounceVertical
+          contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#f39c12"
-            />
+            Platform.OS === 'android' ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                progressViewOffset={-500}
+              />
+            ) : undefined
           }
+          onScrollEndDrag={(event) => {
+            if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+              void handleRefresh();
+            }
+          }}
           contentContainerStyle={{
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
           showsVerticalScrollIndicator={false}
         >
+          {Platform.OS === 'ios' ? (
+            <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+              <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                <LogoSpinner size={26} />
+              </View>
+            </View>
+          ) : null}
           <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
             {t('discoverSuggestionsCount', { count: filteredItems.length })}
           </Text>
@@ -192,18 +210,36 @@ export default function DiscoverScreen() {
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
+          alwaysBounceVertical
+          contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#f39c12"
-            />
+            Platform.OS === 'android' ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                progressViewOffset={-500}
+              />
+            ) : undefined
           }
+          onScrollEndDrag={(event) => {
+            if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+              void handleRefresh();
+            }
+          }}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              {t('discoverSuggestionsCount', { count: filteredItems.length })}
-            </Text>
+            <View>
+              {Platform.OS === 'ios' ? (
+                <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+                  <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                    <LogoSpinner size={26} />
+                  </View>
+                </View>
+              ) : null}
+              <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
+                {t('discoverSuggestionsCount', { count: filteredItems.length })}
+              </Text>
+            </View>
           }
           ListEmptyComponent={
             <DiscoverEmptyState
@@ -225,6 +261,14 @@ export default function DiscoverScreen() {
           )}
         />
       )}
+
+      {refreshing && Platform.OS === 'android' ? (
+        <View pointerEvents="none" className="absolute inset-x-0 z-10 items-center" style={{ top: 90 }}>
+          <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+            <LogoSpinner size={26} />
+          </View>
+        </View>
+      ) : null}
     </CatalogScreenLayout>
   );
 }

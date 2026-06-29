@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import BottomSheetModal from '@/shared/ui/BottomSheetModal';
+import { haptics } from '@/services/shared/haptics';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import type { StoredLocation } from '@/services/shared/location-preferences';
 
@@ -56,8 +57,8 @@ export default function LocationFilterSheet({
     () => selectedLocation?.country?.trim() || defaultCountry,
     [defaultCountry, selectedLocation?.country],
   );
-  const normalizedDefaultCountry = defaultCountry.trim().toLowerCase();
-  const normalizedLockedCountry = lockedCountry.trim().toLowerCase();
+  const normalizedDefaultCountry = normalize(defaultCountry);
+  const normalizedLockedCountry = normalize(lockedCountry);
   const allCitiesSelected =
     !selectedLocation ||
     selectedLocation.mode === 'all' ||
@@ -67,8 +68,7 @@ export default function LocationFilterSheet({
     const normalizedQuery = normalize(query);
     return [...cities]
       .filter((city) => {
-        const cityCountry =
-          city.country?.trim().toLowerCase() || normalizedDefaultCountry;
+        const cityCountry = normalize(city.country || '') || normalizedDefaultCountry;
 
         if (cityCountry !== normalizedLockedCountry) {
           return false;
@@ -123,6 +123,7 @@ export default function LocationFilterSheet({
         <View className="mt-6">
           <TouchableOpacity
             onPress={() => {
+              haptics.selection();
               setQuery('');
               if (onSelectAllCities) {
                 onSelectAllCities();
@@ -169,6 +170,7 @@ export default function LocationFilterSheet({
                     <TouchableOpacity
                       key={city.id}
                       onPress={() => {
+                        haptics.selection();
                         setQuery('');
                         onSelectCity(city);
                       }}

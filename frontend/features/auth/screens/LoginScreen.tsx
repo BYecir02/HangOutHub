@@ -35,7 +35,7 @@ import { useAuthBootstrap } from '@/context/auth-bootstrap';
 const LOGIN_HIGHLIGHTS = [
   { icon: 'musical-notes-outline', labelKey: 'loginHighlightEventsLive' },
   { icon: 'wine-outline', labelKey: 'loginHighlightRooftops' },
-  { icon: 'location-outline', labelKey: 'loginHighlightCotonouSpots' },
+  { icon: 'people-outline', labelKey: 'loginHighlightCotonouSpots' },
 ] as const;
 
 export default function LoginScreen() {

@@ -163,6 +163,9 @@ export default function Button({
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       className={`${fullWidth ? 'w-full' : 'self-start'} overflow-hidden rounded-full ${sizeStyles.container} ${className}`.trim()}
       style={containerStyle}
     >

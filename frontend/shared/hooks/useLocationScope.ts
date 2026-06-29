@@ -21,7 +21,13 @@ interface LocationCandidate {
 }
 
 function normalizeValue(value?: string | null): string {
-  return value?.trim().toLowerCase() || '';
+  return (
+    value
+      ?.normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .trim()
+      .toLowerCase() || ''
+  );
 }
 
 export function useLocationScope(options: UseLocationScopeOptions) {

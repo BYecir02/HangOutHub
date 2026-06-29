@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import api, { clearAuthState, isUnauthorizedError, storage } from '@/services/api';
@@ -8,6 +7,7 @@ import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/fo
 import { getFriendshipOverview } from '@/services/user/friendships';
 import { getRecommendationOnboardingPreferences } from '@/services/shared/recommendation-onboarding';
 import { setStoredLocation, type StoredLocation } from '@/services/shared/location-preferences';
+import { usePlaceSaveSet } from '@/features/places/hooks/usePlaceSaveSet';
 import { resolveStoredUserSession } from '@/services/auth/user-session';
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useLocationScope } from '@/shared/hooks/useLocationScope';
@@ -337,8 +337,8 @@ export function useHomeScreen() {
   const cachedHomeEvents = getCache<HomeEvent[]>('homeEvents');
   const [events, setEvents] = useState<HomeEvent[]>(cachedHomeEvents ?? []);
   const [places, setPlaces] = useState<HomePlace[]>([]);
-  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
-  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const { savedPlaceIds, setSavedPlaceIds, savingPlaceIds, toggleSave } =
+    usePlaceSaveSet();
   const [notificationCount, setNotificationCount] = useState(0);
   const [recommendationPreferences, setRecommendationPreferences] =
     useState<RecommendationPreferencesSnapshot>({
@@ -505,58 +505,6 @@ export function useHomeScreen() {
       setSavedPlaceIds(new Set());
     }
   }, [router]);
-
-  const handleTogglePlaceSave = useCallback(
-    async (placeId: string) => {
-      const token = await storage.getItem('userToken');
-
-      if (!token) {
-        Alert.alert(
-          t('placeDetailLoginRequiredTitle'),
-          t('placeDetailLoginRequiredMessage'),
-        );
-        return;
-      }
-
-      if (savingPlaceIds.has(placeId)) {
-        return;
-      }
-
-      setSavingPlaceIds((current) => {
-        const next = new Set(current);
-        next.add(placeId);
-        return next;
-      });
-
-      try {
-        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
-        setSavedPlaceIds((current) => {
-          const next = new Set(current);
-          if (response.data.saved) {
-            next.add(placeId);
-          } else {
-            next.delete(placeId);
-          }
-          return next;
-        });
-      } catch (error) {
-        if (isUnauthorizedError(error)) {
-          await clearAuthState();
-          router.replace('/');
-          return;
-        }
-
-        Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
-      } finally {
-        setSavingPlaceIds((current) => {
-          const next = new Set(current);
-          next.delete(placeId);
-          return next;
-        });
-      }
-    },
-    [router, savingPlaceIds, t],
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -755,7 +703,7 @@ export function useHomeScreen() {
     categories,
     featuredInspiration,
     handleCategoryPress,
-    handleTogglePlaceSave,
+    handleTogglePlaceSave: toggleSave,
     hasPersonalization,
     loading,
     locationLabel: locationValueLabel,

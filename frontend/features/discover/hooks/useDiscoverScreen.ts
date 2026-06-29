@@ -20,6 +20,7 @@ import api, {
   storage,
 } from '@/services/api';
 import { getCache, setCache } from '@/services/api/dataCache';
+import { usePlaceSaveSet } from '@/features/places/hooks/usePlaceSaveSet';
 import { formatEventDate } from '@/services/shared/formatters';
 import { getRecommendationOnboardingPreferences } from '@/services/shared/recommendation-onboarding';
 import { resolveStoredUserSession } from '@/services/auth/user-session';
@@ -46,8 +47,8 @@ export function useDiscoverScreen() {
   const [activeFilter, setActiveFilter] = useState<DiscoverFilter>('all');
   const [viewMode, setViewMode] = useState<DiscoverViewMode>('inspiration');
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
-  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const { savedPlaceIds, setSavedPlaceIds, savingPlaceIds, toggleSave } =
+    usePlaceSaveSet();
   const [recommendationPreferences, setRecommendationPreferences] =
     useState<RecommendationPreferencesSnapshot>({
       tagIds: [],
@@ -161,63 +162,6 @@ export function useDiscoverScreen() {
   useEffect(() => {
     void loadSavedPlaces();
   }, [loadSavedPlaces]);
-
-  const handleTogglePlaceSave = useCallback(
-    async (placeId: string) => {
-      const token = await storage.getItem('userToken');
-
-      if (!token) {
-        return;
-      }
-
-      let canProceed = false;
-      setSavingPlaceIds((current) => {
-        if (current.has(placeId)) {
-          return current;
-        }
-
-        const next = new Set(current);
-        next.add(placeId);
-        canProceed = true;
-        return next;
-      });
-
-      if (!canProceed) {
-        return;
-      }
-
-      try {
-        const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
-        setSavedPlaceIds((current) => {
-          const next = new Set(current);
-          if (response.data.saved) {
-            next.add(placeId);
-          } else {
-            next.delete(placeId);
-          }
-          return next;
-        });
-      } catch (error) {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'response' in error &&
-          (error as { response?: { status?: number } }).response?.status === 401
-        ) {
-          await clearAuthState();
-          router.replace('/');
-          return;
-        }
-      } finally {
-        setSavingPlaceIds((current) => {
-          const next = new Set(current);
-          next.delete(placeId);
-          return next;
-        });
-      }
-    },
-    [router],
-  );
 
   const filterOptions = useMemo(
     () => [
@@ -425,7 +369,7 @@ export function useDiscoverScreen() {
     filterOptions,
     viewOptions,
     handleRefresh,
-    handleTogglePlaceSave,
+    handleTogglePlaceSave: toggleSave,
     handlePressItem,
     handleBack,
     handleOpenLocation,

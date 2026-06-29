@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -9,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -24,6 +24,7 @@ import MasonryGrid from '@/shared/ui/MasonryGrid';
 import LocationScopeBar from '@/shared/ui/LocationScopeBar';
 import SearchBar from '@/shared/ui/SearchBar';
 import ScreenState from '@/shared/ui/ScreenState';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import api, { getApiErrorMessage, getImageUrl } from '@/services/api';
 import { getCache, setCache } from '@/services/api/dataCache';
 import { formatEventCardPriceLabel, formatEventDate } from '@/services/shared/formatters';
@@ -593,21 +594,37 @@ export default function EventsScreen() {
           onLayout={inspirationAutoplay.onLayout}
           onScroll={handleInspirationScroll}
           scrollEventThrottle={16}
+          alwaysBounceVertical
+          contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                void fetchEvents(true);
-              }}
-              tintColor="#4c669f"
-            />
+            Platform.OS === 'android' ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  void fetchEvents(true);
+                }}
+                progressViewOffset={-500}
+              />
+            ) : undefined
           }
+          onScrollEndDrag={(event) => {
+            if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+              void fetchEvents(true);
+            }
+          }}
           contentContainerStyle={{
             paddingHorizontal: uiTokens.spacing.screenX,
             paddingBottom: 120,
           }}
           showsVerticalScrollIndicator={false}
         >
+          {Platform.OS === 'ios' ? (
+            <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+              <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                <LogoSpinner size={26} />
+              </View>
+            </View>
+          ) : null}
           <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
             {t('eventsResultsCount', { count: filteredEvents.length })}
           </Text>
@@ -641,7 +658,7 @@ export default function EventsScreen() {
           )}
           {loadingMore ? (
             <View className="items-center py-6">
-              <ActivityIndicator size="small" color="#4c669f" />
+              <LogoSpinner size={22} />
             </View>
           ) : null}
         </ScrollView>
@@ -655,9 +672,18 @@ export default function EventsScreen() {
           }}
           ItemSeparatorComponent={ListSeparator}
           ListHeaderComponent={
-            <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
-              {t('eventsResultsCount', { count: filteredEvents.length })}
-            </Text>
+            <View>
+              {Platform.OS === 'ios' ? (
+                <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+                  <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                    <LogoSpinner size={26} />
+                  </View>
+                </View>
+              ) : null}
+              <Text className="pb-4 text-sm text-gray-500 dark:text-gray-400">
+                {t('eventsResultsCount', { count: filteredEvents.length })}
+              </Text>
+            </View>
           }
           ListEmptyComponent={
             <View className="items-center rounded-3xl bg-white px-6 py-12 dark:bg-gray-900">
@@ -669,15 +695,24 @@ export default function EventsScreen() {
               </Text>
             </View>
           }
+          alwaysBounceVertical
+          contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                void fetchEvents(true);
-              }}
-              tintColor="#4c669f"
-            />
+            Platform.OS === 'android' ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  void fetchEvents(true);
+                }}
+                progressViewOffset={-500}
+              />
+            ) : undefined
           }
+          onScrollEndDrag={(event) => {
+            if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+              void fetchEvents(true);
+            }
+          }}
           renderItem={renderListEventItem}
           onEndReached={() => {
             void loadMoreEvents();
@@ -686,12 +721,20 @@ export default function EventsScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View className="items-center py-6">
-                <ActivityIndicator size="small" color="#4c669f" />
+                <LogoSpinner size={22} />
               </View>
             ) : null
           }
         />
       )}
+
+      {refreshing && Platform.OS === 'android' ? (
+        <View pointerEvents="none" className="absolute inset-x-0 z-10 items-center" style={{ top: 90 }}>
+          <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+            <LogoSpinner size={26} />
+          </View>
+        </View>
+      ) : null}
     </CatalogScreenLayout>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -16,6 +15,7 @@ import PlaceGalleryModal from '@/features/places/components/PlaceGalleryModal';
 import PlacePublicationsPanel from '@/features/places/components/PlacePublicationsPanel';
 import PlaceReviewModal from '@/features/places/components/PlaceReviewModal';
 import ReportReasonSheet from '@/shared/ui/ReportReasonSheet';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { usePlaceDetail, type PlaceDetailTab } from '@/features/places/hooks/usePlaceDetail';
 import { getPlaceFriendsAttending, type FriendAttendee } from '@/services/social/activity';
 
@@ -53,7 +53,6 @@ export default function PlaceDetailScreen() {
     placePublicationsVisibility,
     publicationsPanelAStyle,
     publicationsPanelBStyle,
-    screenHeight,
     loadPlacePublications,
     handleOpenPublications,
     handleClosePublications,
@@ -108,7 +107,7 @@ export default function PlaceDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#2ecc71" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -154,13 +153,12 @@ export default function PlaceDetailScreen() {
             friendsAttending={friendsAttending}
           />
 
-          <View className="relative overflow-hidden" style={{ minHeight: screenHeight }}>
+          <View className="relative">
             <Animated.View
-              className="absolute inset-0 overflow-hidden"
               style={publicationsPanelAStyle}
               pointerEvents={publicationsOpen ? 'none' : 'auto'}
             >
-              <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+              <View>
                 <PlaceDetailContent
                   place={place}
                   activeTab={activeTab}
@@ -185,7 +183,7 @@ export default function PlaceDetailScreen() {
                 />
 
                 <View className="pb-24" />
-              </ScrollView>
+              </View>
             </Animated.View>
 
             {/* Panneau "Publications" du lieu masque temporairement (reseau social en veille).

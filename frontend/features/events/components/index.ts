@@ -16,3 +16,5 @@ export { default as EventInspirationCard } from './EventInspirationCard';
 export * from './EventInspirationCard';
 export { default as EventFormWizard } from './EventFormWizard';
 export * from './EventFormWizard';
+export { default as EventBookingConfirmSheet } from './EventBookingConfirmSheet';
+export * from './EventBookingConfirmSheet';

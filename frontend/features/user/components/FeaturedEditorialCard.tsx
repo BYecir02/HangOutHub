@@ -75,7 +75,7 @@ export default function FeaturedEditorialCard({
         shadowRadius: 18,
         elevation: 10,
       }}
-      className="rounded-[26px] bg-white dark:bg-[#15171c]"
+      className="rounded-[26px] bg-white dark:bg-gray-900"
     >
       {/* L'affiche : montrée ENTIÈRE (contain), centrée sur un flou d'elle-même. */}
       <View

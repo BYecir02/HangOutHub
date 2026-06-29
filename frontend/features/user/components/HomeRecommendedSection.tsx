@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -11,6 +10,7 @@ import PlaceInspirationCard from '@/features/places/components/PlaceInspirationC
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
+import HomeSeeAllButton from './HomeSeeAllButton';
 import { estimateRecommendationCardHeight } from './home.utils';
 import type { HomeRecommendationItem, HomeVisibleLayout } from './home.types';
 
@@ -53,9 +53,7 @@ export default function HomeRecommendedSection({
         <Text className="mt-2 text-lg font-bold text-gray-800 dark:text-white">
           {title}
         </Text>
-        <TouchableOpacity onPress={onSeeAll}>
-          <Text className="text-xs font-medium text-[#ff4757]">{seeAllLabel}</Text>
-        </TouchableOpacity>
+        <HomeSeeAllButton label={seeAllLabel} onPress={onSeeAll} />
       </View>
 
       {loading ? (

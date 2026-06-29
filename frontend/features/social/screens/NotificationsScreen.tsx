@@ -4,6 +4,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
+  Platform,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -212,18 +214,35 @@ export default function NotificationsScreen() {
       </View>
 
       <ScrollView
-        className="flex-1 px-5 pb-10 pt-2"
+        className="flex-1 px-5 pb-10"
         showsVerticalScrollIndicator={false}
         // Pull-to-refresh "maison" : pas de RefreshControl natif (pas de rond
         // systeme). Sur iOS le ScrollView rebondit -> on detecte le tirage au
         // relachement. Retour visuel = notre LogoSpinner (overlay plus bas).
         alwaysBounceVertical
+        contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
+        refreshControl={
+          Platform.OS === 'android' ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              progressViewOffset={-500}
+            />
+          ) : undefined
+        }
         onScrollEndDrag={(event) => {
-          if (!refreshing && event.nativeEvent.contentOffset.y <= -80) {
+          if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
             void onRefresh();
           }
         }}
       >
+        {Platform.OS === 'ios' ? (
+          <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+            <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+              <LogoSpinner size={26} />
+            </View>
+          </View>
+        ) : null}
         {errorMessage ? (
           <ScreenState
             mode="warning"
@@ -242,7 +261,7 @@ export default function NotificationsScreen() {
           onChange={setActiveView}
           activeColor="#4c669f"
           horizontalPadding={0}
-          paddingTop={18}
+          paddingTop={4}
           paddingBottom={12}
         />
 
@@ -355,7 +374,7 @@ export default function NotificationsScreen() {
       </ScrollView>
 
       {/* Spinner brande affiche pendant le rafraichissement (pull-to-refresh). */}
-      {refreshing ? (
+      {refreshing && Platform.OS === 'android' ? (
         <View
           pointerEvents="none"
           className="absolute inset-x-0 z-10 items-center"

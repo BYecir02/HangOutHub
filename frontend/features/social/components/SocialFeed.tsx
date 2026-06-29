@@ -19,6 +19,7 @@ import { Platform } from 'react-native';
 
 import { useI18n } from '@/shared/hooks/use-i18n';
 import { useVisibleItemAutoplay } from '@/shared/hooks/useVisibleItemAutoplay';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import PersonRow from './PersonRow';
 import PostItem from './PostItem';
 import SocialFeedEmptyState from './SocialFeedEmptyState';
@@ -1366,7 +1367,7 @@ export default function SocialFeed() {
         ListFooterComponent={
           fetchingMore ? (
             <View className="items-center py-6">
-              <ActivityIndicator color="#4c669f" />
+              <LogoSpinner size={22} />
             </View>
           ) : null
         }

@@ -24,7 +24,10 @@ export default function EventCard({ title, date, location, imageUrl, price, onPr
       <View className="relative">
         <MediaFrame
           source={imageUrl}
-          className="h-36 w-full bg-gray-200 dark:bg-gray-800"
+          className="w-full bg-gray-200 dark:bg-gray-800"
+          adaptiveHeight
+          minHeight={100}
+          maxHeight={400}
         />
 
         <View className="absolute right-3 top-3">

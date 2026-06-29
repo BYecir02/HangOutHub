@@ -25,7 +25,7 @@ async function listenWithPortFallback(
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      await app.listen(currentPort);
+      await app.listen(currentPort, '0.0.0.0');
       return currentPort;
     } catch (error) {
       const maybeError = error as NodeJS.ErrnoException;

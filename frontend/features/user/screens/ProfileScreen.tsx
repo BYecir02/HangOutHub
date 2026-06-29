@@ -19,7 +19,8 @@ import type { PostItemData } from '@/features/social/components/PostItem';
 import PlaceInspirationCard from '@/features/places/components/PlaceInspirationCard';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
 import Tabs from '@/shared/ui/Tabs';
-import api, { clearAuthState, getImageUrl, storage } from '@/services/api';
+import { getImageUrl } from '@/services/api';
+import { usePlaceSaveSet } from '@/features/places/hooks/usePlaceSaveSet';
 import {
   canAccessOrganizerPanel, 
   getOrganizerEntryPath,
@@ -104,8 +105,13 @@ export default function ProfileScreen() {
     deletePost,
   } = useUserProfile();
   const [savedPlacesView, setSavedPlacesView] = useState(savedPlaces);
-  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(new Set());
-  const [savingPlaceIds, setSavingPlaceIds] = useState<Set<string>>(new Set());
+  const { savedPlaceIds, setSavedPlaceIds, savingPlaceIds, toggleSave } =
+    usePlaceSaveSet({
+      onUnsave: (placeId) =>
+        setSavedPlacesView((current) =>
+          current.filter((place) => place.id !== placeId),
+        ),
+    });
 
   const isProfessionalAccount =
     user?.role === 'ORGANIZER' || user?.role === 'PLACE_OWNER';
@@ -329,68 +335,6 @@ export default function ProfileScreen() {
         ? savedPlacesAutoplay
         : null;
 
-  const handleToggleSavedPlace = async (placeId: string) => {
-    const token = await storage.getItem('userToken');
-
-    if (!token) {
-      Alert.alert(
-        t('placeDetailLoginRequiredTitle'),
-        t('placeDetailLoginRequiredMessage'),
-      );
-      return;
-    }
-
-    if (savingPlaceIds.has(placeId)) {
-      return;
-    }
-
-    setSavingPlaceIds((current) => {
-      const next = new Set(current);
-      next.add(placeId);
-      return next;
-    });
-
-    try {
-      const response = await api.post<{ saved: boolean }>(`/places/${placeId}/save`);
-      const isSaved = response.data.saved;
-
-      setSavedPlaceIds((current) => {
-        const next = new Set(current);
-        if (isSaved) {
-          next.add(placeId);
-        } else {
-          next.delete(placeId);
-        }
-        return next;
-      });
-
-      if (!isSaved) {
-        setSavedPlacesView((current) =>
-          current.filter((place) => place.id !== placeId),
-        );
-      }
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error &&
-        (error as { response?: { status?: number } }).response?.status === 401
-      ) {
-        await clearAuthState();
-        router.replace('/');
-        return;
-      }
-
-      Alert.alert(t('commonErrorTitle'), t('placeDetailSaveUpdateFailed'));
-    } finally {
-      setSavingPlaceIds((current) => {
-        const next = new Set(current);
-        next.delete(placeId);
-        return next;
-      });
-    }
-  };
-
   if (loading && !user) {
     return (
       <ScrollView className="flex-1 bg-white dark:bg-black" showsVerticalScrollIndicator={false}>
@@ -523,6 +467,9 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                       key={option.key}
                       onPress={() => setOutingFilter(option.key as typeof outingFilter)}
+                      accessibilityRole="button"
+                      accessibilityLabel={option.label}
+                      accessibilityState={{ selected: active }}
                       className={`flex-1 items-center rounded-full px-3 py-2 ${
                         active ? 'bg-[#ff4757]' : 'bg-transparent'
                       }`}
@@ -629,7 +576,7 @@ export default function ProfileScreen() {
                               showSaveButton
                               isSaved={savedPlaceIds.has(place.id)}
                               saving={savingPlaceIds.has(place.id)}
-                              onToggleSave={() => handleToggleSavedPlace(place.id)}
+                              onToggleSave={() => toggleSave(place.id)}
                               shouldPlay={savedPlacesAutoplay.activeId === place.id}
                             />
                           </View>
@@ -822,6 +769,8 @@ export default function ProfileScreen() {
           <TouchableOpacity
             className="absolute right-5 top-12 z-10 rounded-full bg-gray-800/50 p-2"
             onPress={() => setPreviewImage(null)}
+            accessibilityRole="button"
+            accessibilityLabel={t('genericClose')}
           >
             <Ionicons name="close" size={28} color="white" />
           </TouchableOpacity>

@@ -6,13 +6,16 @@ import Tabs, { type TabItem } from '@/shared/ui/Tabs';
 import EventDetailInfoTab from '@/features/events/components/EventDetailInfoTab';
 import EventDetailTicketsTab from '@/features/events/components/EventDetailTicketsTab';
 import EventDetailGalleryTab from '@/features/events/components/EventDetailGalleryTab';
+import EventAttendeesRow from '@/features/events/components/EventAttendeesRow';
 import type { EventDetail, EventDetailTab } from '@/features/events/hooks/useEventDetail';
+import type { EventAttendeesPreview } from '@/services/social/activity';
 import type { TranslationKey } from '@/services/shared/i18n';
 
 type TranslateFn = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 type EventDetailContentProps = {
   event: EventDetail;
+  attendeesPreview: EventAttendeesPreview;
   t: TranslateFn;
   locale: string;
   tabItems: TabItem[];
@@ -46,6 +49,7 @@ type EventDetailContentProps = {
 
 export default function EventDetailContent({
   event,
+  attendeesPreview,
   t,
   locale,
   tabItems,
@@ -79,10 +83,10 @@ export default function EventDetailContent({
   return (
     <View className="-mt-3 rounded-t-[28px] bg-gray-50 px-5 pt-6 dark:bg-black">
       <Text className="text-3xl font-bold text-gray-900 dark:text-white">{event.title}</Text>
-      <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-        {eventLocationLabel}
-        {event.Place?.City?.name ? ` • ${event.Place.City.name}` : ''}
-      </Text>
+      <EventAttendeesRow
+        count={attendeesPreview.count}
+        attendees={attendeesPreview.attendees}
+      />
 
       <View className="mt-4">
         <TouchableOpacity
@@ -121,14 +125,6 @@ export default function EventDetailContent({
             selectedTicketTypeId={selectedTicketTypeId}
             setSelectedTicketTypeId={setSelectedTicketTypeId}
             availableTicketTypes={availableTicketTypes}
-            promoCode={promoCode}
-            onChangePromoCode={onChangePromoCode}
-            promoError={promoError}
-            joining={joining}
-            hasActiveBooking={hasActiveBooking}
-            isSoldOut={isSoldOut}
-            selectedTicketType={selectedTicketType}
-            displayPrice={displayPrice}
             showCancellationDetails={showCancellationDetails}
             setShowCancellationDetails={setShowCancellationDetails}
             showRefundDetails={showRefundDetails}

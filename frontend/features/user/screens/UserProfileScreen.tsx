@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   Text,
@@ -12,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '@/services/api';
 import PostItem from '@/features/social/components/PostItem';
 
@@ -120,7 +120,7 @@ export default function PublicProfileScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <ActivityIndicator size="large" color="#ff4757" />
+        <LogoSpinner size={44} />
       </View>
     );
   }

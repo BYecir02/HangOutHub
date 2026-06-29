@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -15,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import api, { clearAuthState, getImageUrl, isUnauthorizedError } from '@/services/api';
 import {
   buildMediaUploadPayload,
@@ -155,7 +158,7 @@ export default function EditProfileScreen() {
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator size="large" color="#ff4757" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -175,15 +178,28 @@ export default function EditProfileScreen() {
         };
 
   return (
-    <View className="flex-1 bg-gray-50 dark:bg-black">
+    <KeyboardAvoidingView
+      className="flex-1 bg-gray-50 dark:bg-black"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <View className="flex-row justify-between items-center px-5 pt-16 pb-4 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-black z-10">
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel={t('editProfileCancel')}
+        >
           <Text className="text-gray-500 dark:text-gray-400 text-lg">{t('editProfileCancel')}</Text>
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-800 dark:text-white">
           {t('editProfileTitle')}
         </Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving}>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saving}
+          accessibilityRole="button"
+          accessibilityLabel={t('editProfileSave')}
+          accessibilityState={{ disabled: saving, busy: saving }}
+        >
           {saving ? (
             <ActivityIndicator size="small" color="#ff4757" />
           ) : (
@@ -194,10 +210,16 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 48 }}
+      >
         <View className="items-center mb-6">
           <TouchableOpacity
             onPress={() => pickImage('cover')}
+            accessibilityRole="button"
+            accessibilityLabel={t('editProfileChangeCoverA11y')}
             className="w-full h-40 bg-gray-200 dark:bg-gray-900 relative"
           >
             <Image source={displayCover} className="w-full h-full opacity-80" />
@@ -208,6 +230,8 @@ export default function EditProfileScreen() {
 
           <TouchableOpacity
             onPress={() => pickImage('avatar')}
+            accessibilityRole="button"
+            accessibilityLabel={t('editProfileChangeAvatarA11y')}
             className="-mt-12 relative"
           >
             <Image
@@ -267,6 +291,6 @@ export default function EditProfileScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

@@ -52,7 +52,10 @@ export function EntityCoverCard({
     >
       <MediaFrame
         source={imageUrl}
-        className="h-52 w-full bg-gray-200 dark:bg-gray-800"
+        className="w-full bg-gray-200 dark:bg-gray-800"
+        adaptiveHeight
+        minHeight={150}
+        maxHeight={500}
       />
 
       <View className="p-5">
@@ -102,7 +105,10 @@ export function EntityRowCard({
     >
       <MediaFrame
         source={imageUrl}
-        className="h-28 w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
+        className="w-28 rounded-2xl bg-gray-200 dark:bg-gray-800"
+        adaptiveHeight
+        minHeight={60}
+        maxHeight={200}
       />
 
       <View className="ml-4 flex-1 justify-between py-1">

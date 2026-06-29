@@ -216,6 +216,9 @@ export default function SettingsScreen() {
             <TouchableOpacity
               key={choice.value}
               onPress={() => onSelect(choice.value)}
+              accessibilityRole="button"
+              accessibilityLabel={`${label}: ${choice.label}`}
+              accessibilityState={{ selected: active }}
               className={`mr-2 mb-2 rounded-full px-3 py-2 ${
                 active ? 'bg-[#ff4757]' : 'bg-gray-200 dark:bg-gray-800'
               }`}
@@ -285,10 +288,17 @@ export default function SettingsScreen() {
               />
 
               <ListItem
-                onPress={() => router.push('/preferences')}
+                onPress={() => router.push('/interests')}
                 leading={<Ionicons name="lock-closed-outline" size={22} color={iconColor} />}
                 trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
                 title={t('settingsInterestCenter')}
+              />
+
+              <ListItem
+                onPress={() => router.push('/change-password')}
+                leading={<Ionicons name="key-outline" size={22} color={iconColor} />}
+                trailing={<Ionicons name="chevron-forward" size={20} color={chevronColor} />}
+                title={t('settingsChangePassword')}
               />
 
               <ListItem
@@ -385,6 +395,8 @@ export default function SettingsScreen() {
 
               <TouchableOpacity
                 onPress={() => router.push('/help-support')}
+                accessibilityRole="button"
+                accessibilityLabel={t('settingsHelpSupport')}
                 className="flex-row items-center p-4"
               >
                 <Ionicons name="help-circle-outline" size={22} color={iconColor} />
@@ -402,6 +414,8 @@ export default function SettingsScreen() {
         >
           <TouchableOpacity
             onPress={handleDeleteAccount}
+            accessibilityRole="button"
+            accessibilityLabel={t('settingsDeleteAccount')}
             className="flex-row items-center p-4"
           >
             <Ionicons name="trash-outline" size={22} color="#ff4757" />

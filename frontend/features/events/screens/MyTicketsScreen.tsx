@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -9,8 +8,9 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import Tabs from '@/shared/ui/Tabs';
 import TicketStatusBadge from '@/shared/ui/TicketStatusBadge';
 import { useI18n } from '@/shared/hooks/use-i18n';
@@ -58,9 +58,13 @@ export default function MyTicketsScreen() {
     }
   }, [t]);
 
-  useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
+  // Recharge à chaque fois qu'on revient sur l'écran (ex: après un paiement)
+  // pour que le statut « en attente » -> « confirmé » soit à jour.
+  useFocusEffect(
+    useCallback(() => {
+      void loadTickets();
+    }, [loadTickets]),
+  );
 
   const now = Date.now();
   const tabItems = useMemo(
@@ -148,7 +152,7 @@ export default function MyTicketsScreen() {
     if (loading) {
       return (
         <View className="flex-1 items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#ff4757" />
+          <LogoSpinner size={44} />
           <Text className="mt-3 text-sm text-gray-500 dark:text-gray-400">
             {t('myTicketsLoading')}
           </Text>

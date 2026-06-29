@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import { useI18n } from '@/shared/hooks/use-i18n';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import api from '@/services/api';
 import {
   getRecommendationOnboardingPreferences,
@@ -106,6 +107,17 @@ function normalizeMode(value: string | string[] | undefined): PreferencesMode {
   return raw === 'onboarding' ? 'onboarding' : 'edit';
 }
 
+function parseStepParam(value: string | string[] | undefined): PreferenceStep | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+
+  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= TOTAL_STEPS) {
+    return parsed as PreferenceStep;
+  }
+
+  return null;
+}
+
 function formatCityLabel(city: PreferenceCity, t: (key: TranslationKey, params?: Record<string, string | number>) => string) {
   return [city.name, city.region, city.country || t('homeLocationCountry')]
     .filter(Boolean)
@@ -118,14 +130,19 @@ function normalizeCountryName(value: string | null | undefined) {
 
 export default function PreferencesScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; step?: string }>();
   const mode = normalizeMode(params.mode);
   const isOnboarding = mode === 'onboarding';
+  // Edition ciblee d'une seule section depuis le recap (?step=N) : on ouvre
+  // directement l'etape, on enregistre, et on revient au recap -- sans enchainer
+  // les 5 etapes. Le parcours d'onboarding initial reste totalement inchange.
+  const initialStep = parseStepParam(params.step);
+  const isSectionEdit = !isOnboarding && initialStep !== null;
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
-  const [step, setStep] = useState<PreferenceStep>(1);
+  const [step, setStep] = useState<PreferenceStep>(initialStep ?? 1);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [cities, setCities] = useState<PreferenceCity[]>([]);
   const [categories, setCategories] = useState<PreferenceCategory[]>([]);
@@ -476,6 +493,37 @@ export default function PreferencesScreen() {
   }, [budget, radiusKm, t, userId]);
 
   const handlePrimaryAction = useCallback(async () => {
+    // Edition d'une section unique : on enregistre l'etape courante puis on
+    // revient au recap, au lieu d'enchainer vers l'etape suivante.
+    if (isSectionEdit) {
+      let saved = false;
+
+      if (step === 1) {
+        // L'etape "pays" seule ne s'enregistre pas : on bascule vers la ville.
+        if (!selectedCountry) {
+          Alert.alert(t('commonErrorTitle'), t('preferencesCountryRequired'));
+          return;
+        }
+        setStep(2);
+        return;
+      }
+
+      if (step === 2) {
+        saved = await saveCityStep();
+      } else if (step === 3) {
+        saved = await saveCitiesStep();
+      } else if (step === 4) {
+        saved = await saveTagsStep();
+      } else {
+        saved = await saveBudgetStep();
+      }
+
+      if (saved) {
+        router.back();
+      }
+      return;
+    }
+
     if (step === 1) {
       if (!selectedCountry) {
         Alert.alert(t('commonErrorTitle'), t('preferencesCountryRequired'));
@@ -525,11 +573,13 @@ export default function PreferencesScreen() {
     ]);
   }, [
     isOnboarding,
+    isSectionEdit,
     router,
     saveBudgetStep,
     saveCityStep,
     saveCitiesStep,
     saveTagsStep,
+    selectedCountry,
     step,
     t,
   ]);
@@ -556,13 +606,26 @@ export default function PreferencesScreen() {
   }, [isOnboarding, router, saveBudgetStep, step]);
 
   const goBack = useCallback(() => {
+    // En edition de section : si on a ouvert le sous-ecran "pays", le retour
+    // ramene a l'etape d'origine (la ville) ; sinon on annule vers le recap.
+    if (isSectionEdit) {
+      const target = initialStep ?? 1;
+      if (step !== target) {
+        setStep(target);
+        return;
+      }
+
+      router.back();
+      return;
+    }
+
     if (step > 1) {
       setStep((current) => (current - 1) as PreferenceStep);
       return;
     }
 
     router.back();
-  }, [isOnboarding, router, step]);
+  }, [initialStep, isSectionEdit, router, step]);
 
   const progressWidth: DimensionValue = `${(step / TOTAL_STEPS) * 100}%`;
   const primaryButtonColors: [string, string] = isDark
@@ -572,7 +635,7 @@ export default function PreferencesScreen() {
   if (loading) {
     return (
       <View className={`flex-1 items-center justify-center ${isDark ? 'bg-black' : 'bg-slate-50'}`}>
-        <ActivityIndicator size="large" color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -599,14 +662,18 @@ export default function PreferencesScreen() {
               </TouchableOpacity>
             )}
 
-            <Text className={`text-xs font-semibold uppercase tracking-[0.24em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {t('preferencesStepCounter', { current: step, total: TOTAL_STEPS })}
-            </Text>
+            {!isSectionEdit ? (
+              <Text className={`text-xs font-semibold uppercase tracking-[0.24em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {t('preferencesStepCounter', { current: step, total: TOTAL_STEPS })}
+              </Text>
+            ) : null}
           </View>
 
-          <View className={`h-2 overflow-hidden rounded-full ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}>
-            <View className="h-full rounded-full bg-[#4c669f]" style={{ width: progressWidth }} />
-          </View>
+          {!isSectionEdit ? (
+            <View className={`h-2 overflow-hidden rounded-full ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}>
+              <View className="h-full rounded-full bg-[#4c669f]" style={{ width: progressWidth }} />
+            </View>
+          ) : null}
 
           <Text className={`mt-6 text-[32px] font-black leading-[36px] ${isDark ? 'text-white' : 'text-slate-950'}`}>
             {currentStepTitle}
@@ -664,13 +731,27 @@ export default function PreferencesScreen() {
 
           {step === 2 ? (
             <View className="mt-6 rounded-[28px] border border-white/60 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-[#07101dcc]">
-              <View className="mb-4 rounded-2xl bg-[#4c669f]/10 px-4 py-3">
-                <Text className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {t('preferencesCountryCurrentLabel')}
-                </Text>
-                <Text className={`mt-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {selectedCountryLabel}
-                </Text>
+              <View className="mb-4 flex-row items-center justify-between rounded-2xl bg-[#4c669f]/10 px-4 py-3">
+                <View className="flex-1 pr-3">
+                  <Text className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {t('preferencesCountryCurrentLabel')}
+                  </Text>
+                  <Text className={`mt-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {selectedCountryLabel}
+                  </Text>
+                </View>
+                {isSectionEdit ? (
+                  <TouchableOpacity
+                    onPress={() => setStep(1)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('preferencesChangeCountry')}
+                    className="rounded-full bg-[#4c669f] px-3.5 py-2"
+                  >
+                    <Text className="text-xs font-semibold text-white">
+                      {t('preferencesChangeCountry')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
 
               <Text className={`mb-4 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -942,11 +1023,15 @@ export default function PreferencesScreen() {
                 <ActivityIndicator color="#ffffff" />
               ) : (
                 <Text className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-950'}`}>
-                  {step === 5
-                    ? isOnboarding
-                      ? t('preferencesFinish')
+                  {isSectionEdit
+                    ? step === 1
+                      ? t('preferencesContinue')
                       : t('preferencesSave')
-                    : t('preferencesContinue')}
+                    : step === 5
+                      ? isOnboarding
+                        ? t('preferencesFinish')
+                        : t('preferencesSave')
+                      : t('preferencesContinue')}
                 </Text>
               )}
             </View>

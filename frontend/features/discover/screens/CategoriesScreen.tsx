@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, View, Platform } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import CatalogScreenLayout from '@/shared/ui/CatalogScreenLayout';
@@ -9,6 +9,7 @@ import { useI18n } from '@/shared/hooks/use-i18n';
 import api, { getApiErrorMessage } from '@/services/api';
 import { getCache, setCache } from '@/services/api/dataCache';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { Category } from '@/shared/types';
 
 export default function CategoriesScreen() {
@@ -78,18 +79,34 @@ export default function CategoriesScreen() {
         />
       ) : loading && categories.length === 0 ? (
         <ScrollView
+          alwaysBounceVertical
+          contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                void fetchCategories(true);
-              }}
-              tintColor="#4c669f"
-            />
+            Platform.OS === 'android' ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  void fetchCategories(true);
+                }}
+                progressViewOffset={-500}
+              />
+            ) : undefined
           }
+          onScrollEndDrag={(event) => {
+            if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+              void fetchCategories(true);
+            }
+          }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
+          {Platform.OS === 'ios' ? (
+            <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+              <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                <LogoSpinner size={26} />
+              </View>
+            </View>
+          ) : null}
           <View className="flex-row flex-wrap pt-2">
             {Array.from({ length: 10 }).map((_, index) => (
               <View key={`category-skeleton-${index}`} className="mb-3 mr-3">
@@ -100,18 +117,34 @@ export default function CategoriesScreen() {
         </ScrollView>
       ) : categories.length > 0 ? (
         <ScrollView
+          alwaysBounceVertical
+          contentInset={{ top: Platform.OS === 'ios' && refreshing ? 60 : 0 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                void fetchCategories(true);
-              }}
-              tintColor="#4c669f"
-            />
+            Platform.OS === 'android' ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  void fetchCategories(true);
+                }}
+                progressViewOffset={-500}
+              />
+            ) : undefined
           }
+          onScrollEndDrag={(event) => {
+            if (Platform.OS !== 'android' && !refreshing && event.nativeEvent.contentOffset.y <= -80) {
+              void fetchCategories(true);
+            }
+          }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
+          {Platform.OS === 'ios' ? (
+            <View className="absolute inset-x-0 items-center" style={{ top: -60 }}>
+              <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+                <LogoSpinner size={26} />
+              </View>
+            </View>
+          ) : null}
           <View className="flex-row flex-wrap pt-2">
             {categories.map((category) => (
               <View key={category.id} className="mb-3 mr-3">
@@ -137,6 +170,14 @@ export default function CategoriesScreen() {
           containerClassName="px-5 py-12"
         />
       )}
+
+      {refreshing && Platform.OS === 'android' ? (
+        <View pointerEvents="none" className="absolute inset-x-0 z-10 items-center" style={{ top: 90 }}>
+          <View className="rounded-full bg-white/85 p-2.5 shadow-sm dark:bg-gray-900/85">
+            <LogoSpinner size={26} />
+          </View>
+        </View>
+      ) : null}
     </CatalogScreenLayout>
   );
 }

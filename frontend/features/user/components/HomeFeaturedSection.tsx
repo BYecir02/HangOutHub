@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Text,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -11,6 +10,7 @@ import FeaturedEditorialCard from './FeaturedEditorialCard';
 import { SkeletonBlock } from '@/shared/ui/Skeleton';
 
 import HomeSectionPlaceholder from './HomeSectionPlaceholder';
+import HomeSeeAllButton from './HomeSeeAllButton';
 import type { HomeFeaturedItem } from './home.types';
 
 interface HomeFeaturedSectionProps {
@@ -57,9 +57,7 @@ export default function HomeFeaturedSection({
         <Text className="text-lg font-bold text-gray-800 dark:text-white">
           {title}
         </Text>
-        <TouchableOpacity onPress={onSeeAll}>
-          <Text className="text-xs font-medium text-[#ff4757]">{seeAllLabel}</Text>
-        </TouchableOpacity>
+        <HomeSeeAllButton label={seeAllLabel} onPress={onSeeAll} />
       </View>
 
       {loading ? (

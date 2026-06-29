@@ -1,16 +1,15 @@
 import React from 'react';
 import {
   Text,
-  TouchableOpacity,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
 import { getImageUrl } from '@/services/api';
 import MediaFrame from '@/shared/ui/MediaFrame';
+import PressableScale from '@/shared/ui/PressableScale';
 import PriceDisplay from '@/shared/ui/primitives/PriceDisplay';
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 
@@ -53,7 +52,7 @@ export default function EventInspirationCard({
   const isDark = useColorScheme() === 'dark';
 
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={onPress}
       style={[
         style,
@@ -63,9 +62,8 @@ export default function EventInspirationCard({
               borderWidth: 2,
             }
           : undefined,
-      ]} 
+      ]}
       className="mb-3 overflow-hidden rounded-[22px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-      activeOpacity={0.92}
     >
       <View className="relative">
         <MediaFrame
@@ -76,7 +74,7 @@ export default function EventInspirationCard({
           loop
           showControls={false}
           adaptiveHeight={adaptiveHeight}
-          minHeight={imageHeight}
+          minHeight={adaptiveHeight ? 100 : imageHeight}
           maxHeight={380}
           style={adaptiveHeight ? undefined : { height: imageHeight }}
         />
@@ -85,26 +83,8 @@ export default function EventInspirationCard({
           pointerEvents="box-none"
           className="absolute left-3 right-3 top-3 flex-col"
         >
-          {cityLabel ? (
-            <View className="max-w-[64%] self-start rounded-full bg-black/55 px-3 py-1.5">
-              <Text
-                className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white"
-                numberOfLines={1}
-              >
-                {cityLabel}
-              </Text>
-            </View>
-          ) : null}
-
-          <View className="mt-1 self-end flex-shrink-0">
+          <View className="self-end flex-shrink-0">
             <PriceDisplay label={priceLabel} size="sm" tone="brand" variant="solid" />
-          </View>
-        </View>
-
-        <View className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1.5">
-          <View className="flex-row items-center">
-            <Ionicons name="time-outline" size={10} color="#ffffff" />
-            <Text className="ml-1 text-[10px] font-semibold text-white">{dateLabel}</Text>
           </View>
         </View>
       </View>
@@ -119,21 +99,18 @@ export default function EventInspirationCard({
             {event.title}
           </Text>
 
-          <View className="mt-2 flex-row items-center">
-            <Ionicons name="location-outline" size={13} color={isDark ? '#ff7a45' : '#ff4757'} />
-            <Text
-              className="ml-1.5 flex-1 text-sm text-gray-600 dark:text-gray-300"
-              numberOfLines={1}
-            >
-              {placeLabel}
-            </Text>
-          </View>
+          <Text
+            className="mt-1.5 text-sm text-gray-600 dark:text-gray-300"
+            numberOfLines={1}
+          >
+            {[dateLabel, cityLabel || placeLabel].filter(Boolean).join('  ·  ')}
+          </Text>
         </BlurView>
         <View
           pointerEvents="none"
           className={isDark ? 'absolute inset-0 bg-black/30' : 'absolute inset-0 bg-white/30'}
         />
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

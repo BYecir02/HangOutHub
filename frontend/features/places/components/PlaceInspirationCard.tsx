@@ -12,6 +12,7 @@ import { BlurView } from 'expo-blur';
 
 import { useColorScheme } from '@/shared/hooks/use-color-scheme';
 import MediaFrame from '@/shared/ui/MediaFrame';
+import PressableScale from '@/shared/ui/PressableScale';
 import PlaceCoverFallback from '@/features/places/components/PlaceCoverFallback';
 import { getImageUrl } from '@/services/api';
 import RatingDisplay from '@/shared/ui/primitives/RatingDisplay';
@@ -66,7 +67,7 @@ export default function PlaceInspirationCard({
   const coverUrl = getImageUrl(place.coverUrl);
 
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={onPress}
       style={[
         style,
@@ -78,7 +79,6 @@ export default function PlaceInspirationCard({
           : undefined,
       ]}
       className="mb-3 overflow-hidden rounded-[22px] border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-      activeOpacity={0.92}
     >
       <View className="relative">
         {coverUrl ? (
@@ -90,7 +90,7 @@ export default function PlaceInspirationCard({
             loop
             showControls={false}
             adaptiveHeight={adaptiveHeight}
-            minHeight={imageHeight}
+            minHeight={adaptiveHeight ? 100 : imageHeight}
             maxHeight={380}
             style={adaptiveHeight ? undefined : { height: imageHeight }}
           />
@@ -101,14 +101,6 @@ export default function PlaceInspirationCard({
             logoSize={Math.max(44, Math.min(72, Math.round(imageHeight * 0.28)))}
           />
         )}
-
-        {cityLabel ? (
-          <View className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5">
-            <Text className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
-              {cityLabel}
-            </Text>
-          </View>
-        ) : null}
 
         {showSaveButton && onToggleSave ? (
           <TouchableOpacity
@@ -153,14 +145,14 @@ export default function PlaceInspirationCard({
             {place.name}
           </Text>
 
-          {cityLabel ? (
+          {cityLabel || place.address ? (
             <View className="mt-2 flex-row items-center">
               <Ionicons name="location-outline" size={13} color={isDark ? '#ff7a45' : '#ff4757'} />
               <Text
                 className="ml-1.5 flex-1 text-sm text-gray-600 dark:text-gray-300"
                 numberOfLines={1}
               >
-                {place.address || cityLabel}
+                {cityLabel || place.address}
               </Text>
             </View>
           ) : null}
@@ -170,6 +162,6 @@ export default function PlaceInspirationCard({
           className={isDark ? 'absolute inset-0 bg-black/30' : 'absolute inset-0 bg-white/30'}
         />
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

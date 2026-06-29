@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -18,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import LogoSpinner from '@/shared/ui/LogoSpinner';
 import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -1414,7 +1414,7 @@ export default function DirectChatScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50 dark:bg-black">
-        <ActivityIndicator color="#4c669f" />
+        <LogoSpinner size={44} />
       </View>
     );
   }
@@ -1791,7 +1791,7 @@ export default function DirectChatScreen() {
         ListHeaderComponent={
           loadingMore ? (
             <View className="pb-3 pt-1">
-              <ActivityIndicator color="#4c669f" />
+              <LogoSpinner size={22} />
             </View>
           ) : null
         }
